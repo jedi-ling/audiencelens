@@ -1,0 +1,39 @@
+{
+  "title": "Echoes of the Void - Concept",
+  "type": "concept/GDD",
+  "description": "概念评审包：一句话pitch、核心循环、对标竞品、目标受众、商业化草案",
+  "materials": [
+    {
+      "type": "一句话pitch",
+      "description": "死亡是钥匙，时间是武器——一款融合roguelite随机生成与metroidvania探索深度的2D动作游戏"
+    },
+    {
+      "type": "核心循环说明",
+      "description": "探索→战斗→死亡→时间回溯→解锁新路径→获得永久能力→深入更深层区域。时间回溯是核心创新：死亡后可回溯到之前的时间点，以不同路径重新探索，解锁之前无法到达的区域"
+    },
+    {
+      "type": "竞品对比",
+      "description": "Dead Cells（战斗节奏参考）、Hollow Knight（探索深度参考）、Returnal（时间循环叙事参考）、Ori系列（平台手感参考）"
+    },
+    {
+      "type": "目标受众",
+      "description": "核心独立游戏玩家，喜欢roguelite和metroidvania，25-35岁，PC/Switch平台"
+    },
+    {
+      "type": "定价与平台",
+      "description": "抢先体验 $14.99，正式版 $19.99。PC Steam首发，后续Switch。DLC计划：免费内容更新+1个付费扩展"
+    },
+    {
+      "type": "截图",
+      "description": "3张概念截图：暗色调像素风格，展示时间回溯视觉效果"
+    },
+    {
+      "type": "系统说明",
+      "description": "3个核心系统：时间回溯（死亡后保留能力但重置地图）、能力树（永久解锁）、区域解锁（基于已获得能力）"
+    },
+    {
+      "type": "UI截图",
+      "description": "概念UI：能力树界面、地图界面、HUD布局"
+    }
+  ]
+}

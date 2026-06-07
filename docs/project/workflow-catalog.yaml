@@ -1,0 +1,124 @@
+# AudienceLens Workflow Catalog
+# Machine-readable workflow pipeline definition
+
+version: "0.2.0"
+
+workflows:
+  game-review:
+    description: "Complete game concept/product review pipeline"
+    phases:
+      - id: concept
+        name: "Concept Review"
+        skill: synthetic-playtest
+        description: "Run multi-agent player simulation review"
+        required: true
+        input:
+          - task-type
+          - material
+        output:
+          - audiencelens-report.json
+          - audiencelens-report.md
+          - audiencelens-report.html
+
+      - id: evaluation
+        name: "Quality Evaluation"
+        skill: synthetic-playtest
+        sub_command: harness
+        description: "Run 8-dimension quality evaluation on the review"
+        required: true
+        input:
+          - audiencelens-report.json
+        output:
+          - evaluation-scorecard.json
+
+      - id: stress-test
+        name: "Stress Test"
+        skill: red-team-audience
+        description: "Adversarial testing of positive conclusions"
+        required: false
+        input:
+          - audiencelens-report.json
+        output:
+          - audiencelens-red-team-report.json
+          - audiencelens-red-team-report.md
+
+      - id: generate
+        name: "Generate Custom Personas"
+        skill: persona-generate
+        description: "Create custom persona packs if needed"
+        required: false
+        input:
+          - domain-description
+        output:
+          - personas/
+          - presets/
+
+  product-review:
+    description: "Product/website/app review pipeline"
+    phases:
+      - id: review
+        name: "Audience Panel Review"
+        skill: audience-panel
+        description: "Run multi-agent audience panel review"
+        required: true
+        input:
+          - task-type
+          - material
+        output:
+          - audiencelens-audience-panel-report.json
+          - audiencelens-audience-panel-report.md
+          - audiencelens-audience-panel-report.html
+
+      - id: evaluation
+        name: "Quality Evaluation"
+        skill: synthetic-playtest
+        sub_command: harness
+        description: "Run 8-dimension quality evaluation"
+        required: true
+        input:
+          - audiencelens-audience-panel-report.json
+        output:
+          - evaluation-scorecard.json
+
+      - id: stress-test
+        name: "Stress Test"
+        skill: red-team-audience
+        description: "Adversarial testing"
+        required: false
+        input:
+          - audiencelens-audience-panel-report.json
+        output:
+          - audiencelens-red-team-report.json
+          - audiencelens-red-team-report.md
+
+      - id: generate
+        name: "Generate Custom Personas"
+        skill: persona-generate
+        description: "Create custom persona packs if needed"
+        required: false
+        input:
+          - domain-description
+        output:
+          - personas/
+          - presets/
+
+transitions:
+  - from: synthetic-playtest
+    to: red-team-audience
+    condition: "User wants to stress-test positive conclusions"
+    data_passed: "report JSON path"
+
+  - from: audience-panel
+    to: red-team-audience
+    condition: "User wants adversarial testing"
+    data_passed: "report JSON path"
+
+  - from: red-team-audience
+    to: audience-panel
+    condition: "User wants constructive feedback after stress test"
+    data_passed: "original material"
+
+  - from: any
+    to: persona-generate
+    condition: "User needs custom personas for their domain"
+    data_passed: "domain description"

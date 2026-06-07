@@ -1,0 +1,40 @@
+{
+  "title": "Echoes of the Void - Localization QA",
+  "type": "localization",
+  "description": "本地化评审包：源文本样本、译文样本、UI截图、术语表、文化参考说明",
+  "source_language": "en-US",
+  "target_languages": ["zh-CN", "ja-JP"],
+  "materials": [
+    {
+      "type": "源文本样本",
+      "description": "20条核心对白样本（英文）：包含时间回溯相关术语（Time Rift, Memory Shard, Echo）、NPC对话、物品描述、系统提示。对白风格偏文学化，有多处双关和时间隐喻"
+    },
+    {
+      "type": "译文样本_zh-CN",
+      "description": "中文译文20条：'Time Rift'译为'时间裂隙'，'Memory Shard'译为'记忆碎片'，'Echo'译为'回响'。部分双关处理：英文'Time will tell'→中文'时间会给出答案'（丢失了与时间回溯机制的双关呼应）。3处物品描述出现翻译不一致（同一技能在不同位置译名不同）"
+    },
+    {
+      "type": "译文样本_ja-JP",
+      "description": "日文译文20条：'Time Rift'译为'時空の裂け目'，'Memory Shard'译为'記憶の欠片'，'Echo'译为'残響'。对白语气统一为丁寧語，但Boss战台词也用了敬语，削弱了压迫感。1处文化适配：将西方占星术参考替换为阴阳道概念"
+    },
+    {
+      "type": "UI截图_多语言",
+      "description": "6张UI截图对比（英/中/日各2张）：中文HUD文字略小但可读，日文技能名称过长导致UI溢出1处（'時空を歪める力'超出技能名称框）。中文暂停菜单排版正常，日文设置页面有1处文字截断"
+    },
+    {
+      "type": "术语表",
+      "description": "核心术语表35条：包含游戏内专有名词、技能名称、状态效果。中文术语表完整，日文术语表缺少5个新增Boss技能名称。术语表有版本号(v0.4)但未与游戏版本同步更新"
+    },
+    {
+      "type": "文化参考说明",
+      "description": "2处文化适配记录：(1)英文原版中'crossroads at midnight'参考了西方十字路口恶魔传说→中文版保留原意但添加了'子夜十字路口'的鬼文化注释→日文版替换为'丑三つ時の辻'（丑时三刻的十字路口）；(2)英文版'echo chamber'双关→中文版仅保留字面意思'回声室'，丢失了信息茧房的隐喻"
+    },
+    {
+      "type": "语音/字幕设置",
+      "description": "支持英文语音+中/日文字幕，或中/日文语音+英文字幕。字幕大小3档可调，字幕背景透明度可调。不支持字幕颜色自定义。中文字体使用思源黑体，日文字体使用Noto Sans JP"
+    }
+  ],
+  "localization_stage": "alpha_QA",
+  "developer": "Void Echo Studio",
+  "localization_vendor": "外包翻译团队"
+}

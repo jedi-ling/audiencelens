@@ -1,0 +1,47 @@
+{
+  "title": "Echoes of the Void",
+  "type": "roguelite metroidvania",
+  "description": "一款融合了roguelite随机生成与metroidvania探索深度的2D动作游戏。玩家在每次死亡后保留核心能力，但地图布局和敌人配置重新生成。独特卖点：时间回溯机制——死亡不是终点，而是解锁新路径的钥匙。",
+  "materials": [
+    {
+      "type": "截图",
+      "description": "胶囊图：暗色调像素风格，主角背影面对巨大虚空裂缝"
+    },
+    {
+      "type": "截图",
+      "description": "前三张图：图1展示时间回溯机制（画面分裂为当前和过去两个时间线），图2展示地图探索，图3展示Boss战"
+    },
+    {
+      "type": "实机视频",
+      "description": "30秒实机预告片，展示时间回溯、战斗和探索核心循环"
+    },
+    {
+      "type": "核心循环说明",
+      "description": "探索→战斗→死亡→时间回溯→解锁新路径→获得永久能力→深入更深层区域"
+    },
+    {
+      "type": "竞品对比",
+      "description": "参考：Dead Cells（战斗节奏）、Hollow Knight（探索深度）、Returnal（时间循环叙事）"
+    },
+    {
+      "type": "tags",
+      "description": "roguelite, metroidvania, pixel art, time manipulation, singleplayer"
+    },
+    {
+      "type": "价格",
+      "description": "抢先体验价 $14.99，正式版 $19.99"
+    },
+    {
+      "type": "评价摘要",
+      "description": "暂无用户评价（未发布）"
+    },
+    {
+      "type": "demo",
+      "description": "Demo可下载，包含前2个区域和1个Boss"
+    }
+  ],
+  "short_description": "死亡是钥匙，时间是武器。在每次轮回中探索更深层的虚空。",
+  "platforms": ["PC", "Steam Deck"],
+  "developer": "Void Echo Studio",
+  "release_date": "TBD (Early Access Q3 2026)"
+}

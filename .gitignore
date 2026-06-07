@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+web/backend/libs/
+
+# Standalone repos (separate GitHub repos)
+audiencelens-harness/
+audiencelens-v0.2-harness/
+
+# Utility scripts
+copy-files.ps1
+modify-paper.ps1
+write-*.ps1
+patch_template.py
+sync_and_create.py
+validate_syntax.py
+_fix_contrast.py
+_sync_css.py
+_write_parity.py
+fix_contrast.py
+write_report.py
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+
+# Build output
+web/frontend/dist/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# Pytest
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak

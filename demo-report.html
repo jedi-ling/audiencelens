@@ -1,0 +1,568 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AudienceLens · Cyber Scavenger（赛博拾荒者）</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+  :root{--bg:#0c0e14;--surface:#141828;--surface-raised:#1a1f32;--surface-glow:#202540;--border:#3d4866;--border-glow:#505a80;--text:#e8eaf0;--text-secondary:#c4cce0;--text-muted:#a8b4cc;--accent:#ff6b35;--accent-dim:#c44a20;--accent-glow:rgba(255,107,53,0.15);--cyan:#00d4aa;--cyan-dim:#00a885;--cyan-glow:rgba(0,212,170,0.12);--amber:#ffb347;--amber-dim:#cc8f38;--amber-glow:rgba(255,179,71,0.12);--magenta:#e056fd;--magenta-dim:#b03fc8;--magenta-glow:rgba(224,86,253,0.12);--blue:#4facfe;--blue-dim:#3d8acc;--green:#00d26a;--green-dim:#00a855;--red:#ff4757;--red-dim:#cc3846;--radius:16px;--radius-sm:10px;--radius-xs:6px;--font-mono:'Space Mono','SF Mono','Fira Code',monospace;--font-sans:'Noto Sans SC',-apple-system,sans-serif;--font-serif:'Noto Serif SC',Georgia,serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:var(--font-sans);background:var(--bg);font-size:15px;color:var(--text);line-height:1.65;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,107,53,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,107,53,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+  body::after{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:1}
+  .container{max-width:900px;margin:0 auto;padding:40px 20px 100px;position:relative;z-index:2}
+  .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--magenta));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:14px;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.3)}
+  .brand-text{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:1px;color:var(--text)}
+  .brand-text span{color:var(--accent)}
+  .synthetic-chip{font-family:var(--font-mono);font-size:14px;color:var(--red);border:1px solid rgba(255,71,87,0.3);padding:3px 10px;border-radius:20px;background:rgba(255,71,87,0.06);letter-spacing:0.5px}
+  .post-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:36px 32px 28px;margin-bottom:12px;position:relative;overflow:hidden}
+  .post-header::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--magenta),var(--cyan));box-shadow:0 0 20px rgba(255,107,53,0.3)}
+  .post-header::after{content:'';position:absolute;top:-50%;right:-20%;width:400px;height:400px;background:radial-gradient(circle,var(--accent-glow),transparent 70%);pointer-events:none}
+  .post-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent-glow);color:var(--accent);font-family:var(--font-mono);font-size:14px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:14px;border:1px solid rgba(255,107,53,0.2);letter-spacing:0.5px;text-transform:uppercase}
+  .post-badge::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 6px var(--accent);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 6px var(--accent)}50%{opacity:0.5;box-shadow:0 0 2px var(--accent)}}
+  .post-title{font-family:var(--font-serif);font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.3;color:var(--text)}
+  .post-meta{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:20px}
+  .post-meta span{display:inline-flex;align-items:center;gap:5px}
+  .post-meta .sep{color:var(--border-glow)}
+  .summary-hud{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+  .hud-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px 18px;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.3s}
+  .hud-card:hover{border-color:var(--border-glow);transform:translateY(-2px)}
+  .hud-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0.6}
+  .hud-card.rec::before{background:linear-gradient(90deg,var(--accent),var(--magenta))}
+  .hud-card.risk::before{background:linear-gradient(90deg,var(--red),var(--amber))}
+  .hud-card.evidence::before{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .hud-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .hud-value{font-family:var(--font-serif);font-size:18px;font-weight:700;line-height:1.3}
+  .hud-value.rec{color:var(--text)}
+  .hud-value.risk-low{color:var(--green);text-shadow:0 0 12px rgba(0,210,106,0.2)}
+  .hud-value.risk-medium{color:var(--amber);text-shadow:0 0 12px rgba(255,179,71,0.2)}
+  .hud-value.risk-high{color:var(--red);text-shadow:0 0 12px rgba(255,71,87,0.2)}
+  .hud-value.risk-critical{color:var(--red);text-shadow:0 0 16px rgba(255,71,87,0.3);animation:critical-pulse 1.5s ease-in-out infinite}
+  @keyframes critical-pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+  .hud-value.evidence-strong{color:var(--cyan)}
+  .hud-value.evidence-medium{color:var(--blue)}
+  .hud-value.evidence-weak{color:var(--amber)}
+  .hud-value.evidence-insufficient{color:var(--red)}
+  .section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:24px 28px;margin-bottom:12px;position:relative}
+  .section-card::before{content:'';position:absolute;top:0;left:28px;width:40px;height:2px;background:linear-gradient(90deg,var(--accent),transparent)}
+  .section-title{font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px;letter-spacing:1px;text-transform:uppercase}
+  .section-title .icon{font-size:14px;filter:drop-shadow(0 0 4px var(--accent-glow))}
+  .point-list{list-style:none}
+  .point-list li{padding:8px 0;font-size:15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;transition:padding-left 0.2s}
+  .point-list li:hover{padding-left:4px}
+  .point-list li:last-child{border-bottom:none}
+  .point-list li .dot{width:7px;height:7px;border-radius:50%;margin-top:7px;flex-shrink:0;box-shadow:0 0 6px currentColor}
+  .point-list.agree .dot{background:var(--green);color:var(--green)}
+  .point-list.question .dot{background:var(--amber);color:var(--amber)}
+  .point-list.gap .dot{background:var(--red);color:var(--red)}
+  .disagreement-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px;margin-bottom:10px;position:relative;overflow:hidden}
+  .disagreement-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--red),var(--amber))}
+  .disagreement-card:last-child{margin-bottom:0}
+  .disagreement-topic{font-family:var(--font-serif);font-size:15px;font-weight:700;margin-bottom:10px;padding-left:8px}
+  .stance-row{display:flex;align-items:center;gap:10px;padding:5px 0 5px 8px;font-size:15px}
+  .stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .stance-text{color:var(--text);flex:1}
+  .disagreement-resolution{margin-top:10px;margin-left:8px;font-size:14px;color:var(--cyan);padding:10px 14px;background:var(--cyan-glow);border-radius:var(--radius-xs);border-left:2px solid var(--cyan);font-family:var(--font-mono)}
+  .fix-table{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
+  .fix-table th{text-align:left;padding:10px 12px;color:var(--text-secondary);font-family:var(--font-mono);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;border-bottom:1px solid var(--border)}
+  .fix-table td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top}
+  .fix-table tr:last-child td{border-bottom:none}
+  .fix-table tr:hover td{background:var(--surface-raised)}
+  .severity-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-family:var(--font-mono);font-size:14px;font-weight:700;letter-spacing:0.5px}
+  .severity-badge.low{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.2)}
+  .severity-badge.medium{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
+  .severity-badge.high{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .severity-badge.critical{background:rgba(255,71,87,0.15);color:var(--red);border:1px solid rgba(255,71,87,0.3);animation:critical-pulse 1.5s ease-in-out infinite}
+  .comment-thread{margin-top:12px}
+  .comment-thread .section-title{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .comment{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden;transition:border-color 0.3s,box-shadow 0.3s;position:relative}
+  .comment::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--accent),var(--magenta));opacity:0;transition:opacity 0.3s}
+  .comment:hover{border-color:var(--border-glow);box-shadow:0 0 30px rgba(255,107,53,0.05)}
+  .comment:hover::before{opacity:1}
+  .comment-top{display:flex;align-items:center;gap:14px;padding:18px 24px 0}
+  .avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:18px;font-weight:700;color:#fff;flex-shrink:0;position:relative;border:2px solid rgba(255,255,255,0.1);box-shadow:0 0 16px rgba(0,0,0,0.3)}
+  .comment-user-info{flex:1;min-width:0}
+  .comment-username{font-family:var(--font-serif);font-weight:700;font-size:15px}
+  .comment-archetype{font-family:var(--font-mono);font-size:14px;color:var(--text-secondary);letter-spacing:0.5px}
+  .stance-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:20px;font-family:var(--font-mono);font-size:15px;font-weight:700;white-space:nowrap;letter-spacing:0.5px}
+  .stance-tag.positive{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.25)}
+  .stance-tag.neutral{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.25)}
+  .stance-tag.negative{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.25)}
+  .stance-tag::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .comment-body{padding:14px 24px 20px;font-size:15px}
+  .voice-sample{background:var(--surface-raised);border-left:3px solid var(--accent);padding:12px 18px;border-radius:0 var(--radius-xs) var(--radius-xs) 0;font-family:var(--font-serif);font-style:italic;font-size:15px;margin-bottom:18px;color:var(--text);position:relative}
+  .voice-sample::before{content:'\201C';position:absolute;top:-4px;left:10px;font-size:36px;color:var(--accent);opacity:0.3;font-family:Georgia,serif;line-height:1}
+  .scores-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+  .score-item{background:var(--surface-raised);border-radius:var(--radius-xs);padding:12px 14px;border:1px solid var(--border)}
+  .score-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .score-bar-wrap{display:flex;align-items:center;gap:10px}
+  .score-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;position:relative}
+  .score-bar-fill{height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);position:relative}
+  .score-bar-fill::after{content:'';position:absolute;top:0;right:0;width:20px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15))}
+  .score-bar-fill.s1{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .score-bar-fill.s2{background:linear-gradient(90deg,var(--red),var(--amber))}
+  .score-bar-fill.s3{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .score-bar-fill.s4{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+  .score-bar-fill.s5{background:linear-gradient(90deg,var(--cyan),var(--green))}
+  .score-num{font-family:var(--font-mono);font-size:14px;font-weight:700;min-width:18px;text-align:right}
+  .evidence-list{margin-bottom:18px}
+  .evidence-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .evidence-item{font-size:15px;padding:5px 0;display:flex;align-items:flex-start;gap:8px}
+  .evidence-level{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;font-weight:700;white-space:nowrap;margin-top:2px;letter-spacing:0.5px}
+  .evidence-level.direct{background:rgba(0,212,170,0.1);color:var(--cyan);border:1px solid rgba(0,212,170,0.2)}
+  .evidence-level.inferred{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
+  .evidence-level.gap{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .issues-list{margin-bottom:18px}
+  .issues-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .issue-item{background:var(--surface-raised);border-radius:var(--radius-xs);padding:12px 14px;margin-bottom:8px;border:1px solid var(--border);transition:border-color 0.2s}
+  .issue-item:hover{border-color:var(--border-glow)}
+  .issue-item:last-child{margin-bottom:0}
+  .issue-title-row{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+  .issue-title{font-size:15px;font-weight:700}
+  .issue-why{font-size:14px;color:#b8bdd0;line-height:1.5}
+  .issue-fix{font-size:14px;color:var(--cyan);margin-top:6px;font-family:var(--font-mono);padding-left:12px;border-left:2px solid var(--cyan)}
+  .triggers-row{display:flex;gap:20px;flex-wrap:wrap;.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .trigger-group{flex:1;min-width:200px}
+  .trigger-group .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+  .trigger-group.continue .sub-title{color:var(--green)}
+  .trigger-group.quit .sub-title{color:var(--red)}
+  .trigger-tag{display:inline-block;padding:3px 10px;border-radius:4px;font-size:15px;margin:3px;font-family:var(--font-mono);transition:transform 0.15s}
+  .trigger-tag:hover{transform:scale(1.05)}
+  .trigger-tag.continue{background:rgba(0,210,106,0.08);color:var(--green);border:1px solid rgba(0,210,106,0.15)}
+  .trigger-tag.quit{background:rgba(255,71,87,0.08);color:var(--red);border:1px solid rgba(255,71,87,0.15)}
+  .next-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .next-step-card{background:var(--surface-raised);border-radius:var(--radius-xs);padding:16px 18px;border:1px solid var(--border);transition:border-color 0.2s}
+  .next-step-card:hover{border-color:var(--border-glow)}
+  .next-step-card .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+  .next-step-card ul{list-style:none;font-size:15px}
+  .next-step-card ul li{padding:4px 0;padding-left:16px;position:relative;color:#b8bdd0}
+  .next-step-card ul li::before{content:'>';position:absolute;left:0;color:var(--accent);font-family:var(--font-mono);font-size:14px}
+  .report-footer{text-align:center;padding:36px 0;font-family:var(--font-mono);font-size:15px;color:var(--text);border-top:1px solid var(--border);margin-top:32px;letter-spacing:0.5px}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .post-header,.hud-card,.section-card,.comment{animation:fadeInUp 0.6s ease-out both}
+  .hud-card:nth-child(1){animation-delay:0.1s}
+  .hud-card:nth-child(2){animation-delay:0.2s}
+  .hud-card:nth-child(3){animation-delay:0.3s}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--border-glow)}
+  .hud-card.harness::before{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .hud-card.grounding::before{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .hud-card.divergence::before{background:linear-gradient(90deg,var(--magenta),var(--amber))}
+  .validation-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:14px;font-weight:700;padding:3px 10px;border-radius:4px;margin-top:6px;letter-spacing:0.5px}
+  .validation-status.pass{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.25)}
+  .validation-status.fail{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.25)}
+  .validation-status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .hud-sub{font-family:var(--font-mono);font-size:15px;color:var(--text);margin-top:4px}
+  .round-indicator{display:flex;gap:4px;margin-bottom:18px}
+  .round-step{flex:1;display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);transition:border-color 0.3s,color 0.3s}
+  .round-step.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+  .round-step .step-num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;background:var(--border);color:var(--text-secondary);flex-shrink:0}
+  .round-step.active .step-num{background:var(--accent);color:#fff;box-shadow:0 0 8px rgba(255,107,53,0.3)}
+  .round-connector{width:20px;height:2px;background:var(--border);flex-shrink:0;align-self:center}
+  .debate-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);margin-bottom:12px;overflow:hidden;transition:border-color 0.2s}
+  .debate-card:hover{border-color:var(--border-glow)}
+  .debate-card:last-child{margin-bottom:0}
+  .debate-topic{padding:12px 18px;font-family:var(--font-serif);font-size:14px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .debate-topic::before{content:'\2694';font-size:15px}
+  .debate-sides{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .debate-side{padding:14px 18px;position:relative}
+  .debate-side.pro{border-right:1px solid var(--border)}
+  .debate-side-label{font-family:var(--font-mono);font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .debate-side.pro .debate-side-label{color:var(--green)}
+  .debate-side.con .debate-side-label{color:var(--red)}
+  .debate-arg{font-size:14px;color:var(--text);line-height:1.6;margin-bottom:6px;padding-left:10px;border-left:2px solid var(--border)}
+  .debate-side.pro .debate-arg{border-left-color:rgba(0,210,106,0.3)}
+  .debate-side.con .debate-arg{border-left-color:rgba(255,71,87,0.3)}
+  .debate-arg-persona{font-family:var(--font-mono);font-size:15px;color:var(--accent);margin-top:2px}
+  .vote-change-list{margin-top:14px}
+  .vote-change-item{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);margin-bottom:8px;font-size:15px}
+  .vote-change-item:last-child{margin-bottom:0}
+  .vc-persona{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);min-width:70px}
+  .vc-arrow{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary)}
+  .vc-before{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .vc-after{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.2)}
+  .vc-reason{font-size:14px;color:var(--text-secondary);flex:1;padding-left:10px;border-left:2px solid var(--amber)}
+  .confidence-chart{margin-top:16px}
+  .confidence-chart .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  .conf-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .conf-bar-label{font-family:var(--font-mono);font-size:14px;color:var(--text);min-width:90px;text-align:right}
+  .conf-bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;position:relative}
+  .conf-bar-fill{height:100%;border-radius:4px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);position:relative}
+  .conf-bar-fill::after{content:'';position:absolute;top:0;right:0;width:16px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12))}
+  .conf-bar-fill.high{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .conf-bar-fill.medium{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .conf-bar-fill.low{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .conf-bar-num{font-family:var(--font-mono);font-size:15px;font-weight:700;min-width:32px}
+  .conf-delta{font-family:var(--font-mono);font-size:14px;margin-left:4px}
+  .conf-delta.up{color:var(--green)}
+  .conf-delta.down{color:var(--red)}
+  .conf-delta.same{color:var(--text-secondary)}
+  .compliance-banner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-top:12px;position:relative;overflow:hidden}
+  .compliance-banner::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .compliance-banner::after{content:'';position:absolute;top:-30%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(255,71,87,0.04),transparent 70%);pointer-events:none}
+  .compliance-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .compliance-title{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:8px;letter-spacing:1px;text-transform:uppercase}
+  .compliance-title::before{content:'';width:8px;height:8px;background:var(--red);border-radius:50%;box-shadow:0 0 8px var(--red);animation:pulse 2s ease-in-out infinite}
+  .compliance-status{font-family:var(--font-mono);font-size:15px;font-weight:700;padding:5px 16px;border-radius:4px;letter-spacing:1px}
+  .compliance-status.pass{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.3)}
+  .compliance-status.needs-revision{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.3)}
+  .compliance-status.rejected{background:rgba(255,71,87,0.12);color:var(--red);border:1px solid rgba(255,71,87,0.35);animation:critical-pulse 1.5s ease-in-out infinite}
+  .compliance-body{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .compliance-score-block{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px}
+  .compliance-score-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .compliance-score-value{font-family:var(--font-serif);font-size:32px;font-weight:700;line-height:1}
+  .compliance-score-value.score-high{color:var(--green);text-shadow:0 0 16px rgba(0,210,106,0.2)}
+  .compliance-score-value.score-medium{color:var(--amber);text-shadow:0 0 16px rgba(255,179,71,0.2)}
+  .compliance-score-value.score-low{color:var(--red);text-shadow:0 0 16px rgba(255,71,87,0.2)}
+  .compliance-score-bar{margin-top:10px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+  .compliance-score-bar-fill{height:100%;border-radius:2px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1)}
+  .compliance-score-bar-fill.high{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .compliance-score-bar-fill.medium{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .compliance-score-bar-fill.low{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .compliance-steps-block{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px}
+  .compliance-steps-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  .compliance-steps-list{list-style:none}
+  .compliance-steps-list li{padding:4px 0;padding-left:18px;position:relative;font-size:15px;color:var(--text-secondary)}
+  .compliance-steps-list li::before{content:'\25C7';position:absolute;left:0;color:var(--cyan);font-size:14px}
+  .compliance-ai-notice{margin-top:16px;padding:12px 18px;background:rgba(255,71,87,0.05);border:1px solid rgba(255,71,87,0.15);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--red);display:flex;align-items:center;gap:8px}
+  .compliance-ai-notice::before{content:'\26A0';font-size:14px}
+  @media(max-width:640px){.container{padding:20px 12px 60px}.post-header{padding:24px 18px 20px}.post-title{font-size:22px}.summary-hud{grid-template-columns:1fr}.comment-top{flex-wrap:wrap}.scores-grid{grid-template-columns:1fr 1fr}.fix-table{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}.fix-table th,.fix-table td{padding:8px}.triggers-row{flex-direction:column}.debate-sides{grid-template-columns:1fr}.debate-side.pro{border-right:none;border-bottom:1px solid var(--border)}.compliance-body{grid-template-columns:1fr}.round-indicator{flex-wrap:wrap}.round-step{min-width:calc(50% - 2px)}.round-connector{display:none}.vote-change-item{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <div class="brand"><div class="brand-icon">AL</div><div class="brand-text">Audience<span>Lens</span></div></div>
+    <div class="synthetic-chip">AI 模拟评审 · 非真人数据</div>
+  </div>
+  <div class="post-header">
+    <div class="post-badge">玩家模拟评审报告</div>
+    <h1 class="post-title">Cyber Scavenger（赛博拾荒者）</h1>
+    <div class="post-meta">
+      <span>📅 2026-05-31</span><span class="sep">|</span>
+      <span>👤 6 位模拟评审员</span><span class="sep">|</span>
+      <span>📦 v0.4.2</span>
+    </div>
+  </div>
+  <div class="summary-hud">
+    <div class="hud-card rec"><div class="hud-label">综合建议</div><div class="hud-value rec">有条件继续 · 需简化核心机制</div></div>
+    <div class="hud-card risk"><div class="hud-label">风险等级</div><div class="hud-value risk-medium">medium</div></div>
+    <div class="hud-card evidence"><div class="hud-label">证据充分度</div><div class="hud-value evidence-medium">medium</div></div>
+  </div>
+  <div class="summary-hud">
+    <div class="hud-card harness"><div class="hud-label">Harness 评分</div><div class="hud-value" style="color:var(--green)">31<span style="font-size:14px;color:var(--text-secondary);font-family:var(--font-mono)">/40</span></div><div class="validation-status pass">PASS</div><div class="hud-sub">阈值 28/40</div></div>
+    <div class="hud-card grounding"><div class="hud-label">证据接地率</div><div class="hud-value" style="color:var(--cyan)">62<span style="font-size:14px;color:var(--text-secondary);font-family:var(--font-mono)">%</span></div><div class="hud-sub">direct 证据占比</div></div>
+    <div class="hud-card divergence"><div class="hud-label">Persona 差异化度</div><div class="hud-value" style="color:var(--magenta)">0.41</div><div class="hud-sub">Jaccard 距离均值</div></div>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🤝</span> 共识</div>
+    <ul class="point-list agree">
+      <li><span class="dot"></span>赛博打工人主题与讽刺幽默感有辨识度，概念层面有记忆点</li>
+      <li><span class="dot"></span>四种资源（能量、电池、风险信用值、金钱）的互锁关系是核心亮点，但当前描述不足以证明闭环</li>
+      <li><span class="dot"></span>风险信用值机制认知负担过重，新手和轻度玩家几乎无法理解</li>
+      <li><span class="dot"></span>7天生存+周KPI的目标框架清晰，但与"打工人"叙事的张力方向需更明确</li>
+      <li><span class="dot"></span>竖屏手游形态适合碎片化场景，但点击操作深度存疑</li>
+    </ul>
+    <ul class="point-list question" style="margin-top:12px">
+      <li><span class="dot"></span>节点轮换策略是否足够有趣，还是只是"换个地方继续点"？</li>
+      <li><span class="dot"></span>风控警告的惩罚力度是否足以产生真正的紧张感？</li>
+      <li><span class="dot"></span>小程序后台限制是否会导致离线收益机制无法实现？</li>
+    </ul>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚡</span> 重大分歧</div>
+    <div class="disagreement-card">
+      <div class="disagreement-topic">风控机制是核心张力还是认知负担？</div>
+      <div class="stance-row"><span class="stance-persona">周策</span><span class="stance-text">风控是唯一能让系统产生真正博弈的机制 — 正方</span></div>
+      <div class="stance-row"><span class="stance-persona">小禾</span><span class="stance-text">看不懂就不想玩，风控应该是"感觉"而不是"计算" — 反方</span></div>
+      <div class="stance-row"><span class="stance-persona">林岚</span><span class="stance-text">风控本身没错，但需要让玩家"直觉理解后果"而非"读懂数值" — 中间</span></div>
+      <div class="disagreement-resolution">建议将风险信用值从显式数值改为视觉/氛围反馈（如节点变红、警报声），保留策略深度但降低认知门槛</div>
+    </div>
+    <div class="disagreement-card">
+      <div class="disagreement-topic">点击游戏能否承载"赛博打工人"的讽刺深度？</div>
+      <div class="stance-row"><span class="stance-persona">沈渺</span><span class="stance-text">点击本身就可以是讽刺 — 你在用重复劳动模拟重复劳动 — 正方</span></div>
+      <div class="stance-row"><span class="stance-persona">Eva</span><span class="stance-text">概念好但点击品类市场已饱和，需要额外差异化锚点 — 反方</span></div>
+      <div class="stance-row"><span class="stance-persona">乔诺</span><span class="stance-text">我不在乎讽刺不讽刺，我只在乎点起来爽不爽 — 反方</span></div>
+      <div class="disagreement-resolution">讽刺幽默应通过文案和事件触发而非依赖玩家"自觉领悟"，确保即使不理解的玩家也能享受核心循环</div>
+    </div>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🔧</span> 优先修复</div>
+    <table class="fix-table">
+      <thead><tr><th>#</th><th>问题</th><th>严重度</th><th>影响方</th><th>建议</th></tr></thead>
+      <tbody>
+        <tr><td style="font-family:var(--font-mono);color:var(--text-secondary);font-size:15px">1</td><td style="font-weight:600">风险信用值认知门槛过高</td><td><span class="severity-badge critical">critical</span></td><td style="font-size:15px;color:var(--text-secondary)">小禾, 乔诺, 阿橘</td><td style="color:var(--text-secondary)">改为视觉化反馈，数值仅在详情页展示</td></tr>
+        <tr><td style="font-family:var(--font-mono);color:var(--text-secondary);font-size:15px">2</td><td style="font-weight:600">核心循环"点击→代币"深度不足</td><td><span class="severity-badge high">high</span></td><td style="font-size:15px;color:var(--text-secondary)">林岚, 周策, Eva</td><td style="color:var(--text-secondary)">增加节点特性差异和组合收益，让轮换有策略意义</td></tr>
+        <tr><td style="font-family:var(--font-mono);color:var(--text-secondary);font-size:15px">3</td><td style="font-weight:600">小程序后台运行限制未解决</td><td><span class="severity-badge high">high</span></td><td style="font-size:15px;color:var(--text-secondary)">小禾, 阿橘, Eva</td><td style="color:var(--text-secondary)">设计"离线结算"替代"后台挂机"，符合平台规范</td></tr>
+        <tr><td style="font-family:var(--font-mono);color:var(--text-secondary);font-size:15px">4</td><td style="font-weight:600">讽刺幽默感传达依赖玩家自觉</td><td><span class="severity-badge medium">medium</span></td><td style="font-size:15px;color:var(--text-secondary)">沈渺, 林岚</td><td style="color:var(--text-secondary)">通过事件文案和NPC对白主动输出幽默，而非被动等待</td></tr>
+        <tr><td style="font-family:var(--font-mono);color:var(--text-secondary);font-size:15px">5</td><td style="font-weight:600">7天生存目标与长期留存矛盾</td><td><span class="severity-badge medium">medium</span></td><td style="font-size:15px;color:var(--text-secondary)">周策, Eva</td><td style="color:var(--text-secondary)">7天为一周期，周目间携带部分进度，形成roguelite结构</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="comment-thread">
+    <div class="section-title"><span class="icon">💬</span> 评审员评论 (6)</div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#ff6b35,#e056fd)">林</div>
+        <div class="comment-user-info"><div class="comment-username">林岚</div><div class="comment-archetype">P01-indie-core-operator · 核心独立探索者</div></div>
+        <span class="stance-tag neutral">neutral</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">概念有辨识度，但我还没看到"只有它能做到"的那个机制。四种资源互锁是个好起点，可当前描述只停留在"有四种资源"，没证明它们怎么咬合。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">第一印象</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">核心循环</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">独特性</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">风控张力</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">叙事一致</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level direct">direct</span><span>核心循环流程图显示4种资源产出/消耗关系</span></div>
+          <div class="evidence-item"><span class="evidence-level inferred">inferred</span><span>风控警告UI暗示存在惩罚机制，但具体逻辑不明</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>缺乏节点差异化说明，无法判断轮换策略深度</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">核心循环证据不足</span></div><div class="issue-why">流程图只展示了资源种类，没有展示资源间的互锁和博弈关系</div><div class="issue-fix">补充一个完整回合的决策树示例</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge medium">medium</span><span class="issue-title">轮换动机不明确</span></div><div class="issue-why">为什么要换节点？如果只是"这里点完了去那里"，没有策略意义</div><div class="issue-fix">让节点有不同风险/收益特性，轮换本身成为资源博弈的一部分</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">机制互锁</span><span class="trigger-tag continue">创作者意图清晰</span><span class="trigger-tag continue">赛博主题辨识度</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">核心循环只有刷数值</span><span class="trigger-tag quit">卖点说不清</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#4facfe,#00d4aa)">周</div>
+        <div class="comment-user-info"><div class="comment-username">周策</div><div class="comment-archetype">P02-systems-theorycrafter · 系统推演党</div></div>
+        <span class="stance-tag positive">positive</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">四种资源+风控+7天生存，系统骨架有推演空间。关键问题是：资源关系是闭环还是伪深度？我需要看到数值关系可被界面读取。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">系统闭环</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">UI支撑度</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">重玩性</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">假复杂风险</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level direct">direct</span><span>核心循环流程图确认4种资源存在产出/消耗关系</span></div>
+          <div class="evidence-item"><span class="evidence-level inferred">inferred</span><span>风控警告UI暗示风险信用值有阈值触发机制</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>缺乏数值关系说明，无法判断是否存在多条可行策略</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">资源闭环未验证</span></div><div class="issue-why">有4种资源不等于有闭环。需要证明消耗A是为了获取B，而B的短缺又影响A的产出</div><div class="issue-fix">提供至少一个完整资源循环路径的数值示例</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge medium">medium</span><span class="issue-title">7天结构可能限制长线</span></div><div class="issue-why">如果7天后重置，玩家会问"那我为什么要努力？"</div><div class="issue-fix">采用roguelite周目结构，每轮携带部分升级</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">系统之间存在反制与协同</span><span class="trigger-tag continue">每次选择都有机会成本</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">策略同质化</span><span class="trigger-tag quit">信息噪声远高于决策价值</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#ffb347,#ff6b35)">小</div>
+        <div class="comment-user-info"><div class="comment-username">小禾</div><div class="comment-archetype">P07-casual-mobile-dropin · 轻度碎片玩家</div></div>
+        <span class="stance-tag negative">negative</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">四种资源？风控信用值？我光是看描述就头大了。我只是想在地铁上点点点放松一下啊。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">上手时间</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div><span class="score-num">2</span></div></div>
+          <div class="score-item"><div class="score-label">单局时长</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">中断成本</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div><span class="score-num">2</span></div></div>
+          <div class="score-item"><div class="score-label">认知负担</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s1" style="width:20%"></div></div><span class="score-num">1</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level direct">direct</span><span>UI原型截图显示主界面有4个资源栏+节点列表+风控指示</span></div>
+          <div class="evidence-item"><span class="evidence-level inferred">inferred</span><span>竖屏布局暗示单手操作，但信息密度与碎片场景矛盾</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>没有暂停/存档说明，不知道能不能随时退出</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge critical">critical</span><span class="issue-title">开局信息过载</span></div><div class="issue-why">4种资源+风控+节点选择，两分钟内根本看不懂要干什么</div><div class="issue-fix">开局只给1种资源，逐步解锁其余，让玩家先"点起来"再"学系统"</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">中断惩罚不明</span></div><div class="issue-why">7天生存制+小程序后台限制，退出后进度怎么办？</div><div class="issue-fix">明确"每日结算"机制，退出不丢当日进度</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">清晰目标</span><span class="trigger-tag continue">爽点来得快</span><span class="trigger-tag continue">手机体验友好</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">开局冗长</span><span class="trigger-tag quit">信息噪声太多</span><span class="trigger-tag quit">一停下来就前功尽弃</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#00d26a,#4facfe)">乔</div>
+        <div class="comment-user-info"><div class="comment-username">乔诺</div><div class="comment-archetype">P08-first-time-novice · 新手上手观察者</div></div>
+        <span class="stance-tag negative">negative</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">算力代币是什么？风控信用值又是什么？为什么我的角色要挖算力？我连"为什么要轮换节点"都没搞明白。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">第一小时困惑</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div><span class="score-num">2</span></div></div>
+          <div class="score-item"><div class="score-label">术语负担</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s1" style="width:20%"></div></div><span class="score-num">1</span></div></div>
+          <div class="score-item"><div class="score-label">教学顺序</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div><span class="score-num">2</span></div></div>
+          <div class="score-item"><div class="score-label">首次失败</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level direct">direct</span><span>角色设定文档提到"赛博员工"但未解释为什么是员工</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>完全没有新手引导说明</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>风控信用值降低后会发生什么？没有失败反馈说明</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge critical">critical</span><span class="issue-title">术语没有上下文解释</span></div><div class="issue-why">算力代币、风控信用值、AI平台节点——全是黑话</div><div class="issue-fix">用生活化比喻替代：算力=工资，风控=查岗，节点=工位</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">首次失败体验不可理解</span></div><div class="issue-why">风控触发后会发生什么？不知道就害怕</div><div class="issue-fix">第一次风控触发应该是"警告+教学"，不是惩罚</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">一步只学一个</span><span class="trigger-tag continue">失败可理解</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">看不懂目标</span><span class="trigger-tag quit">首次失败像受罚</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#e056fd,#ff6b35)">阿</div>
+        <div class="comment-user-info"><div class="comment-username">阿橘</div><div class="comment-archetype">P11-taptap-comment-scout · TapTap口碑型浏览者</div></div>
+        <span class="stance-tag neutral">neutral</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">赛博打工人这个设定在TapTap上肯定有人买账，但评论区一定会有人说"又是个挂机游戏套了个赛博皮"。你得让他们说不出这句话。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">口碑风险</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">更新节奏</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">开发者态度</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">氪金/适配</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level inferred">inferred</span><span>赛博打工人主题在中文社区有天然传播力</span></div>
+          <div class="evidence-item"><span class="evidence-level inferred">inferred</span><span>点击+挂机品类在TapTap差评集中在"套皮"和"氪金"</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>没有付费模式说明，无法判断口碑风险</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">"套皮挂机"口碑风险</span></div><div class="issue-why">点击游戏在TapTap的信任度极低</div><div class="issue-fix">首发时突出风控博弈和讽刺叙事，与纯挂机划清界限</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge medium">medium</span><span class="issue-title">付费模式缺失</span></div><div class="issue-why">没有付费说明=评论区会自己脑补最差情况</div><div class="issue-fix">尽早公布付费设计</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">开发者回应快</span><span class="trigger-tag continue">玩家自发安利</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">差评集中氪金</span><span class="trigger-tag quit">宣传和实情差距大</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:linear-gradient(135deg,#ff4757,#ffb347)">E</div>
+        <div class="comment-user-info"><div class="comment-username">Eva</div><div class="comment-archetype">P13-publisher-scout · 发行侦察官</div></div>
+        <span class="stance-tag neutral">neutral</span>
+      </div>
+      <div class="comment-body">
+        <div class="voice-sample">Pitch有一句话卖点，有主题辨识度，但target+comp+hook三要素里comp和hook都不够硬。点击赛博这个交叉赛道上，我需要看到为什么不是"赛博朋克壁纸+放置奇兵数值"。</div>
+        <div class="scores-grid">
+          <div class="score-item"><div class="score-label">定位</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">竞品框</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div><span class="score-num">2</span></div></div>
+          <div class="score-item"><div class="score-label">USP</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div><span class="score-num">3</span></div></div>
+          <div class="score-item"><div class="score-label">量产风险</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+          <div class="score-item"><div class="score-label">营销可讲性</div><div class="score-bar-wrap"><div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div><span class="score-num">4</span></div></div>
+        </div>
+        <div class="evidence-list"><div class="sub-title">关键证据</div>
+          <div class="evidence-item"><span class="evidence-level direct">direct</span><span>一句话描述清晰：赛博员工+挖算力+规避风控</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>没有竞品对标分析，无法判断市场窗口</span></div>
+          <div class="evidence-item"><span class="evidence-level gap">gap</span><span>目标受众边界模糊</span></div>
+        </div>
+        <div class="issues-list"><div class="sub-title">关键问题</div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge high">high</span><span class="issue-title">受众定位矛盾</span></div><div class="issue-why">4资源+风控=核心向，但竖屏点击=轻度向。两边都不讨好</div><div class="issue-fix">选择一个主受众，另一个作为加分项</div></div>
+          <div class="issue-item"><div class="issue-title-row"><span class="severity-badge medium">medium</span><span class="issue-title">小程序平台限制未评估</span></div><div class="issue-why">后台运行限制可能直接砍掉挂机收益这个核心卖点</div><div class="issue-fix">先做技术验证，确认离线结算方案可行再推进</div></div>
+        </div>
+        <div class="triggers-row">
+          <div class="trigger-group continue"><div class="sub-title">✅ 留存触发</div><span class="trigger-tag continue">有清晰ICP</span><span class="trigger-tag continue">营销可讲性高</span></div>
+          <div class="trigger-group quit"><div class="sub-title">🚫 流失触发</div><span class="trigger-tag quit">广撒网定位</span><span class="trigger-tag quit">同质竞品过多</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚔️</span> 交叉质询记录</div>
+    <div class="round-indicator">
+      <div class="round-step active"><span class="step-num">1</span><span>Round 1</span></div>
+      <div class="round-connector"></div>
+      <div class="round-step active"><span class="step-num">2</span><span>Round 2</span></div>
+      <div class="round-connector"></div>
+      <div class="round-step active"><span class="step-num">3</span><span>Round 3</span></div>
+    </div>
+    <div class="debate-card">
+      <div class="debate-topic">风控机制应该显式数值还是隐式氛围？</div>
+      <div class="debate-sides">
+        <div class="debate-side pro"><div class="debate-side-label">正方 · 显式数值</div>
+          <div class="debate-arg">玩家需要可读的风险信息来做策略决策，隐藏数值等于剥夺agency<div class="debate-arg-persona">— 周策</div></div>
+          <div class="debate-arg">核心玩家会自己算，不如直接给他们数据<div class="debate-arg-persona">— 林岚</div></div>
+        </div>
+        <div class="debate-side con"><div class="debate-side-label">反方 · 隐式氛围</div>
+          <div class="debate-arg">数值只会吓跑轻度玩家，用颜色和声音传达"危险"就够了<div class="debate-arg-persona">— 小禾</div></div>
+          <div class="debate-arg">新手不需要知道具体数字，只需要知道"现在很危险"<div class="debate-arg-persona">— 乔诺</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="debate-card">
+      <div class="debate-topic">7天生存制应该重置还是延续？</div>
+      <div class="debate-sides">
+        <div class="debate-side pro"><div class="debate-side-label">正方 · 周目重置</div>
+          <div class="debate-arg">重置+携带升级=roguelite结构，重玩性有保障<div class="debate-arg-persona">— 周策</div></div>
+          <div class="debate-arg">7天一周目正好匹配"周KPI"叙事<div class="debate-arg-persona">— Eva</div></div>
+        </div>
+        <div class="debate-side con"><div class="debate-side-label">反方 · 持续延续</div>
+          <div class="debate-arg">重置=我白干了？轻度玩家不会接受<div class="debate-arg-persona">— 小禾</div></div>
+          <div class="debate-arg">打工人最恨的就是"这周白干了"<div class="debate-arg-persona">— 阿橘</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="vote-change-list">
+      <div class="sub-title" style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">改票记录</div>
+      <div class="vote-change-item"><span class="vc-persona">林岚</span><span class="vc-before">neutral</span><span class="vc-arrow">→</span><span class="vc-after">positive</span><span class="vc-reason">Round 2 辩论后认为风控视觉化方案可兼顾深度与门槛</span></div>
+      <div class="vote-change-item"><span class="vc-persona">阿橘</span><span class="vc-before">neutral</span><span class="vc-arrow">→</span><span class="vc-after">positive</span><span class="vc-reason">Round 3 后认为roguelite周目+讽刺叙事组合有传播潜力</span></div>
+      <div class="vote-change-item"><span class="vc-persona">乔诺</span><span class="vc-before">negative</span><span class="vc-arrow">→</span><span class="vc-after">neutral</span><span class="vc-reason">渐进解锁+生活化比喻方案降低了新手恐惧</span></div>
+    </div>
+    <div class="confidence-chart">
+      <div class="sub-title">置信度变化</div>
+      <div class="conf-bar-row"><span class="conf-bar-label">林岚</span><div class="conf-bar-track"><div class="conf-bar-fill high" style="width:78%"></div></div><span class="conf-bar-num" style="color:var(--green)">78%</span><span class="conf-delta up">+12%</span></div>
+      <div class="conf-bar-row"><span class="conf-bar-label">周策</span><div class="conf-bar-track"><div class="conf-bar-fill high" style="width:82%"></div></div><span class="conf-bar-num" style="color:var(--green)">82%</span><span class="conf-delta up">+5%</span></div>
+      <div class="conf-bar-row"><span class="conf-bar-label">小禾</span><div class="conf-bar-track"><div class="conf-bar-fill low" style="width:32%"></div></div><span class="conf-bar-num" style="color:var(--red)">32%</span><span class="conf-delta down">-8%</span></div>
+      <div class="conf-bar-row"><span class="conf-bar-label">乔诺</span><div class="conf-bar-track"><div class="conf-bar-fill medium" style="width:45%"></div></div><span class="conf-bar-num" style="color:var(--amber)">45%</span><span class="conf-delta up">+15%</span></div>
+      <div class="conf-bar-row"><span class="conf-bar-label">阿橘</span><div class="conf-bar-track"><div class="conf-bar-fill medium" style="width:58%"></div></div><span class="conf-bar-num" style="color:var(--amber)">58%</span><span class="conf-delta up">+10%</span></div>
+      <div class="conf-bar-row"><span class="conf-bar-label">Eva</span><div class="conf-bar-track"><div class="conf-bar-fill medium" style="width:55%"></div></div><span class="conf-bar-num" style="color:var(--amber)">55%</span><span class="conf-delta same">+0%</span></div>
+    </div>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🕳️</span> 信息缺口</div>
+    <ul class="point-list gap">
+      <li><span class="dot"></span>节点差异化特性未定义——不同AI平台节点有什么区别？</li>
+      <li><span class="dot"></span>风控惩罚的具体后果未说明——扣资源？强制停止？游戏结束？</li>
+      <li><span class="dot"></span>付费模式完全缺失——免费+广告？买断？内购？</li>
+      <li><span class="dot"></span>小程序后台限制的技术验证结果未提供</li>
+      <li><span class="dot"></span>7天周期结束后的进度处理方式未定义</li>
+      <li><span class="dot"></span>新手引导流程和教学节奏完全没有设计</li>
+    </ul>
+  </div>
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🧪</span> 下一步真人测试建议</div>
+    <div class="next-steps">
+      <div class="next-step-card"><div class="sub-title">建议测试任务</div><ul><li>5分钟上手测试：观察新手能否理解核心循环</li><li>风控触发反应测试：观察玩家对风控警告的理解和应对</li><li>节点轮换决策测试：观察玩家是否主动轮换及原因</li><li>讽刺幽默感知测试：询问玩家是否"get到"打工人梗</li></ul></div>
+      <div class="next-step-card"><div class="sub-title">建议招募类型</div><ul><li>轻度手游玩家（3-5人）：验证上手门槛</li><li>放置/点击游戏老玩家（2-3人）：验证差异化</li><li>赛博朋克题材爱好者（2人）：验证主题吸引力</li></ul></div>
+      <div class="next-step-card"><div class="sub-title">需要补充的材料</div><ul><li>可交互的纸面原型或Figma点击流</li><li>一个完整回合的决策流程图（含数值）</li><li>风控触发与惩罚的规则说明</li><li>新手引导的前3步设计</li></ul></div>
+    </div>
+  </div>
+  <div class="compliance-banner">
+    <div class="compliance-header"><div class="compliance-title">AI 生成声明</div><div class="compliance-status needs-revision">NEEDS-REVISION</div></div>
+    <div class="compliance-body">
+      <div class="compliance-score-block"><div class="compliance-score-label">伦理合规评分</div><div class="compliance-score-value score-medium">72</div><div class="compliance-score-bar"><div class="compliance-score-bar-fill medium" style="width:72%"></div></div></div>
+      <div class="compliance-steps-block"><div class="compliance-steps-label">推荐真人验证步骤</div><ul class="compliance-steps-list"><li>在做出任何产品决策前，用真人玩家验证核心循环可理解性</li><li>风控机制的认知门槛结论须由新手玩家实测确认</li><li>小程序技术限制须由工程师验证，不可仅凭AI推演</li><li>付费模式设计须经过目标市场用户调研</li><li>讽刺幽默的接受度须在真实社区环境中测试</li></ul></div>
+    </div>
+    <div class="compliance-ai-notice">本报告全部由 AI 人格模拟生成，非真人研究数据。任何决策前须经过真人验证。</div>
+  </div>
+  <div class="report-footer">Generated by AudienceLens 玩家模拟评审 · 本报告由 AI 人格生成，非真人研究数据</div>
+</div>
+</body>
+</html>

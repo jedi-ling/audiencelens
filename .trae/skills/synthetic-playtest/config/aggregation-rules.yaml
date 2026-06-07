@@ -1,0 +1,22 @@
+version: 0.1.0
+consensus_threshold: 0.7
+severity_boost:
+  critical: 2.0
+  high: 1.5
+  medium: 1.0
+  low: 0.5
+persona_weight_field: weight_default
+disagreement_detection:
+  method: stance_clustering
+  min_cluster_distance: 0.3
+priority_fixes_sort: "severity * weight * affected_count"
+report_sections:
+  - consensus
+  - major_disagreements
+  - priority_fixes
+  - information_gaps
+  - next_human_test
+cross_exam:
+  max_controversy_points: 3
+  confidence_change_threshold: 0.15
+  allow_stance_update: true

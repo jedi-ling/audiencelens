@@ -1,0 +1,36 @@
+{
+  "title": "Echoes of the Void - Discord Community",
+  "type": "discord_community",
+  "description": "Discord社区运营评审包：频道结构、社区规则、开发者互动、玩家氛围、活动记录",
+  "platform": "Discord",
+  "materials": [
+    {
+      "type": "频道结构",
+      "description": "分类：公告区（announcements, rules, faq）、讨论区（general, spoilers, suggestions）、创作区（fan-art, memes, clips）、开发区（devlog, bug-reports, feedback）、语音区（2个语音频道）。共12个文字频道，3个语音频道"
+    },
+    {
+      "type": "社区规则",
+      "description": "8条规则：尊重他人、禁止剧透不标标签、禁止NSFW、禁止自我推广、用英文或中文、bug反馈用指定格式、建议发到suggestions频道、管理员有最终解释权。违规处理：警告→静音→封禁"
+    },
+    {
+      "type": "开发者帖子",
+      "description": "近30天开发者发帖12条：3篇devlog摘要、4条bug修复进展回复、2次投票（新Boss设计二选一、UI风格偏好）、3条日常互动。平均回复时间约6小时"
+    },
+    {
+      "type": "玩家互动样本",
+      "description": "general频道日均消息约150条，讨论以攻略分享和机制讨论为主。spoilers频道活跃度中等。fan-art频道每周约5-8件创作。整体氛围友好，偶有新玩家提问"
+    },
+    {
+      "type": "活动记录",
+      "description": "近3个月举办过2次社区活动：1次Boss设计投票（参与率约35%）、1次截图大赛（提交约40件作品，奖品为游戏Key）。无定期活动安排"
+    },
+    {
+      "type": "FAQ/公告",
+      "description": "置顶FAQ包含：游戏发售时间、平台支持、Demo下载链接、已知bug列表、众筹信息。最后更新于2周前"
+    }
+  ],
+  "member_count": 823,
+  "online_count": 87,
+  "developer": "Void Echo Studio",
+  "community_age_months": 6
+}

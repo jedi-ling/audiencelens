@@ -1,0 +1,31 @@
+{
+  "title": "Echoes of the Void - Demo",
+  "type": "roguelite metroidvania demo",
+  "description": "Demo首玩体验包：前15分钟实机录屏描述和核心循环说明",
+  "materials": [
+    {
+      "type": "实机战斗视频",
+      "description": "前15分钟实机：开场教程约3分钟（移动、攻击、闪避），随后进入第一个区域，遇到2种基础敌人，1个mini-boss"
+    },
+    {
+      "type": "HUD",
+      "description": "HUD包含：生命值条、能力冷却指示器、小地图、当前区域名称"
+    },
+    {
+      "type": "控制说明",
+      "description": "WASD移动，鼠标左键攻击，右键闪避，空格时间回溯，E互动"
+    },
+    {
+      "type": "新手说明",
+      "description": "教程阶段有文字提示框，介绍基本操作，无语音引导"
+    },
+    {
+      "type": "核心循环说明",
+      "description": "探索→战斗→死亡→时间回溯→解锁新路径→获得永久能力"
+    },
+    {
+      "type": "暂停存档",
+      "description": "支持随时暂停，自动存档检查点在每个区域入口"
+    }
+  ]
+}

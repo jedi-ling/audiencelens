@@ -1,0 +1,55 @@
+name: Bug 报告
+description: 报告 AudienceLens 的 bug
+title: "[Bug] "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug 描述
+        请简洁描述问题。
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 如何复现这个 bug？
+      placeholder: |
+        1. 运行命令 '...'
+        2. 输入 '...'
+        3. 出现错误 '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 你期望的正常行为是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么？
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: 环境信息
+      description: Python 版本、操作系统、Claude Code 版本等
+      placeholder: Python 3.11, Windows 11, Claude Code latest
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误日志
+      description: 如果有错误日志，请粘贴在这里
+      placeholder: |
+        Traceback (most recent call last):
+        ...

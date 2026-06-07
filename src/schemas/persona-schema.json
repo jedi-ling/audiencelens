@@ -1,0 +1,426 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "persona-schema",
+  "title": "Persona Configuration Schema",
+  "description": "Persona YAML 的校验 Schema，定义虚拟评审角色的完整结构",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "gender",
+    "age_range",
+    "region",
+    "language",
+    "archetype",
+    "identity_summary",
+    "gaming_profile",
+    "behavior_profile",
+    "motivations",
+    "likes",
+    "dislikes",
+    "decision_rules",
+    "quit_triggers",
+    "continue_triggers",
+    "first_scan_focus",
+    "review_output"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^P\\d{2}-[a-z0-9-]+$",
+      "description": "Persona 唯一标识，格式 P00-slug"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "角色名称"
+    },
+    "gender": {
+      "type": "string",
+      "enum": ["男", "女", "非二元", "未指定", "自我描述"],
+      "description": "性别"
+    },
+    "age_range": {
+      "type": "string",
+      "pattern": "^\\d{2,3}-\\d{2,3}$",
+      "description": "年龄区间，如 25-35"
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1,
+      "description": "所在地区"
+    },
+    "language": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      ],
+      "description": "使用语言，字符串或字符串数组"
+    },
+    "archetype": {
+      "type": "string",
+      "minLength": 1,
+      "description": "原型标签"
+    },
+    "identity_summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "身份概要"
+    },
+    "gaming_profile": {
+      "type": "object",
+      "required": ["experience", "platforms", "genres", "session_length"],
+      "properties": {
+        "experience": {
+          "type": "string",
+          "enum": [
+            "核心",
+            "中核",
+            "轻度",
+            "新手",
+            "商业视角",
+            "平台重度浏览",
+            "平台口碑型",
+            "老平台用户",
+            "核心老兵"
+          ],
+          "description": "游戏经验类型"
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "常用平台列表"
+        },
+        "genres": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "偏好类型列表"
+        },
+        "session_length": {
+          "type": "string",
+          "minLength": 1,
+          "description": "单次游戏时长"
+        }
+      },
+      "additionalProperties": false
+    },
+    "behavior_profile": {
+      "type": "object",
+      "required": [
+        "patience",
+        "genre_literacy",
+        "novelty_seeking",
+        "risk_tolerance",
+        "social_influence",
+        "completion_drive",
+        "price_sensitivity",
+        "criticism_style",
+        "emotional_engagement",
+        "agency_preference",
+        "tolerance_for_ambiguity",
+        "platform_loyalty"
+      ],
+      "properties": {
+        "patience": {
+          "type": "string",
+          "enum": ["很低", "低", "中", "高", "很高"]
+        },
+        "genre_literacy": {
+          "type": "string",
+          "enum": ["很低", "低", "中", "高", "很高"]
+        },
+        "novelty_seeking": {
+          "type": "string",
+          "enum": ["很低", "低", "中", "高", "很高"]
+        },
+        "risk_tolerance": {
+          "type": "string",
+          "enum": ["低", "中", "高"]
+        },
+        "social_influence": {
+          "type": "string",
+          "enum": ["低", "中", "高", "很高"]
+        },
+        "completion_drive": {
+          "type": "string",
+          "enum": ["很低", "低", "中", "高", "很高"]
+        },
+        "price_sensitivity": {
+          "type": "string",
+          "enum": ["低", "中", "高", "很高"]
+        },
+        "criticism_style": {
+          "type": "string",
+          "enum": [
+            "分析直给",
+            "结构化分析",
+            "短句直接",
+            "细腻具体",
+            "条目化",
+            "感受加例子",
+            "生活化直白",
+            "困惑点导向",
+            "温暖具体",
+            "快评式",
+            "口碑直觉",
+            "传播视角",
+            "商业冷静",
+            "价值评估型",
+            "尖锐怀疑",
+            "对标式"
+          ]
+        },
+        "emotional_engagement": {
+          "type": "string",
+          "enum": ["低", "中", "高"]
+        },
+        "agency_preference": {
+          "type": "string",
+          "enum": ["低", "中", "高"]
+        },
+        "tolerance_for_ambiguity": {
+          "type": "string",
+          "enum": ["低", "中", "高"]
+        },
+        "platform_loyalty": {
+          "type": "string",
+          "enum": ["低", "中", "高"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "motivations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "动机列表"
+    },
+    "likes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "偏好列表"
+    },
+    "dislikes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "厌恶列表"
+    },
+    "decision_rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "决策规则，至少1条"
+    },
+    "quit_triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "放弃触发条件"
+    },
+    "continue_triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "继续触发条件"
+    },
+    "first_scan_focus": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "首次浏览关注点"
+    },
+    "review_output": {
+      "type": "object",
+      "required": ["tone", "strictness", "must_comment_on", "avoid"],
+      "properties": {
+        "tone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "评审语气"
+        },
+        "strictness": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "严格程度 1-5"
+        },
+        "must_comment_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "必须评论的方面"
+        },
+        "avoid": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "应避免的方面"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mbti": {
+      "type": "string",
+      "enum": [
+        "INTJ", "INTP", "ENTJ", "ENTP",
+        "INFJ", "INFP", "ENFJ", "ENFP",
+        "ISTJ", "ISFJ", "ESTJ", "ESFJ",
+        "ISTP", "ISFP", "ESTP", "ESFP",
+        "未指定"
+      ],
+      "description": "MBTI 类型（可选）"
+    },
+    "communication_style": {
+      "type": "string",
+      "enum": [
+        "简洁分析型",
+        "发散联想型",
+        "直接行动型",
+        "共情理想型",
+        "感受审美型",
+        "温暖表达型",
+        "战略指挥型",
+        "社交活力型",
+        "严谨务实型",
+        "忠诚守护型",
+        "务实操作型",
+        "敏感体验型",
+        "务实管理型",
+        "热情服务型",
+        "灵活应变型",
+        "自由表达型"
+      ],
+      "description": "沟通风格（可选）"
+    },
+    "task_affinity": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "description": "任务亲和度映射，键为任务类型，值为 0-1 浮点数（可选）"
+    },
+    "evidence_types_needed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "所需证据类型列表（可选）"
+    },
+    "model_hint": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus"],
+      "description": "推荐模型（可选）"
+    },
+    "source_basis": {
+      "type": "string",
+      "description": "来源依据（可选）"
+    },
+    "weight_default": {
+      "type": "number",
+      "default": 1.0,
+      "description": "默认权重（可选）"
+    },
+    "version": {
+      "type": "string",
+      "description": "Persona 版本号（可选）"
+    },
+    "last_calibrated_at": {
+      "type": "string",
+      "description": "最后校准时间（可选）"
+    },
+    "notes": {
+      "type": "string",
+      "description": "备注（可选）"
+    },
+    "ethics_compliance": {
+      "type": "object",
+      "required": ["behavior_over_demographics", "stereotype_risk", "gap_filling_violations", "mbti_usage"],
+      "properties": {
+        "behavior_over_demographics": {
+          "type": "boolean",
+          "const": true,
+          "description": "核心原则：行为优先于人口统计，必须为 true"
+        },
+        "stereotype_risk": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high"],
+          "description": "刻板印象风险等级，基于刻板印象回避清单检查结果"
+        },
+        "gap_filling_violations": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "空缺填补违规计数，0 表示无违规"
+        },
+        "mbti_usage": {
+          "type": "string",
+          "enum": ["style_only", "logic", "none"],
+          "description": "MBTI 使用方式：style_only=仅修饰表达风格（合规），logic=用于推导判断（违规），none=未使用MBTI"
+        }
+      },
+      "additionalProperties": false,
+      "description": "伦理合规信息，对应 ethics.md 守则"
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "must_comment_on_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "必须评论项的覆盖百分比（0-100%）"
+        },
+        "evidence_direct_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "直接证据占比（0-100%），direct inference_level 的证据条数 / 总证据条数"
+        },
+        "jaccard_distance_from_others": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "与其他 persona 的 Jaccard 距离（0-1），值越大差异化越高"
+        }
+      },
+      "additionalProperties": false,
+      "description": "验证指标，用于量化 persona 输出质量"
+    }
+  },
+  "additionalProperties": false
+}

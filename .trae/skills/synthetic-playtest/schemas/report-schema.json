@@ -1,0 +1,291 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "report-schema",
+  "title": "Aggregated Review Report Schema",
+  "description": "聚合评审报告的 JSON Schema",
+  "type": "object",
+  "required": [
+    "meta",
+    "executive_summary",
+    "consensus",
+    "major_disagreements",
+    "priority_fixes",
+    "persona_notes",
+    "information_gaps",
+    "next_human_test"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "task_type",
+        "target",
+        "build_version",
+        "prompt_version",
+        "persona_pack_version",
+        "generated_at",
+        "is_synthetic"
+      ],
+      "properties": {
+        "task_type": {
+          "type": "string",
+          "description": "任务类型"
+        },
+        "target": {
+          "type": "string",
+          "description": "评审目标"
+        },
+        "build_version": {
+          "type": "string",
+          "description": "构建版本"
+        },
+        "prompt_version": {
+          "type": "string",
+          "description": "Prompt 版本"
+        },
+        "persona_pack_version": {
+          "type": "string",
+          "description": "Persona 包版本"
+        },
+        "generated_at": {
+          "type": "string",
+          "description": "生成时间"
+        },
+        "is_synthetic": {
+          "type": "boolean",
+          "const": true,
+          "description": "标记为合成报告（恒为 true）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "executive_summary": {
+      "type": "object",
+      "required": [
+        "primary_recommendation",
+        "release_risk",
+        "evidence_quality"
+      ],
+      "properties": {
+        "primary_recommendation": {
+          "type": "string",
+          "minLength": 1,
+          "description": "主要建议"
+        },
+        "release_risk": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "发布风险等级"
+        },
+        "evidence_quality": {
+          "type": "string",
+          "enum": ["strong", "medium", "weak", "insufficient"],
+          "description": "证据质量"
+        }
+      },
+      "additionalProperties": false
+    },
+    "consensus": {
+      "type": "object",
+      "required": ["agreed_points", "questioned_points"],
+      "properties": {
+        "agreed_points": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "共识点"
+        },
+        "questioned_points": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "存疑点"
+        }
+      },
+      "additionalProperties": false
+    },
+    "major_disagreements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["topic", "persona_stances", "resolution_suggestion"],
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "description": "分歧主题"
+          },
+          "persona_stances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["persona_id", "stance", "evidence"],
+              "properties": {
+                "persona_id": {
+                  "type": "string",
+                  "description": "Persona 标识"
+                },
+                "stance": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "立场"
+                },
+                "evidence": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "支撑证据"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 2,
+            "description": "各 Persona 立场，至少2方"
+          },
+          "resolution_suggestion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "解决建议"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "重大分歧列表"
+    },
+    "priority_fixes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["priority", "issue", "severity", "why_it_matters", "affected_personas", "suggested_fix"],
+        "properties": {
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "优先级排序"
+          },
+          "issue": {
+            "type": "string",
+            "minLength": 1,
+            "description": "问题描述"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "严重程度"
+          },
+          "why_it_matters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "为何重要"
+          },
+          "affected_personas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "受影响的 Persona 列表"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "建议修复方式"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "优先修复列表"
+    },
+    "persona_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["persona_id", "persona_name", "stance", "evidence_top3", "top_issues", "continue_triggers", "quit_triggers"],
+        "properties": {
+          "persona_id": {
+            "type": "string",
+            "description": "Persona 标识"
+          },
+          "persona_name": {
+            "type": "string",
+            "description": "Persona 名称"
+          },
+          "stance": {
+            "type": "string",
+            "minLength": 1,
+            "description": "立场"
+          },
+          "evidence_top3": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "description": "前3条证据"
+          },
+          "top_issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "首要问题"
+          },
+          "continue_triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "继续触发条件"
+          },
+          "quit_triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "放弃触发条件"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "各 Persona 评审摘要"
+    },
+    "information_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "信息缺口列表"
+    },
+    "next_human_test": {
+      "type": "object",
+      "required": ["suggested_tasks", "recruit_types", "next_materials"],
+      "properties": {
+        "suggested_tasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "建议的后续测试任务"
+        },
+        "recruit_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "建议招募的用户类型"
+        },
+        "next_materials": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "下次评审需要的材料"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

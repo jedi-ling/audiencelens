@@ -1,0 +1,41 @@
+{
+  "title": "Echoes of the Void - Kickstarter",
+  "type": "crowdfunding_page",
+  "description": "众筹页评审包：项目视频、团队介绍、回报档位、风险说明、里程碑计划",
+  "platform": "Kickstarter",
+  "materials": [
+    {
+      "type": "项目视频",
+      "description": "2分30秒众筹视频：前30秒展示暗色调像素风格世界和时间回溯核心概念，中间1分钟实机演示战斗与探索循环，最后30秒团队出镜介绍开发历程和愿景"
+    },
+    {
+      "type": "团队介绍",
+      "description": "3人核心团队：主策/程序（前Celeste mod作者）、像素美术（参与过Dead Cells外包）、音效设计（独立游戏配乐经验）。团队照片和简短个人介绍，附过往作品链接"
+    },
+    {
+      "type": "回报档位",
+      "description": "5档：$15数字版（早鸟限500名）、$20数字版（正式价）、$35数字版+原声带+数字画册、$60实体版+以上全部、$150设计者档位（与团队共创1个NPC）。所有档位含Beta测试资格"
+    },
+    {
+      "type": "风险说明",
+      "description": "承认3人团队规模风险，承诺每月2次开发日志更新，列出核心功能完成度（战斗系统80%、地图生成60%、叙事系统40%），EA阶段预计12个月"
+    },
+    {
+      "type": "里程碑",
+      "description": "融资目标$45,000。$60,000解锁Switch移植，$80,000解锁额外Boss和区域，$120,000解锁合作模式。时间线：众筹结束后3个月Beta，6个月EA，12个月正式版"
+    },
+    {
+      "type": "社区更新记录",
+      "description": "众筹前已发布4篇devlog，Discord社区800+成员，Twitter关注2000+，2篇独立游戏媒体报道"
+    },
+    {
+      "type": "媒体报道",
+      "description": "IndieGamesPlus和AlphaBetaGamer各一篇试玩报道，均正面评价核心机制"
+    }
+  ],
+  "funding_goal": 45000,
+  "currency": "USD",
+  "duration_days": 30,
+  "developer": "Void Echo Studio",
+  "estimated_delivery": "Q4 2027 (Full Release)"
+}

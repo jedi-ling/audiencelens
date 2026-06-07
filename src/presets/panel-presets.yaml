@@ -1,0 +1,62 @@
+version: 0.1.0
+presets:
+  steam_page_review:
+    description: Steam商店页评审
+    default_personas: [P06, P10, P14, P15, P16]
+    optional_personas: [P01, P04]
+    min_panel_size: 4
+    max_panel_size: 8
+  demo_first_play:
+    description: Demo首玩评审
+    default_personas: [P03, P05, P07, P08, P04]
+    optional_personas: [P02, P09]
+    min_panel_size: 4
+    max_panel_size: 8
+  concept_review:
+    description: 概念/GDD评审
+    default_personas: [P01, P02, P04, P06, P13, P16]
+    optional_personas: [P12]
+    min_panel_size: 4
+    max_panel_size: 8
+  monetization_review:
+    description: 商业化/付费方案评审
+    default_personas: [P11, P13, P14, P15]
+    optional_personas: [P07, P10]
+    min_panel_size: 4
+    max_panel_size: 8
+  looking_for_party_post:
+    description: 找搭子帖/社区文案评审
+    default_personas: [P07, P09, P11, P12]
+    optional_personas: [P03, P04]
+    min_panel_size: 3
+    max_panel_size: 8
+  update_announcement_review:
+    description: 更新公告/版本日志评审
+    default_personas: [P05, P09, P11, P15]
+    optional_personas: [P02, P13]
+    min_panel_size: 3
+    max_panel_size: 8
+  kickstarter_review:
+    description: 众筹页评审
+    default_personas: [P06, P09, P13, P14, P33]
+    optional_personas: [P01, P36]
+    min_panel_size: 4
+    max_panel_size: 8
+  discord_community_review:
+    description: 社区运营评审
+    default_personas: [P07, P09, P11, P12, P34]
+    optional_personas: [P04, P38]
+    min_panel_size: 4
+    max_panel_size: 8
+  devlog_review:
+    description: 开发日志评审
+    default_personas: [P01, P04, P05, P11, P13]
+    optional_personas: [P02, P17]
+    min_panel_size: 4
+    max_panel_size: 8
+  localization_review:
+    description: 本地化评审
+    default_personas: [P01, P04, P06, P10, P43]
+    optional_personas: [P02, P29]
+    min_panel_size: 4
+    max_panel_size: 8
