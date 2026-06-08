@@ -1,18 +1,341 @@
+<div align="center">
+
 # AudienceLens
 
-> 基于合成人格（Synthetic Persona）的多代理游戏评审系统。
+**Multi-Agent Synthetic Audience Review System with Cross-Examination**
 
-使用 16 个行为驱动的 AI 人格对独立游戏的 Steam 商店页、Demo、概念稿、商业化方案、社区文案和版本公告进行多视角评审，输出结构化的 JSON 和 Markdown 报告。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
+[![Tests](https://img.shields.io/badge/Tests-180+-success.svg)](tests/)
 
-**AudienceLens 不是玩家研究，不能替代真人测试。** 它是一个**预筛与压力测试工具**，用于在投入真人测试资源之前发现最明显的问题。
+**基于合成人格的多代理交叉质询评审系统 · Python CLI + FastAPI + React**
+
+[English](#english) · [中文](#中文)
+
+</div>
 
 ---
 
-## 核心特性
+<a id="english"></a>
 
-### 16 个行为驱动的人格库
+## Overview
 
-每个 persona 不再是"25岁男性玩家"这样的身份标签，而是通过 12 个行为轴刻画：
+AudienceLens is a **full-stack synthetic audience review system** that simulates diverse player personas to evaluate games, products, and creative projects — before committing resources to real user testing.
+
+Unlike simply asking ChatGPT for feedback, AudienceLens:
+1. Runs **multiple behavior-driven personas in isolation** (75+ across 8 packs)
+2. Applies **structured cross-examination** on top-3 controversies
+3. Tracks **stance revisions** with full provenance (who changed, why, which argument)
+4. Validates output through **8-dimension quality Harness**
+5. Enforces **ethical constraints** — stereotype detection, evidence tiering, mandatory disclaimers
+
+> **AudienceLens is not a substitute for real user research.** It is a pre-screening and stress-testing tool for discovering the most obvious issues before investing in human testing.
+
+---
+
+## Feature Categories
+
+### 1. Runner Engine — Pipeline Architecture
+
+The core execution engine is a 7-stage pipeline in `src/runner/`:
+
+| Stage | Module | Function |
+|---|---|---|
+| **Panel Selection** | `panel_selector.py` | Select personas by task type; guarantee dissenter inclusion (auto-append P15 if missing) |
+| **Evidence Pre-check** | `evidence_precheck.py` | Filter out personas with <30% evidence coverage for required evidence types |
+| **Persona Execution** | `persona_agent.py` | Render 5-segment prompt (Persona Card → MBTI Boundary → Identity-Behavior Decoupling → Task → Evidence Rules); parse structured output |
+| **3-Layer Validation** | `validator.py` | Schema validation (Draft7Validator) → Role consistency (must_comment_on ≥80%, inferred ≤40%) → Evidence grounding (hallucination <30%) |
+| **Cross-Examination** | `cross_exam.py` | Extract top-3 controversies (by severity variance, with SequenceMatcher dedup); opposing personas rebut; stance revision if Δc >0.15 |
+| **Rule-Driven Aggregation** | `aggregator.py` | Compute consensus, disagreements, priority fixes (severity × persona weight × affected count); release risk assessment |
+| **Calibration Check** | `calibration.py` | Role consistency rate, perspective coverage (Jaccard ≥0.3), hallucination rate, stability |
+
+### 2. Persona System — 12-Axis Behavioral Vectors
+
+Personas are defined by **behavioral vectors**, not demographic labels. SCOPE research shows demographics explain only 1.5% of behavioral variance.
+
+| Axis | Description |
+|---|---|
+| `patience` | Time tolerance for slow-burn content |
+| `genre_literacy` | Domain knowledge depth |
+| `novelty_seeking` | Preference for innovation vs. convention |
+| `risk_tolerance` | Comfort with uncertainty (EA/crowdfunding) |
+| `social_influence` | Reliance on reviews/community sentiment |
+| `completion_drive` | Drive to complete all content/achievements |
+| `price_sensitivity` | Price-value sensitivity |
+| `emotional_engagement` | Emotional investment level |
+| `agency_preference` | Preference for guidance vs. free exploration |
+| `tolerance_for_ambiguity` | Comfort with unclear systems/narratives |
+| `platform_loyalty` | Platform attachment strength |
+| `criticism_style` | Constructive vs. harsh feedback tendency |
+
+**8 Persona Packs (75+ personas total):**
+
+| Pack | File | Personas |
+|---|---|---|
+| Game Core | `game-core.yaml` | 16 core game personas (explorer, systems theorist, action feel, narrative, visual, casual, novice, cozy, Steam browser, TapTap scout, creator, publisher scout, price-sensitive, toxic skeptic, competitor veteran) |
+| Competitive Esport | `competitive-esport.yaml` | Rank climber, speedrun challenger, team coordinator, esport spectator, mod competitor |
+| Family Casual | `family-casual.yaml` | Party socialite, cozy relaxer, nostalgia retro, generational bridge |
+| Indie Creative | `indie-creative.yaml` | Creativity seeker, indie rhythm fanatic, visual atmosphere lover |
+| Mobile F2P | `mobile-f2p.yaml` | Mobile monthly card, mobile ad tolerant, hypercasual passerby, free lunch hunter, fragmented whale |
+| VR Immersive | `vr-immersive.yaml` | VR motion sensitive, presence seeker, VR fitness player, social VR resident |
+| Accessibility | `accessibility.yaml` | Color vision aid, cognitive load sensitive, motor accessibility, hearing accessibility |
+| Educational Serious | `educational-serious.yaml` | Teacher evaluator, parent gatekeeper, lifelong learner, special needs learner, parent-child creator |
+
+### 3. Cross-Examination — Structured Debate Protocol
+
+Traditional "let the most disagreeing personas argue" often produces unproductive extreme-vs-extreme noise. AudienceLens uses a structured protocol:
+
+1. **Controversy Extraction** — Extract top-3 controversies from all persona outputs, ranked by severity variance, with SequenceMatcher deduplication
+2. **Opposing Rebuttals** — For each controversy, personas on opposite sides write evidence-based arguments
+3. **Persuasion Scoring** — All personas score each argument's persuasiveness
+4. **Stance Revision** — If confidence change exceeds 0.15, persona may update stance
+5. **Full Provenance** — System records: who changed, why, which argument triggered it, confidence before/after
+
+### 4. Task Types — 10 Review Scenarios
+
+| Task Type | Use Case |
+|---|---|
+| `steam_page_review` | Store page information architecture, visual communication, trust signals |
+| `demo_first_play` | Onboarding friction, game feel, first 15-minute experience |
+| `concept_review` | Core loop, differentiation, feasibility |
+| `monetization_review` | Pricing, pay boundaries, value perception |
+| `looking_for_party_post` | Community copy, virality, social appeal |
+| `update_announcement_review` | Patch notes, trust reinforcement, retention signals |
+| `devlog_review` | Development narrative, community engagement |
+| `kickstarter_review` | Campaign page, reward tiers, backer trust |
+| `localization_review` | Translation quality, cultural adaptation |
+| `discord_community_review` | Community management, tone, engagement patterns |
+
+### 5. Web Application — Full-Stack Implementation
+
+| Layer | Tech Stack | Key Features |
+|---|---|---|
+| **Backend** | FastAPI + SQLite + WebSocket | 25+ API endpoints, 9 WebSocket events, 4 core services |
+| **Frontend** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 12 pages, 7 components, 2 Zustand stores |
+| **Services** | PersonaService, ReviewService, LLMService, EthicsService | Multi-model gateway (Claude/GPT/DeepSeek/Ollama), stereotype detection, ethics compliance |
+| **Real-time** | WebSocket (9 event types) | Live review progress, persona-by-persona results |
+| **Deployment** | Docker Compose | Frontend (Nginx) + Backend (Uvicorn) |
+
+**3 Review Modes:**
+
+| Mode | Personas | Cross-Exam | Calibration | Use Case |
+|---|---|---|---|---|
+| Quick | 3 | No | No | Rapid scan |
+| Standard | 4–6 | Yes | No | Balanced review |
+| Full | 6–8 | Yes | Yes | Complete analysis |
+
+### 6. Quality Harness — 8-Dimension Evaluation
+
+| # | Dimension | What It Checks |
+|---|---|---|
+| 1 | **Persona Differentiation** | Are personas producing distinct perspectives? |
+| 2 | **Input Grounding** | Is feedback anchored in actual materials? |
+| 3 | **Actionability** | Are there concrete P0/P1/P2 fixes? |
+| 4 | **Segment Conflict** | Are disagreements surfaced? |
+| 5 | **Risk Detection** | Are critical risks identified? |
+| 6 | **Ethical Persona Use** | No demographic stereotypes? |
+| 7 | **Report Structure** | All required sections present? |
+| 8 | **Calibration Honesty** | Findings framed as hypotheses, not predictions? |
+
+### 7. Ethics Framework — Built-In Safeguards
+
+| Principle | Implementation |
+|---|---|
+| **Identity-Behavior Decoupling** | Gender/age/region are weak style modifiers only — never causal predictors |
+| **MBTI De-authorization** | MBTI modifies expression style only — never core judgment logic |
+| **Evidence Tiering** | `[direct]` / `[inferred]` / `[gap]` — inferred capped at 40% |
+| **No Fabrication** | Personas must not invent missing features, plot, multiplayer, monetization |
+| **Mandatory Disclaimer** | Every report: "AI-generated synthetic review — not real user research" |
+| **Stereotype Detection** | EthicsService with 10+ detection rules for demographic stereotyping |
+
+### 8. Evidence System — Three-Tier Annotation
+
+| Tier | Label | Rule |
+|---|---|---|
+| **Direct** | `[direct]` | Directly quoted from input materials — must be locatable |
+| **Inferred** | `[inferred]` | Reasonable inference from persona's behavioral profile — capped at 40% of total evidence |
+| **Gap** | `[gap]` | Information not provided — must write "unspecified", never fabricate |
+
+---
+
+## Quick Start
+
+### CLI Mode
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Simulated mode (no API key needed)
+python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+
+# Real API mode
+export ANTHROPIC_API_KEY=your-key
+python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+```
+
+### Web Mode
+
+```bash
+# Backend
+cd web/backend
+pip install -r requirements.txt
+python run.py
+
+# Frontend (in another terminal)
+cd web/frontend
+npm install
+npm run dev
+```
+
+### Docker
+
+```bash
+cd web
+docker-compose up
+```
+
+### Programmatic API
+
+```python
+from runner.cli import run_panel
+import json
+
+with open('examples/steam-page-sample/artifact.json') as f:
+    artifact = json.load(f)
+
+result = run_panel(task_type='steam_page_review', artifact_bundle=artifact)
+print(result['markdown'])       # Markdown report
+print(result['report'])         # JSON report
+print(result['calibration'])    # Calibration results
+```
+
+---
+
+## Repository Structure
+
+```
+audiencelens/
+├── src/
+│   ├── runner/                        # Pipeline engine (7 stages)
+│   │   ├── cli.py                     #   CLI entry + core orchestration
+│   │   ├── panel_selector.py          #   Panel selection + dissenter guarantee
+│   │   ├── evidence_precheck.py       #   Evidence coverage filtering
+│   │   ├── persona_agent.py           #   Prompt rendering + output parsing
+│   │   ├── validator.py               #   3-layer validation
+│   │   ├── cross_exam.py              #   Structured cross-examination
+│   │   ├── aggregator.py              #   Rule-driven report aggregation
+│   │   └── calibration.py             #   Quality calibration check
+│   ├── personas/                      # 8 persona packs (75+ personas)
+│   ├── presets/                       # Panel presets per task type
+│   ├── schemas/                       # JSON Schema (persona, output, report)
+│   ├── templates/                     # Prompt + report templates
+│   └── config/                        # Aggregation rules + budget config
+├── web/
+│   ├── backend/                       # FastAPI backend
+│   │   └── app/
+│   │       ├── api/                   #   25+ REST endpoints
+│   │       ├── services/              #   4 core services
+│   │       ├── models/                #   SQLAlchemy models
+│   │       ├── schemas/               #   Pydantic schemas
+│   │       └── websocket/             #   9 WebSocket events
+│   └── frontend/                      # React frontend
+│       └── src/
+│           ├── pages/                 #   12 pages
+│           ├── components/            #   7 components
+│           └── store/                 #   2 Zustand stores
+├── tests/                             # 180+ TDD tests
+├── examples/                          # 7 sample artifacts
+├── docs/                              # Documentation
+├── requirements.txt
+└── pytest.ini
+```
+
+---
+
+## Testing
+
+```bash
+pip install -r requirements.txt
+python -m pytest tests/ -v
+```
+
+**180+ tests — all passing**
+
+---
+
+## Roadmap
+
+| Version | Focus | Status |
+|---|---|---|
+| v0.1 | MVP — 16 personas, 6 task types, CLI runner, cross-examination, 3-layer validation | Done |
+| **v0.2** | **Harness Edition — 8-dim quality gate, ethics service, 75+ personas, Web UI** | **Current** |
+| v0.3 | Human parity study, golden output regression, auto evidence tier detection | Planned |
+| v1.0 | Big-Five replacement for MBTI, dynamic panel generation, cost-aware model routing | Planned |
+
+---
+
+## Disclaimer
+
+**Synthetic audience feedback is not a substitute for real user research.** Use it for:
+- Blind-spot detection
+- Hypothesis generation
+- Pre-screening before real testing
+- Critique preparation
+- Next-test planning
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE)
+
+---
+
+## Made by Shuoji Team
+
+---
+
+---
+
+<a id="中文"></a>
+
+## 概述
+
+AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人格对游戏、产品和创意项目进行评审——在投入真人测试资源之前。
+
+与直接问 ChatGPT 不同，AudienceLens：
+1. **隔离运行**多个行为驱动人格（8个Pack共75+个人格）
+2. 对 top-3 争议点执行**结构化交叉质询**
+3. 追踪**立场修正**的完整溯源链（谁改了、为什么改、被哪个论据说服）
+4. 通过**8维质量 Harness** 验证输出
+5. 强制**伦理约束**——刻板印象检测、证据分级、强制免责声明
+
+> **AudienceLens 不是玩家研究，不能替代真人测试。** 它是一个预筛与压力测试工具，用于在投入真人测试资源之前发现最明显的问题。
+
+---
+
+## 功能分类
+
+### 1. Runner 引擎 — 流水线架构
+
+核心执行引擎是 `src/runner/` 中的7阶段流水线：
+
+| 阶段 | 模块 | 功能 |
+|---|---|---|
+| **面板选择** | `panel_selector.py` | 按任务类型选择人格；保证反对者存在（缺P15自动追加） |
+| **证据预检** | `evidence_precheck.py` | 过滤证据覆盖度 <30% 的人格 |
+| **人格执行** | `persona_agent.py` | 渲染五段式 Prompt（人格卡→MBTI边界→身份-行为解耦→任务→证据规则）；解析结构化输出 |
+| **三层校验** | `validator.py` | Schema校验(Draft7Validator) → 角色一致性(must_comment_on≥80%, inferred≤40%) → 证据接地(幻觉<30%) |
+| **交叉质询** | `cross_exam.py` | 提取top-3争议点（按severity方差排序，SequenceMatcher去重）；对立人格反驳；置信度变化>0.15可修正立场 |
+| **规则聚合** | `aggregator.py` | 计算共识、分歧、优先修复项（severity×人格权重×影响人数）；发布风险评估 |
+| **校准检查** | `calibration.py` | 角色一致性率、视角覆盖度(Jaccard≥0.3)、幻觉率、稳定性 |
+
+### 2. 人格系统 — 12轴行为向量
+
+人格由**行为向量**定义，而非人口统计标签。SCOPE研究表明人口统计仅解释1.5%的行为方差。
 
 | 行为轴 | 说明 |
 |---|---|
@@ -29,108 +352,134 @@
 | `platform_loyalty` | 平台忠诚度 |
 | `criticism_style` | 批评风格 |
 
-人格库涵盖：核心探索者、系统推演党、动作手感党、叙事沉浸党、视觉氛围党、轻度碎片玩家、新手上手观察者、治愈社交分享型、Steam 愿望单浏览者、TapTap 口碑型浏览者、创作者视角、发行侦察官、价格敏感买家、毒舌怀疑型、竞品对标老兵。
+**8个人格Pack（75+人格）：**
 
-### 6 种任务类型
-
-| 任务类型 | 中文名 | 适用场景 |
+| Pack | 文件 | 人格 |
 |---|---|---|
-| `steam_page_review` | Steam页评审 | 商店页信息架构、视觉传达、信任信号 |
-| `demo_first_play` | Demo首玩 | 上手摩擦、手感、首15分钟体验 |
-| `concept_review` | 概念评审 | 核心循环、差异化、可行性 |
-| `monetization_review` | 商业化评审 | 定价、付费边界、价值感知 |
-| `looking_for_party_post` | 找搭子帖 | 社区文案、传播性、社交吸引力 |
-| `update_announcement_review` | 更新公告 | 版本日志、信任强化、留存信号 |
+| 游戏核心 | `game-core.yaml` | 16个核心游戏人格（探索者、推演党、手感党、沉浸党、氛围党、碎片玩家、新手、治愈社交、Steam浏览者、TapTap口碑、创作者、发行侦察、价格敏感、毒舌怀疑、竞品老兵） |
+| 竞技电竞 | `competitive-esport.yaml` | 冲分玩家、速通挑战者、团队协调者、电竞观众、Mod竞技者 |
+| 家庭休闲 | `family-casual.yaml` | 派对社交、治愈放松、怀旧复古、代际桥梁 |
+| 独立创意 | `indie-creative.yaml` | 创意探索者、独立节奏狂、视觉氛围爱好者 |
+| 移动免费 | `mobile-f2p.yaml` | 月卡党、广告容忍者、超休闲路人、白嫖猎人、碎片鲸鱼 |
+| VR沉浸 | `vr-immersive.yaml` | VR晕动敏感、临场感追求者、VR健身玩家、社交VR居民 |
+| 无障碍 | `accessibility.yaml` | 色觉辅助、认知负荷敏感、运动无障碍、听觉无障碍 |
+| 教育严肃 | `educational-serious.yaml` | 教师评估者、家长守门人、终身学习者、特殊需求学习者、亲子共创者 |
 
-### 严格的行为约束
+### 3. 交叉质询 — 结构化辩论协议
 
-- **证据三级标注**：`[direct]` 直接引用材料 / `[inferred]` 角色合理推断 / `[gap]` 信息缺口写"未指定"
-- **禁止脑补**：不得替开发者脑补缺失功能、剧情、联机、商业化细节
-- **身份-行为解耦**：persona 的判断必须基于 behavior_profile，不得将性别/年龄/地域作为偏好的直接因果解释
-- **MBTI 去权**：MBTI 仅用于修饰表达风格，不得用于推导核心判断逻辑
-- **Demographics 正交化**：每个敏感人口属性值（如"非二元"）至少出现在两个不同 archetype 的人格上
+传统"让分歧最大的两个人格互问"容易变成极端对立的无意义争吵。AudienceLens 使用结构化协议：
 
-### 焦点争议点质询
+1. **争议提取** — 从所有人格输出中提取top-3争议点，按severity方差排序，SequenceMatcher去重
+2. **对立反驳** — 对每个争议点，持相反立场的人格写基于证据的论证
+3. **说服力评分** — 所有人格对每段论证评分
+4. **立场修正** — 置信度变化超过0.15时，人格可更新立场
+5. **完整溯源** — 系统记录：谁改了、为什么改、被哪个论点触发、置信度前后变化
 
-传统"让分歧最大的两个 persona 互问"容易变成两个极端角色的无意义争吵。AudienceLens 改为：
+### 4. 任务类型 — 10种评审场景
 
-1. 从所有 persona 输出中提取 top-3 争议点（按 severity 方差排序）
-2. 对每个争议点，让持相反立场的 persona 各写一段论证
-3. 所有 persona 对每段论证做说服力评分
-4. confidence 变化超过 0.15 时允许更新立场
-
-### 校准与监控
-
-| 指标 | 说明 |
+| 任务类型 | 适用场景 |
 |---|---|
-| `role_consistency_rate` | must_comment_on_check 覆盖率 ≥ 80% |
-| `coverage_score` | persona 间 Jaccard 距离均值 ≥ 0.3（视角足够多样） |
-| `hallucination_rate` | direct 证据中无法在输入材料中定位的比例 |
-| `variance_ratio` | scores 面板方差充足 |
+| `steam_page_review` | 商店页信息架构、视觉传达、信任信号 |
+| `demo_first_play` | 上手摩擦、手感、首15分钟体验 |
+| `concept_review` | 核心循环、差异化、可行性 |
+| `monetization_review` | 定价、付费边界、价值感知 |
+| `looking_for_party_post` | 社区文案、传播性、社交吸引力 |
+| `update_announcement_review` | 版本日志、信任强化、留存信号 |
+| `devlog_review` | 开发叙事、社区参与 |
+| `kickstarter_review` | 众筹页面、奖励层级、支持者信任 |
+| `localization_review` | 翻译质量、文化适配 |
+| `discord_community_review` | 社区管理、语气、参与模式 |
 
----
+### 5. Web应用 — 全栈实现
 
-## 安装
+| 层 | 技术栈 | 核心功能 |
+|---|---|---|
+| **后端** | FastAPI + SQLite + WebSocket | 25+ API端点、9个WebSocket事件、4个核心服务 |
+| **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 12个页面、7个组件、2个Zustand Store |
+| **服务** | PersonaService、ReviewService、LLMService、EthicsService | 多模型网关(Claude/GPT/DeepSeek/Ollama)、刻板印象检测、伦理合规 |
+| **实时** | WebSocket（9种事件类型） | 实时评审进度、逐人格结果展示 |
+| **部署** | Docker Compose | 前端(Nginx) + 后端(Uvicorn) |
 
-### 前置依赖
+**3种评审模式：**
 
-- Python 3.11+
-- Anthropic API Key（用于真实 API 调用，可选）
+| 模式 | 人格数 | 交叉质询 | 校准 | 适用场景 |
+|---|---|---|---|---|
+| 快速 | 3 | 否 | 否 | 快速扫描 |
+| 标准 | 4–6 | 是 | 否 | 均衡评审 |
+| 完整 | 6–8 | 是 | 是 | 完整分析 |
 
-### 安装步骤
+### 6. 质量 Harness — 8维评估
 
-```bash
-git clone https://github.com/your-repo/audiencelens.git
-cd audiencelens
-pip install -r requirements.txt
-```
+| # | 维度 | 检查内容 |
+|---|---|---|
+| 1 | **人格差异化** | 人格是否产出不同视角？ |
+| 2 | **输入依据** | 反馈是否锚定在实际材料上？ |
+| 3 | **可操作性** | 是否有具体的P0/P1/P2修复项？ |
+| 4 | **群体冲突** | 分歧是否被暴露？ |
+| 5 | **风险检测** | 关键风险是否被识别？ |
+| 6 | **伦理人格使用** | 是否无人口统计刻板印象？ |
+| 7 | **报告结构** | 所有必需段落是否完整？ |
+| 8 | **校准诚实度** | 发现是否定位为假设而非预测？ |
 
-### 安装为 Claude Code Skill（可选）
+### 7. 伦理框架 — 内置安全机制
 
-```bash
-# 项目级安装
-Expand-Archive synthetic-playtest.skill.zip -DestinationPath .claude/skills/synthetic-playtest/
+| 原则 | 实现 |
+|---|---|
+| **身份-行为解耦** | 性别/年龄/地域仅作为弱风格修饰符——绝不作为因果预测因子 |
+| **MBTI去权** | MBTI仅修饰表达风格——不推导核心判断逻辑 |
+| **证据分级** | `[direct]` / `[inferred]` / `[gap]` — 推断证据上限40% |
+| **禁止脑补** | 人格不得编造缺失的功能、剧情、联机或商业化细节 |
+| **强制免责** | 每份报告包含"AI生成的合成评审——非真实用户研究" |
+| **刻板印象检测** | EthicsService含10+条检测规则 |
 
-# 或个人级安装（所有项目可用）
-Expand-Archive synthetic-playtest.skill.zip -DestinationPath ~/.claude/skills/synthetic-playtest/
-```
+### 8. 证据系统 — 三级标注
+
+| 级别 | 标签 | 规则 |
+|---|---|---|
+| **直接** | `[direct]` | 直接引用输入材料——必须可定位 |
+| **推断** | `[inferred]` | 基于人格行为画像的合理推断——不超过总证据的40% |
+| **缺口** | `[gap]` | 信息未提供——必须写"未指定"，禁止编造 |
 
 ---
 
 ## 快速开始
 
-### 方式1：Claude Code Skill（推荐）
-
-在 Claude Code 中直接调用：
+### CLI模式
 
 ```bash
-# 评审 Steam 商店页
-/synthetic-playtest steam_page_review examples/steam-page-sample/artifact.json
+# 安装依赖
+pip install -r requirements.txt
 
-# 评审 Demo 体验
-/synthetic-playtest demo_first_play examples/demo-sample/artifact.json
+# 模拟模式（无需API Key）
+python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 
-# 评审概念文档
-/synthetic-playtest concept_review examples/concept-sample/artifact.json
+# 真实API模式
+export ANTHROPIC_API_KEY=your-key
+python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 ```
 
-Claude 会自动读取 SKILL.md 中的指令，选择合适的 persona 面板，逐一运行隔离评审，然后聚合输出 `audiencelens-report.json` 和 `audiencelens-report.md`。
-
-### 方式2：Python CLI
+### Web模式
 
 ```bash
-# 模拟模式（无需 API Key）
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+# 后端
+cd web/backend
+pip install -r requirements.txt
+python run.py
 
-# 真实 API 模式
-export ANTHROPIC_API_KEY=your-api-key
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
-
-# 指定输出目录
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json --output-dir ./reports
+# 前端（另一个终端）
+cd web/frontend
+npm install
+npm run dev
 ```
 
-### 方式3：程序化调用
+### Docker
+
+```bash
+cd web
+docker-compose up
+```
+
+### 程序化调用
 
 ```python
 from runner.cli import run_panel
@@ -139,11 +488,7 @@ import json
 with open('examples/steam-page-sample/artifact.json') as f:
     artifact = json.load(f)
 
-result = run_panel(
-    task_type='steam_page_review',
-    artifact_bundle=artifact
-)
-
+result = run_panel(task_type='steam_page_review', artifact_bundle=artifact)
 print(result['markdown'])       # Markdown 报告
 print(result['report'])         # JSON 报告
 print(result['calibration'])    # 校准结果
@@ -151,180 +496,84 @@ print(result['calibration'])    # 校准结果
 
 ---
 
-## 准备评审材料
-
-评审材料是一个 JSON 或 YAML 文件，包含 `title`、`description` 和 `materials` 列表：
-
-```json
-{
-  "title": "Echoes of the Void",
-  "description": "一款融合 roguelite 与 metroidvania 的 2D 动作游戏",
-  "materials": [
-    {
-      "type": "截图",
-      "description": "胶囊图：暗色调像素风格，主角背影面对巨大虚空裂缝"
-    },
-    {
-      "type": "实机视频",
-      "description": "30秒实机预告片，展示时间回溯、战斗和探索核心循环"
-    },
-    {
-      "type": "核心循环说明",
-      "description": "探索→战斗→死亡→时间回溯→解锁新路径→获得永久能力"
-    },
-    {
-      "type": "价格",
-      "description": "抢先体验价 $14.99，正式版 $19.99"
-    },
-    {
-      "type": "tags",
-      "description": "roguelite, metroidvania, pixel art, time manipulation"
-    }
-  ]
-}
-```
-
-**材料越丰富，评审越准确。** 如果材料缺失某类证据，persona 会输出"未指定"并在报告中标注。
-
----
-
-## 理解报告
-
-AudienceLens 输出两类文件：
-
-### audiencelens-report.json
-
-完整的结构化报告，包含：
-- **executive_summary**：主要建议、发布风险、证据质量
-- **consensus**：多数 persona 认可的点和质疑的点
-- **major_disagreements**：主要分歧及解决方案建议
-- **priority_fixes**：按优先级排序的修复项（severity × persona权重 × 影响人数）
-- **persona_notes**：每个 persona 的立场、证据、继续/退出触发器
-- **information_gaps**：材料中缺失的信息
-- **next_human_test**：建议下一步真人测试的方向
-
-### audiencelens-report.md
-
-人类可读的 Markdown 报告，包含 Synthetic Banner、Executive Summary、共识/分歧/优先修复项、Persona 视角摘要、信息缺口和下一步建议。
-
----
-
-## 项目结构
+## 仓库结构
 
 ```
 audiencelens/
-├── SKILL.md                           # Claude Code Skill 主入口
-├── synthetic-playtest.skill.zip       # 可分发的 Skill 包
 ├── src/
-│   ├── personas/
-│   │   └── game-core.yaml             # 16个persona定义
-│   ├── presets/
-│   │   └── panel-presets.yaml         # 6种任务默认面板
-│   ├── schemas/
-│   │   ├── persona-schema.json        # Persona YAML校验schema
-│   │   ├── output-schema.json         # 单persona输出schema
-│   │   └── report-schema.json         # 聚合报告schema
-│   ├── templates/
-│   │   ├── persona-prompt.md          # 五段式Prompt模板
-│   │   ├── cross-exam-prompt.md       # 焦点争议点质询模板
-│   │   └── report-template.md         # Markdown报告模板
-│   ├── config/
-│   │   ├── aggregation-rules.yaml     # 聚合规则
-│   │   └── budget.yaml                # 成本配置
-│   └── runner/
-│       ├── panel_selector.py           # 面板选择
-│       ├── evidence_precheck.py       # 证据完整性预检
-│       ├── validator.py                # 三层校验
-│       ├── persona_agent.py           # 单persona代理
-│       ├── cross_exam.py              # 焦点争议点质询
-│       ├── aggregator.py              # 规则驱动聚合
-│       ├── calibration.py             # 校准harness
-│       └── cli.py                     # CLI入口
-├── tests/                             # 180个TDD测试
-├── examples/                          # 示例素材
+│   ├── runner/                        # 流水线引擎（7阶段）
+│   │   ├── cli.py                     #   CLI入口 + 核心编排
+│   │   ├── panel_selector.py          #   面板选择 + 反对者保证
+│   │   ├── evidence_precheck.py       #   证据覆盖度过滤
+│   │   ├── persona_agent.py           #   Prompt渲染 + 输出解析
+│   │   ├── validator.py               #   三层校验
+│   │   ├── cross_exam.py              #   结构化交叉质询
+│   │   ├── aggregator.py              #   规则驱动报告聚合
+│   │   └── calibration.py             #   质量校准检查
+│   ├── personas/                      # 8个人格Pack（75+人格）
+│   ├── presets/                       # 各任务类型面板预设
+│   ├── schemas/                       # JSON Schema（人格、输出、报告）
+│   ├── templates/                     # Prompt + 报告模板
+│   └── config/                        # 聚合规则 + 预算配置
+├── web/
+│   ├── backend/                       # FastAPI 后端
+│   │   └── app/
+│   │       ├── api/                   #   25+ REST端点
+│   │       ├── services/              #   4个核心服务
+│   │       ├── models/                #   SQLAlchemy模型
+│   │       ├── schemas/               #   Pydantic模型
+│   │       └── websocket/             #   9个WebSocket事件
+│   └── frontend/                      # React 前端
+│       └── src/
+│           ├── pages/                 #   12个页面
+│           ├── components/            #   7个组件
+│           └── store/                 #   2个Zustand Store
+├── tests/                             # 180+ TDD测试
+├── examples/                          # 7个示例素材
+├── docs/                              # 文档
 ├── requirements.txt
 └── pytest.ini
 ```
 
 ---
 
-## 运行测试
+## 测试
 
 ```bash
 pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-当前：**180 个测试全部通过**
+**180+ 测试全部通过**
 
 ---
 
-## 伦理使用声明
+## 路线图
 
-> **Synthetic panel. All responses were generated by AI personas, not human respondents.**
-> This report must not be represented as "player research findings", "user survey results", or "real player opinion distribution".
-
-AudienceLens 的输出：
-
-- ❌ **不能**写成真实性玩家研究结论
-- ❌ **不能**写成用户调查或真实玩家意见分布
-- ❌ **不能**替代真人 playtest 或用户访谈
-- ✅ **可以**作为预筛工具，发现最明显的问题
-- ✅ **可以**作为压力测试工具，检验开发团队是否遗漏了关键视角
-- ✅ **可以**作为快速迭代工具，在投入真人测试资源之前做多轮快速评审
-
-详见 [伦理使用指南](./ETHICS.md)。
+| 版本 | 重点 | 状态 |
+|---|---|---|
+| v0.1 | MVP — 16个人格、6种任务类型、CLI引擎、交叉质询、三层校验 | 已完成 |
+| **v0.2** | **Harness版 — 8维质量门控、伦理服务、75+人格、Web UI** | **当前** |
+| v0.3 | 人类对照研究、黄金输出回归、证据分级自动检测 | 计划中 |
+| v1.0 | Big-Five替代MBTI、动态面板生成、成本感知模型路由 | 计划中 |
 
 ---
 
-## Roadmap
+## 免责声明
 
-### v0.1 — MVP（当前）
-
-- [x] 16个persona YAML（含12行为轴）
-- [x] 6种任务preset
-- [x] 五段式Prompt模板
-- [x] 焦点争议点质询
-- [x] 规则驱动聚合器
-- [x] 三层校验（schema + 角色一致性 + 证据接地）
-- [x] 最简校准harness
-- [x] Claude Code Skill
-
-### v0.2
-
-- [ ] 人类对照导入和校准流程
-- [ ] 黄金输出回归测试
-- [ ] 证据三级标注自动检测
-
-### v1.0
-
-- [ ] 无障碍专项persona pack（4-6个）
-- [ ] Big-Five替代MBTI
-- [ ] 动态面板生成算法
-- [ ] 成本感知模型路由
-
-### 企业版
-
-- [ ] RBAC + 审计日志
-- [ ] 团队空间和私有人物包
-- [ ] 多模型网关
-- [ ] Web UI + 仪表板
-
----
-
-## 致谢
-
-AudienceLens 借鉴了以下开源项目和学术研究：
-
-- **CCGS** — Claude Code Skills 生态的多代理组织方式
-- **SynthPanel** — YAML persona/instrument 和合成面板的工程实践
-- **Mirror** — think-aloud 和综合报告机制
-- **trashmy.tech** — 并行 persona 和确定性评分思路
-- **SCOPE 研究** — demographics 仅解释 1.5% 行为方差
-- **NN/g persona 方法论** — 行为优先于身份的设计原则
+**合成观众反馈不能替代真实用户研究。** 适用于：
+- 盲点检测
+- 假设生成
+- 真实测试前的预筛选
+- 评审准备
+- 下一步测试规划
 
 ---
 
 ## 许可证
 
-MIT License
+MIT License — 详见 [LICENSE](LICENSE)
+
+---
+
+## 朔纪团队出品
