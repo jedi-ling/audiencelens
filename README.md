@@ -172,7 +172,10 @@ pip install -r requirements.txt
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 
 # Real API mode
+# Linux/macOS
 export ANTHROPIC_API_KEY=your-key
+# Windows PowerShell: $env:ANTHROPIC_API_KEY="your-key"
+# Windows CMD: set ANTHROPIC_API_KEY=your-key
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 ```
 
@@ -298,8 +301,6 @@ MIT License — see [LICENSE](LICENSE)
 
 ---
 
----
-
 <a id="中文"></a>
 
 ## 概述
@@ -313,7 +314,7 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 4. 通过**8维质量 Harness** 验证输出
 5. 强制**伦理约束**——刻板印象检测、证据分级、强制免责声明
 
-> **AudienceLens 不是玩家研究，不能替代真人测试。** 它是一个预筛与压力测试工具，用于在投入真人测试资源之前发现最明显的问题。
+> **AudienceLens 不能替代真实用户研究。** 它是一个预筛与压力测试工具，用于在投入真人测试资源之前发现最明显的问题。
 
 ---
 
@@ -454,7 +455,10 @@ pip install -r requirements.txt
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 
 # 真实API模式
+# Linux/macOS
 export ANTHROPIC_API_KEY=your-key
+# Windows PowerShell: $env:ANTHROPIC_API_KEY="your-key"
+# Windows CMD: set ANTHROPIC_API_KEY=your-key
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 ```
 
