@@ -5,17 +5,36 @@ from typing import List
 
 import yaml
 
-from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
-from runner.calibration import run_calibration_check
-from runner.cross_exam import (
-    extract_controversy_points,
-    render_cross_exam_prompt,
-    run_cross_exam_protocol,
+try:
+    from .aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
+    from .calibration import run_calibration_check
+    from .cross_exam import (
+        extract_controversy_points,
+        render_cross_exam_prompt,
+        run_cross_exam_protocol,
+    )
+    from .evidence_precheck import precheck_panel
+    from .panel_selector import load_personas, load_presets, select_panel
+    from .persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
+    from .validator import load_schema, validate_output
+except ImportError:
+    from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
+    from runner.calibration import run_calibration_check
+    from runner.cross_exam import (
+        extract_controversy_points,
+        render_cross_exam_prompt,
+        run_cross_exam_protocol,
+    )
+    from runner.evidence_precheck import precheck_panel
+    from runner.panel_selector import load_personas, load_presets, select_panel
+    from runner.persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
+    from runner.validator import load_schema, validate_output
+
+SIMULATION_WARNING = (
+    "⚠️ 模拟模式（未检测到 ANTHROPIC_API_KEY）：所有人格输出均为预制占位数据，"
+    "不包含任何真实评审意见，仅用于验证流水线是否可运行。"
+    "请勿将本次结果用于任何决策。设置 ANTHROPIC_API_KEY 后重新运行以获得真实评审。"
 )
-from runner.evidence_precheck import precheck_panel
-from runner.panel_selector import load_personas, load_presets, select_panel
-from runner.persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
-from runner.validator import load_schema, validate_output
 
 VALID_TASK_TYPES = [
     "steam_page_review",
@@ -74,10 +93,11 @@ def _build_simulated_output(persona: dict, task_type: str) -> dict:
         "first_scan_observations": ["模拟观察"],
         "must_comment_on_check": must_comment_on_check,
         "missing_information": [],
-        "voice_sample": "模拟原声评价",
+        "voice_sample": "（模拟占位数据，非真实评审意见）",
         "meta": {
-            "caveats": ["此为模拟输出"],
+            "caveats": ["此为模拟占位输出，不包含任何真实评审意见，请勿用于决策"],
             "is_synthetic": True,
+            "is_simulated": True,
         },
     }
 
@@ -182,6 +202,10 @@ def run_panel(
     if html_template_path is None:
         html_template_path = os.path.join(base, "src", "templates", "report-template.html")
 
+    simulated = not os.environ.get("ANTHROPIC_API_KEY")
+    if simulated:
+        print(f"\n{SIMULATION_WARNING}\n", flush=True)
+
     personas = load_personas(personas_path)
     presets = load_presets(presets_path)
 
@@ -244,16 +268,29 @@ def run_panel(
         cross_exam_data,
     )
 
+    if simulated:
+        report["simulation_notice"] = SIMULATION_WARNING
+
     calibration = run_calibration_check(persona_outputs, artifact_texts)
 
     markdown = ""
     if report_template_path:
         markdown = render_markdown_report(report, report_template_path)
+        if simulated:
+            markdown = f"> **{SIMULATION_WARNING}**\n\n{markdown}"
 
     report["_persona_outputs"] = persona_outputs
     html = ""
     if html_template_path:
         html = render_html_report(report, html_template_path)
+        if simulated and "<body" in html:
+            banner = (
+                '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
+                'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
+                f"{SIMULATION_WARNING}</div>"
+            )
+            idx = html.index(">", html.index("<body")) + 1
+            html = html[:idx] + banner + html[idx:]
     del report["_persona_outputs"]
 
     total_cost = sum(r["cost"] for r in persona_results)
@@ -263,6 +300,7 @@ def run_panel(
         "markdown": markdown,
         "html": html,
         "calibration": calibration,
+        "simulated": simulated,
         "cost_summary": {
             "total_cost": total_cost,
             "persona_count": len(persona_results),
@@ -328,3 +366,8 @@ def main():
     )
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(result["html"])
+
+    if result.get("simulated"):
+        print("=" * 60)
+        print(SIMULATION_WARNING)
+        print("=" * 60)

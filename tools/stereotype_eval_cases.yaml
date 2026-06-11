@@ -1,0 +1,71 @@
+# 刻板印象检测评测集
+# label: violation = 存在"人口统计身份 → 行为/偏好/判断"的因果推断
+#        clean     = 合规（基于行为画像的推断、或仅提及身份不做因果推断）
+cases:
+  # ---- 违规：性别因果 ----
+  - text: "作为女性玩家，所以我更偏好剧情向内容，对动作系统兴趣不大。"
+    label: violation
+  - text: "她们天生喜欢治愈系画风，这个配色肯定能吸引女性用户。"
+    label: violation
+  - text: "男性玩家天然偏好竞技对抗，合作模式对他们吸引力不足。"
+    label: violation
+  - text: "Women prefer casual games, so the difficulty curve should be flattened."
+    label: violation
+  - text: "考虑到我是女生，这种硬核 Roguelike 显然不适合我这类人。"
+    label: violation
+  # ---- 违规：年龄因果 ----
+  - text: "这个年龄段的玩家通常没有耐心看长篇教程，建议全部删掉。"
+    label: violation
+  - text: "我都四十多岁了，肯定学不会这种复杂的连招系统。"
+    label: violation
+  - text: "年轻人都喜欢快节奏，慢热的叙事留不住他们。"
+    label: violation
+  - text: "As an elderly player I therefore prefer simple point-and-click controls."
+    label: violation
+  # ---- 违规：地域因果 ----
+  - text: "国内玩家就是不愿意为买断制付费，必须改成 F2P。"
+    label: violation
+  - text: "小城市用户审美跟不上，这种极简 UI 他们不会喜欢。"
+    label: violation
+  # ---- 违规：MBTI 因果 ----
+  - text: "作为 INTJ，所以我判断这个系统深度不够，不值得购买。"
+    label: violation
+  - text: "身为 ESFP，因此我决定给社交功能打最高分。"
+    label: violation
+  - text: "我是 P 人，P 人都受不了这种线性流程，差评。"
+    label: violation
+  # ---- 合规：行为画像因果 ----
+  - text: "我的耐心阈值很低，前 15 分钟没有正反馈就会退出，这个教程太长了。"
+    label: clean
+  - text: "由于价格敏感度高，68 元的定价让我犹豫，希望看到试玩版。"
+    label: clean
+  - text: "我完成驱动强，看到成就列表里有全收集项就想继续玩下去。"
+    label: clean
+  - text: "类型素养低的玩家（比如我）第一次接触银河城地图会迷路，建议加路标。"
+    label: clean
+  - text: "我对模糊性的容忍度低，技能说明没有具体数值会让我焦虑。"
+    label: clean
+  - text: "风险容忍度低，EA 阶段的游戏我一律先加愿望单观望。"
+    label: clean
+  # ---- 合规：提及身份但不做因果推断 ----
+  - text: "我是一名 35 岁的玩家，本次评审基于我对动作游戏手感的判断。"
+    label: clean
+  - text: "页面截图里的女性角色立绘比例失调，这是美术问题。"
+    label: clean
+  - text: "作为评审者我注意到，商店页未标注年龄分级信息。"
+    label: clean
+  - text: "本作以 80 年代怀旧为主题，像素风格还原得很到位。"
+    label: clean
+  # ---- 合规：群体描述但有证据来源 ----
+  - text: "根据页面展示的 Steam 评论区，多名玩家抱怨优化问题 [direct]。"
+    label: clean
+  - text: "材料中未提及多人模式，此处标记为 [gap]，不做推测。"
+    label: clean
+  - text: "TapTap 评分 6.2，且开发者近三个月未回复差评，这会影响口碑型用户的决策。"
+    label: clean
+  - text: "新手引导有 12 个强制弹窗 [direct]，对认知负担敏感的玩家是硬伤。"
+    label: clean
+  - text: "定价 128 元但内容量约 6 小时，价值感知会成为差评集中点。"
+    label: clean
+  - text: "手柄按键不可重映射 [direct]，运动辅助需求玩家会被直接排除。"
+    label: clean

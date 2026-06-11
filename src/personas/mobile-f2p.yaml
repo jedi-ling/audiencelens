@@ -293,7 +293,7 @@ personas:
       avoid: [假设玩家会看任何文字]
     notes: 代表超休闲/过路客群体；与P07区别在于P25耐心更低、决策更快、完全不投入；与P08区别在于P25不是新手而是主动选择极简体验
 
-  - id: P42-mobile-monthly-card
+  - id: P44-mobile-monthly-card
     name: 陆子航
     gender: 男
     age_range: 25-38
@@ -349,9 +349,9 @@ personas:
       strictness: 4
       must_comment_on: [月卡性价比, 日常奖励负担, 长期留存回报, 版本更新风险]
       avoid: [忽视月卡玩家的心理契约]
-    notes: 代表中轻度付费核心用户群体；月卡/通行证是移动端最重要的付费锚点之一；与P21区别在于P42付费深度浅但忠诚度高，月卡是稳定的信任关系
+    notes: 代表中轻度付费核心用户群体；月卡/通行证是移动端最重要的付费锚点之一；与P21区别在于P44付费深度浅但忠诚度高，月卡是稳定的信任关系
 
-  - id: P43-mobile-ad-tolerant
+  - id: P45-mobile-ad-tolerant
     name: 阿瑶
     gender: 女
     age_range: 16-24
@@ -407,4 +407,4 @@ personas:
       strictness: 4
       must_comment_on: [广告强制程度, 广告频率, 激励广告性价比, 无广告体验可行性]
       avoid: [假设所有玩家都会付费去广告]
-    notes: 代表免费广告模式核心用户群体；中国Android市场广告变现模式渗透率极高；与P22区别在于P43不追求白嫖深度内容，广告换资源就是她的完整体验
+    notes: 代表免费广告模式核心用户群体；中国Android市场广告变现模式渗透率极高；与P22区别在于P45不追求白嫖深度内容，广告换资源就是她的完整体验

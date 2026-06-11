@@ -37,7 +37,13 @@
     },
     "gender": {
       "type": "string",
-      "enum": ["男", "女", "非二元", "未指定", "自我描述"],
+      "enum": [
+        "男",
+        "女",
+        "非二元",
+        "未指定",
+        "自我描述"
+      ],
       "description": "性别"
     },
     "age_range": {
@@ -77,20 +83,30 @@
     },
     "gaming_profile": {
       "type": "object",
-      "required": ["experience", "platforms", "genres", "session_length"],
+      "required": [
+        "experience",
+        "platforms",
+        "genres",
+        "session_length"
+      ],
       "properties": {
         "experience": {
           "type": "string",
           "enum": [
-            "核心",
             "中核",
-            "轻度",
-            "新手",
+            "中核消费型",
             "商业视角",
-            "平台重度浏览",
             "平台口碑型",
+            "平台重度浏览",
+            "新手",
+            "核心",
+            "核心-老兵",
+            "核心老兵",
             "老平台用户",
-            "核心老兵"
+            "轻度",
+            "轻度-中核",
+            "轻度-教育型",
+            "轻度-核心之间"
           ],
           "description": "游戏经验类型"
         },
@@ -137,68 +153,161 @@
       "properties": {
         "patience": {
           "type": "string",
-          "enum": ["很低", "低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "很高",
+            "高"
+          ]
         },
         "genre_literacy": {
           "type": "string",
-          "enum": ["很低", "低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "很高",
+            "高"
+          ]
         },
         "novelty_seeking": {
           "type": "string",
-          "enum": ["很低", "低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "很高",
+            "高"
+          ]
         },
         "risk_tolerance": {
           "type": "string",
-          "enum": ["低", "中", "高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "高"
+          ]
         },
         "social_influence": {
           "type": "string",
-          "enum": ["低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很高",
+            "高"
+          ]
         },
         "completion_drive": {
           "type": "string",
-          "enum": ["很低", "低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "很高",
+            "高"
+          ]
         },
         "price_sensitivity": {
           "type": "string",
-          "enum": ["低", "中", "高", "很高"]
+          "enum": [
+            "中",
+            "低",
+            "很高",
+            "高"
+          ]
         },
         "criticism_style": {
           "type": "string",
           "enum": [
-            "分析直给",
-            "结构化分析",
-            "短句直接",
-            "细腻具体",
-            "条目化",
-            "感受加例子",
-            "生活化直白",
-            "困惑点导向",
-            "温暖具体",
-            "快评式",
-            "口碑直觉",
-            "传播视角",
-            "商业冷静",
+            "临场感分析",
+            "亲子体验",
+            "价值评估",
             "价值评估型",
+            "传播视角",
+            "体验结构式",
+            "信息等价验证",
+            "分析直给",
+            "创新导向",
+            "创造性批判",
+            "功能清单式",
+            "功能验证式",
+            "协作导向",
+            "口碑直觉",
+            "可及性导向",
+            "商业冷静",
+            "困惑导向",
+            "困惑点导向",
+            "安全优先",
+            "审美直觉",
+            "对标式",
             "尖锐怀疑",
-            "对标式"
+            "帧级精确",
+            "快评式",
+            "怀旧对标",
+            "性价比直觉",
+            "感受具体",
+            "感受加例子",
+            "感受导向",
+            "教学评估",
+            "文化立场评估",
+            "本能反应式",
+            "机制拆解",
+            "条目化",
+            "氛围导向",
+            "温暖具体",
+            "生活化直白",
+            "知识评估",
+            "短句直接",
+            "社交体验评估",
+            "社交空间评估",
+            "竞技硬核",
+            "细腻具体",
+            "结构化分析",
+            "舒适验证式",
+            "观赛视角",
+            "角色叙事评估",
+            "运动效果评估",
+            "通用设计"
           ]
         },
         "emotional_engagement": {
           "type": "string",
-          "enum": ["低", "中", "高"]
+          "enum": [
+            "中",
+            "低",
+            "很高",
+            "高"
+          ]
         },
         "agency_preference": {
           "type": "string",
-          "enum": ["低", "中", "高"]
+          "enum": [
+            "中",
+            "低",
+            "很高",
+            "高"
+          ]
         },
         "tolerance_for_ambiguity": {
           "type": "string",
-          "enum": ["低", "中", "高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "很高",
+            "高"
+          ]
         },
         "platform_loyalty": {
           "type": "string",
-          "enum": ["低", "中", "高"]
+          "enum": [
+            "中",
+            "低",
+            "很低",
+            "高"
+          ]
         }
       },
       "additionalProperties": false
@@ -261,7 +370,12 @@
     },
     "review_output": {
       "type": "object",
-      "required": ["tone", "strictness", "must_comment_on", "avoid"],
+      "required": [
+        "tone",
+        "strictness",
+        "must_comment_on",
+        "avoid"
+      ],
       "properties": {
         "tone": {
           "type": "string",
@@ -295,10 +409,22 @@
     "mbti": {
       "type": "string",
       "enum": [
-        "INTJ", "INTP", "ENTJ", "ENTP",
-        "INFJ", "INFP", "ENFJ", "ENFP",
-        "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-        "ISTP", "ISFP", "ESTP", "ESFP",
+        "INTJ",
+        "INTP",
+        "ENTJ",
+        "ENTP",
+        "INFJ",
+        "INFP",
+        "ENFJ",
+        "ENFP",
+        "ISTJ",
+        "ISFJ",
+        "ESTJ",
+        "ESFJ",
+        "ISTP",
+        "ISFP",
+        "ESTP",
+        "ESFP",
         "未指定"
       ],
       "description": "MBTI 类型（可选）"
@@ -306,21 +432,23 @@
     "communication_style": {
       "type": "string",
       "enum": [
-        "简洁分析型",
-        "发散联想型",
-        "直接行动型",
-        "共情理想型",
-        "感受审美型",
-        "温暖表达型",
-        "战略指挥型",
-        "社交活力型",
         "严谨务实型",
-        "忠诚守护型",
+        "共情理想型",
         "务实操作型",
-        "敏感体验型",
         "务实管理型",
-        "热情服务型",
+        "发散联想型",
+        "忠诚守护型",
+        "感受审美型",
+        "战略指挥型",
+        "敏感体验型",
+        "温暖表达型",
         "灵活应变型",
+        "热情服务型",
+        "生活化直白",
+        "生活化直白→温暖表达型",
+        "直接行动型",
+        "社交活力型",
+        "简洁分析型",
         "自由表达型"
       ],
       "description": "沟通风格（可选）"
@@ -343,7 +471,11 @@
     },
     "model_hint": {
       "type": "string",
-      "enum": ["haiku", "sonnet", "opus"],
+      "enum": [
+        "haiku",
+        "sonnet",
+        "opus"
+      ],
       "description": "推荐模型（可选）"
     },
     "source_basis": {
@@ -369,7 +501,12 @@
     },
     "ethics_compliance": {
       "type": "object",
-      "required": ["behavior_over_demographics", "stereotype_risk", "gap_filling_violations", "mbti_usage"],
+      "required": [
+        "behavior_over_demographics",
+        "stereotype_risk",
+        "gap_filling_violations",
+        "mbti_usage"
+      ],
       "properties": {
         "behavior_over_demographics": {
           "type": "boolean",
@@ -378,7 +515,12 @@
         },
         "stereotype_risk": {
           "type": "string",
-          "enum": ["none", "low", "medium", "high"],
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ],
           "description": "刻板印象风险等级，基于刻板印象回避清单检查结果"
         },
         "gap_filling_violations": {
@@ -389,7 +531,11 @@
         },
         "mbti_usage": {
           "type": "string",
-          "enum": ["style_only", "logic", "none"],
+          "enum": [
+            "style_only",
+            "logic",
+            "none"
+          ],
           "description": "MBTI 使用方式：style_only=仅修饰表达风格（合规），logic=用于推导判断（违规），none=未使用MBTI"
         }
       },

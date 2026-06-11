@@ -1,5 +1,5 @@
 ---
-name: P42-mobile-monthly-card
+name: P44-mobile-monthly-card
 description: "月卡党 - 月卡不是消费，是信仰充值——每月一张月卡是他对游戏的信任投票，但也意味着他要持续看到回报。 Invoke when synthetic-playtest needs this persona's perspective."
 tools: Read, Glob, Grep, Write
 model: sonnet

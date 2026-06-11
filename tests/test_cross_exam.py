@@ -8,6 +8,7 @@ from runner.cross_exam import (
     find_opposing_stances,
     parse_cross_exam_output,
     render_cross_exam_prompt,
+    run_cross_exam_protocol,
 )
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -170,6 +171,17 @@ class TestRenderCrossExamPrompt:
         controversy = extract_controversy_points(persona_outputs, top_n=2)
         result = render_cross_exam_prompt(controversy, persona_outputs, TEMPLATE_PATH)
         assert "林岚" in result or "周策" in result or "韩岳" in result
+
+
+class TestRunCrossExamProtocol:
+    def test_protocol_marks_derived_summary_not_live_debate(self, persona_outputs):
+        controversy = extract_controversy_points(persona_outputs, top_n=1)
+        result = run_cross_exam_protocol(persona_outputs, controversy)
+
+        assert result["mode"] == "derived_summary"
+        assert result["is_live_debate"] is False
+        assert "limitation" in result
+        assert result["vote_changes"] == []
 
 
 class TestParseCrossExamOutput:

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "audiencelens"
+version = "0.3.0"
+description = "Multi-Agent Cross-Examination Framework for Synthetic Audience Review"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Shuoji Team"}
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.17",
+    "jinja2>=3.1",
+    "rich>=13.0",
+    "click>=8.1",
+]
+
+[project.scripts]
+audiencelens = "src.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+src = ["templates/*", "schemas/*", "config/*", "presets/*", "personas/*"]

@@ -5,6 +5,11 @@ from typing import List
 from difflib import SequenceMatcher
 from jinja2 import Template
 
+try:
+    from .similarity import get_issue_similarity
+except ImportError:
+    from runner.similarity import get_issue_similarity
+
 
 SEVERITY_MAP = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
@@ -21,8 +26,10 @@ def _variance(values: List[float]) -> float:
 
 
 def extract_controversy_points(
-    persona_outputs: List[dict], top_n: int = 3
+    persona_outputs: List[dict], top_n: int = 3, similarity=None
 ) -> List[dict]:
+    # similarity 可注入便于测试；默认优先语义 embedding，缺依赖时回退字符串相似度
+    sim = similarity if similarity is not None else get_issue_similarity()
     all_issues = []
     for output in persona_outputs:
         persona_id = output.get("persona_id", "")
@@ -39,7 +46,7 @@ def extract_controversy_points(
     for issue in all_issues:
         merged = False
         for ui in unique_issues:
-            if _similarity(issue["title"], ui["title"]) > 0.7:
+            if sim.is_same_issue(issue["title"], ui["title"]):
                 ui["views"].append(
                     {
                         "persona_id": issue["persona_id"],
@@ -74,6 +81,7 @@ def extract_controversy_points(
                 "title": ui["title"],
                 "severity_variance": var,
                 "persona_views": ui["views"],
+                "dedup_method": sim.method,
             }
         )
 
@@ -239,7 +247,7 @@ def run_cross_exam_protocol(
             })
         else:
             pro_args.append({
-                "point": f"支持方观点（{pro_name}）",
+                "point": "未从原始 persona 输出中提取到支持方论证",
                 "persona_id": pro_name,
             })
 
@@ -251,7 +259,7 @@ def run_cross_exam_protocol(
             })
         else:
             con_args.append({
-                "point": f"反对方观点（{con_name}）",
+                "point": "未从原始 persona 输出中提取到反对方论证",
                 "persona_id": con_name,
             })
 
@@ -274,6 +282,9 @@ def run_cross_exam_protocol(
         })
 
     return {
+        "mode": "derived_summary",
+        "is_live_debate": False,
+        "limitation": "This cross-examination block is derived from existing persona outputs; no live multi-agent rebuttal was executed.",
         "rounds": rounds,
         "disputes": disputes,
         "vote_changes": vote_changes,

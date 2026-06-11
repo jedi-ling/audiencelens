@@ -4,8 +4,10 @@ import tempfile
 
 import pytest
 import yaml
+from click.testing import CliRunner
 
 from runner.cli import load_artifact_bundle, main, run_panel, run_single_persona
+from src import cli as audiencelens_cli
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PERSONAS_PATH = os.path.join(PROJECT_ROOT, "src", "personas", "game-core.yaml")
@@ -90,6 +92,46 @@ def artifact_yaml_file(sample_artifact_bundle):
         path = f.name
     yield path
     os.unlink(path)
+
+
+class TestPersonaCatalogIntegrity:
+    def test_mobile_extension_personas_do_not_reuse_family_prefixes(self):
+        with open(os.path.join(PROJECT_ROOT, "src", "personas", "mobile-f2p.yaml"), "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        ids = {persona["id"] for persona in data.get("personas", [])}
+
+        assert "P42-mobile-monthly-card" not in ids
+        assert "P43-mobile-ad-tolerant" not in ids
+        assert "P44-mobile-monthly-card" in ids
+        assert "P45-mobile-ad-tolerant" in ids
+
+
+class TestAudienceLensCli:
+    def test_run_command_invokes_runner(self, artifact_json_file, monkeypatch, tmp_path):
+        called = {}
+
+        def fake_run_panel(**kwargs):
+            called.update(kwargs)
+            return {"report": {}, "markdown": "", "html": "", "calibration": {}, "cost_summary": {"total_cost": 0.0}}
+
+        monkeypatch.setattr(audiencelens_cli.runner_cli, "run_panel", fake_run_panel)
+        runner = CliRunner()
+        result = runner.invoke(
+            audiencelens_cli.main,
+            [
+                "run",
+                "synthetic-playtest",
+                "concept_review",
+                artifact_json_file,
+                "--output-dir",
+                str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert called["task_type"] == "concept_review"
+        assert called["artifact_bundle"]["task_type"] == "concept_review"
+        assert "runner 模块未完全配置" not in result.output
 
 
 class TestLoadArtifactBundle:
@@ -243,6 +285,26 @@ class TestRunPanel:
         assert "total_cost" in result["cost_summary"]
         assert "persona_count" in result["cost_summary"]
         assert "skipped_count" in result["cost_summary"]
+
+    def test_simulated_mode_carries_warning(self, sample_artifact_bundle):
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=sample_artifact_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+        )
+        assert result["simulated"] is True
+        assert "simulation_notice" in result["report"]
+        assert "模拟模式" in result["report"]["simulation_notice"]
+        assert "模拟模式" in result["markdown"]
 
     def test_report_has_required_sections(self, sample_artifact_bundle):
         os.environ.pop("ANTHROPIC_API_KEY", None)

@@ -168,15 +168,28 @@ Traditional "let the most disagreeing personas argue" often produces unproductiv
 # Install dependencies
 pip install -r requirements.txt
 
-# Simulated mode (no API key needed)
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
-
-# Real API mode
+# Set your API key first
 # Linux/macOS
 export ANTHROPIC_API_KEY=your-key
 # Windows PowerShell: $env:ANTHROPIC_API_KEY="your-key"
 # Windows CMD: set ANTHROPIC_API_KEY=your-key
+
+# Run a review
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+```
+
+> ⚠️ **Without an API key, the CLI falls back to simulation mode**: all persona outputs are pre-built placeholder data with **zero review value**. It only verifies that the pipeline runs — never use simulated results for any decision. The CLI and all generated reports carry a prominent warning when this mode is active.
+
+**Quality & experiment commands** (unified CLI):
+
+```bash
+# Stereotype-detection benchmark on a 30-case labeled set (offline regex layer)
+python -m src.cli stereotype-eval
+# Add the LLM review layer (requires ANTHROPIC_API_KEY)
+python -m src.cli stereotype-eval --llm
+
+# Persona-differentiation ablation: full vs no_behavior vs bare (requires API key)
+python -m src.cli ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
 
 ### Web Mode
@@ -451,15 +464,28 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 # 安装依赖
 pip install -r requirements.txt
 
-# 模拟模式（无需API Key）
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
-
-# 真实API模式
+# 先设置 API Key
 # Linux/macOS
 export ANTHROPIC_API_KEY=your-key
 # Windows PowerShell: $env:ANTHROPIC_API_KEY="your-key"
 # Windows CMD: set ANTHROPIC_API_KEY=your-key
+
+# 运行评审
 python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+```
+
+> ⚠️ **未设置 API Key 时，CLI 会退回模拟模式**：所有人格输出均为预制占位数据，**没有任何评审价值**，仅用于验证流水线能否跑通。请勿将模拟结果用于任何决策——该模式下 CLI 与所有生成的报告都会带有醒目警告。
+
+**质量与实验命令**（统一 CLI）：
+
+```bash
+# 刻板印象检测评测：30条标注集（离线正则层）
+python -m src.cli stereotype-eval
+# 加上 LLM 复审层（需 ANTHROPIC_API_KEY）
+python -m src.cli stereotype-eval --llm
+
+# 人格分化消融实验：full vs no_behavior vs bare（需 API Key）
+python -m src.cli ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
 
 ### Web模式
