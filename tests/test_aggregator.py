@@ -183,6 +183,44 @@ class TestComputeDisagreements:
                 assert "stance" in ps
                 assert "evidence" in ps
 
+    def test_disagreement_dedup_method_recorded(self):
+        """P1-2: disagreements 应记录 dedup_method"""
+        from runner.similarity import get_issue_similarity
+        personas = [
+            _make_persona("p1", primary_stance="positive"),
+            _make_persona("p2", primary_stance="negative"),
+        ]
+        result = compute_disagreements(personas)
+        for d in result:
+            assert "dedup_method" in d
+            assert d["dedup_method"] in ("semantic", "lexical")
+
+    def test_disagreement_similarity_merges_paraphrased_titles(self):
+        """P1-2: 相似度合并应将换措辞的同一议题归为一组"""
+        personas = [
+            _make_persona(
+                "p1",
+                primary_stance="positive",
+                key_issues=[
+                    {"severity": "low", "title": "UI lag", "why_it_matters": "annoying", "suggested_fix": "optimize"},
+                ],
+            ),
+            _make_persona(
+                "p2",
+                primary_stance="negative",
+                key_issues=[
+                    {"severity": "critical", "title": "UI lag", "why_it_matters": "game-breaking", "suggested_fix": "rewrite"},
+                ],
+            ),
+        ]
+        from runner.similarity import get_issue_similarity
+        sim = get_issue_similarity(force_lexical=True)
+        result = compute_disagreements(personas, similarity=sim)
+        # 两个 persona 对同一议题有不同立场，应产生争议
+        assert len(result) >= 1
+        for d in result:
+            assert d["dedup_method"] == "lexical"
+
 
 class TestComputePriorityFixes:
     def test_basic_priority(self):

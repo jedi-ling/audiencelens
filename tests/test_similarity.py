@@ -70,3 +70,29 @@ class TestSemanticSimilarity:
     def test_semantic_keeps_distinct_issues(self):
         sim = get_issue_similarity()
         assert not sim.is_same_issue("付费设计太激进", "缺少色盲辅助模式")
+
+
+class TestEvaluatorSemanticDimension:
+    """P1-3: evaluator persona_differentiation 应记录 dedup_method"""
+
+    def test_persona_differentiation_records_dedup_method(self):
+        from harness.evaluator import _evaluate_persona_differentiation
+        report = {
+            "persona_reviews": [
+                {
+                    "persona_id": "P01",
+                    "key_issues": [
+                        {"title": "新手引导太长", "severity": "high"},
+                    ],
+                },
+                {
+                    "persona_id": "P02",
+                    "key_issues": [
+                        {"title": "付费设计太激进", "severity": "medium"},
+                    ],
+                },
+            ],
+        }
+        result = _evaluate_persona_differentiation(report, {})
+        assert "dedup_method" in result["details"]
+        assert result["details"]["dedup_method"] in ("semantic", "lexical")

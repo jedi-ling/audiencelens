@@ -143,6 +143,33 @@ class TestExtractControversyPoints:
         titles = [p["title"] for p in result]
         assert len(titles) == len(set(titles))
 
+    def test_hierarchical_clustering_order_independent(self):
+        """P1-4: 层次聚类结果不依赖输入顺序"""
+        outputs_a = [
+            {
+                "persona_id": "P01",
+                "key_issues": [
+                    {"title": "新手引导太长", "severity": "high"},
+                    {"title": "付费墙太早", "severity": "medium"},
+                ],
+            },
+            {
+                "persona_id": "P02",
+                "key_issues": [
+                    {"title": "付费墙太早", "severity": "critical"},
+                    {"title": "新手引导太长", "severity": "low"},
+                ],
+            },
+        ]
+        outputs_b = list(reversed(outputs_a))
+        from runner.similarity import get_issue_similarity
+        sim = get_issue_similarity(force_lexical=True)
+        result_a = extract_controversy_points(outputs_a, top_n=10, similarity=sim)
+        result_b = extract_controversy_points(outputs_b, top_n=10, similarity=sim)
+        titles_a = sorted(p["title"] for p in result_a)
+        titles_b = sorted(p["title"] for p in result_b)
+        assert titles_a == titles_b
+
 
 class TestFindOpposingStances:
     def test_finds_pro_and_con(self, persona_outputs):
@@ -159,6 +186,15 @@ class TestFindOpposingStances:
         controversy = extract_controversy_points(persona_outputs, top_n=1)[0]
         result = find_opposing_stances(controversy, persona_outputs)
         assert result["pro"]["persona_id"] != result["con"]["persona_id"]
+
+    def test_find_opposing_stances_accepts_similarity_param(self, persona_outputs):
+        """P1-1: find_opposing_stances 应接受 similarity 参数并复用 IssueSimilarity"""
+        from runner.similarity import get_issue_similarity
+        sim = get_issue_similarity(force_lexical=True)
+        controversy = extract_controversy_points(persona_outputs, top_n=1, similarity=sim)[0]
+        result = find_opposing_stances(controversy, persona_outputs, similarity=sim)
+        assert "pro" in result
+        assert "con" in result
 
 
 class TestRenderCrossExamPrompt:
