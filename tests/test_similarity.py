@@ -65,7 +65,13 @@ class TestSemanticSimilarity:
     def test_semantic_merges_paraphrases(self):
         sim = get_issue_similarity()
         # 措辞不同、语义相同：字符串相似度合不上，语义应能合上
+        # 阈值 0.65 经 bge-small-zh 实测校准：新手引导太长太啰嗦 vs 教程阶段过于冗长 = 0.66
         assert sim.is_same_issue("新手引导太长太啰嗦", "教程阶段过于冗长")
+
+    def test_semantic_merges_soft_paraphrases(self):
+        sim = get_issue_similarity()
+        # 闪退崩溃 vs 程序崩溃 = 0.69, 在 0.65 阈值下应命中
+        assert sim.is_same_issue("闪退崩溃", "程序崩溃")
 
     def test_semantic_keeps_distinct_issues(self):
         sim = get_issue_similarity()

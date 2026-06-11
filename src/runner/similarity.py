@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 from typing import Optional
 
 SEMANTIC_MODEL_NAME = "BAAI/bge-small-zh-v1.5"
-SEMANTIC_THRESHOLD = 0.75
+SEMANTIC_THRESHOLD = 0.65
 LEXICAL_THRESHOLD = 0.7
 
 _model = None
