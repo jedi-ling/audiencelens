@@ -43,6 +43,10 @@ VALID_TASK_TYPES = [
     "monetization_review",
     "looking_for_party_post",
     "update_announcement_review",
+    "devlog_review",
+    "kickstarter_review",
+    "localization_review",
+    "discord_community_review",
 ]
 
 

@@ -5,7 +5,7 @@
 **Multi-Agent Synthetic Audience Review System with Cross-Examination**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](requirements.txt)
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
 [![Tests](https://img.shields.io/badge/Tests-180+-success.svg)](tests/)
@@ -184,12 +184,12 @@ python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 
 ```bash
 # Stereotype-detection benchmark on a 30-case labeled set (offline regex layer)
-python -m src.cli stereotype-eval
+audiencelens stereotype-eval
 # Add the LLM review layer (requires ANTHROPIC_API_KEY)
-python -m src.cli stereotype-eval --llm
+audiencelens stereotype-eval --llm
 
 # Persona-differentiation ablation: full vs no_behavior vs bare (requires API key)
-python -m src.cli ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
+audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
 
 ### Web Mode
@@ -480,12 +480,12 @@ python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
 
 ```bash
 # 刻板印象检测评测：30条标注集（离线正则层）
-python -m src.cli stereotype-eval
+audiencelens stereotype-eval
 # 加上 LLM 复审层（需 ANTHROPIC_API_KEY）
-python -m src.cli stereotype-eval --llm
+audiencelens stereotype-eval --llm
 
 # 人格分化消融实验：full vs no_behavior vs bare（需 API Key）
-python -m src.cli ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
+audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
 
 ### Web模式

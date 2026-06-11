@@ -7,7 +7,7 @@ name = "audiencelens"
 version = "0.3.0"
 description = "Multi-Agent Cross-Examination Framework for Synthetic Audience Review"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
     {name = "Shuoji Team"}
