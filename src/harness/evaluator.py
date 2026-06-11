@@ -16,6 +16,14 @@ try:
 except ImportError:
     from harness.stereotype_judge import detect_stereotypes
 
+try:
+    from .similarity import get_issue_similarity
+except ImportError:
+    try:
+        from runner.similarity import get_issue_similarity
+    except ImportError:
+        get_issue_similarity = None
+
 
 # 默认阈值配置
 DEFAULT_THRESHOLDS = {
@@ -262,6 +270,39 @@ def _evaluate_persona_differentiation(report: dict, config: dict) -> dict:
     mean_distance = sum(distances) / len(distances) if distances else 0.0
     score = _score_from_ratio(mean_distance, min_jaccard)
 
+    # 语义分化度：使用 embedding 计算议题向量间的余弦距离
+    semantic_distance = None
+    if get_issue_similarity is not None:
+        sim = get_issue_similarity()
+        if sim.method == "semantic":
+            # 为每个 persona 构建议题文本向量（取所有 issue title 拼接）
+            persona_issue_texts = []
+            for review in persona_reviews:
+                titles = [issue.get("title", "") for issue in review.get("key_issues", []) if issue.get("title")]
+                persona_issue_texts.append(" ".join(titles))
+
+            if len(persona_issue_texts) >= 2:
+                sem_distances = []
+                for i in range(len(persona_issue_texts)):
+                    for j in range(i + 1, len(persona_issue_texts)):
+                        if persona_issue_texts[i] and persona_issue_texts[j]:
+                            d = 1.0 - sim.similarity(persona_issue_texts[i], persona_issue_texts[j])
+                            sem_distances.append(d)
+                if sem_distances:
+                    semantic_distance = sum(sem_distances) / len(sem_distances)
+
+    details = {
+        "mean_jaccard_distance": round(mean_distance, 3),
+        "num_pairs": len(distances),
+        "min_distance": round(min(distances), 3) if distances else 0,
+        "max_distance": round(max(distances), 3) if distances else 0,
+    }
+    if semantic_distance is not None:
+        details["semantic_distance"] = round(semantic_distance, 3)
+        details["dedup_method"] = "semantic"
+    else:
+        details["dedup_method"] = "lexical"
+
     return {
         "name": "人物差异化 (Persona Differentiation)",
         "key": "persona_differentiation",
@@ -270,12 +311,7 @@ def _evaluate_persona_differentiation(report: dict, config: dict) -> dict:
         "value": round(mean_distance, 3),
         "passed": score >= 4,
         "weight": weight,
-        "details": {
-            "mean_jaccard_distance": round(mean_distance, 3),
-            "num_pairs": len(distances),
-            "min_distance": round(min(distances), 3) if distances else 0,
-            "max_distance": round(max(distances), 3) if distances else 0,
-        },
+        "details": details,
     }
 
 

@@ -8,6 +8,11 @@ from jinja2 import Environment, FileSystemLoader
 
 from runner.validator import check_identity_behavior_decoupling
 
+try:
+    from .similarity import get_issue_similarity
+except ImportError:
+    from runner.similarity import get_issue_similarity
+
 
 def load_aggregation_rules(rules_path: str) -> dict:
     if not os.path.isfile(rules_path):
@@ -41,7 +46,10 @@ def compute_consensus(persona_outputs: List[dict], threshold: float = 0.7) -> di
     }
 
 
-def compute_disagreements(persona_outputs: List[dict]) -> List[dict]:
+def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[dict]:
+    if similarity is None:
+        similarity = get_issue_similarity()
+
     stance_groups = {}
     for p in persona_outputs:
         stance = p["primary_stance"]
@@ -53,13 +61,24 @@ def compute_disagreements(persona_outputs: List[dict]) -> List[dict]:
     if len(unique_stances) <= 1:
         return []
 
-    issue_map = {}
+    # 使用相似度合并议题，避免同一问题换措辞被分到不同组
+    issue_clusters = []  # [{"title": str, "entries": [(pid, stance, issue)]}]
     for p in persona_outputs:
         for issue in p.get("key_issues", []):
             title = issue["title"]
-            if title not in issue_map:
-                issue_map[title] = []
-            issue_map[title].append((p["persona_id"], p["primary_stance"], issue))
+            merged = False
+            for cluster in issue_clusters:
+                if similarity.is_same_issue(title, cluster["title"]):
+                    cluster["entries"].append((p["persona_id"], p["primary_stance"], issue))
+                    merged = True
+                    break
+            if not merged:
+                issue_clusters.append({
+                    "title": title,
+                    "entries": [(p["persona_id"], p["primary_stance"], issue)],
+                })
+
+    issue_map = {c["title"]: c["entries"] for c in issue_clusters}
 
     disagreements = []
 
@@ -84,6 +103,7 @@ def compute_disagreements(persona_outputs: List[dict]) -> List[dict]:
                 "topic": title,
                 "persona_stances": persona_stances,
                 "resolution_suggestion": f"Further investigation needed on {title}",
+                "dedup_method": similarity.method,
             })
     else:
         for i in range(len(unique_stances)):
@@ -109,6 +129,7 @@ def compute_disagreements(persona_outputs: List[dict]) -> List[dict]:
                     "topic": f"{stance_a} vs {stance_b}",
                     "persona_stances": persona_stances,
                     "resolution_suggestion": f"Mediate between {stance_a} and {stance_b} perspectives",
+                    "dedup_method": similarity.method,
                 })
 
     return disagreements

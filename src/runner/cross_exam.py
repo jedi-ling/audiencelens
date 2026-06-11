@@ -2,7 +2,7 @@ import json
 import re
 from typing import List
 
-from difflib import SequenceMatcher
+
 from jinja2 import Template
 
 try:
@@ -12,10 +12,6 @@ except ImportError:
 
 
 SEVERITY_MAP = {"low": 1, "medium": 2, "high": 3, "critical": 4}
-
-
-def _similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
 
 
 def _variance(values: List[float]) -> float:
@@ -90,8 +86,10 @@ def extract_controversy_points(
 
 
 def find_opposing_stances(
-    controversy_point: dict, persona_outputs: List[dict]
+    controversy_point: dict, persona_outputs: List[dict], similarity=None
 ) -> dict:
+    # similarity 可注入便于测试；默认优先语义 embedding，缺依赖时回退字符串相似度
+    sim = similarity if similarity is not None else get_issue_similarity()
     views = controversy_point.get("persona_views", [])
     severity_scores = [
         SEVERITY_MAP.get(v["severity"], 1) for v in views
@@ -130,7 +128,7 @@ def find_opposing_stances(
     con_argument = ""
     for output in persona_outputs:
         for issue in output.get("key_issues", []):
-            if _similarity(issue.get("title", ""), issue_title) > 0.5:
+            if sim.is_same_issue(issue.get("title", ""), issue_title):
                 if output.get("persona_id") == pro_view["persona_id"]:
                     pro_argument = issue.get("why_it_matters", "")
                 if output.get("persona_id") == con_view["persona_id"]:
