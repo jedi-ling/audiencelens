@@ -4,14 +4,23 @@ Multi-Agent Cross-Examination Framework for Synthetic Audience Review
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
+# 路径引导：让 `python -m src.cli`、`audiencelens`（console_script）、直接运行三种方式
+# 都能解析 runner.* / harness.* / tools.* 这套全项目统一的裸导入。
+_SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(_SRC_DIR)
+for _p in (_SRC_DIR, _REPO_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import click
 import yaml
 
-from src.runner import cli as runner_cli
+from runner import cli as runner_cli
 
 try:
     from rich.console import Console
@@ -96,7 +105,7 @@ def run(skill, task_type, artifact, mode, output_dir, personas):
 @click.option("--schema", type=click.Path(), default=None, help="自定义 JSON Schema 路径")
 def personas_validate(path, schema):
     """校验人物 YAML 文件"""
-    from src.runner.validator import validate_schema
+    from runner.validator import validate_schema
 
     path = Path(path)
     schema_path = Path(schema) if schema else PROJECT_ROOT / "schemas" / "persona-schema.json"
@@ -170,7 +179,7 @@ def personas_validate(path, schema):
 def harness_evaluate(report_path, output_format, threshold_file):
     """8维 Harness 评估"""
     try:
-        from src.harness.evaluator import evaluate_report
+        from harness.evaluator import evaluate_report
 
         with open(report_path, "r", encoding="utf-8") as f:
             report = json.load(f)
@@ -293,8 +302,8 @@ def ablation(task_type, artifact, personas, limit, model, conditions, output_pat
         _print("[red]错误: 消融实验需要 ANTHROPIC_API_KEY，模拟数据上测分化度没有意义[/red]")
         sys.exit(1)
 
-    from src.harness.ablation import run_ablation
-    from src.runner.panel_selector import load_personas
+    from harness.ablation import run_ablation
+    from runner.panel_selector import load_personas
 
     artifact_bundle = runner_cli.load_artifact_bundle(artifact)
     personas_path = personas or str(PROJECT_ROOT / "personas" / "game-core.yaml")

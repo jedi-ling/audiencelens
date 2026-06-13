@@ -165,8 +165,8 @@ Traditional "let the most disagreeing personas argue" often produces unproductiv
 ### CLI Mode
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install the package (registers the `audiencelens` command)
+pip install -e .
 
 # Set your API key first
 # Linux/macOS
@@ -175,12 +175,12 @@ export ANTHROPIC_API_KEY=your-key
 # Windows CMD: set ANTHROPIC_API_KEY=your-key
 
 # Run a review
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+audiencelens run synthetic-playtest steam_page_review examples/steam-page-sample/artifact.json
 ```
 
 > ⚠️ **Without an API key, the CLI falls back to simulation mode**: all persona outputs are pre-built placeholder data with **zero review value**. It only verifies that the pipeline runs — never use simulated results for any decision. The CLI and all generated reports carry a prominent warning when this mode is active.
 
-**Quality & experiment commands** (unified CLI):
+**Quality & experiment commands:**
 
 ```bash
 # Stereotype-detection benchmark on a 30-case labeled set (offline regex layer)
@@ -191,6 +191,8 @@ audiencelens stereotype-eval --llm
 # Persona-differentiation ablation: full vs no_behavior vs bare (requires API key)
 audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
+
+> Prefer not to install? Every command also runs via `python -m src.cli <command> ...` from the repo root.
 
 ### Web Mode
 
@@ -461,8 +463,8 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 ### CLI模式
 
 ```bash
-# 安装依赖
-pip install -r requirements.txt
+# 安装本包（注册 `audiencelens` 命令）
+pip install -e .
 
 # 先设置 API Key
 # Linux/macOS
@@ -471,12 +473,12 @@ export ANTHROPIC_API_KEY=your-key
 # Windows CMD: set ANTHROPIC_API_KEY=your-key
 
 # 运行评审
-python -m runner.cli steam_page_review examples/steam-page-sample/artifact.json
+audiencelens run synthetic-playtest steam_page_review examples/steam-page-sample/artifact.json
 ```
 
 > ⚠️ **未设置 API Key 时，CLI 会退回模拟模式**：所有人格输出均为预制占位数据，**没有任何评审价值**，仅用于验证流水线能否跑通。请勿将模拟结果用于任何决策——该模式下 CLI 与所有生成的报告都会带有醒目警告。
 
-**质量与实验命令**（统一 CLI）：
+**质量与实验命令：**
 
 ```bash
 # 刻板印象检测评测：30条标注集（离线正则层）
@@ -487,6 +489,8 @@ audiencelens stereotype-eval --llm
 # 人格分化消融实验：full vs no_behavior vs bare（需 API Key）
 audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
 ```
+
+> 不想安装？所有命令也可在仓库根目录用 `python -m src.cli <命令> ...` 运行。
 
 ### Web模式
 
