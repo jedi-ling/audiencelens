@@ -194,6 +194,37 @@ audiencelens ablation concept_review examples/steam-page-sample/artifact.json --
 
 > Prefer not to install? Every command also runs via `python -m src.cli <command> ...` from the repo root.
 
+### MCP Integration (let AI assistants call AudienceLens)
+
+Expose the review engine as MCP tools so any MCP-capable assistant (Claude Desktop, Claude Code, Cursor, Cherry Studio…) can invoke it.
+
+```bash
+pip install -e ".[mcp]"
+```
+
+Then add to your client's MCP config (Claude Desktop example, `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "audiencelens": {
+      "command": "audiencelens-mcp",
+      "env": { "ANTHROPIC_API_KEY": "your-key" }
+    }
+  }
+}
+```
+
+Exposed tools:
+
+| Tool | Purpose |
+|---|---|
+| `list_task_types` | Discover the 10 review task types |
+| `list_persona_packs` / `list_personas` | Inspect available persona panels |
+| `run_synthetic_review` | Run a full review; `artifact` accepts a file path, JSON string, or raw text |
+
+> Reviews use a real LLM. If the server has no `ANTHROPIC_API_KEY`, `run_synthetic_review` returns a clear instruction instead of worthless placeholder data (pass `allow_simulation=true` to deliberately dry-run the pipeline).
+
 ### Web Mode
 
 ```bash
@@ -491,6 +522,37 @@ audiencelens ablation concept_review examples/steam-page-sample/artifact.json --
 ```
 
 > 不想安装？所有命令也可在仓库根目录用 `python -m src.cli <命令> ...` 运行。
+
+### MCP 接入（让 AI 助手自己调用 AudienceLens）
+
+把评审引擎暴露为 MCP 工具，任何支持 MCP 的助手（Claude 桌面版、Claude Code、Cursor、Cherry Studio 等）都能直接调用。
+
+```bash
+pip install -e ".[mcp]"
+```
+
+然后在客户端的 MCP 配置里添加（以 Claude 桌面版 `claude_desktop_config.json` 为例）：
+
+```json
+{
+  "mcpServers": {
+    "audiencelens": {
+      "command": "audiencelens-mcp",
+      "env": { "ANTHROPIC_API_KEY": "你的-key" }
+    }
+  }
+}
+```
+
+暴露的工具：
+
+| 工具 | 作用 |
+|---|---|
+| `list_task_types` | 列出 10 种评审任务类型 |
+| `list_persona_packs` / `list_personas` | 查看可用的人格面板 |
+| `run_synthetic_review` | 运行完整评审；`artifact` 支持文件路径 / JSON 字符串 / 纯文本 |
+
+> 评审使用真实 LLM。若 server 未配置 `ANTHROPIC_API_KEY`，`run_synthetic_review` 会返回明确提示而非无价值的占位数据（如需空跑流水线可传 `allow_simulation=true`）。
 
 ### Web模式
 
