@@ -11,6 +11,8 @@ import SettingsPage from '@/pages/SettingsPage'
 import PrivacyPage from '@/pages/PrivacyPage'
 import SkillSelectPage from '@/pages/SkillSelectPage'
 import EvaluationPage from '@/pages/EvaluationPage'
+import AskPage from '@/pages/AskPage'
+import LedgerPage from '@/pages/LedgerPage'
 
 export default function App() {
   return (
@@ -18,6 +20,10 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
+          {/* 对话式入口：大白话 → 意图解析 → 发起评审 */}
+          <Route path="/ask" element={<AskPage />} />
+          {/* 判断复利闭环：预测留档 + 回填验证 + 命中率 */}
+          <Route path="/ledger" element={<LedgerPage />} />
           <Route path="/review/new" element={<CreateReviewPage />} />
           <Route path="/review/:id" element={<ReviewProgressPage />} />
           <Route path="/review/:id/report" element={<ReportPage />} />

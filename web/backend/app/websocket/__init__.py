@@ -5,14 +5,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.config import settings
+
 router = APIRouter()
 
-# 安全措施：WebSocket 允许的 origin 白名单，防止跨站 WebSocket 劫持
-ALLOWED_WS_ORIGINS = {
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    "http://localhost:5175",
-}
+# 安全措施：WebSocket origin 白名单，防止跨站 WebSocket 劫持。
+# 生产部署时用 AL_CORS_ORIGINS 配置真实域名（与 HTTP CORS 同源）。
+ALLOWED_WS_ORIGINS = set(settings.cors_origins) | {"http://127.0.0.1:5173"}
 
 
 class ConnectionManager:
@@ -55,8 +54,21 @@ class ConnectionManager:
         if self._loop is not None and not self._loop.is_closed():
             asyncio.run_coroutine_threadsafe(self.broadcast(review_id, data), self._loop)
 
+    # 后台 worker 线程用这个入口推进度（语义比 broadcast_sync 更明确）
+    def publish_threadsafe(self, review_id: str, data: Dict[str, Any]):
+        self.broadcast_sync(review_id, data)
+
 
 manager = ConnectionManager()
+
+# WS 事件契约（前端据此分支；新增事件请同步更新 docs/ARCHITECTURE.md）
+WS_EVENTS = (
+    "review.started",
+    "review.progress",
+    "review.persona_completed",
+    "review.completed",
+    "review.failed",
+)
 
 
 @router.websocket("/ws/review/{review_id}")
