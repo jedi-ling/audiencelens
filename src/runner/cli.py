@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import json
 import os
 from typing import List
@@ -180,6 +181,7 @@ def run_panel(
     cross_exam_prompt_path: str = None,
     report_template_path: str = None,
     html_template_path: str = None,
+    max_concurrency: int = None,
 ) -> dict:
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
@@ -230,16 +232,28 @@ def run_panel(
     valid_personas = precheck["valid_personas"]
     skipped_count = len(panel["skipped"]) + len(precheck["skipped_personas"])
 
-    persona_results = []
-    for persona in valid_personas:
-        config = {
-            "budget": budget_config,
-            "persona_prompt_path": persona_prompt_path,
-        }
-        result = run_single_persona(
+    config = {
+        "budget": budget_config,
+        "persona_prompt_path": persona_prompt_path,
+    }
+
+    # 人格评审彼此独立，是 I/O 密集（等 LLM 返回）任务，用线程池并发。
+    # run_single_persona 内部已兜住异常并返回 error 字段，故 future 不会抛。
+    if max_concurrency is None:
+        max_concurrency = int(os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6"))
+    workers = max(1, min(max_concurrency, len(valid_personas))) if valid_personas else 1
+
+    def _run(persona):
+        return run_single_persona(
             persona, task_type, artifact_summary, artifact_texts, config, artifact_bundle
         )
-        persona_results.append(result)
+
+    if workers <= 1 or len(valid_personas) <= 1:
+        persona_results = [_run(p) for p in valid_personas]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            # executor.map 按输入顺序返回结果，保证确定性
+            persona_results = list(ex.map(_run, valid_personas))
 
     persona_outputs = []
     for r in persona_results:
