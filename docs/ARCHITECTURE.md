@@ -66,13 +66,20 @@ POST /api/v2/reviews
 后台 worker（job_service 线程池）
   │
   ├─ WS: review.started
-  ├─ runner.run_panel(max_concurrency=6)   ← 人格并发，实测约 4× 加速
+  ├─ runner.run_panel(max_concurrency=6, progress_callback=…, api_key=…)
+  │     ← 人格并发（实测约 4×）；key 显式传参，绝不写进程全局环境变量
+  │       （多 worker 并发跑不同用户的评审时，环境变量注入会串 key）
+  │     ← 每个人格完成即回调 → WS: review.persona_completed {persona_id, done, total}
+  │                              WS: review.progress {progress: 5→80}
+  │                              job.progress 同步更新
   ├─ 安全网：若 result.simulated == true → 直接丢弃并报错（不让假数据入库）
   ├─ 落库 report + persona_outputs
   ├─ ledger.record_judgments()             ← 预测盖时间戳留档（护城河）
   ├─ quota.record_usage()                  ← 记账（即使配额没开也记）
   └─ WS: review.completed
 ```
+
+> 并发下 `review.progress` 可能乱序到达（done=3 先于 done=2），前端取 max 处理。
 
 **前端**：`POST` 后拿 `review_id` → `connectReviewSocket()` 订阅进度 → 终态跳报告页。
 WS 连不上时自动回落轮询 `GET /api/v2/reviews/{id}`。
@@ -85,7 +92,7 @@ WS 连不上时自动回落轮询 `GET /api/v2/reviews/{id}`。
 |---|---|---|---|
 | **身份认证** | 匿名 | JWT 签发/校验、口令 PBKDF2 哈希、注册/登录接口 | `AL_AUTH_ENABLED=true` |
 | **BYOK Key** | 启用 | 密文落库、掩码回显、轮换、解析链 | 默认即用；改 `AL_KEY_MODE` 切托管 |
-| **配额计费** | 关闭（但**照常记账**） | UsageRecord 流水、24h 窗口聚合、402 拦截 | `AL_QUOTA_ENABLED=true` |
+| **配额计费** | 关闭（但**照常记账**） | UsageRecord 流水、24h 窗口聚合、402 拦截、**free/pro/team 套餐限额**（`plan_service.py`，按 `user.plan` 生效） | `AL_QUOTA_ENABLED=true` |
 | **限流** | 启用 | 内存令牌桶、按用户/IP 分桶 | 多副本部署时换 Redis 后端 |
 | **任务队列** | 线程池 | Job 落库、进度、失败记录、取消 | 实现 `JobBackend` 换 Celery/RQ |
 | **WebSocket** | 启用 | 5 类事件、线程安全推送、origin 白名单 | 生产配 `AL_CORS_ORIGINS` |
@@ -139,7 +146,8 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 | GET/POST/DELETE | `/api/keys` | BYOK key（仅掩码回显，明文只进不出） |
 | POST | `/api/intent/parse` | 大白话 → 评审参数（`method` 字段声明用了哪档） |
 | POST | `/api/uploads` | 上传材料，返回文本 |
-| GET | `/api/usage` | 24h 用量与配额 |
+| GET | `/api/usage` | 24h 用量与配额（含当前套餐限额） |
+| GET | `/api/plans` | 套餐矩阵 free/pro/team（公开，纯静态定价数据） |
 | **POST** | **`/api/v2/reviews`** | **发起评审（202，异步）** |
 | GET | `/api/v2/reviews/{id}` | 评审详情/报告 |
 | GET | `/api/jobs/{id}` | 任务状态与进度 |
@@ -181,8 +189,12 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 
 | 范围 | 位置 | 数量 |
 |---|---|---|
-| 核心引擎 | `tests/` | 232 |
-| 平台链路 | `web/backend/tests/` | 37 |
+| 核心引擎 | `tests/` | 237 |
+| 平台链路 | `web/backend/tests/` | 48 |
+
+平台链路里包含一组 **E2E 冒烟测试**（`test_e2e_chain.py`）：用假引擎替换 LLM，
+证明"发起 → 队列 → 报告落库 → 判断留档 → 记账"整条链真的闭环，
+以及 simulated 结果永远进不了正式数据（负向测试）。
 
 平台测试逐条验证：健康开关不泄密、匿名身份、JWT/口令/密钥加解密、
 BYOK 四种解析路径、**无 key 必须 428 且不返回模拟数据**、意图解析四档、

@@ -19,14 +19,19 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.errors import QuotaExceeded
 from app.models import UsageRecord
+from app.services import plan_service
 
 
 def _day_ago() -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=1)
 
 
-def usage_summary(db: Session, user_id: str) -> dict:
-    """近 24h 用量 + 剩余额度（前端设置页/用量页直接用）。"""
+def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
+    """近 24h 用量 + 剩余额度（前端设置页/用量页直接用）。
+
+    plan 参数向后兼容：不传等价于旧行为（free 档限额）。
+    """
+    plan_info = plan_service.get_plan(plan)
     since = _day_ago()
     q = db.query(
         func.count(UsageRecord.id),
@@ -52,22 +57,31 @@ def usage_summary(db: Session, user_id: str) -> dict:
     return {
         "quota_enabled": settings.quota_enabled,
         "window": "24h",
+        "plan": plan_info["id"],
+        "plan_name": plan_info["name"],
         "reviews_used": int(count or 0),
-        "reviews_limit": settings.quota_free_reviews_per_day if settings.quota_enabled else None,
+        "reviews_limit": plan_info["reviews_per_day"] if settings.quota_enabled else None,
         "cost_usd_total": round(float(cost or 0.0), 4),
         "cost_usd_on_server_key": round(float(server_cost or 0.0), 4),
-        "cost_usd_limit": settings.quota_free_cost_usd_per_day if settings.quota_enabled else None,
+        "cost_usd_limit": plan_info["cost_usd_per_day"] if settings.quota_enabled else None,
     }
 
 
-def check_quota(db: Session, user_id: str, key_source: str = "byok") -> None:
+def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str = "free") -> None:
     """评审发起前调用。超限抛 QuotaExceeded（HTTP 402）。
 
     BYOK 不计入配额——用户自己付钱，没有理由限制他。
     只有走服务端 key（你垫钱）才受配额约束。
+
+    plan 参数向后兼容：不传等价于旧行为（按 free 档限额校验）；
+    未知 plan 由 plan_service 回落 free。
     """
     if not settings.quota_enabled or key_source != "server":
         return
+
+    plan_info = plan_service.get_plan(plan)
+    reviews_limit = plan_info["reviews_per_day"]
+    cost_limit = plan_info["cost_usd_per_day"]
 
     since = _day_ago()
     count = (
@@ -81,10 +95,10 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok") -> None:
         .scalar()
         or 0
     )
-    if count >= settings.quota_free_reviews_per_day:
+    if count >= reviews_limit:
         raise QuotaExceeded(
-            f"24 小时内免费评审次数已用完（{settings.quota_free_reviews_per_day} 次）。"
-            "可填写自己的 API Key（BYOK）以不受限制使用。"
+            f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
+            "可升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
         )
 
     cost = (
@@ -97,10 +111,10 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok") -> None:
         .scalar()
         or 0.0
     )
-    if float(cost) >= settings.quota_free_cost_usd_per_day:
+    if float(cost) >= cost_limit:
         raise QuotaExceeded(
-            f"24 小时内免费额度已用完（${settings.quota_free_cost_usd_per_day}）。"
-            "可填写自己的 API Key（BYOK）以不受限制使用。"
+            f"24 小时内成本额度已用完（{plan_info['name']} 套餐限 ${cost_limit}/天）。"
+            "可升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
         )
 
 

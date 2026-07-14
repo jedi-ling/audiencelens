@@ -22,6 +22,7 @@ from app.services import (
     job_service,
     key_service,
     ledger_service,
+    plan_service,
     quota_service,
     review_service,
 )
@@ -211,13 +212,19 @@ async def upload_file(
     }
 
 
-# ============================== 用量 / 配额 ==============================
+# ============================== 用量 / 配额 / 套餐 ==============================
+
+@router.get("/plans")
+async def plans():
+    """公开定价页数据：三档套餐及各自限额（无需登录）。"""
+    return {"plans": plan_service.list_plans()}
+
 
 @router.get("/usage")
 async def usage(
     identity: Identity = Depends(current_identity), db: Session = Depends(get_db)
 ):
-    return quota_service.usage_summary(db, identity.user_id)
+    return quota_service.usage_summary(db, identity.user_id, plan=identity.plan)
 
 
 # ============================== 异步评审（v2 链路）==============================
@@ -249,7 +256,9 @@ async def create_review_v2(
     if body.mode not in intent_service.VALID_MODES:
         raise BadRequest(f"未知模式：{body.mode}")
 
-    quota_service.check_quota(db, identity.user_id, key_source=resolved.source)
+    quota_service.check_quota(
+        db, identity.user_id, key_source=resolved.source, plan=identity.plan
+    )
 
     review = Review(
         user_id=identity.user_id,

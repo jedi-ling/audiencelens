@@ -2,7 +2,8 @@ import argparse
 import concurrent.futures
 import json
 import os
-from typing import List
+import threading
+from typing import Callable, List, Optional
 
 import yaml
 
@@ -114,7 +115,10 @@ def run_single_persona(
     artifact_texts: List[str],
     config: dict,
     artifact_bundle: dict = None,
+    api_key: str = None,
 ) -> dict:
+    """api_key 显式传入优先于环境变量——多用户服务端并发跑评审时，
+    绝不能靠进程全局的 os.environ 注入 key（会在用户间串 key）。"""
     budget_config = config.get("budget", {})
     persona_prompt_path = config.get("persona_prompt_path", "")
 
@@ -122,7 +126,8 @@ def run_single_persona(
 
     prompt = render_prompt(persona, task_type, artifact_summary, persona_prompt_path, artifact_bundle)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if api_key is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
 
     if api_key:
         try:
@@ -182,7 +187,15 @@ def run_panel(
     report_template_path: str = None,
     html_template_path: str = None,
     max_concurrency: int = None,
+    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    api_key: str = None,
 ) -> dict:
+    """progress_callback(done_count, total, persona_id)：每个人格评审完成后
+    在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
+    默认 None 时行为与旧版完全一致。
+
+    api_key：显式传入优先于环境变量。服务端多用户并发时必须显式传，
+    避免通过进程全局 os.environ 注入导致用户间串 key（安全+计费问题）。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -208,7 +221,8 @@ def run_panel(
     if html_template_path is None:
         html_template_path = os.path.join(base, "src", "templates", "report-template.html")
 
-    simulated = not os.environ.get("ANTHROPIC_API_KEY")
+    effective_api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY")
+    simulated = not effective_api_key
     if simulated:
         print(f"\n{SIMULATION_WARNING}\n", flush=True)
 
@@ -243,17 +257,34 @@ def run_panel(
         max_concurrency = int(os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6"))
     workers = max(1, min(max_concurrency, len(valid_personas))) if valid_personas else 1
 
+    # 实时进度：线程安全计数器，每个人格完成后在 worker 线程内回调
+    total_personas = len(valid_personas)
+    progress_lock = threading.Lock()
+    done_counter = [0]
+
     def _run(persona):
-        return run_single_persona(
-            persona, task_type, artifact_summary, artifact_texts, config, artifact_bundle
+        result = run_single_persona(
+            persona, task_type, artifact_summary, artifact_texts, config, artifact_bundle,
+            api_key=effective_api_key,
         )
+        if progress_callback is not None:
+            with progress_lock:
+                done_counter[0] += 1
+                done = done_counter[0]
+            try:
+                progress_callback(done, total_personas, persona["id"])
+            except Exception:
+                # 进度回调故障不得影响评审本身
+                pass
+        return result
 
     if workers <= 1 or len(valid_personas) <= 1:
         persona_results = [_run(p) for p in valid_personas]
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            # executor.map 按输入顺序返回结果，保证确定性
-            persona_results = list(ex.map(_run, valid_personas))
+            # 按提交顺序收集 future 结果，保证与输入人格顺序一致（确定性）
+            futures = [ex.submit(_run, p) for p in valid_personas]
+            persona_results = [f.result() for f in futures]
 
     persona_outputs = []
     for r in persona_results:

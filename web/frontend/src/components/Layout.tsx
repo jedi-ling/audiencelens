@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
 import { cn } from '@/lib/utils'
-import { Eye, Plus, Users, Home, BookOpen, Settings, Menu, X, Layers, Sparkles, FlaskConical } from 'lucide-react'
+import { Eye, Plus, Users, Home, BookOpen, Settings, Menu, X, Layers, Sparkles, FlaskConical, MessageSquare, TrendingUp } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: '首页', icon: Home },
+  { path: '/ask', label: '对话评审', icon: MessageSquare },
+  { path: '/ledger', label: '判断复利', icon: TrendingUp },
   { path: '/tutorial', label: '使用教程', icon: BookOpen },
   { path: '/skills', label: '技能中心', icon: Sparkles },
   { path: '/task-types', label: '任务类型', icon: Layers },

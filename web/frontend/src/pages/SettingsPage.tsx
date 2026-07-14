@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { fetchLLMFormats, fetchLLMPresets, saveLLMSettings, testLLMConnection } from '@/lib/api'
 import type { LLMFormat, LLMPreset } from '@/lib/api'
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Save, Wifi, WifiOff, Zap, Bot, Cpu, Globe, Server, ShieldCheck, ArrowRight } from 'lucide-react'
+import { api } from '@/lib/apiClient'
+import type { KeyStatus, UsageSummary } from '@/lib/types'
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Save, Wifi, WifiOff, Zap, Bot, Cpu, Globe, Server, ShieldCheck, ArrowRight, KeyRound, Trash2, BarChart3 } from 'lucide-react'
 
 type ApiFormat = 'anthropic' | 'openai_compatible'
 type TestStatus = 'idle' | 'testing' | 'success' | 'error'
@@ -61,6 +63,61 @@ export default function SettingsPage() {
   const [testModel, setTestModel] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // ---------------- BYOK（v2 平台链路）----------------
+  const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null)
+  const [usage, setUsage] = useState<UsageSummary | null>(null)
+  const [byokKey, setByokKey] = useState('')
+  const [showByokKey, setShowByokKey] = useState(false)
+  const [byokSaving, setByokSaving] = useState(false)
+  const [byokDeleting, setByokDeleting] = useState<string | null>(null)
+  const [byokError, setByokError] = useState<string | null>(null)
+  const [byokSaved, setByokSaved] = useState(false)
+
+  const refreshByok = useCallback(async () => {
+    // key 状态和用量各自失败互不影响；平台服务没起时整块降级为提示
+    const [keysRes, usageRes] = await Promise.allSettled([api.getKeys(), api.usage()])
+    if (keysRes.status === 'fulfilled') setKeyStatus(keysRes.value)
+    if (usageRes.status === 'fulfilled') setUsage(usageRes.value)
+    if (keysRes.status === 'rejected' && usageRes.status === 'rejected') {
+      setByokError('平台服务不可用，BYOK Key 管理暂时无法使用')
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshByok()
+  }, [refreshByok])
+
+  const handleByokSave = async () => {
+    if (!byokKey.trim()) return
+    setByokSaving(true)
+    setByokError(null)
+    setByokSaved(false)
+    try {
+      await api.saveKey(byokKey.trim())
+      setByokKey('')
+      setByokSaved(true)
+      setTimeout(() => setByokSaved(false), 3000)
+      await refreshByok()
+    } catch (e) {
+      setByokError(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setByokSaving(false)
+    }
+  }
+
+  const handleByokDelete = async (provider: string) => {
+    setByokDeleting(provider)
+    setByokError(null)
+    try {
+      await api.deleteKey(provider)
+      await refreshByok()
+    } catch (e) {
+      setByokError(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setByokDeleting(null)
+    }
+  }
 
   useEffect(() => {
     Promise.all([fetchLLMFormats(), fetchLLMPresets()])
@@ -444,6 +501,155 @@ export default function SettingsPage() {
                 : 'OpenAI 兼容格式使用 Bearer Token 认证，调用 /v1/chat/completions 端点，兼容所有 OpenAI API 兼容服务'}
             </p>
           </div>
+        </section>
+
+        {/* ---------------- API Key (BYOK) —— v2 平台链路 ---------------- */}
+        <section className="pt-8 border-t border-border">
+          <h2 className="text-lg font-display font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
+            API Key（BYOK）
+          </h2>
+          <p className="text-xs text-text-muted mb-4">
+            自带 Key 用于 Web 评审链路：Key 加密存储在服务端，评审时按你的 Key 计费。
+            {keyStatus?.server_key_available && '（服务器也配置了共享 Key，可作为回落）'}
+          </p>
+
+          {byokError && (
+            <div className="mb-4 flex items-start gap-2 text-sm text-severity-critical">
+              <XCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.25} />
+              <span className="break-all">{byokError}</span>
+            </div>
+          )}
+
+          {/* 已保存的 Key：掩码展示 + 删除 */}
+          {keyStatus && keyStatus.keys.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {keyStatus.keys.map((k) => (
+                <div
+                  key={k.provider}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-card border border-neon-green/30"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-neon-green shrink-0" strokeWidth={1.25} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-text-primary font-medium">{k.provider}</div>
+                    <div className="text-xs text-text-muted font-mono truncate">
+                      {k.masked}
+                      {k.last_used_at && ` · 最近使用 ${new Date(k.last_used_at).toLocaleString()}`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleByokDelete(k.provider)}
+                    disabled={byokDeleting === k.provider}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-severity-critical/10 text-severity-critical hover:bg-severity-critical/20 transition-all disabled:opacity-50"
+                  >
+                    {byokDeleting === k.provider ? (
+                      <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.25} />
+                    ) : (
+                      <Trash2 className="w-3 h-3" strokeWidth={1.25} />
+                    )}
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 新增 / 更新 Key */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showByokKey ? 'text' : 'password'}
+                value={byokKey}
+                onChange={(e) => setByokKey(e.target.value)}
+                placeholder="sk-ant-…（输入 Anthropic API Key）"
+                className="w-full px-4 py-3 pr-12 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors font-mono text-sm"
+              />
+              <button
+                onClick={() => setShowByokKey(!showByokKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-bg-card-hover text-text-muted hover:text-text-secondary transition-colors"
+              >
+                {showByokKey ? (
+                  <EyeOff className="w-4 h-4" strokeWidth={1.25} />
+                ) : (
+                  <Eye className="w-4 h-4" strokeWidth={1.25} />
+                )}
+              </button>
+            </div>
+            <button
+              onClick={handleByokSave}
+              disabled={byokSaving || !byokKey.trim()}
+              className={cn(
+                'flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all shrink-0',
+                byokSaving || !byokKey.trim()
+                  ? 'bg-bg-card text-text-muted cursor-not-allowed'
+                  : 'bg-neon-green text-bg-primary hover:bg-neon-green-dim'
+              )}
+            >
+              {byokSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} />
+              ) : (
+                <Save className="w-4 h-4" strokeWidth={1.25} />
+              )}
+              保存 Key
+            </button>
+          </div>
+          {byokSaved && (
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-neon-green animate-fade-in">
+              <CheckCircle2 className="w-4 h-4" strokeWidth={1.25} />
+              Key 已保存
+            </p>
+          )}
+
+          {/* 24h 用量：quota 关闭时只报数字，不画配额条 */}
+          {usage && (
+            <div className="mt-6 rounded-xl border border-border bg-bg-card p-4">
+              <h3 className="text-sm font-display font-semibold text-text-primary mb-3 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-cyan" strokeWidth={1.25} />
+                近 24 小时用量
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <div className="text-xs text-text-muted mb-1">评审次数</div>
+                  <div className="font-display font-bold text-text-primary">
+                    {usage.reviews_used}
+                    {usage.quota_enabled && usage.reviews_limit != null && (
+                      <span className="text-text-muted font-normal"> / {usage.reviews_limit}</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-text-muted mb-1">总费用</div>
+                  <div className="font-display font-bold text-warm-orange">
+                    ${usage.cost_usd_total.toFixed(4)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-text-muted mb-1">其中服务器 Key</div>
+                  <div className="font-display font-bold text-text-secondary">
+                    ${usage.cost_usd_on_server_key.toFixed(4)}
+                  </div>
+                </div>
+              </div>
+              {usage.quota_enabled && usage.reviews_limit != null && usage.reviews_limit > 0 && (
+                <div className="mt-3">
+                  <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-700',
+                        usage.reviews_used >= usage.reviews_limit ? 'bg-severity-critical' : 'bg-cyan'
+                      )}
+                      style={{
+                        width: `${Math.min(100, Math.round((usage.reviews_used / usage.reviews_limit) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-text-muted">
+                    配额窗口：{usage.window}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
 

@@ -1,8 +1,22 @@
+/**
+ * 评审进度页 —— 同时接住 v1 / v2 两条链路。
+ *
+ * v1（旧）：/api/reviews/{id} 返回含 persona_outputs 的全量 Review，
+ *          WS 消息形如 { type: 'persona_completed', ... }。
+ * v2（新）：/api/v2/reviews/{id} 返回精简 ReviewDetail，
+ *          WS 事件形如 { event: 'review.progress', data: {...} }。
+ *
+ * 两套事件在同一个 WS 处理器里按字段判别（event 前缀 vs type），互不干扰。
+ * WS 连不上时回落到 2s 轮询（终态自动停止）。
+ */
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { fetchReview, connectReviewWS } from '@/lib/api'
+import { fetchReview } from '@/lib/api'
+import { api } from '@/lib/apiClient'
+import { connectReviewSocket } from '@/lib/ws'
 import { cn } from '@/lib/utils'
 import type { Review, WSMessage, ReviewMode } from '@/lib/mock-data'
+import type { ReviewDetail } from '@/lib/types'
 import { usePersonaStore } from '@/store/persona-store'
 import { ArrowLeft, FileText, DollarSign, Clock, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
@@ -13,6 +27,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   running: { label: '运行中', color: 'text-cyan', bg: 'bg-status-running' },
   completed: { label: '已完成', color: 'text-neon-green', bg: 'bg-status-completed' },
   failed: { label: '失败', color: 'text-severity-critical', bg: 'bg-status-failed' },
+  cancelled: { label: '已取消', color: 'text-text-muted', bg: 'bg-status-waiting' },
 }
 
 const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; icon: string }> = {
@@ -27,13 +42,31 @@ function getPersonaProgress(status: string): number {
   return 0
 }
 
+function isTerminal(status: string | null | undefined): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled'
+}
+
 export default function ReviewProgressPage() {
   const { id } = useParams()
+  // v1 全量数据（含 persona_outputs / target_title）
   const [review, setReview] = useState<Review | null>(null)
+  // v2 精简数据（含 error_message / report）
+  const [detail, setDetail] = useState<ReviewDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [crossExamPhase, setCrossExamPhase] = useState<PhaseStatus>('waiting')
   const [aggregationPhase, setAggregationPhase] = useState<PhaseStatus>('waiting')
-  const wsCleanupRef = useRef<(() => void) | null>(null)
+
+  // v2 WS 推送的进度信号（v1 链路不会碰这些状态）
+  const [v2Progress, setV2Progress] = useState<number | null>(null)
+  const [v2Done, setV2Done] = useState(0)
+  const [v2Total, setV2Total] = useState(0)
+  const [v2CompletedIds, setV2CompletedIds] = useState<string[]>([])
+  const [wsError, setWsError] = useState<string | null>(null)
+
+  // 轮询兜底用：记住这条评审在哪个 API 上取得到
+  const sourceRef = useRef<'v1' | 'v2'>('v1')
+  const socketRef = useRef<{ close: () => void } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { personas, initPersonas, initialized } = usePersonaStore()
 
   useEffect(() => {
@@ -42,29 +75,127 @@ export default function ReviewProgressPage() {
 
   const loadReview = useCallback(async () => {
     if (!id) return
+    // v1 优先：数据更全；v2 创建的评审同库同表，v1 端点通常也能取到
     try {
       const data = await fetchReview(id)
       setReview(data)
+      sourceRef.current = 'v1'
       if (data.status === 'completed') {
         setCrossExamPhase('completed')
         setAggregationPhase('completed')
       }
+      return
     } catch {
-      // ignore
-    } finally {
-      setLoading(false)
+      // 回落 v2
+    }
+    try {
+      const d = await api.getReview(id)
+      setDetail(d)
+      sourceRef.current = 'v2'
+      if (d.status === 'completed') {
+        setCrossExamPhase('completed')
+        setAggregationPhase('completed')
+      }
+    } catch {
+      // 两条链路都取不到 → 渲染「未找到」
     }
   }, [id])
 
   useEffect(() => {
-    loadReview()
+    void loadReview().finally(() => setLoading(false))
   }, [loadReview])
 
-  useEffect(() => {
-    if (!id || !review) return
-    if (review.status === 'completed' || review.status === 'failed') return
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
 
-    const cleanup = connectReviewWS(id, (msg: WSMessage) => {
+  /** WS 彻底连不上时的兜底：2s 轮询，终态停止 */
+  const startPolling = useCallback(() => {
+    if (!id || pollRef.current) return
+    pollRef.current = setInterval(async () => {
+      try {
+        if (sourceRef.current === 'v2') {
+          const d = await api.getReview(id)
+          setDetail(d)
+          if (isTerminal(d.status)) {
+            if (d.status === 'completed') {
+              setCrossExamPhase('completed')
+              setAggregationPhase('completed')
+            }
+            stopPolling()
+          }
+        } else {
+          const data = await fetchReview(id)
+          setReview(data)
+          if (isTerminal(data.status)) {
+            if (data.status === 'completed') {
+              setCrossExamPhase('completed')
+              setAggregationPhase('completed')
+            }
+            stopPolling()
+          }
+        }
+      } catch {
+        // 网络抖动：下个周期再试
+      }
+    }, 2000)
+  }, [id, stopPolling])
+
+  // 卸载时清掉轮询
+  useEffect(() => () => stopPolling(), [stopPolling])
+
+  /** v2 事件：{ event: 'review.*', data: {...} } */
+  const handleV2Event = useCallback(
+    (event: string, data: Record<string, unknown>) => {
+      switch (event) {
+        case 'review.started':
+          setReview((prev) => (prev ? { ...prev, status: 'running' as const } : prev))
+          setDetail((prev) => (prev ? { ...prev, status: 'running' as const } : prev))
+          break
+        case 'review.progress': {
+          const p = typeof data.progress === 'number' ? data.progress : null
+          if (p !== null) setV2Progress(Math.max(0, Math.min(100, Math.round(p))))
+          break
+        }
+        case 'review.persona_completed': {
+          if (typeof data.done === 'number') setV2Done(data.done)
+          if (typeof data.total === 'number') setV2Total(data.total)
+          const pid = typeof data.persona_id === 'string' ? data.persona_id : ''
+          if (pid) setV2CompletedIds((prev) => (prev.includes(pid) ? prev : [...prev, pid]))
+          break
+        }
+        case 'review.completed':
+          setV2Progress(100)
+          setCrossExamPhase('completed')
+          setAggregationPhase('completed')
+          setReview((prev) => (prev ? { ...prev, status: 'completed' as const } : prev))
+          setDetail((prev) => (prev ? { ...prev, status: 'completed' as const } : prev))
+          stopPolling()
+          void loadReview() // 拉全量：报告入口 / 费用
+          break
+        case 'review.failed': {
+          const err = typeof data.error === 'string' ? data.error : null
+          setWsError(err)
+          setReview((prev) => (prev ? { ...prev, status: 'failed' as const } : prev))
+          setDetail((prev) =>
+            prev
+              ? { ...prev, status: 'failed' as const, error_message: err ?? prev.error_message }
+              : prev,
+          )
+          stopPolling()
+          break
+        }
+      }
+    },
+    [loadReview, stopPolling],
+  )
+
+  /** v1 事件：{ type: 'persona_completed', ... }（保持旧行为不变） */
+  const handleV1Event = useCallback(
+    (msg: WSMessage) => {
       switch (msg.type) {
         case 'persona_started':
           setReview((prev) => prev ? {
@@ -106,19 +237,51 @@ export default function ReviewProgressPage() {
           break
         case 'review_completed':
           setReview((prev) => prev ? { ...prev, status: 'completed' } : prev)
-          loadReview()
+          stopPolling()
+          void loadReview()
+          // v1 终态事件 ws.ts 识别不了，手动关闭以免无谓重连
+          socketRef.current?.close()
           break
         case 'review_failed':
           setReview((prev) => prev ? { ...prev, status: 'failed' } : prev)
+          if (msg.error) setWsError(msg.error)
+          stopPolling()
+          socketRef.current?.close()
           break
       }
-    })
+    },
+    [loadReview, stopPolling],
+  )
 
-    wsCleanupRef.current = cleanup
+  const status = review?.status ?? detail?.status ?? null
+  const terminal = isTerminal(status)
+
+  useEffect(() => {
+    if (!id || loading || terminal) return
+
+    const socket = connectReviewSocket(id, {
+      onEvent: (payload) => {
+        // 同一个处理器接两代事件：v2 有 event 字段，v1 有 type 字段
+        const raw = payload as unknown as {
+          event?: string
+          data?: Record<string, unknown>
+          type?: string
+        }
+        if (typeof raw.event === 'string' && raw.event.startsWith('review.')) {
+          handleV2Event(raw.event, raw.data ?? {})
+        } else if (typeof raw.type === 'string') {
+          handleV1Event(raw as unknown as WSMessage)
+        }
+      },
+      onOpen: () => stopPolling(), // WS 通了就别双通道
+      onUnavailable: () => startPolling(), // 重试耗尽 → 轮询兜底
+    })
+    socketRef.current = socket
     return () => {
-      cleanup()
+      socket.close()
+      socketRef.current = null
     }
-  }, [id, review?.status, loadReview])
+  }, [id, loading, terminal, handleV1Event, handleV2Event, startPolling, stopPolling])
 
   if (loading) {
     return (
@@ -129,7 +292,7 @@ export default function ReviewProgressPage() {
     )
   }
 
-  if (!review) {
+  if (!review && !detail) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
         <p className="text-text-secondary">未找到评审记录</p>
@@ -138,12 +301,29 @@ export default function ReviewProgressPage() {
     )
   }
 
-  const completedCount = review.persona_outputs.filter((p) => p.status === 'completed').length
-  const totalCount = review.persona_outputs.length
+  const personaOutputs = review?.persona_outputs ?? []
+  const completedCount = personaOutputs.filter((p) => p.status === 'completed').length
+  const totalCount = personaOutputs.length
+
+  // v2 链路只有事件流信号，没有 persona_outputs
+  const hasV2Signal = v2Progress !== null || v2Total > 0
+  const personaDone = totalCount > 0 ? completedCount : v2Done
+  const personaTotal = totalCount > 0 ? totalCount : v2Total
+
   const personaProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const crossExamProgress = crossExamPhase === 'completed' ? 100 : crossExamPhase === 'running' ? 50 : 0
   const aggregationProgress = aggregationPhase === 'completed' ? 100 : aggregationPhase === 'running' ? 50 : 0
-  const overallProgress = Math.round(personaProgress * 0.7 + crossExamProgress * 0.15 + aggregationProgress * 0.15)
+  const overallProgress =
+    status === 'completed'
+      ? 100
+      : hasV2Signal
+        ? (v2Progress ?? Math.round((v2Done / Math.max(v2Total, 1)) * 80))
+        : Math.round(personaProgress * 0.7 + crossExamProgress * 0.15 + aggregationProgress * 0.15)
+
+  const title = review?.target_title || detail?.task_type || '评审'
+  const costUsd = review?.total_cost_usd ?? detail?.total_cost_usd ?? 0
+  const errorMessage = wsError ?? detail?.error_message ?? null
+  const sc = statusConfig[status ?? 'pending'] ?? statusConfig.pending
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
@@ -152,11 +332,11 @@ export default function ReviewProgressPage() {
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-semibold text-text-primary truncate">{review.target_title}</h1>
+          <h1 className="text-xl font-semibold text-text-primary truncate">{title}</h1>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-sm text-text-secondary">评审进度</p>
             {(() => {
-              const reviewMode = (review.mode ?? 'standard') as ReviewMode
+              const reviewMode = (review?.mode ?? detail?.mode ?? 'standard') as ReviewMode
               const mb = modeBadgeConfig[reviewMode] ?? modeBadgeConfig.standard
               return (
                 <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', mb.bg, mb.color)}>
@@ -167,9 +347,9 @@ export default function ReviewProgressPage() {
             })()}
           </div>
         </div>
-        {review.status === 'completed' && (
+        {status === 'completed' && (
           <Link
-            to={`/review/${review.id}/report`}
+            to={`/review/${id}/report`}
             className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-neon-green/10 text-neon-green hover:bg-neon-green/20 transition-colors text-sm"
           >
             <FileText className="w-4 h-4" strokeWidth={1.25} />
@@ -178,19 +358,43 @@ export default function ReviewProgressPage() {
         )}
       </div>
 
+      {/* 失败：如实展示 error_message */}
+      {status === 'failed' && (
+        <div className="mb-6 rounded-xl border-2 border-severity-critical/30 bg-bg-card p-4 flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-severity-critical shrink-0 mt-0.5" strokeWidth={1.25} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-severity-critical">评审失败</p>
+            <p className="text-xs text-text-secondary mt-1 break-all">
+              {errorMessage ?? '执行失败，请稍后重试'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 完成：报告入口横幅（v2 链路没有其它入口时尤其重要） */}
+      {status === 'completed' && (
+        <div className="mb-6 rounded-xl border-2 border-neon-green/30 bg-bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <CheckCircle2 className="w-5 h-5 text-neon-green shrink-0" strokeWidth={1.25} />
+            <span className="text-sm text-text-primary font-medium">评审已完成，报告已生成</span>
+          </div>
+          <Link
+            to={`/review/${id}/report`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-green text-bg-primary text-sm font-bold hover:bg-neon-green-dim transition-colors"
+          >
+            <FileText className="w-4 h-4" strokeWidth={1.25} />
+            查看完整报告 →
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <div className="rounded-xl border border-border bg-bg-card p-3 md:p-4">
           <div className="flex items-center gap-2 text-text-muted mb-1">
             <Clock className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="text-xs">状态</span>
           </div>
-          <span className={cn(
-            'font-medium text-sm',
-            review.status === 'completed' ? 'text-neon-green' :
-            review.status === 'running' ? 'text-cyan' : 'text-text-secondary'
-          )}>
-            {review.status === 'pending' ? '等待中' : review.status === 'running' ? '运行中' : review.status === 'completed' ? '已完成' : '失败'}
-          </span>
+          <span className={cn('font-medium text-sm', sc.color)}>{sc.label}</span>
         </div>
 
         <div className="rounded-xl border border-border bg-bg-card p-3 md:p-4">
@@ -207,7 +411,7 @@ export default function ReviewProgressPage() {
             <span className="text-xs">角色数</span>
           </div>
           <span className="font-display font-bold text-text-primary text-sm md:text-base">
-            {completedCount}/{totalCount}
+            {personaDone}/{personaTotal}
           </span>
         </div>
 
@@ -216,69 +420,125 @@ export default function ReviewProgressPage() {
             <DollarSign className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="text-xs">已消耗</span>
           </div>
-          <span className="font-display font-bold text-warm-orange text-sm md:text-base">${review.total_cost_usd.toFixed(2)}</span>
+          <span className="font-display font-bold text-warm-orange text-sm md:text-base">${costUsd.toFixed(2)}</span>
         </div>
       </div>
 
+      {/* v2 链路：事件流没带 persona_outputs 时，用总进度条 + 逐人格打勾展示 */}
+      {totalCount === 0 && !terminal && (
+        <div className="mb-8 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <h3 className="text-sm font-medium text-text-muted mb-3">评审进行中</h3>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-cyan rounded-full transition-all duration-700"
+                style={{ width: `${overallProgress}%` }}
+              />
+            </div>
+            <span className="font-mono text-sm text-text-secondary">{overallProgress}%</span>
+          </div>
+          {!hasV2Signal && (
+            <p className="text-xs text-text-muted mt-3 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.25} />
+              等待评审团就位…
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-text-primary mb-4">角色进度</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {review.persona_outputs.map((po) => {
-            const sc = statusConfig[po.status] ?? statusConfig.pending
-            const progress = getPersonaProgress(po.status)
-            const persona = personas.find((p) => p.id === po.persona_id)
-            return (
-              <div
-                key={po.persona_id}
-                className={cn(
-                  'rounded-xl border-2 p-3 md:p-4 transition-all',
-                  'bg-bg-card',
-                  po.status === 'completed' ? 'border-neon-green/20' :
-                  po.status === 'running' ? 'border-cyan/20' : 'border-border'
-                )}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className={cn('w-2.5 h-2.5 rounded-full', sc.bg, po.status === 'running' && 'animate-pulse-glow')} />
-                  <span className="font-medium text-text-primary text-sm">{po.persona_name}</span>
-                  {persona && <span className="text-xs text-text-muted">{persona.archetype}</span>}
-                </div>
+        {totalCount > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {personaOutputs.map((po) => {
+              const psc = statusConfig[po.status] ?? statusConfig.pending
+              const progress = getPersonaProgress(po.status)
+              const persona = personas.find((p) => p.id === po.persona_id)
+              return (
+                <div
+                  key={po.persona_id}
+                  className={cn(
+                    'rounded-xl border-2 p-3 md:p-4 transition-all',
+                    'bg-bg-card',
+                    po.status === 'completed' ? 'border-neon-green/20' :
+                    po.status === 'running' ? 'border-cyan/20' : 'border-border'
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={cn('w-2.5 h-2.5 rounded-full', psc.bg, po.status === 'running' && 'animate-pulse-glow')} />
+                    <span className="font-medium text-text-primary text-sm">{po.persona_name}</span>
+                    {persona && <span className="text-xs text-text-muted">{persona.archetype}</span>}
+                  </div>
 
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={cn('text-xs', sc.color)}>{sc.label}</span>
-                  {po.status !== 'pending' && (
-                    <div className="flex-1 h-2 bg-bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-700',
-                          po.status === 'completed' ? 'bg-neon-green' : 'bg-cyan'
-                        )}
-                        style={{ width: `${progress}%` }}
-                      />
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={cn('text-xs', psc.color)}>{psc.label}</span>
+                    {po.status !== 'pending' && (
+                      <div className="flex-1 h-2 bg-bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-700',
+                            po.status === 'completed' ? 'bg-neon-green' : 'bg-cyan'
+                          )}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    )}
+                    {po.status !== 'pending' && (
+                      <span className="text-xs font-mono text-text-muted">{progress}%</span>
+                    )}
+                  </div>
+
+                  {po.status === 'completed' && po.cost_usd > 0 && (
+                    <div className="flex items-center gap-3 text-xs mt-2 pt-2 border-t border-border">
+                      <span className="text-text-muted font-mono">
+                        费用 ${po.cost_usd.toFixed(3)}
+                      </span>
                     </div>
                   )}
-                  {po.status !== 'pending' && (
-                    <span className="text-xs font-mono text-text-muted">{progress}%</span>
+
+                  {po.status === 'failed' && (
+                    <p className="text-xs text-severity-critical mt-1.5 flex items-start gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" strokeWidth={1.25} />
+                      执行失败
+                    </p>
                   )}
                 </div>
-
-                {po.status === 'completed' && po.cost_usd > 0 && (
-                  <div className="flex items-center gap-3 text-xs mt-2 pt-2 border-t border-border">
-                    <span className="text-text-muted font-mono">
-                      费用 ${po.cost_usd.toFixed(3)}
-                    </span>
-                  </div>
-                )}
-
-                {po.status === 'failed' && (
-                  <p className="text-xs text-severity-critical mt-1.5 flex items-start gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" strokeWidth={1.25} />
-                    执行失败
-                  </p>
-                )}
+              )
+            })}
+          </div>
+        ) : v2CompletedIds.length > 0 || v2Total > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* v2：逐人格打勾（事件只告诉我们谁完成了） */}
+            {v2CompletedIds.map((pid) => {
+              const persona = personas.find((p) => p.id === pid)
+              return (
+                <div
+                  key={pid}
+                  className="rounded-xl border-2 border-neon-green/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-neon-green shrink-0" strokeWidth={1.25} />
+                  <span className="font-medium text-text-primary text-sm truncate">
+                    {persona?.name ?? pid}
+                  </span>
+                  {persona && <span className="text-xs text-text-muted shrink-0">{persona.archetype}</span>}
+                  <span className="ml-auto text-xs text-neon-green shrink-0">已完成</span>
+                </div>
+              )
+            })}
+            {!terminal && v2Total > v2CompletedIds.length && (
+              <div className="rounded-xl border-2 border-border bg-bg-card p-3 md:p-4 flex items-center gap-2.5">
+                <Loader2 className="w-4 h-4 text-cyan animate-spin shrink-0" strokeWidth={1.25} />
+                <span className="text-sm text-text-secondary">
+                  还有 {v2Total - v2CompletedIds.length} 位人格评审中…
+                </span>
               </div>
-            )
-          })}
-        </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted">
+            {terminal ? '本次评审没有可展示的角色明细' : '评审团正在开庭，人格完成后逐一亮灯…'}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

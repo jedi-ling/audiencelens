@@ -82,29 +82,48 @@ def _execute_review(
         _broadcast(review_id, "review.started", {"review_id": review_id})
         job_service.update_progress(job_id, 5)
 
-        # runner 通过环境变量读 key；这里在本线程内注入，用完即撤
-        prev_key = os.environ.get("ANTHROPIC_API_KEY")
-        os.environ["ANTHROPIC_API_KEY"] = api_key
-        try:
-            personas_path = None
-            if review.persona_pack:
-                personas_path = os.path.join(
-                    settings.repo_root, "src", "personas", f"{review.persona_pack}.yaml"
-                )
-                if not os.path.isfile(personas_path):
-                    personas_path = None
-
-            result = run_panel(
-                task_type=review.task_type,
-                artifact_bundle=review.artifact_bundle,
-                personas_path=personas_path,
-                max_concurrency=settings.review_concurrency,
+        # key 显式传参，绝不写进程全局 os.environ ——
+        # 多 worker 并发跑不同用户的评审时，环境变量注入会在用户间串 key（安全+计费问题）
+        personas_path = None
+        if review.persona_pack:
+            personas_path = os.path.join(
+                settings.repo_root, "src", "personas", f"{review.persona_pack}.yaml"
             )
-        finally:
-            if prev_key is None:
-                os.environ.pop("ANTHROPIC_API_KEY", None)
-            else:
-                os.environ["ANTHROPIC_API_KEY"] = prev_key
+            if not os.path.isfile(personas_path):
+                personas_path = None
+
+        def _on_persona_done(done: int, total: int, persona_id: str) -> None:
+            """runner worker 线程回调：逐人格推 WS 进度 + 更新 job 进度。
+
+            进度映射：人格阶段占 5%→80% 区间，即 5 + int(75 * done / total)。
+            run_panel 已兜住回调异常，这里失败不会拖垮评审。
+            """
+            progress = 5 + int(75 * done / total) if total else 5
+            _broadcast(
+                review_id,
+                "review.persona_completed",
+                {
+                    "review_id": review_id,
+                    "persona_id": persona_id,
+                    "done": done,
+                    "total": total,
+                },
+            )
+            _broadcast(
+                review_id,
+                "review.progress",
+                {"review_id": review_id, "progress": progress},
+            )
+            job_service.update_progress(job_id, progress)
+
+        result = run_panel(
+            task_type=review.task_type,
+            artifact_bundle=review.artifact_bundle,
+            personas_path=personas_path,
+            max_concurrency=settings.review_concurrency,
+            progress_callback=_on_persona_done,
+            api_key=api_key,
+        )
 
         job_service.update_progress(job_id, 80)
 

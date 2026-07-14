@@ -1,6 +1,7 @@
 """并发化 run_panel 的验证：结果与串行一致、保序，且确实并行。"""
 
 import os
+import threading
 import time
 
 import pytest
@@ -111,4 +112,102 @@ class TestActuallyParallel:
         monkeypatch.setattr(runner_cli, "run_single_persona", slow)
         result = _panel(bundle, max_concurrency=1)
         # 串行路径仍能正确产出
+        assert result["report"]["persona_notes"]
+
+
+class TestExplicitApiKey:
+    """api_key 显式参数：多用户服务端并发的防串 key 保证。"""
+
+    def test_explicit_key_reaches_workers_without_env(self, bundle, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
+        seen = []
+        real = runner_cli.run_single_persona
+
+        def spy(persona, task_type, artifact_summary, artifact_texts, config,
+                artifact_bundle=None, api_key=None):
+            seen.append(api_key)
+            # 强制走模拟输出路径，避免真调 API
+            return real(persona, task_type, artifact_summary, artifact_texts,
+                        config, artifact_bundle, api_key=None)
+
+        monkeypatch.setattr(runner_cli, "run_single_persona", spy)
+        result = _panel(bundle, max_concurrency=4, api_key="sk-ant-explicit")
+        # 显式 key 时不再标记模拟——key 的判定不依赖进程环境变量
+        assert result["simulated"] is False
+        assert seen and all(k == "sk-ant-explicit" for k in seen)
+
+    def test_env_fallback_still_works(self, bundle, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-env")
+        monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
+        seen = []
+        real = runner_cli.run_single_persona
+
+        def spy(persona, task_type, artifact_summary, artifact_texts, config,
+                artifact_bundle=None, api_key=None):
+            seen.append(api_key)
+            return real(persona, task_type, artifact_summary, artifact_texts,
+                        config, artifact_bundle, api_key=None)
+
+        monkeypatch.setattr(runner_cli, "run_single_persona", spy)
+        result = _panel(bundle, max_concurrency=4)  # 不传 api_key → 回落环境变量
+        assert result["simulated"] is False
+        assert seen and all(k == "sk-ant-from-env" for k in seen)
+
+
+class TestProgressCallback:
+    """run_panel(progress_callback=...) 的实时进度回调契约。"""
+
+    def _collecting_callback(self):
+        calls = []
+        lock = threading.Lock()
+
+        def cb(done, total, persona_id):
+            with lock:
+                calls.append((done, total, persona_id))
+
+        return calls, cb
+
+    def test_callback_invoked_once_per_persona_concurrent(self, bundle, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
+        calls, cb = self._collecting_callback()
+
+        result = _panel(bundle, max_concurrency=6, progress_callback=cb)
+
+        n = result["cost_summary"]["persona_count"]
+        assert n >= 1
+        # 调用次数 == 人格数
+        assert len(calls) == n
+        # done 值集合恰为 1..N（顺序可乱，但计数不丢不重）
+        assert sorted(c[0] for c in calls) == list(range(1, n + 1))
+        # 每次 total 都等于 N
+        assert all(c[1] == n for c in calls)
+        # persona_id 非空
+        assert all(c[2] for c in calls)
+
+    def test_callback_invoked_in_serial_mode(self, bundle, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
+        calls, cb = self._collecting_callback()
+
+        result = _panel(bundle, max_concurrency=1, progress_callback=cb)
+
+        n = result["cost_summary"]["persona_count"]
+        assert len(calls) == n
+        # 串行模式下 done 应严格递增 1..N
+        assert [c[0] for c in calls] == list(range(1, n + 1))
+        assert all(c[1] == n for c in calls)
+        assert all(c[2] for c in calls)
+
+    def test_callback_exception_does_not_break_review(self, bundle, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
+
+        def exploding(done, total, persona_id):
+            raise RuntimeError("progress callback boom")
+
+        result = _panel(bundle, max_concurrency=6, progress_callback=exploding)
+        # 回调抛异常不得影响评审产出
+        assert result["cost_summary"]["persona_count"] >= 1
         assert result["report"]["persona_notes"]

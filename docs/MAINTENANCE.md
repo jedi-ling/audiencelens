@@ -214,11 +214,24 @@ def encrypt_secret(plaintext: str, secret: str) -> str:
 
 ### 4.6 接入真实计费
 
-1. `quota_service.check_quota` → 按 `user.plan` 查套餐额度（替换写死的 free 常量）
+1. ~~`quota_service.check_quota` → 按 `user.plan` 查套餐额度~~ **已完成**：
+   `check_quota(db, user_id, key_source, plan=identity.plan)` 按 `plan_service` 的套餐限额校验
 2. `quota_service.record_usage` 末尾 → 推送计量事件到 Stripe/自建计费
    （代码里已标好接入点注释）
 
 历史用量在 `usage_records` 表里**早就攒着了**——这就是"配额关着也记账"的价值。
+
+### 4.7 调整套餐
+
+套餐矩阵在 [`web/backend/app/services/plan_service.py`](../web/backend/app/services/plan_service.py)
+的 `PLANS` 字典里，当前三档：free / pro($19) / team($49)。
+
+- **加档位**：往 `PLANS` 加一个条目即可，`GET /api/plans` 与配额校验自动生效
+- **free 档的限额仍从环境变量读**（`AL_QUOTA_FREE_REVIEWS_PER_DAY` / `AL_QUOTA_FREE_COST_USD_PER_DAY`），
+  这是有意的——单机形态下不用改代码就能调；pro/team 是代码里的固定值
+- **未知 plan 一律回落 free**（防御：数据库里出现脏 plan 值时不至于放开限额）
+- 用户的档位在 `users.plan` 字段；改档 = 更新该字段（未来接 Stripe webhook 时在此落点）
+- BYOK 用户**始终不受套餐限额约束**——他们花自己的钱
 
 ---
 
@@ -275,6 +288,8 @@ alembic upgrade head
 | 402 配额超限 | 走服务端 key 且超额 | 让用户填自己的 key（BYOK 不受配额约束） |
 | 用户 key 突然失效 | `AL_JWT_SECRET` 被改过 | 密文解不开会当"无 key"，让用户重填即可 |
 | 评审很慢 | 并发度太低 | 调 `AUDIENCELENS_MAX_CONCURRENCY`（默认 6） |
+| 进度条不动但评审能完成 | WS 被拦（origin 不在白名单） | 检查 `AL_CORS_ORIGINS`；前端会自动回落 2s 轮询，功能不受影响 |
+| 402 提示"XX 套餐限 N 次" | 套餐限额（走服务端 key） | 升级 `users.plan` 或让用户填 BYOK key（不受限）；档位定义见 §4.7 |
 
 **排查任何线上问题的第一步**：拿到用户报障时的 `X-Request-Id`（响应头里），
 在日志里 grep 它——一次请求的全链路都串在这个 ID 上。
