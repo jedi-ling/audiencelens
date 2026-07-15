@@ -27,19 +27,19 @@ export default function Layout() {
     <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-bg-primary/60 backdrop-blur-xl border-b border-transparent shrink-0">
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-neon-green/40 to-transparent" />
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
+        <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="relative">
               <Eye className="w-6 h-6 text-neon-green group-hover:text-glow-green transition-colors" strokeWidth={1.25} />
               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-neon-green shadow-[0_0_6px_rgba(0,255,136,0.8)] animate-pulse" />
             </div>
-            <span className="font-display font-bold text-lg text-neon-green text-glow-green">
+            <span className="font-display font-bold text-lg text-neon-green text-glow-green whitespace-nowrap">
               AudienceLens
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-3">
-            <nav className="flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-2 min-w-0">
+            <nav className="flex items-center gap-0.5 shrink-0">
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive = item.path === '/'
@@ -50,13 +50,13 @@ export default function Layout() {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      'relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all',
+                      'relative flex items-center gap-1 px-2 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all',
                       isActive
                         ? 'text-neon-green'
                         : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
-                    <Icon className="w-4 h-4" strokeWidth={1.25} />
+                    <Icon className="w-4 h-4 shrink-0" strokeWidth={1.25} />
                     <span>{item.label}</span>
                     <span
                       className={cn(
@@ -69,7 +69,7 @@ export default function Layout() {
               })}
             </nav>
 
-            <div className="hidden md:flex items-center gap-1 ml-2 pl-2 border-l border-border">
+            <div className="hidden md:flex items-center gap-0.5 shrink-0 ml-1 pl-2 border-l border-border">
               {secondaryNavItems.map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname.startsWith(item.path)
@@ -78,13 +78,13 @@ export default function Layout() {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      'relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all',
+                      'relative flex items-center gap-1 px-2 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all',
                       isActive
                         ? 'text-cyan'
                         : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
-                    <Icon className="w-4 h-4" strokeWidth={1.25} />
+                    <Icon className="w-4 h-4 shrink-0" strokeWidth={1.25} />
                     <span>{item.label}</span>
                   </Link>
                 )
@@ -94,9 +94,9 @@ export default function Layout() {
             {!isCreatePage && (
               <Link
                 to="/review/new"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 hover:border-neon-green/50 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 hover:border-neon-green/50 transition-all"
               >
-                <Plus className="w-4 h-4" strokeWidth={1.25} />
+                <Plus className="w-4 h-4 shrink-0" strokeWidth={1.25} />
                 <span>新建评审</span>
               </Link>
             )}
