@@ -23,7 +23,7 @@ const FORMAT_CONFIG: Record<ApiFormat, {
       border: 'border-neon-green/50',
       bg: 'bg-neon-green/10',
       text: 'text-neon-green',
-      glow: 'shadow-[0_0_15px_rgba(0,255,136,0.15)]',
+      glow: 'shadow-sm',
     },
     desc: '/v1/messages',
   },
@@ -34,7 +34,7 @@ const FORMAT_CONFIG: Record<ApiFormat, {
       border: 'border-cyan/50',
       bg: 'bg-cyan/10',
       text: 'text-cyan',
-      glow: 'shadow-[0_0_15px_rgba(0,212,255,0.15)]',
+      glow: 'shadow-sm',
     },
     desc: '/v1/chat/completions',
   },
@@ -481,7 +481,7 @@ export default function SettingsPage() {
 
         <section className="rounded-xl border border-border bg-bg-card p-4">
           <h3 className="text-sm font-display font-semibold text-text-primary mb-2 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
+            <Zap className="w-4 h-4 text-cyan" strokeWidth={1.25} />
             LiteLLM 路由说明
           </h3>
           <div className="space-y-1.5 text-xs text-text-muted">
@@ -619,13 +619,13 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <div className="text-xs text-text-muted mb-1">总费用</div>
-                  <div className="font-display font-bold text-warm-orange">
+                  <div className="font-mono font-bold text-text-primary">
                     ${usage.cost_usd_total.toFixed(4)}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted mb-1">其中服务器 Key</div>
-                  <div className="font-display font-bold text-text-secondary">
+                  <div className="font-mono font-bold text-text-secondary">
                     ${usage.cost_usd_on_server_key.toFixed(4)}
                   </div>
                 </div>

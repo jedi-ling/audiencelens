@@ -10,11 +10,12 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
   const percentage = (value / max) * 100
   const angle = (percentage / 100) * 180
 
+  // 语义色 —— 镜像 index.css token（SVG stroke 无法用 Tailwind 类）
   const getColor = () => {
-    if (percentage >= 80) return '#00ff88'
-    if (percentage >= 60) return '#ffbb33'
-    if (percentage >= 40) return '#ff6b35'
-    return '#ff3355'
+    if (percentage >= 80) return '#2f9e6f' // 成功（status-completed）
+    if (percentage >= 60) return '#c1841f' // 警告（severity-medium）
+    if (percentage >= 40) return '#e0603f' // 偏低（severity-high / warm-orange）
+    return '#d34b3d' // 严重（severity-critical）
   }
 
   const color = getColor()
@@ -25,7 +26,7 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
         <path
           d="M 10 75 A 60 60 0 0 1 130 75"
           fill="none"
-          stroke="#2a2a3a"
+          stroke="#dfe3ea"
           strokeWidth="10"
           strokeLinecap="round"
         />
@@ -36,7 +37,6 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={`${(angle / 180) * 188.5} 188.5`}
-          style={{ filter: `drop-shadow(0 0 6px ${color}40)` }}
         />
         <line
           x1="70"
@@ -46,7 +46,6 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
           stroke={color}
           strokeWidth="2"
           strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 4px ${color}60)` }}
         />
         <circle cx="70" cy="75" r="4" fill={color} />
       </svg>

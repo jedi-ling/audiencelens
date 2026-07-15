@@ -17,8 +17,11 @@ interface MouseState {
   active: boolean;
 }
 
-const COLORS = ['#00ff88', '#00d4ff', '#ff6b35'];
-const COLOR_WEIGHTS = [0.6, 0.3, 0.1];
+// 钴蓝仪器风：极淡的钴蓝灰点阵，去霓虹。整体透明度由 PARTICLE_ALPHA / LINE_ALPHA 控制。
+const COLORS = ['#2f5fd0', '#5a7fc8', '#9aa4b4'];
+const COLOR_WEIGHTS = [0.5, 0.3, 0.2];
+const PARTICLE_ALPHA = 0.16; // 粒子整体透明度：近乎不可见的淡点
+const LINE_ALPHA = 0.05; // 连线透明度：几乎隐形的发丝连接
 
 function getRandomColor(): string {
   const rand = Math.random();
@@ -38,7 +41,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16),
       }
-    : { r: 0, g: 255, b: 136 };
+    : { r: 47, g: 95, b: 208 };
 }
 
 function blendColors(color1: string, color2: string, ratio: number): string {
@@ -186,8 +189,10 @@ const ParticleConstellation: React.FC<ParticleConstellationProps> = ({ className
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.globalAlpha = PARTICLE_ALPHA;
         ctx.fillStyle = p.color;
         ctx.fill();
+        ctx.globalAlpha = 1;
       }
 
       for (let i = 0; i < particles.length; i++) {
@@ -199,7 +204,7 @@ const ParticleConstellation: React.FC<ParticleConstellationProps> = ({ className
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           if (dist < 150) {
-            const opacity = (1 - dist / 150) * 0.3;
+            const opacity = (1 - dist / 150) * LINE_ALPHA;
             const blendedColor = blendColors(p1.color, p2.color, 0.5);
 
             ctx.beginPath();
@@ -212,19 +217,7 @@ const ParticleConstellation: React.FC<ParticleConstellationProps> = ({ className
         }
       }
 
-      const gradient = ctx.createRadialGradient(
-        width / 2,
-        height,
-        0,
-        width / 2,
-        height,
-        height * 0.6
-      );
-      gradient.addColorStop(0, 'rgba(10, 10, 15, 0)');
-      gradient.addColorStop(1, 'rgba(10, 10, 15, 0.9)');
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, height * 0.4, width, height * 0.6);
+      // 仪器风：移除纯黑径向渐变/CRT 暗角叠层，让浅底页面直接透出。
 
       rafRef.current = requestAnimationFrame(animate);
     };
@@ -249,7 +242,7 @@ const ParticleConstellation: React.FC<ParticleConstellationProps> = ({ className
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: '#0a0a0f',
+        backgroundColor: 'transparent',
         willChange: 'transform',
         pointerEvents: 'none',
       }}

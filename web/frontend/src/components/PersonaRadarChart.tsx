@@ -17,6 +17,16 @@ const AXIS_LABEL_MAP: Record<string, string> = {
   platform_loyalty: '平台忠诚度',
 }
 
+// 钴蓝仪器调色板 —— 镜像 index.css 的 token 值。
+// Recharts 走 SVG presentation attribute，无法用 Tailwind 类，故直接引用 token 对应值。
+const CHART = {
+  grid: '#dfe3ea', // --color-border：发丝级灰网格
+  tick: '#8b94a2', // --color-text-muted：轴标签
+  legend: '#586173', // --color-text-secondary：图例
+  series1: '#2f5fd0', // --color-neon-green：钴蓝主色
+  series2: '#2f8fd0', // --color-cyan：亮钴蓝对比系列
+} as const
+
 type ChartData = BehaviorAxis[] | Record<string, number>
 
 function normalizeData(data: ChartData): BehaviorAxis[] {
@@ -81,15 +91,15 @@ export default function PersonaRadarChart({ data, compareData, name1 = '角色 A
     <div ref={containerRef}>
       <ResponsiveContainer width={computedSize} height={computedSize}>
         <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid stroke="#2a2a3a" />
-          <PolarAngleAxis dataKey="axis" tick={{ fill: '#8888a0', fontSize, fontFamily: 'Noto Sans SC' }} />
+          <PolarGrid stroke={CHART.grid} />
+          <PolarAngleAxis dataKey="axis" tick={{ fill: CHART.tick, fontSize, fontFamily: 'Noto Sans SC' }} />
           <PolarRadiusAxis angle={30} domain={[0, 1]} tick={false} axisLine={false} />
-          <Radar name={name1} dataKey="value1" stroke="#00ff88" fill="#00ff88" fillOpacity={0.15} strokeWidth={2} />
+          <Radar name={name1} dataKey="value1" stroke={CHART.series1} fill={CHART.series1} fillOpacity={0.15} strokeWidth={2} />
           {normalizedCompare && (
-            <Radar name={name2} dataKey="value2" stroke="#00d4ff" fill="#00d4ff" fillOpacity={0.15} strokeWidth={2} />
+            <Radar name={name2} dataKey="value2" stroke={CHART.series2} fill={CHART.series2} fillOpacity={0.15} strokeWidth={2} />
           )}
           {normalizedCompare && (
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: '#8888a0' }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: CHART.legend }} />
           )}
         </RadarChart>
       </ResponsiveContainer>
