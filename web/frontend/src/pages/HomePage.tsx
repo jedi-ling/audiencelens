@@ -4,7 +4,6 @@ import { useReviewStore } from '@/store/review-store'
 import {
   Zap,
   BarChart3,
-  Share2,
   ArrowRight,
   Clock,
   CheckCircle2,
@@ -21,6 +20,7 @@ import {
   Eye,
   Gauge,
   MessageSquareText,
+  TerminalSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Review } from '@/lib/mock-data'
@@ -46,6 +46,20 @@ import { TASK_TYPES } from '@/lib/mock-data'
 const taskTypeNames: Record<string, string> = Object.fromEntries(
   TASK_TYPES.map((t) => [t.id, t.name])
 )
+
+/** 板块眉标：等宽字体的代码注释风格，全站赛博视觉锚点 */
+function SectionTag({ children, color = 'cyan' }: { children: string; color?: 'cyan' | 'green' | 'orange' }) {
+  const colorClass = {
+    cyan: 'text-cyan',
+    green: 'text-neon-green',
+    orange: 'text-warm-orange',
+  }[color]
+  return (
+    <div className={cn('font-mono text-[11px] md:text-xs tracking-[0.3em] uppercase mb-3', colorClass)}>
+      {'// '}{children}
+    </div>
+  )
+}
 
 function ReviewRow({ review }: { review: Review }) {
   return (
@@ -81,7 +95,7 @@ const stats = [
   { value: '14', label: '任务类型', icon: Layers },
 ]
 
-// 核心差异化——三条经过竞品调研核实的差异点（见 docs/landing-page 的对比数据），
+// 核心差异化——三条经过竞品调研核实的差异点，
 // 取代泛泛的"零门槛/可视化/可分享"话术，讲清楚"为什么不是又一个 AI 对话框"。
 const features = [
   {
@@ -110,32 +124,36 @@ const features = [
   },
 ]
 
+// 终端错误码风格的三个痛点
 const PROBLEMS = [
   {
-    tag: '01 / 单一视角',
+    code: 'ERR://01',
+    name: 'SINGLE_VIEWPOINT',
     title: '一个 AI 的一面之词',
     body: '问一次得一个答案，它不会反驳自己。你听不到不同人格之间的分歧，也就看不到盲点在哪。',
   },
   {
-    tag: '02 / 一致性幻觉',
+    code: 'ERR://02',
+    name: 'FALSE_CONSENSUS',
     title: '大家都说"挺好的"',
     body: '没有对抗机制，合成反馈会滑向廉价的共识。好听，但对你的决策毫无价值。',
   },
   {
-    tag: '03 / 无从追溯',
+    code: 'ERR://03',
+    name: 'NO_PROVENANCE',
     title: '结论没有证据链',
     body: '"感觉不错"——凭什么？哪个人格因为什么改了主意？没有记录，就无法复盘，也无法信任。',
   },
 ]
 
 const STEPS = [
-  { title: '选择技能', body: '游戏评审 / 产品评审 / 红队对抗 / 人格生成器。' },
-  { title: '投入素材', body: '概念文档、商店页面、功能描述或直接粘贴文本。' },
-  { title: '评审团开庭', body: '人格独立评审 → 交叉质询 → 改票投票。' },
-  { title: '获取裁决', body: 'JSON 数据 + Markdown 摘要 + 可视化报告。' },
+  { cmd: 'select --skill', title: '选择技能', body: '游戏评审 / 产品评审 / 红队对抗 / 人格生成器' },
+  { cmd: 'load ./artifact', title: '投入素材', body: '概念文档、商店页面、功能描述或直接粘贴文本' },
+  { cmd: 'run --panel', title: '评审团开庭', body: '人格独立评审 → 交叉质询 → 改票投票' },
+  { cmd: 'export verdict', title: '获取裁决', body: 'JSON 数据 + Markdown 摘要 + 可视化报告' },
 ]
 
-// 价格区间已对照对方官网核实（见 docs/landing-page 对比表同一份数据）：
+// 价格区间已对照对方官网核实：
 // SyntheticUsers 官网为 $2–60/次区间；Yabble 为年约 $8,900–80,000，非月费。
 const COMPARE_ROWS: Array<[string, string, string, string, string]> = [
   ['方法论', '评审式', '访谈式', '真人访谈', '对话式'],
@@ -147,21 +165,25 @@ const COMPARE_ROWS: Array<[string, string, string, string, string]> = [
 
 const ETHICS = [
   {
+    tag: 'ETHIC_01',
     icon: Fingerprint,
     title: '行为优先于人口统计',
     body: '人格由 12 维行为特征定义，而非性别、年龄、地域——从源头切断刻板印象的因果链。',
   },
   {
+    tag: 'ETHIC_02',
     icon: Eye,
     title: '两层刻板印象检测',
     body: '正则初筛 + LLM 复审双层机制，自动识别并标记"身份→行为"的因果推断违规。',
   },
   {
+    tag: 'ETHIC_03',
     icon: ShieldCheck,
     title: '证据三级标注',
     body: '直接引用 / 合理推断 / 信息缺口三级分层，推断占比强制封顶，杜绝凭空捏造。',
   },
   {
+    tag: 'ETHIC_04',
     icon: Gauge,
     title: '8 维质量 Harness',
     body: '通过 8 个维度的评估框架量化人格分化度与校准诚实度，结论以假设而非预测呈现。',
@@ -230,10 +252,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---------- 问题：你收到的反馈 ---------- */}
-      <section className="py-16 md:py-24 border-b border-border">
-        <div className="max-w-5xl mx-auto px-4">
+      {/* ---------- 问题：终端错误码 ---------- */}
+      <section className="relative py-16 md:py-24 border-b border-border">
+        <div className="absolute inset-0 grid-lines pointer-events-none [mask-image:radial-gradient(ellipse_70%_60%_at_50%_40%,#000_30%,transparent_80%)]" />
+        <div className="relative max-w-5xl mx-auto px-4">
           <div className="text-center mb-10 md:mb-14">
+            <SectionTag color="orange">FEEDBACK_AUDIT — 3 ERRORS FOUND</SectionTag>
             <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
               问题不在没人给反馈，而在反馈从没被质询过
             </h2>
@@ -241,12 +265,21 @@ export default function HomePage() {
               找 ChatGPT 问一句，得到的是一个声音的附和。真实用户测试很贵、很慢。中间这段，一直是空的。
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border rounded-xl overflow-hidden border border-border">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {PROBLEMS.map((p) => (
-              <div key={p.tag} className="bg-bg-primary p-6">
-                <div className="text-xs font-mono text-cyan tracking-wider mb-3">{p.tag}</div>
-                <h3 className="font-display text-lg font-bold text-text-primary mb-2">{p.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed">{p.body}</p>
+              <div
+                key={p.code}
+                className="group relative rounded-lg border border-border bg-bg-card/80 backdrop-blur-sm overflow-hidden hover:border-warm-orange/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-bg-secondary/80 font-mono text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-warm-orange animate-pulse-glow" />
+                  <span className="text-warm-orange">{p.code}</span>
+                  <span className="text-text-muted tracking-wider">{p.name}</span>
+                </div>
+                <div className="p-4 md:p-5">
+                  <h3 className="font-display text-base md:text-lg font-bold text-text-primary mb-2">{p.title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{p.body}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -254,7 +287,7 @@ export default function HomePage() {
       </section>
 
       {/* ---------- 实时统计 ---------- */}
-      <section className="relative border-y border-border">
+      <section className="relative border-b border-border">
         <div className="absolute inset-0 bg-gradient-to-r from-bg-primary via-bg-secondary to-bg-primary" />
         <div className="relative max-w-6xl mx-auto px-4 py-8 md:py-10">
           <div className="grid grid-cols-2 md:grid-cols-4">
@@ -273,12 +306,15 @@ export default function HomePage() {
       {/* ---------- 核心差异化 ---------- */}
       <section className="py-16 md:py-28">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-center text-gradient-green mb-4">
-            不是又一个 AI 对话框
-          </h2>
-          <p className="text-text-secondary text-center max-w-xl mx-auto mb-12 md:mb-16 text-sm md:text-base">
-            三轮质询、改票机制、结构化裁决——这是真正会互相较真的合成评审团
-          </p>
+          <div className="text-center mb-12 md:mb-16">
+            <SectionTag color="green">CORE_DIFFERENTIATORS</SectionTag>
+            <h2 className="font-display text-3xl md:text-5xl font-bold text-gradient-green mb-4">
+              不是又一个 AI 对话框
+            </h2>
+            <p className="text-text-secondary max-w-xl mx-auto text-sm md:text-base">
+              三轮质询、改票机制、结构化裁决——这是真正会互相较真的合成评审团
+            </p>
+          </div>
 
           <div className="space-y-16 md:space-y-32">
             {features.map((feature, index) => {
@@ -318,15 +354,15 @@ export default function HomePage() {
                     )}
                   >
                     <div className="flex-1 flex justify-center w-full">
-                      <div className={cn('w-24 h-24 md:w-40 md:h-40 rounded-xl border', c.border, 'flex items-center justify-center relative overflow-hidden', c.glow, 'group-hover:scale-105 transition-transform duration-500')}>
+                      <div className={cn('w-24 h-24 md:w-40 md:h-40 rounded-xl border', c.border, 'flex items-center justify-center relative overflow-hidden', c.glow, 'group-hover:scale-105 transition-transform duration-500 scanline-overlay')}>
                         <div className={cn('absolute inset-0 opacity-20', c.bg)} />
                         <Icon className={cn('w-10 h-10 md:w-16 md:h-16', c.text)} strokeWidth={1.25} />
                       </div>
                     </div>
 
                     <div className="flex-1 text-center md:text-left pt-0">
-                      <div className={cn('text-sm font-display tracking-wider mb-2', c.text)}>
-                        0{index + 1}
+                      <div className={cn('text-sm font-mono tracking-[0.2em] mb-2', c.text)}>
+                        {'['}0{index + 1}{']'}
                       </div>
                       <h3 className="font-display text-xl md:text-3xl font-bold text-text-primary mb-3">
                         {feature.title}
@@ -334,7 +370,7 @@ export default function HomePage() {
                       <p className="text-text-secondary leading-relaxed mb-4 max-w-md text-sm md:text-base">
                         {feature.description}
                       </p>
-                      <div className={cn('inline-flex items-center gap-2 text-sm font-medium', c.text)}>
+                      <div className={cn('inline-flex items-center gap-2 text-sm font-mono', c.text)}>
                         <span className="w-4 h-px bg-current" />
                         {feature.stat}
                       </div>
@@ -347,18 +383,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---------- 运作流程 ---------- */}
-      <section className="py-12 md:py-16 border-t border-border">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary mb-8 text-center">
-            四步，从素材到裁决
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-xl overflow-hidden border border-border">
+      {/* ---------- 运作流程：命令管线 ---------- */}
+      <section className="relative py-12 md:py-20 border-t border-border">
+        <div className="absolute inset-0 grid-lines pointer-events-none [mask-image:radial-gradient(ellipse_60%_70%_at_50%_50%,#000_20%,transparent_75%)]" />
+        <div className="relative max-w-6xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <SectionTag>EXECUTION_PIPELINE</SectionTag>
+            <h2 className="font-display text-xl md:text-3xl font-bold text-text-primary">
+              四步，从素材到裁决
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {STEPS.map((step, i) => (
-              <div key={step.title} className="bg-bg-card p-5">
-                <div className="font-mono text-xs text-neon-green mb-2">{String(i + 1).padStart(2, '0')}</div>
-                <h3 className="font-display text-sm md:text-base font-bold text-text-primary mb-1">{step.title}</h3>
-                <p className="text-xs text-text-secondary leading-relaxed">{step.body}</p>
+              <div key={step.title} className="relative">
+                <div className="hud-corners h-full rounded-lg border border-border bg-bg-card/80 backdrop-blur-sm p-4 md:p-5 hover:border-neon-green/30 transition-colors">
+                  <div className="font-mono text-[11px] text-text-muted mb-1">
+                    <span className="text-neon-green">$</span> audiencelens {step.cmd}
+                  </div>
+                  <div className="font-mono text-xs text-neon-green mb-3">[{String(i + 1).padStart(2, '0')}/04]</div>
+                  <h3 className="font-display text-sm md:text-base font-bold text-text-primary mb-1.5">{step.title}</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">{step.body}</p>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div className="hidden lg:flex absolute top-1/2 -right-3.5 -translate-y-1/2 z-10 text-neon-green/60 font-mono text-lg select-none">
+                    ▸
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -366,13 +416,16 @@ export default function HomePage() {
       </section>
 
       {/* ---------- 评审技能 ---------- */}
-      <section className="py-12 md:py-16 border-b border-border">
+      <section className="py-12 md:py-16 border-t border-border">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary">
-              评审技能
-            </h2>
-            <Link to="/skills" className="text-sm text-cyan hover:text-cyan-dim transition-colors flex items-center gap-1">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <SectionTag color="green">SKILL_ARSENAL</SectionTag>
+              <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary">
+                评审技能
+              </h2>
+            </div>
+            <Link to="/skills" className="text-sm text-cyan hover:text-cyan-dim transition-colors flex items-center gap-1 pb-1">
               查看全部 <ArrowRight className="w-3 h-3" strokeWidth={1.25} />
             </Link>
           </div>
@@ -395,7 +448,7 @@ export default function HomePage() {
                 <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed">
                   {skill.description_zh}
                 </p>
-                <div className="flex items-center gap-2 mt-3 text-xs text-text-muted">
+                <div className="flex items-center gap-2 mt-3 text-xs text-text-muted font-mono">
                   <span>{skill.task_types.length} 种任务</span>
                   <span>·</span>
                   <span>{skill.persona_count} 个角色</span>
@@ -406,10 +459,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---------- 竞品对比 ---------- */}
-      <section className="py-16 md:py-24">
+      {/* ---------- 竞品对比：终端窗口 ---------- */}
+      <section className="py-16 md:py-24 border-t border-border">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-10">
+            <SectionTag>COMPETITIVE_SCAN</SectionTag>
             <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
               不是所有 AI 研究工具都一样
             </h2>
@@ -417,37 +471,48 @@ export default function HomePage() {
               差异集中在一个地方：反馈有没有被质询过。价格区间已对照对方官网核实。
             </p>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="bg-bg-secondary">
-                  <th className="text-left px-4 py-3 font-display text-text-secondary font-medium">维度</th>
-                  <th className="text-left px-4 py-3 font-display text-neon-green font-bold">AudienceLens</th>
-                  <th className="text-left px-4 py-3 font-display text-text-secondary font-medium">SyntheticUsers</th>
-                  <th className="text-left px-4 py-3 font-display text-text-secondary font-medium">Outset</th>
-                  <th className="text-left px-4 py-3 font-display text-text-secondary font-medium">Yabble</th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARE_ROWS.map((row, i) => (
-                  <tr key={row[0]} className={cn(i % 2 === 1 && 'bg-bg-card/40')}>
-                    <th className="text-left px-4 py-3 font-medium text-text-secondary whitespace-nowrap">{row[0]}</th>
-                    <td className="px-4 py-3 bg-neon-green/5 text-text-primary font-medium border-x border-neon-green/20">{row[1]}</td>
-                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[2]}</td>
-                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[3]}</td>
-                    <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[4]}</td>
+
+          <div className="hud-corners-cyan hud-corners rounded-xl border border-border bg-bg-card overflow-hidden scan-sweep">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary font-mono text-[11px] text-text-muted">
+              <span className="w-2.5 h-2.5 rounded-full bg-severity-critical/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-severity-medium/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neon-green/80" />
+              <span className="ml-2"><span className="text-neon-green">$</span> audiencelens compare --against synthetic-users outset yabble</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="bg-bg-secondary/60">
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">维度</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-neon-green font-bold">AudienceLens</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">SyntheticUsers</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Outset</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Yabble</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {COMPARE_ROWS.map((row, i) => (
+                    <tr key={row[0]} className={cn('border-t border-border/60', i % 2 === 1 && 'bg-bg-secondary/30')}>
+                      <th className="text-left px-4 py-3 font-medium text-text-secondary whitespace-nowrap">{row[0]}</th>
+                      <td className="px-4 py-3 bg-neon-green/5 text-neon-green font-medium border-x border-neon-green/20 whitespace-nowrap">{row[1]}</td>
+                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[2]}</td>
+                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[3]}</td>
+                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[4]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ---------- 裁决预览 + 判断复利 ---------- */}
-      <section className="py-16 md:py-24 border-t border-border">
-        <div className="max-w-5xl mx-auto px-4">
+      {/* ---------- 裁决预览：运行中的终端 ---------- */}
+      <section className="relative py-16 md:py-24 border-t border-border">
+        <div className="absolute inset-0 grid-lines pointer-events-none [mask-image:radial-gradient(ellipse_60%_60%_at_50%_45%,#000_25%,transparent_78%)]" />
+        <div className="relative max-w-5xl mx-auto px-4">
           <div className="text-center mb-10">
+            <SectionTag color="green">VERDICT_PREVIEW</SectionTag>
             <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
               三轮质询后的结构化评价书
             </h2>
@@ -456,48 +521,62 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary text-xs font-mono text-text-muted">
-              <span className="w-2.5 h-2.5 rounded-full bg-severity-critical" />
-              <span className="w-2.5 h-2.5 rounded-full bg-severity-medium" />
-              <span className="w-2.5 h-2.5 rounded-full bg-neon-green" />
-              <span className="ml-2">evaluation-report.json</span>
+          <div className="hud-corners rounded-xl border border-neon-green/25 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(0,255,136,0.06)]">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary font-mono text-[11px] text-text-muted">
+              <span className="w-2.5 h-2.5 rounded-full bg-severity-critical/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-severity-medium/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neon-green/80" />
+              <TerminalSquare className="w-3.5 h-3.5 ml-2 text-neon-green" strokeWidth={1.5} />
+              <span>evaluation-report.json — panel:20 · rounds:3 · flips:1</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 bg-bg-card">
-              <div className="rounded-lg border border-border p-4 bg-bg-primary">
-                <div className="flex items-center gap-2 text-xs font-mono tracking-wider text-neon-green mb-3">
-                  <span className="w-2 h-2 rounded-sm bg-current" /> 共识区 · CONSENSUS
+
+            <div className="px-5 pt-4 font-mono text-xs text-text-secondary">
+              <span className="text-neon-green">$</span> audiencelens run steam_page_review ./artifact.json --mode full
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+              <div className="rounded-lg border border-border p-4 bg-bg-primary/80">
+                <div className="flex items-center gap-2 text-[11px] font-mono tracking-[0.2em] text-neon-green mb-3">
+                  <span className="w-2 h-2 rounded-sm bg-current animate-pulse-glow" /> CONSENSUS · 共识区
                 </div>
                 <p className="text-sm text-text-primary mb-1">17 / 20 人格认为核心循环满足需求</p>
                 <p className="text-xs text-text-muted">探索—战斗—成长的节奏被广泛认可，前期正反馈充足。</p>
               </div>
-              <div className="rounded-lg border border-border p-4 bg-bg-primary">
-                <div className="flex items-center gap-2 text-xs font-mono tracking-wider text-warm-orange mb-3">
-                  <span className="w-2 h-2 rounded-sm bg-current" /> 分歧区 · DISAGREEMENT
+              <div className="rounded-lg border border-border p-4 bg-bg-primary/80">
+                <div className="flex items-center gap-2 text-[11px] font-mono tracking-[0.2em] text-warm-orange mb-3">
+                  <span className="w-2 h-2 rounded-sm bg-current animate-pulse-glow" /> DISAGREEMENT · 分歧区
                 </div>
                 <p className="text-sm text-text-primary mb-1">8 / 20 人格对定价策略持负面意见</p>
                 <p className="text-xs text-text-muted">价格敏感型与核心硬核型在"128 元含金量"上尖锐对立。</p>
               </div>
-              <div className="rounded-lg border border-border p-4 bg-bg-primary">
-                <div className="flex items-center gap-2 text-xs font-mono tracking-wider text-severity-medium mb-3">
-                  <span className="w-2 h-2 rounded-sm bg-current" /> 修复建议 · REPAIR
+              <div className="rounded-lg border border-border p-4 bg-bg-primary/80">
+                <div className="flex items-center gap-2 text-[11px] font-mono tracking-[0.2em] text-severity-medium mb-3">
+                  <span className="w-2 h-2 rounded-sm bg-current" /> REPAIR_TABLE · 修复建议
                 </div>
-                <p className="text-sm text-text-primary mb-1"><span className="font-mono text-severity-critical text-xs border border-severity-critical/40 rounded px-1 mr-1.5">HIGH</span>移动端适配缺失 → 优先修复</p>
-                <p className="text-sm text-text-primary"><span className="font-mono text-severity-medium text-xs border border-severity-medium/40 rounded px-1 mr-1.5">MED</span>CTA 不够突出 → 增大对比度</p>
+                <p className="text-sm text-text-primary mb-1.5"><span className="font-mono text-severity-critical text-[10px] border border-severity-critical/40 rounded px-1 py-0.5 mr-1.5">HIGH</span>移动端适配缺失 → 优先修复</p>
+                <p className="text-sm text-text-primary"><span className="font-mono text-severity-medium text-[10px] border border-severity-medium/40 rounded px-1 py-0.5 mr-1.5">MED</span>CTA 不够突出 → 增大对比度</p>
               </div>
-              <div className="rounded-lg border border-border p-4 bg-bg-primary">
-                <div className="flex items-center gap-2 text-xs font-mono tracking-wider text-cyan mb-3">
-                  <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} /> 质询记录 · CROSS-EXAM
+              <div className="rounded-lg border border-cyan/25 p-4 bg-bg-primary/80">
+                <div className="flex items-center gap-2 text-[11px] font-mono tracking-[0.2em] text-cyan mb-3">
+                  <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} /> CROSS_EXAM_LOG · 质询记录
                 </div>
-                <p className="text-xs font-mono text-text-secondary mb-1">R2·P12→P05 你的正面评价是否忽略了移动端体验？</p>
-                <p className="text-xs font-mono text-warm-orange">R3·P05→P12 确实，我改投反对票 ↺</p>
+                <p className="text-xs font-mono text-text-secondary mb-1.5">
+                  <span className="text-cyan">R2·P12→P05</span> 你的正面评价是否忽略了移动端体验？
+                </p>
+                <p className="text-xs font-mono text-warm-orange">
+                  <span className="text-cyan">R3·P05→P12</span> 确实，我改投反对票 <span className="inline-block">↺ VOTE_FLIPPED</span>
+                </p>
               </div>
+            </div>
+
+            <div className="px-5 pb-4 font-mono text-xs text-text-muted terminal-cursor">
+              <span className="text-neon-green">✓</span> verdict sealed · 3 judgments recorded to ledger
             </div>
           </div>
 
           <div className="mt-6 text-center">
-            <Link to="/ledger" className="inline-flex items-center gap-2 text-sm text-cyan hover:text-cyan-dim transition-colors">
-              判断复利：查看历史预测的命中率追踪 <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.25} />
+            <Link to="/ledger" className="inline-flex items-center gap-2 text-sm font-mono text-cyan hover:text-cyan-dim transition-colors">
+              {'>'} 判断复利：查看历史预测的命中率追踪 <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.25} />
             </Link>
           </div>
         </div>
@@ -507,6 +586,7 @@ export default function HomePage() {
       <section className="py-16 md:py-24 border-t border-border">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-10">
+            <SectionTag>ETHICS_&_COMPLIANCE</SectionTag>
             <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
               合成评审，必须负责任
             </h2>
@@ -518,11 +598,12 @@ export default function HomePage() {
             {ETHICS.map((e) => {
               const Icon = e.icon
               return (
-                <div key={e.title} className="flex gap-4 p-5 rounded-xl border border-border bg-bg-card">
+                <div key={e.tag} className="hud-corners flex gap-4 p-5 rounded-lg border border-border bg-bg-card/80 hover:border-neon-green/30 transition-colors">
                   <div className="shrink-0 w-10 h-10 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
                     <Icon className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
                   </div>
                   <div>
+                    <div className="font-mono text-[10px] tracking-[0.25em] text-text-muted mb-1">[{e.tag}]</div>
                     <h3 className="font-display text-sm md:text-base font-bold text-text-primary mb-1">{e.title}</h3>
                     <p className="text-xs md:text-sm text-text-secondary leading-relaxed">{e.body}</p>
                   </div>
@@ -536,11 +617,14 @@ export default function HomePage() {
       {/* ---------- 最近评审 ---------- */}
       <section className="py-16 md:py-24 border-t border-border">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-xl md:text-3xl font-bold text-text-primary">
-              最近评审
-            </h2>
-            <Link to="/review/new" className="text-sm text-cyan hover:text-cyan-dim transition-colors flex items-center gap-1">
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <SectionTag color="green">RECENT_RUNS</SectionTag>
+              <h2 className="font-display text-xl md:text-3xl font-bold text-text-primary">
+                最近评审
+              </h2>
+            </div>
+            <Link to="/review/new" className="text-sm text-cyan hover:text-cyan-dim transition-colors flex items-center gap-1 pb-1">
               查看全部 <ArrowRight className="w-3 h-3" strokeWidth={1.25} />
             </Link>
           </div>
@@ -569,9 +653,11 @@ export default function HomePage() {
       </section>
 
       {/* ---------- 最终 CTA ---------- */}
-      <section className="pt-16 pb-12 md:pt-20 md:pb-16 relative overflow-hidden border-t border-border">
+      <section className="relative pt-16 pb-12 md:pt-20 md:pb-16 overflow-hidden border-t border-border">
         <div className="absolute inset-0 bg-gradient-to-b from-bg-secondary/50 via-bg-secondary to-bg-primary" />
+        <div className="absolute inset-0 grid-lines animate-grid-pulse pointer-events-none [mask-image:radial-gradient(ellipse_65%_80%_at_50%_100%,#000_20%,transparent_80%)]" />
         <div className="relative max-w-4xl mx-auto px-4 text-center">
+          <SectionTag color="green">PANEL_STANDBY</SectionTag>
           <h2 className="font-display text-2xl md:text-4xl font-bold text-gradient-green mb-4">
             75 位 AI 评审员已就位，等待你的素材
           </h2>
