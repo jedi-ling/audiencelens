@@ -124,20 +124,20 @@ export default function EvaluationPage() {
           <h3 className="text-sm font-medium text-text-muted mb-4">维度雷达图</h3>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="var(--color-border)" />
-              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
-              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: 'var(--color-text-muted)' }} />
+              <PolarGrid stroke="#2a2a3a" />
+              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#8888a0' }} />
+              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#8888a0' }} />
               <Radar
                 name="评分"
                 dataKey="score"
-                stroke="var(--color-neon-green)"
-                fill="var(--color-neon-green)"
+                stroke="#00d4ff"
+                fill="#00d4ff"
                 fillOpacity={0.2}
                 strokeWidth={2}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '12px' }}
-                itemStyle={{ color: 'var(--color-text-primary)' }}
+                contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
+                itemStyle={{ color: '#e8e8f0' }}
               />
             </RadarChart>
           </ResponsiveContainer>
@@ -239,7 +239,7 @@ export default function EvaluationPage() {
       {ethicsData.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-violet-700" strokeWidth={1.25} />
+            <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">伦理摘要</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

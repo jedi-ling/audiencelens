@@ -17,10 +17,10 @@ const riskConfig: Record<RiskLevel, { label: string; color: string; bg: string; 
 }
 
 const stanceColors: Record<PrimaryStance, string> = {
-  advocate: '#2f9e6f',
-  neutral: '#c1841f',
-  skeptic: '#e0603f',
-  blocker: '#d34b3d',
+  advocate: '#00ff88',
+  neutral: '#ffbb33',
+  skeptic: '#ff6b35',
+  blocker: '#ff3355',
 }
 
 const stanceLabels: Record<PrimaryStance, string> = {
@@ -284,8 +284,8 @@ export default function ReportPage() {
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '12px' }}
-                itemStyle={{ color: 'var(--color-text-primary)' }}
+                contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
+                itemStyle={{ color: '#e8e8f0' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -500,15 +500,15 @@ export default function ReportPage() {
                   return {
                     name: dim?.name ?? r.dimension,
                     score: r.score,
-                    fill: r.passed ? 'var(--color-status-completed)' : 'var(--color-severity-critical)',
+                    fill: r.passed ? '#00ff88' : '#ff3355',
                   }
                 })}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8888a0' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#8888a0' }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '8px', fontSize: '12px' }}
-                    itemStyle={{ color: 'var(--color-text-primary)' }}
+                    contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
+                    itemStyle={{ color: '#e8e8f0' }}
                   />
                   <Bar dataKey="score" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -570,7 +570,7 @@ export default function ReportPage() {
       {ethicsReports.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-violet-700" strokeWidth={1.25} />
+            <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">伦理报告</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -683,7 +683,7 @@ export default function ReportPage() {
             'flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all',
             redTeaming
               ? 'bg-bg-card text-text-muted cursor-not-allowed'
-              : 'bg-severity-critical/10 text-severity-critical border border-severity-critical/30 hover:bg-severity-critical/20'
+              : 'bg-red-400/10 text-red-400 border border-red-400/30 hover:bg-red-400/20'
           )}
         >
           {redTeaming ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <Shield className="w-4 h-4" strokeWidth={1.25} />}
@@ -692,7 +692,7 @@ export default function ReportPage() {
         {evaluationScorecard && (
           <Link
             to={`/evaluations/${id}`}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm bg-violet-700/10 text-violet-700 border border-violet-700/30 hover:bg-violet-700/20 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm bg-purple-400/10 text-purple-400 border border-purple-400/30 hover:bg-purple-400/20 transition-all"
           >
             <FlaskConical className="w-4 h-4" strokeWidth={1.25} />
             查看完整评估

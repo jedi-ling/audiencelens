@@ -131,7 +131,7 @@ export default function AskPage() {
           }}
         />
         <div className="flex items-center gap-3 border-t px-4 py-3">
-          <span className="font-mono text-[11px] text-muted-foreground">Enter 解析 · Shift+Enter 换行</span>
+          <span className="text-xs text-muted-foreground">Enter 解析 · Shift+Enter 换行</span>
           <button
             className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
             onClick={handleParse}
@@ -169,16 +169,14 @@ export default function AskPage() {
       )}
 
       {intent && (
-        <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm">
-          <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">解析结果</span>
-            {/* 如实声明用了哪档解析，不假装都是 AI —— 中性 chip */}
-            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+        <div className="mt-8 rounded-xl border bg-card p-6">
+          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>解析结果</span>
+            {/* 如实声明用了哪档解析，不假装都是 AI */}
+            <span className="rounded bg-muted px-2 py-0.5">
               {intent.method === 'llm' ? 'LLM 解析' : '规则解析（无 Key 降级）'}
             </span>
-            <span className="ml-auto font-mono text-[11px] tabular-nums">
-              置信度 {(intent.confidence * 100).toFixed(0)}%
-            </span>
+            <span>置信度 {(intent.confidence * 100).toFixed(0)}%</span>
           </div>
 
           {intent.needs_clarification ? (
@@ -215,11 +213,11 @@ export default function AskPage() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">深度</dt>
-                  <dd className="mt-1 font-mono text-sm font-medium">{intent.mode}</dd>
+                  <dd className="mt-1 font-medium">{intent.mode}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">人格包</dt>
-                  <dd className="mt-1 font-mono text-sm font-medium">{intent.persona_pack}</dd>
+                  <dd className="mt-1 font-medium">{intent.persona_pack}</dd>
                 </div>
               </dl>
               <button

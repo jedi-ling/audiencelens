@@ -4,6 +4,7 @@ import { useReviewStore } from '@/store/review-store'
 import { Zap, BarChart3, Share2, ArrowRight, Clock, CheckCircle2, Loader2, ChevronDown, Users, Package, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Review } from '@/lib/mock-data'
+import ParticleConstellation from '@/components/ParticleConstellation'
 import { SKILLS } from '@/lib/mock-data'
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -95,25 +96,14 @@ export default function HomePage() {
   return (
     <div>
       <section className="relative min-h-[calc(100vh-4rem)] md:min-h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden">
-        {/* 仪器风背景：冷色渐层 + 发丝级蓝图网格，取代赛博粒子场 */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-bg-secondary/60 via-bg-primary to-bg-primary" />
-          <div
-            className="absolute inset-0 opacity-[0.4]"
-            style={{
-              backgroundImage:
-                'linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-              maskImage: 'radial-gradient(ellipse 65% 55% at 50% 42%, black, transparent 78%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 65% 55% at 50% 42%, black, transparent 78%)',
-            }}
-          />
-        </div>
+        <ParticleConstellation className="absolute inset-0" />
+
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-bg-primary pointer-events-none" />
 
         <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
           <h1
             className="font-display text-4xl sm:text-5xl md:text-9xl font-bold text-gradient-green mb-4 md:mb-6 tracking-tight animate-hero-text"
-            style={{ animationDelay: '0.1s' }}
+            style={{ animationDelay: '0.1s', textShadow: '0 0 20px rgba(0,255,136,0.2)' }}
           >
             AudienceLens
           </h1>
@@ -135,7 +125,7 @@ export default function HomePage() {
           <div style={{ animationDelay: '0.7s' }} className="animate-hero-text">
             <Link
               to="/review/new"
-              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-primary-foreground font-bold text-base md:text-lg shadow-sm hover:scale-105 hover:shadow-md transition-all duration-300"
+              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
             >
               <Zap className="w-5 h-5" strokeWidth={1.25} />
               开始评审
@@ -222,19 +212,19 @@ export default function HomePage() {
                   text: 'text-neon-green',
                   bg: 'bg-neon-green/10',
                   border: 'border-neon-green/20',
-                  glow: 'group-hover:shadow-md',
+                  glow: 'group-hover:shadow-[0_0_30px_rgba(0,255,136,0.15)]',
                 },
                 'cyan': {
                   text: 'text-cyan',
                   bg: 'bg-cyan/10',
                   border: 'border-cyan/20',
-                  glow: 'group-hover:shadow-md',
+                  glow: 'group-hover:shadow-[0_0_30px_rgba(0,212,255,0.15)]',
                 },
                 'warm-orange': {
                   text: 'text-warm-orange',
                   bg: 'bg-warm-orange/10',
                   border: 'border-warm-orange/20',
-                  glow: 'group-hover:shadow-md',
+                  glow: 'group-hover:shadow-[0_0_30px_rgba(255,107,53,0.15)]',
                 },
               }
               const c = colorMap[feature.color]
@@ -304,7 +294,7 @@ export default function HomePage() {
               <p className="text-text-muted text-sm mb-6">创建你的第一个评审，获取多维度玩家视角</p>
               <Link
                 to="/review/new"
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-neon-green text-primary-foreground font-semibold hover:bg-neon-green-dim transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-neon-green text-bg-primary font-semibold hover:bg-neon-green-dim transition-colors"
               >
                 <Zap className="w-4 h-4" strokeWidth={1.25} />
                 开始评审
@@ -325,7 +315,7 @@ export default function HomePage() {
           </p>
           <Link
             to="/review/new"
-            className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-primary-foreground font-bold text-base md:text-lg shadow-sm hover:scale-105 hover:shadow-md transition-all duration-300"
+            className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
           >
             <Zap className="w-5 h-5" strokeWidth={1.25} />
             立即开始

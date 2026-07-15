@@ -26,14 +26,14 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-bg-primary/60 backdrop-blur-xl border-b border-transparent shrink-0">
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-neon-green/40 to-transparent" />
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="relative">
-              <Eye className="w-6 h-6 text-neon-green group-hover:text-neon-green-dim transition-colors" strokeWidth={1.25} />
-              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+              <Eye className="w-6 h-6 text-neon-green group-hover:text-glow-green transition-colors" strokeWidth={1.25} />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-neon-green shadow-[0_0_6px_rgba(0,255,136,0.8)] animate-pulse" />
             </div>
-            <span className="font-display font-bold text-lg text-neon-green">
+            <span className="font-display font-bold text-lg text-neon-green text-glow-green">
               AudienceLens
             </span>
           </Link>
@@ -53,7 +53,7 @@ export default function Layout() {
                       'relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all',
                       isActive
                         ? 'text-neon-green'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-neon-green/5'
+                        : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
                     <Icon className="w-4 h-4" strokeWidth={1.25} />
@@ -81,7 +81,7 @@ export default function Layout() {
                       'relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all',
                       isActive
                         ? 'text-cyan'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-cyan/5'
+                        : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
                     <Icon className="w-4 h-4" strokeWidth={1.25} />
@@ -118,7 +118,7 @@ export default function Layout() {
       {menuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="absolute inset-0 bg-text-primary/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMenuOpen(false)}
           />
           <nav className="absolute left-0 top-0 bottom-0 w-64 bg-bg-primary border-r border-border shadow-2xl animate-fade-in flex flex-col pt-20 px-4">
@@ -136,7 +136,7 @@ export default function Layout() {
                     'flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all mb-1',
                     isActive
                       ? 'bg-neon-green/10 text-neon-green border-l-2 border-neon-green'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-neon-green/5'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-card'
                   )}
                 >
                   <Icon className="w-5 h-5" strokeWidth={1.25} />
@@ -169,7 +169,7 @@ export default function Layout() {
                       'flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all mb-1',
                       isActive
                         ? 'bg-cyan/10 text-cyan border-l-2 border-cyan'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-cyan/5'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-card'
                     )}
                   >
                     <Icon className="w-5 h-5" strokeWidth={1.25} />

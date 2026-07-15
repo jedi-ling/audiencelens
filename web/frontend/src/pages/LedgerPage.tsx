@@ -80,7 +80,7 @@ export default function LedgerPage() {
 
       {/* 命中率总览 */}
       {stats && (
-        <section className="mb-8 rounded-xl border bg-card p-6 shadow-sm">
+        <section className="mb-8 rounded-xl border bg-card p-6">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             <Stat label="累计预测" value={stats.total_judgments} />
             <Stat label="待验证" value={stats.pending_verification} />
@@ -92,9 +92,8 @@ export default function LedgerPage() {
           </div>
           {/* 诚实标注：样本不足绝不吹准确率 */}
           {stats.note && (
-            <p className="mt-4 flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-              <span aria-hidden>⚠️</span>
-              <span>{stats.note}</span>
+            <p className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              ⚠️ {stats.note}
             </p>
           )}
         </section>
@@ -102,7 +101,7 @@ export default function LedgerPage() {
 
       {/* 人格命中率排行 */}
       {board.length > 0 && (
-        <section className="mb-8 rounded-xl border bg-card p-6 shadow-sm">
+        <section className="mb-8 rounded-xl border bg-card p-6">
           <h2 className="mb-4 text-sm font-semibold">谁的判断最值得听</h2>
           <div className="space-y-2">
             {board.map((p) => (
@@ -128,7 +127,7 @@ export default function LedgerPage() {
       )}
 
       {/* 预测清单 + 回填 */}
-      <section className="rounded-xl border bg-card shadow-sm">
+      <section className="rounded-xl border bg-card">
         <div className="flex items-center gap-3 border-b px-6 py-4">
           <h2 className="text-sm font-semibold">历史预测</h2>
           <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -195,7 +194,7 @@ export default function LedgerPage() {
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
-      <div className="font-mono text-2xl font-bold tabular-nums">{value}</div>
+      <div className="text-2xl font-bold tabular-nums">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{label}</div>
     </div>
   )
