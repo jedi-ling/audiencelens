@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useReviewStore } from '@/store/review-store'
+import { api } from '@/lib/apiClient'
+import type { Plan } from '@/lib/types'
 import {
   Zap,
   BarChart3,
@@ -153,7 +155,18 @@ const STEPS = [
   { cmd: 'export verdict', title: '获取裁决', body: 'JSON 数据 + Markdown 摘要 + 可视化报告' },
 ]
 
-// 价格区间已对照对方官网核实：
+// 主对比表：打"方法"而非具名竞品——方法对比不会过时、无需持续核实对方定价
+const METHOD_ROWS: Array<[string, string, string, string, string]> = [
+  ['多视角分歧', '6–8 个行为人格独立评审', '单一模型一面之词', '看样本运气', '受招募范围限制'],
+  ['对抗质询', '三轮交叉质询', '无', '无', '依赖主持人水平'],
+  ['改票留痕', '每次翻转记录在案', '无', '无', '极少记录'],
+  ['证据链', '直接引用/推断/缺口 三级标注', '无标注', '无', '靠人工整理'],
+  ['可复盘', '预测留档 + 命中率回填', '无', '无', '很少做'],
+  ['速度', '分钟级', '秒级', '数天', '数周'],
+  ['成本', '仅你自己的 API 费', '免费', '问卷平台费', '数千到数万元'],
+]
+
+// 具名竞品表（附件）：价格区间已对照对方官网核实。
 // SyntheticUsers 官网为 $2–60/次区间；Yabble 为年约 $8,900–80,000，非月费。
 const COMPARE_ROWS: Array<[string, string, string, string, string]> = [
   ['方法论', '评审式', '访谈式', '真人访谈', '对话式'],
@@ -161,6 +174,13 @@ const COMPARE_ROWS: Array<[string, string, string, string, string]> = [
   ['改票机制', '支持 ✓', '不支持', '不支持', '不支持'],
   ['开源', 'MIT ✓', '闭源', '闭源', '闭源'],
   ['价格', '免费', '$2–60 / 次', '按项目报价', '$8,900–80,000 / 年'],
+]
+
+// 托管档静态兜底（与后端 plan_service.py 同值）：后端不在线时定价区仍可渲染
+const FALLBACK_PLANS: Plan[] = [
+  { id: 'free', name: 'Free', price_usd_month: 0, reviews_per_day: 5, cost_usd_per_day: 1 },
+  { id: 'pro', name: 'Pro', price_usd_month: 19, reviews_per_day: 100, cost_usd_per_day: 20 },
+  { id: 'team', name: 'Team', price_usd_month: 49, reviews_per_day: 500, cost_usd_per_day: 100 },
 ]
 
 const ETHICS = [
@@ -193,9 +213,14 @@ const ETHICS = [
 export default function HomePage() {
   const reviews = useReviewStore((s) => s.reviews)
   const initReviews = useReviewStore((s) => s.initReviews)
+  const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS)
 
   useEffect(() => {
     initReviews()
+    // 套餐从后端拉真实定义；失败时保留静态兜底
+    api.plans().then((r) => {
+      if (r.plans?.length) setPlans(r.plans)
+    }).catch(() => {})
   }, [initReviews])
 
   return (
@@ -219,6 +244,14 @@ export default function HomePage() {
             style={{ animationDelay: '0.3s' }}
           >
             多代理合成玩家评审系统
+          </p>
+
+          <p
+            className="font-mono text-[11px] sm:text-xs md:text-sm text-text-muted tracking-wide mb-4 md:mb-6 animate-hero-text"
+            style={{ animationDelay: '0.4s' }}
+          >
+            <span className="text-neon-green">{'>'}</span> 75 AI players argue about your game
+            <span className="text-warm-orange"> — before real players do.</span>
           </p>
 
           <p
@@ -459,16 +492,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ---------- 竞品对比：终端窗口 ---------- */}
+      {/* ---------- 方法对比（主打）+ 具名竞品（可展开附件） ---------- */}
       <section className="py-16 md:py-24 border-t border-border">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-10">
-            <SectionTag>COMPETITIVE_SCAN</SectionTag>
+            <SectionTag>METHOD_MATRIX</SectionTag>
             <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
-              不是所有 AI 研究工具都一样
+              和你现在的做法比一比
             </h2>
             <p className="text-text-secondary text-sm md:text-base max-w-xl mx-auto">
-              差异集中在一个地方：反馈有没有被质询过。价格区间已对照对方官网核实。
+              直接问 ChatGPT、发问卷、招真人测试——每种方法都有位置。
+              AudienceLens 补的是它们中间那段空白。
             </p>
           </div>
 
@@ -477,33 +511,149 @@ export default function HomePage() {
               <span className="w-2.5 h-2.5 rounded-full bg-severity-critical/80" />
               <span className="w-2.5 h-2.5 rounded-full bg-severity-medium/80" />
               <span className="w-2.5 h-2.5 rounded-full bg-neon-green/80" />
-              <span className="ml-2"><span className="text-neon-green">$</span> audiencelens compare --against synthetic-users outset yabble</span>
+              <span className="ml-2"><span className="text-neon-green">$</span> audiencelens compare --method chatgpt survey human-playtest</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="w-full text-sm min-w-[720px]">
                 <thead>
                   <tr className="bg-bg-secondary/60">
                     <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">维度</th>
                     <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-neon-green font-bold">AudienceLens</th>
-                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">SyntheticUsers</th>
-                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Outset</th>
-                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Yabble</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">直接问 ChatGPT</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">问卷调研</th>
+                    <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">真人测试</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPARE_ROWS.map((row, i) => (
+                  {METHOD_ROWS.map((row, i) => (
                     <tr key={row[0]} className={cn('border-t border-border/60', i % 2 === 1 && 'bg-bg-secondary/30')}>
                       <th className="text-left px-4 py-3 font-medium text-text-secondary whitespace-nowrap">{row[0]}</th>
-                      <td className="px-4 py-3 bg-neon-green/5 text-neon-green font-medium border-x border-neon-green/20 whitespace-nowrap">{row[1]}</td>
-                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[2]}</td>
-                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[3]}</td>
-                      <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[4]}</td>
+                      <td className="px-4 py-3 bg-neon-green/5 text-neon-green font-medium border-x border-neon-green/20">{row[1]}</td>
+                      <td className="px-4 py-3 text-text-muted">{row[2]}</td>
+                      <td className="px-4 py-3 text-text-muted">{row[3]}</td>
+                      <td className="px-4 py-3 text-text-muted">{row[4]}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <div className="px-4 py-2.5 border-t border-border bg-bg-secondary/40 font-mono text-[10px] text-text-muted">
+              * 真人测试不可替代——AudienceLens 定位于它之前的预筛，帮你带着更好的版本去见真人。
+            </div>
           </div>
+
+          {/* 具名竞品对比：降级为可展开附件，价格已对照对方官网核实 */}
+          <details className="mt-4 group">
+            <summary className="cursor-pointer list-none font-mono text-xs text-text-muted hover:text-cyan transition-colors inline-flex items-center gap-2">
+              <span className="text-neon-green">$</span> audiencelens compare --against synthetic-users outset yabble --verified
+              <span className="text-text-muted group-open:rotate-90 transition-transform">▸</span>
+            </summary>
+            <div className="mt-3 rounded-xl border border-border bg-bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="bg-bg-secondary/60">
+                      <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">维度</th>
+                      <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-neon-green font-bold">AudienceLens</th>
+                      <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">SyntheticUsers</th>
+                      <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Outset</th>
+                      <th className="text-left px-4 py-3 font-mono text-[11px] tracking-wider uppercase text-text-muted font-medium">Yabble</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {COMPARE_ROWS.map((row, i) => (
+                      <tr key={row[0]} className={cn('border-t border-border/60', i % 2 === 1 && 'bg-bg-secondary/30')}>
+                        <th className="text-left px-4 py-3 font-medium text-text-secondary whitespace-nowrap">{row[0]}</th>
+                        <td className="px-4 py-3 bg-neon-green/5 text-neon-green font-medium border-x border-neon-green/20 whitespace-nowrap">{row[1]}</td>
+                        <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[2]}</td>
+                        <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[3]}</td>
+                        <td className="px-4 py-3 text-text-muted whitespace-nowrap">{row[4]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 py-2.5 border-t border-border bg-bg-secondary/40 font-mono text-[10px] text-text-muted">
+                * 竞品价格区间于 2026-07 对照对方官网核实；具体以对方最新报价为准。
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      {/* ---------- 定价矩阵：终端计价面板 ---------- */}
+      <section className="relative py-16 md:py-24 border-t border-border">
+        <div className="absolute inset-0 grid-lines pointer-events-none [mask-image:radial-gradient(ellipse_60%_60%_at_50%_40%,#000_25%,transparent_78%)]" />
+        <div className="relative max-w-5xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <SectionTag color="green">PRICING_MATRIX</SectionTag>
+            <h2 className="font-display text-2xl md:text-4xl font-bold text-text-primary mb-3">
+              开源永远免费，算力永远你自己说了算
+            </h2>
+            <p className="text-text-secondary text-sm md:text-base max-w-xl mx-auto">
+              BYOK 模式：用你自己的 API Key，我们不经手你的数据，也不赚你算力的差价。
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+            {/* 开源自托管：唯一"现在就能用"的档位，视觉主角 */}
+            <div className="hud-corners rounded-xl border border-neon-green/40 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(0,255,136,0.08)] flex flex-col">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-bg-secondary font-mono text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse-glow" />
+                <span className="text-neon-green tracking-wider">SELF_HOSTED</span>
+                <span className="ml-auto text-neon-green border border-neon-green/40 rounded px-1.5 py-0.5 text-[10px]">AVAILABLE_NOW</span>
+              </div>
+              <div className="p-5 flex flex-col flex-1">
+                <h3 className="font-display text-lg font-bold text-text-primary mb-1">开源自托管</h3>
+                <div className="font-mono text-3xl font-bold text-neon-green mb-4">$0<span className="text-sm text-text-muted font-normal"> / 永远</span></div>
+                <ul className="space-y-2 font-mono text-xs text-text-secondary flex-1">
+                  <li><span className="text-neon-green">+</span> MIT 协议，可商用可改造</li>
+                  <li><span className="text-neon-green">+</span> 全部功能无阉割</li>
+                  <li><span className="text-neon-green">+</span> BYOK：算力费直付模型商</li>
+                  <li><span className="text-neon-green">+</span> 数据不离开你的机器</li>
+                  <li><span className="text-neon-green">+</span> 单次评审成本 ≈ $0.05–1.5*</li>
+                </ul>
+                <a
+                  href="https://github.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" strokeWidth={1.25} />
+                  GitHub 部署
+                </a>
+              </div>
+            </div>
+
+            {/* 托管档：诚实标注 COMING_SOON，不假装有支付系统 */}
+            {plans.filter((p) => p.id !== 'free').map((p) => (
+              <div key={p.id} className="rounded-xl border border-border bg-bg-card/70 overflow-hidden flex flex-col opacity-90">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-bg-secondary font-mono text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-text-muted" />
+                  <span className="text-text-secondary tracking-wider uppercase">HOSTED_{p.id}</span>
+                  <span className="ml-auto text-cyan border border-cyan/40 rounded px-1.5 py-0.5 text-[10px]">COMING_SOON</span>
+                </div>
+                <div className="p-5 flex flex-col flex-1">
+                  <h3 className="font-display text-lg font-bold text-text-primary mb-1">托管版 {p.name}</h3>
+                  <div className="font-mono text-3xl font-bold text-text-primary mb-4">${p.price_usd_month}<span className="text-sm text-text-muted font-normal"> / 月</span></div>
+                  <ul className="space-y-2 font-mono text-xs text-text-secondary flex-1">
+                    <li><span className="text-cyan">+</span> 免部署，打开网页即用</li>
+                    <li><span className="text-cyan">+</span> {p.reviews_per_day} 次评审 / 天</li>
+                    <li><span className="text-cyan">+</span> ${p.cost_usd_per_day} 算力额度 / 天</li>
+                    <li><span className="text-cyan">+</span> 也可绑自己的 Key 不限量</li>
+                    {p.id === 'team' && <li><span className="text-cyan">+</span> 团队共享判断复利台账</li>}
+                  </ul>
+                  <div className="mt-5 inline-flex items-center justify-center px-4 py-2.5 rounded-lg border border-border font-mono text-xs text-text-muted select-none">
+                    上线后开放订阅 · 无自动续费
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-4 text-center font-mono text-[10px] text-text-muted">
+            * 单次成本取决于所选模型与人格数：Haiku 档约 $0.05–0.3，Sonnet 档约 $0.3–1.5，账单在你自己的模型商后台。
+          </p>
         </div>
       </section>
 

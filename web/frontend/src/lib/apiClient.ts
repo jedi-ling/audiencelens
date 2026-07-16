@@ -23,6 +23,7 @@ import {
   type KeyStatus,
   type LeaderboardEntry,
   type PersonaPack,
+  type Plan,
   type ReviewDetail,
   type ReviewMode,
   type TaskType,
@@ -151,9 +152,11 @@ export const api = {
       `/api/jobs/${id}`,
     ),
 
-  // ---------------- 用量 / 配额 ----------------
+  // ---------------- 用量 / 配额 / 套餐 ----------------
 
   usage: () => request<UsageSummary>('/api/usage'),
+
+  plans: () => request<{ plans: Plan[] }>('/api/plans'),
 
   // ---------------- 判断复利闭环 ----------------
 

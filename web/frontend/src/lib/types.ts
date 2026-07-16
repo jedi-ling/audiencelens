@@ -150,6 +150,15 @@ export interface PersonaNote {
   key_issues?: PriorityFix[]
 }
 
+/** GET /api/plans 的套餐定义（plan_service.py 的镜像） */
+export interface Plan {
+  id: 'free' | 'pro' | 'team' | string
+  name: string
+  price_usd_month: number
+  reviews_per_day: number
+  cost_usd_per_day: number
+}
+
 export interface UsageSummary {
   quota_enabled: boolean
   window: string
