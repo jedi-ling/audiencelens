@@ -51,6 +51,15 @@
   --color-destructive-foreground: #e8e8f0;
 }
 
+/*
+ * 全局兜底：任何没显式写 text-* 颜色类的元素，默认走 App 主文字色，
+ * 而不是浏览器默认黑色（黑字落在近黑背景上等于隐形——曾在 Ask/Ledger
+ * 页面发生过，此处防止同类问题在未来任何新页面上重演）。
+ */
+html, body {
+  color: var(--color-text-primary);
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

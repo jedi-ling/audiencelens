@@ -95,20 +95,20 @@ export default function AskPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <header className="mb-10 text-center">
-        <h1 className="text-4xl font-bold tracking-tight">让 75 位 AI 观众先吵一架</h1>
-        <p className="mt-3 text-muted-foreground">
+        <h1 className="text-4xl font-bold tracking-tight text-text-primary font-display">让 75 位 AI 观众先吵一架</h1>
+        <p className="mt-3 text-text-secondary">
           直接说你想评审什么，或把材料贴进来——系统会自己判断该开哪种庭。
         </p>
       </header>
 
       {/* 无 key 提醒：BYOK 模式下先引导填 key，别等提交才报错 */}
       {config && !ready && (
-        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-          <p className="font-medium">尚未配置 API Key</p>
-          <p className="mt-1 text-muted-foreground">
+        <div className="mb-6 rounded-lg border border-warm-orange/40 bg-warm-orange/10 p-4 text-sm">
+          <p className="font-medium text-text-primary">尚未配置 API Key</p>
+          <p className="mt-1 text-text-secondary">
             评审必须使用真实模型——模拟数据没有评审价值。
             <button
-              className="ml-1 underline underline-offset-2"
+              className="ml-1 text-neon-green underline underline-offset-2 hover:text-neon-green-dim"
               onClick={() => navigate('/settings')}
             >
               去设置页填写
@@ -117,9 +117,9 @@ export default function AskPage() {
         </div>
       )}
 
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border border-border bg-bg-card shadow-sm">
         <textarea
-          className="min-h-[120px] w-full resize-y bg-transparent p-4 text-base outline-none"
+          className="min-h-[120px] w-full resize-y bg-transparent p-4 text-base text-text-primary placeholder-text-muted outline-none"
           placeholder="把你的 Steam 页面文案、Demo 描述或概念文档贴进来，评审团即刻开庭…"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -130,10 +130,10 @@ export default function AskPage() {
             }
           }}
         />
-        <div className="flex items-center gap-3 border-t px-4 py-3">
-          <span className="text-xs text-muted-foreground">Enter 解析 · Shift+Enter 换行</span>
+        <div className="flex items-center gap-3 border-t border-border px-4 py-3">
+          <span className="font-mono text-xs text-text-muted">Enter 解析 · Shift+Enter 换行</span>
           <button
-            className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            className="ml-auto rounded-md bg-neon-green px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
             onClick={handleParse}
             disabled={parsing || !text.trim()}
           >
@@ -146,7 +146,7 @@ export default function AskPage() {
         {EXAMPLES.map((ex) => (
           <button
             key={ex}
-            className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:border-primary"
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-neon-green/40 hover:text-text-primary transition-colors"
             onClick={() => setText(ex)}
           >
             {ex.slice(0, 22)}…
@@ -155,11 +155,11 @@ export default function AskPage() {
       </div>
 
       {error && (
-        <div className="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+        <div className="mt-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
           {error}
           {needsKey && (
             <button
-              className="ml-2 underline underline-offset-2"
+              className="ml-2 text-neon-green underline underline-offset-2 hover:text-neon-green-dim"
               onClick={() => navigate('/settings')}
             >
               去填写 API Key
@@ -169,11 +169,11 @@ export default function AskPage() {
       )}
 
       {intent && (
-        <div className="mt-8 rounded-xl border bg-card p-6">
-          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="mt-8 rounded-xl border border-border bg-bg-card p-6">
+          <div className="mb-4 flex items-center gap-2 font-mono text-xs text-text-muted">
             <span>解析结果</span>
             {/* 如实声明用了哪档解析，不假装都是 AI */}
-            <span className="rounded bg-muted px-2 py-0.5">
+            <span className="rounded bg-bg-secondary px-2 py-0.5 text-text-secondary">
               {intent.method === 'llm' ? 'LLM 解析' : '规则解析（无 Key 降级）'}
             </span>
             <span>置信度 {(intent.confidence * 100).toFixed(0)}%</span>
@@ -181,13 +181,13 @@ export default function AskPage() {
 
           {intent.needs_clarification ? (
             <div>
-              <p className="font-medium">{intent.clarifying_question ?? '需要更多信息'}</p>
+              <p className="font-medium text-text-primary">{intent.clarifying_question ?? '需要更多信息'}</p>
               {intent.candidates.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {intent.candidates.map((c) => (
                     <button
                       key={c}
-                      className="rounded-md border px-3 py-1.5 text-sm hover:border-primary"
+                      className="rounded-md border border-border px-3 py-1.5 text-sm text-text-primary hover:border-neon-green/40 transition-colors"
                       onClick={() =>
                         setIntent({
                           ...intent,
@@ -206,22 +206,22 @@ export default function AskPage() {
             <>
               <dl className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <dt className="text-muted-foreground">任务类型</dt>
-                  <dd className="mt-1 font-medium">
+                  <dt className="text-text-muted">任务类型</dt>
+                  <dd className="mt-1 font-medium text-text-primary">
                     {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">深度</dt>
-                  <dd className="mt-1 font-medium">{intent.mode}</dd>
+                  <dt className="text-text-muted">深度</dt>
+                  <dd className="mt-1 font-medium text-text-primary">{intent.mode}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">人格包</dt>
-                  <dd className="mt-1 font-medium">{intent.persona_pack}</dd>
+                  <dt className="text-text-muted">人格包</dt>
+                  <dd className="mt-1 font-medium text-text-primary">{intent.persona_pack}</dd>
                 </div>
               </dl>
               <button
-                className="mt-6 w-full rounded-md bg-primary py-2.5 font-semibold text-primary-foreground disabled:opacity-50"
+                className="mt-6 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
                 onClick={handleSubmit}
                 disabled={submitting}
               >
