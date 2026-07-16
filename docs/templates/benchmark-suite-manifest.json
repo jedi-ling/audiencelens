@@ -1,0 +1,16 @@
+{
+  "name": "steam-page-validation-v1",
+  "target_method": "audiencelens",
+  "baseline_method": "single_prompt",
+  "cases": [
+    {
+      "id": "project-001",
+      "reference": "project-001/reference.json",
+      "candidates": {
+        "audiencelens": "project-001/audiencelens.json",
+        "single_prompt": "project-001/single-prompt.json",
+        "expert_quick": "project-001/expert-quick.json"
+      }
+    }
+  ]
+}

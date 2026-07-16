@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/apiClient'
-import type { HitRate, Judgment, LeaderboardEntry, Verdict } from '@/lib/types'
+import type { HitRate, Judgment, LeaderboardEntry, ValidationMetrics, Verdict } from '@/lib/types'
 
 const VERDICT_LABELS: Record<Verdict, string> = {
   hit: '说中了',
@@ -32,6 +32,7 @@ export default function LedgerPage() {
   const [judgments, setJudgments] = useState<Judgment[]>([])
   const [stats, setStats] = useState<HitRate | null>(null)
   const [board, setBoard] = useState<LeaderboardEntry[]>([])
+  const [valueMetrics, setValueMetrics] = useState<ValidationMetrics | null>(null)
   const [onlyUnverified, setOnlyUnverified] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,14 +41,16 @@ export default function LedgerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [j, s, b] = await Promise.all([
+      const [j, s, b, v] = await Promise.all([
         api.listJudgments({ onlyUnverified }),
         api.hitRate(),
         api.leaderboard(),
+        api.validationMetrics(),
       ])
       setJudgments(j.judgments)
       setStats(s)
       setBoard(b.personas)
+      setValueMetrics(v)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
@@ -78,6 +81,52 @@ export default function LedgerPage() {
         <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
           {error}
         </div>
+      )}
+
+      {valueMetrics && (
+        <section className="mb-8 rounded-xl border border-neon-green/30 bg-bg-card p-6">
+          <h2 className="mb-4 font-display text-sm font-semibold text-text-primary">产品价值验证</h2>
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
+            <Stat label="反馈覆盖" value={percent(valueMetrics.feedback_coverage)} />
+            <Stat label="认为有用" value={percent(valueMetrics.useful_rate)} />
+            <Stat label="改变决策" value={percent(valueMetrics.decision_change_rate)} />
+            <Stat label="建议采纳" value={percent(valueMetrics.adoption_rate)} />
+            <Stat label="累计节省" value={`${valueMetrics.hours_saved}h`} />
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 sm:grid-cols-4">
+            <Stat label="平均模型成本" value={money(valueMetrics.average_model_cost_usd)} />
+            <Stat label="每份有效报告成本" value={money(valueMetrics.cost_per_useful_review_usd)} />
+            <Stat label="每条采纳成本" value={money(valueMetrics.cost_per_adopted_fix_usd)} />
+            <Stat label="平均付费意愿" value={money(valueMetrics.average_willingness_to_pay_usd)} />
+          </div>
+          {valueMetrics.by_task_type.length > 0 && (
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="mb-2 text-xs font-semibold text-text-secondary">按任务类型寻找最强切入点</h3>
+              <div className="space-y-2">
+                {valueMetrics.by_task_type.map((row) => (
+                  <div key={row.task_type} className="grid grid-cols-[1fr_auto_auto] gap-4 text-xs">
+                    <span className="font-mono text-text-secondary">{row.task_type} {row.low_confidence && '⚠️'}</span>
+                    <span className="text-text-primary">有用 {percent(row.useful_rate)}</span>
+                    <span className="text-text-primary">采纳 {percent(row.adoption_rate)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {valueMetrics.top_adopted_fixes.length > 0 && (
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="mb-2 text-xs font-semibold text-text-secondary">真正被采纳的建议</h3>
+              <ol className="space-y-2">
+                {valueMetrics.top_adopted_fixes.map((fix) => (
+                  <li key={fix.title} className="flex justify-between gap-4 text-xs text-text-primary">
+                    <span>{fix.title}</span><span className="font-mono text-neon-green">×{fix.adoption_count}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {valueMetrics.note && <p className="mt-4 text-xs text-warm-orange">⚠️ {valueMetrics.note}</p>}
+        </section>
       )}
 
       {/* 命中率总览 */}
@@ -201,4 +250,12 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <div className="mt-1 text-xs text-text-muted">{label}</div>
     </div>
   )
+}
+
+function percent(value: number | null): string {
+  return value === null ? '—' : `${(value * 100).toFixed(0)}%`
+}
+
+function money(value: number | null): string {
+  return value === null ? '—' : `$${value.toFixed(2)}`
 }

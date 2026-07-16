@@ -75,30 +75,34 @@ def _passthrough_precheck(selected, bundle):
 
 class TestActuallyParallel:
     def test_calls_overlap_in_time(self, bundle, monkeypatch):
-        """用带 sleep 的桩替换单人格评审，证明总耗时远小于串行累加。"""
+        """直接记录同时执行的调用数，避免冷启动模型耗时污染墙钟断言。"""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
         delay = 0.15
         real = runner_cli.run_single_persona
+        lock = threading.Lock()
+        active = 0
+        max_active = 0
 
         def slow(persona, *a, **kw):
-            time.sleep(delay)
-            return real(persona, *a, **kw)
+            nonlocal active, max_active
+            with lock:
+                active += 1
+                max_active = max(max_active, active)
+            try:
+                time.sleep(delay)
+                return real(persona, *a, **kw)
+            finally:
+                with lock:
+                    active -= 1
 
         monkeypatch.setattr(runner_cli, "run_single_persona", slow)
 
-        t0 = time.time()
         result = _panel(bundle, max_concurrency=6)
-        elapsed = time.time() - t0
 
         n = result["cost_summary"]["persona_count"]
         assert n >= 3  # 需要足够多人格才能体现并行
-        sequential_lower_bound = n * delay
-        # 并发后应远小于串行累加；给足调度余量，取一半为阈值
-        assert elapsed < sequential_lower_bound * 0.6, (
-            f"{n} 人格 × {delay}s：串行需 {sequential_lower_bound:.2f}s，"
-            f"并发实测 {elapsed:.2f}s——未体现并行"
-        )
+        assert max_active >= 2, f"最大同时执行数为 {max_active}，未体现并行"
 
     def test_max_concurrency_one_is_serial(self, bundle, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

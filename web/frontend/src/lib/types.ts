@@ -38,6 +38,7 @@ export type ApiErrorCode =
   | 'llm_key_missing'
   | 'upstream_error'
   | 'internal_error'
+  | 'admin_disabled'
 
 export class ApiError extends Error {
   code: ApiErrorCode
@@ -212,6 +213,33 @@ export interface LeaderboardEntry {
   low_confidence: boolean
 }
 
+export interface ValidationMetrics {
+  completed_reviews: number
+  feedback_count: number
+  feedback_coverage: number | null
+  useful_rate: number | null
+  decision_change_rate: number | null
+  fixes_suggested: number
+  fixes_adopted: number
+  adoption_rate: number | null
+  hours_saved: number
+  average_willingness_to_pay_usd: number | null
+  total_model_cost_usd: number
+  average_model_cost_usd: number | null
+  cost_per_useful_review_usd: number | null
+  cost_per_adopted_fix_usd: number | null
+  by_task_type: Array<{
+    task_type: string
+    feedback_count: number
+    useful_rate: number
+    adoption_rate: number | null
+    low_confidence: boolean
+  }>
+  top_adopted_fixes: Array<{ title: string; adoption_count: number }>
+  low_confidence: boolean
+  note: string | null
+}
+
 // ---------- WebSocket 事件 ----------
 
 export type WsEventName =
@@ -224,4 +252,59 @@ export type WsEventName =
 export interface WsEvent<T = Record<string, unknown>> {
   event: WsEventName
   data: T
+}
+
+// ---------- 后台管理（Admin，需 X-Admin-Token）----------
+
+export interface AdminOverview {
+  reviews: { total: number; by_status: Record<string, number> }
+  usage_24h: {
+    count: number
+    cost_usd_total: number
+    cost_usd_by_source: Record<string, number>
+  }
+  judgments: { total: number; verified: number }
+  registered_users: number
+  jobs_by_status: Record<string, number>
+}
+
+/** 单项运行时可调配置：env 默认值 vs 后台覆盖值，overridden 标注是否已被面板改过 */
+export interface AdminSettingRow {
+  key: string
+  label: string
+  type: 'bool' | 'int' | 'float' | 'str'
+  choices: string[] | null
+  env_default: unknown
+  effective_value: unknown
+  overridden: boolean
+}
+
+export interface AdminServerKeyStatus {
+  configured: boolean
+  key: { provider: string; masked: string; last_used_at: string | null } | null
+}
+
+export interface AdminJob {
+  id: string
+  kind: string
+  ref_id: string | null
+  user_id: string | null
+  status: string
+  progress: number
+  error_message: string | null
+  created_at: string | null
+  finished_at: string | null
+}
+
+export interface AdminReviewRow {
+  id: string
+  user_id: string | null
+  task_type: string
+  target_title: string | null
+  mode: string
+  status: string
+  total_cost_usd: number
+  error_message: string | null
+  created_at: string | null
+  completed_at: string | null
 }

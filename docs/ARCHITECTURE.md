@@ -156,10 +156,14 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 | GET | `/api/ledger/hit-rate` | 命中率（带 `low_confidence` 诚实标注） |
 | GET | `/api/ledger/leaderboard` | 人格命中率排行 |
 | WS | `/ws/review/{id}` | 进度推送 |
+| GET | `/api/admin/overview` | 跨用户系统概览（需 `X-Admin-Token`，见 §8） |
+| GET/PUT/DELETE | `/api/admin/settings[/{key}]` | 运行时配置覆盖，改动无需重启 |
+| GET/PUT/DELETE | `/api/admin/server-key` | 平台级 API Key（托管/混合模式垫付用） |
+| GET | `/api/admin/jobs` `/reviews` | 任务/评审巡检（只读，按状态筛选） |
 
 **错误契约**：一律 `{"error": {"code", "message", "detail?"}}`。
 错误码：`bad_request` `unauthorized` `forbidden` `not_found` `rate_limited`
-`quota_exceeded` `llm_key_missing` `upstream_error` `internal_error`。
+`quota_exceeded` `llm_key_missing` `upstream_error` `internal_error` `admin_disabled`。
 
 **WS 事件**：`review.started` `review.progress` `review.persona_completed`
 `review.completed` `review.failed`。
@@ -180,8 +184,10 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 | `jobs` | 异步任务（换外部队列时前端契约不变） |
 | `judgments` | 可证伪的预测 + `predicted_at` 时间戳 |
 | `outcomes` | 对预测的事后验证（hit/miss/partial/unknown） |
+| `platform_settings` | 后台面板的运行时配置覆盖（键值对，DB 优先于 env 默认值） |
 
 `Review` 新增 `user_id`（归属）与 `error_message`（失败原因）。
+`user_api_keys` 复用保留 user_id `__platform__` 存放后台设置的平台级 server key。
 
 ---
 
@@ -189,8 +195,8 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 
 | 范围 | 位置 | 数量 |
 |---|---|---|
-| 核心引擎 | `tests/` | 237 |
-| 平台链路 | `web/backend/tests/` | 48 |
+| 核心引擎 | `tests/` | 251 |
+| 平台链路 | `web/backend/tests/` | 74 |
 
 平台链路里包含一组 **E2E 冒烟测试**（`test_e2e_chain.py`）：用假引擎替换 LLM，
 证明"发起 → 队列 → 报告落库 → 判断留档 → 记账"整条链真的闭环，

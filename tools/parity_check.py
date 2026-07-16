@@ -8,6 +8,7 @@
 import argparse
 import json
 import math
+import re
 import statistics
 import sys
 from collections import Counter
@@ -64,8 +65,15 @@ def normalize_text(text):
 def extract_tokens(text):
     if not text:
         return set()
-    words = normalize_text(text).split()
-    return set(w for w in words if len(w) > 2)
+    normalized = normalize_text(text)
+    tokens = set(re.findall(r"[a-z0-9_]{3,}", normalized))
+    # 中文没有天然空格：对连续汉字生成 2/3-gram，使“教程太长”和
+    # “教程长度过高”仍能共享“教程”，同时避免单字带来的虚假重叠。
+    for segment in re.findall(r"[\u4e00-\u9fff]+", normalized):
+        for size in (2, 3):
+            if len(segment) >= size:
+                tokens.update(segment[i:i + size] for i in range(len(segment) - size + 1))
+    return tokens
 
 
 def jaccard_similarity(set_a, set_b):

@@ -183,14 +183,30 @@ audiencelens run synthetic-playtest steam_page_review examples/steam-page-sample
 **Quality & experiment commands:**
 
 ```bash
-# Stereotype-detection benchmark on a 30-case labeled set (offline regex layer)
+# Stereotype-detection benchmark on a 50-case labeled set (offline regex layer)
 audiencelens stereotype-eval
 # Add the LLM review layer (requires ANTHROPIC_API_KEY)
 audiencelens stereotype-eval --llm
 
 # Persona-differentiation ablation: full vs no_behavior vs bare (requires API key)
 audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
+
+# Compare one case against the same post-hoc human-research reference
+audiencelens benchmark-compare --reference reference.json \
+  --candidate audiencelens=audiencelens.json \
+  --candidate single_prompt=single-prompt.json \
+  --candidate expert_quick=expert-quick.json
+
+# Scaffold a non-overwriting real pilot case
+audiencelens benchmark-init --dir ./pilot-data --case-id studio-001
+
+# Aggregate multiple projects with paired bootstrap confidence intervals
+audiencelens benchmark-suite --manifest benchmark-suite.json --output benchmark-result.json
 ```
+
+The benchmark tooling is implemented, but no parity claim is made until enough real projects and post-hoc human-research references have been collected. See [benchmark protocol](docs/benchmark-protocol.md).
+
+The offline stereotype regex regression set currently reports 50/50 correct. This is a small, developer-expanded regression set—not evidence of 100% real-world generalization. See the [dated experiment record](docs/experiments/stereotype-regex-baseline-2026-07-16.md).
 
 > Prefer not to install? Every command also runs via `python -m src.cli <command> ...` from the repo root.
 
@@ -311,7 +327,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-**180+ tests — all passing**
+**303+ tests — all passing**
 
 ---
 
@@ -321,7 +337,7 @@ python -m pytest tests/ -v
 |---|---|---|
 | v0.1 | MVP — 16 personas, 6 task types, CLI runner, cross-examination, 3-layer validation | Done |
 | **v0.2** | **Harness Edition — 8-dim quality gate, ethics service, 75+ personas, Web UI** | **Current** |
-| v0.3 | Human parity study, golden output regression, auto evidence tier detection | Planned |
+| v0.3 | Human-parity benchmark infrastructure and product-value feedback loop | In progress — tooling done, real cohort data pending |
 | v1.0 | Big-Five replacement for MBTI, dynamic panel generation, cost-aware model routing | Planned |
 
 ---

@@ -69,3 +69,45 @@ cases:
     label: clean
   - text: "手柄按键不可重映射 [direct]，运动辅助需求玩家会被直接排除。"
     label: clean
+  # ---- 扩展回归：隐式/变体违规 ----
+  - text: "Z 世代注意力都很短，开场必须在十秒内爆炸。"
+    label: violation
+  - text: "退休玩家反应慢，动作判定应该自动放宽。"
+    label: violation
+  - text: "00 后只吃短平快内容，复杂叙事没有市场。"
+    label: violation
+  - text: "三线城市用户消费能力低，不会购买高价豪华版。"
+    label: violation
+  - text: "欧美玩家更崇尚个人英雄主义，所以合作机制不重要。"
+    label: violation
+  - text: "东南亚用户收入不高，天然只能接受广告变现。"
+    label: violation
+  - text: "女性通常不擅长空间导航，地图需要替她们简化。"
+    label: violation
+  - text: "宝妈玩家没有整块时间，肯定只喜欢三分钟一局。"
+    label: violation
+  - text: "INFP 天生重视情绪，所以一定会原谅玩法缺陷。"
+    label: violation
+  - text: "他是 J 人，必然受不了开放式任务设计。"
+    label: violation
+  # ---- 扩展回归：相近但合规 ----
+  - text: "访谈中的 8 名参与者有 6 人在开场十秒内跳过动画 [direct]。"
+    label: clean
+  - text: "这名退休参与者报告按键提示太小；这里只记录个人反馈，不外推年龄群体。"
+    label: clean
+  - text: "材料明确把目标市场写为东南亚，但没有提供当地定价研究 [gap]。"
+    label: clean
+  - text: "角色设定为 INFP 只影响台词语气，不用于推导玩法评价。"
+    label: clean
+  - text: "我偏好短局，因为每天可支配时间只有十分钟。"
+    label: clean
+  - text: "对空间导航不熟悉的首次玩家需要更清晰的地图图例。"
+    label: clean
+  - text: "豪华版价格高于材料列出的同类产品均价 40% [direct]。"
+    label: clean
+  - text: "合作机制需要改进，因为测试中三组队伍都无法找到标记按钮。"
+    label: clean
+  - text: "页面提到了女性主角，但没有给出角色动机和叙事弧线。"
+    label: clean
+  - text: "项目计划针对 Z 世代开展调研；当前材料不足，暂不预测偏好。"
+    label: clean

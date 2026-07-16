@@ -14,10 +14,24 @@ from typing import List, Optional
 REGEX_PATTERNS = [
     re.compile(r"作为[一名个]?[男女女性男性].*?(?:所以|因此|更|偏好|倾向)", re.IGNORECASE),
     re.compile(r"(?:她|他|她们|他们)(?:天生|天然|本能地).*(?:偏好|喜欢|选择)", re.IGNORECASE),
-    re.compile(r"(?:这个|那)(?:年龄|年代|岁数)(?:段|的)(?:人|玩家|用户).*(?:通常|一般|都|总是)", re.IGNORECASE),
+    re.compile(r"(?:这个|那)(?:年龄|年代|岁数)(?:段|的)(?:的)?(?:人|玩家|用户).*(?:通常|一般|都|总是)", re.IGNORECASE),
     re.compile(r"(?:作为|身为)[A-Z]{4}.*?(?:所以|因此|决定|判断)", re.IGNORECASE),
     re.compile(r"(?:women|men|female|male)\s+(?:prefer|tend\s+to|naturally|instinctively)", re.IGNORECASE),
     re.compile(r"(?:as\s+a\s+)?(?:woman|man|girl|boy|elderly|young)\s+.*?(?:therefore|so|prefer|tend)", re.IGNORECASE),
+    # 群体标签直接推出天生偏好/能力/购买行为
+    re.compile(r"(?:男性|女性|男生|女生)(?:玩家|用户|群体)?.{0,12}(?:天然|天生|都|通常).{0,24}(?:偏好|喜欢|不喜欢|不适合|不会|兴趣)", re.IGNORECASE),
+    re.compile(r"(?:我是|身为|考虑到我是)(?:一名)?(?:女生|男生|女性|男性).{0,30}(?:不适合|更适合|肯定|显然|所以|因此)", re.IGNORECASE),
+    # 年龄身份推出耐心、学习能力或节奏偏好
+    re.compile(r"(?:年轻人|老年人|中年人|\d{2,3}\s*多?岁).{0,24}(?:都|通常|肯定|学不会|喜欢|没有耐心|偏好)", re.IGNORECASE),
+    re.compile(r"(?:我都|我已经|作为).{0,8}(?:[二三四五六七八九十]+|\d{2,3})多?岁.{0,24}(?:肯定|一定|学不会|不适合|跟不上)", re.IGNORECASE),
+    # 地域/城市层级推出审美与付费意愿
+    re.compile(r"(?:国内|国外|中国|欧美|日本|小城市|大城市|一线城市)(?:的)?(?:玩家|用户|人).{0,30}(?:都|就是|通常|不愿意|不会|审美|偏好|付费)", re.IGNORECASE),
+    # MBTI 简写或“P/J 人”直接推出判断；普通字母 P 不应命中
+    re.compile(r"(?:我是|作为|身为)\s*(?:[A-Z]{4}|[A-Z]\s*人).{0,30}(?:所以|因此|都|决定|判断|受不了|差评)", re.IGNORECASE),
+    re.compile(r"(?:Z\s*世代|00\s*后|90\s*后|退休玩家|老年玩家|宝妈玩家).{0,30}(?:都|只|反应慢|没有|肯定|必然|注意力|喜欢|偏好)", re.IGNORECASE),
+    re.compile(r"(?:一二三四五线城市|三线城市|欧美|东南亚|北方|南方)(?:的)?(?:玩家|用户|人).{0,32}(?:能力低|收入不高|不会|天然|更|只|偏好|喜欢|审美)", re.IGNORECASE),
+    re.compile(r"(?:男性|女性|男生|女生)(?:玩家|用户|群体)?.{0,12}(?:通常|一般|都).{0,24}(?:不擅长|擅长|能力|学不会|跟不上)", re.IGNORECASE),
+    re.compile(r"(?:他是|她是|我是|作为|身为)?\s*(?:[A-Z]{4}|[A-Z]\s*人).{0,24}(?:天生|必然|一定|都|所以|因此).{0,24}(?:喜欢|偏好|受不了|判断|原谅|决定)", re.IGNORECASE),
 ]
 
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
@@ -35,8 +49,16 @@ JUDGE_PROMPT = """你是评审系统的伦理审查员。系统规则：人格�
 
 def regex_detect(text: str) -> List[dict]:
     violations = []
+    # 明确拒绝外推的伦理声明不应因同时出现身份词和“偏好”而误报；
+    # 只移除该分句，文本中其他真实违规句仍继续扫描。
+    scan_text = re.sub(
+        r"[^。；;]*(?:暂不预测|不外推|不用于推导|不做推测|不能推断)[^。；;]*[。；;]?",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
     for pattern in REGEX_PATTERNS:
-        for match in pattern.findall(text):
+        for match in pattern.findall(scan_text):
             violations.append(
                 {
                     "source": "regex",

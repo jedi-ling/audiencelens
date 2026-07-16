@@ -50,6 +50,7 @@ class Review(Base):
     persona_outputs = relationship("PersonaOutput", back_populates="review", cascade="all, delete-orphan")
     evaluation_results = relationship("EvaluationResult", back_populates="review", cascade="all, delete-orphan")
     judgments = relationship("Judgment", back_populates="review", cascade="all, delete-orphan")
+    feedback = relationship("ReviewFeedback", back_populates="review", uselist=False, cascade="all, delete-orphan")
 
 
 class PersonaOutput(Base):
@@ -225,3 +226,56 @@ class Outcome(Base):
     verified_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     judgment = relationship("Judgment", back_populates="outcome")
+
+
+class ReviewFeedback(Base):
+    """评审后的价值回填：衡量采用、决策影响和付费意愿。"""
+
+    __tablename__ = "review_feedback"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    review_id = Column(String, ForeignKey("reviews.id"), unique=True, index=True, nullable=False)
+    user_id = Column(String, index=True, nullable=False, default="anonymous")
+    useful = Column(Boolean, nullable=False)
+    decision_changed = Column(Boolean, nullable=False, default=False)
+    fixes_suggested = Column(Integer, nullable=False, default=0)
+    fixes_adopted = Column(Integer, nullable=False, default=0)
+    hours_saved = Column(Float, nullable=False, default=0.0)
+    willingness_to_pay_usd = Column(Float, nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    review = relationship("Review", back_populates="feedback")
+    adoptions = relationship("FeedbackAdoption", back_populates="feedback", cascade="all, delete-orphan")
+
+
+class FeedbackAdoption(Base):
+    """被实际采纳的具体建议，支持后续分析哪些建议真正产生行为。"""
+
+    __tablename__ = "feedback_adoptions"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    feedback_id = Column(String, ForeignKey("review_feedback.id"), index=True, nullable=False)
+    fix_title = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    feedback = relationship("ReviewFeedback", back_populates="adoptions")
+
+
+# ---------------------------------------------------------------------------
+# 后台管理（Admin）
+#
+# PlatformSetting 是运行时可调配置的唯一落点：管理员在后台面板改的每一项
+# （配额开关、限流参数、key_mode…）落这张表，读取时"DB 覆盖值优先于环境变量默认值"。
+# 好处是改配置不需要重启进程；坏处是每次读取多一次数据库查询——
+# 对自托管/单机部署这个量级完全无感，多副本 SaaS 规模才需要加缓存层。
+# ---------------------------------------------------------------------------
+
+
+class PlatformSetting(Base):
+    """管理员在后台面板调整的运行时配置覆盖（键值对，值统一存字符串，按声明类型转换）。"""
+
+    __tablename__ = "platform_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

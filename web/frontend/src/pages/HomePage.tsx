@@ -262,20 +262,24 @@ export default function HomePage() {
             最后收敛出一份带证据的结构化裁决——定位于真人测试之前的预筛，而非替代真人研究。
           </p>
 
+          <p className="mx-auto mb-5 w-fit rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 font-mono text-[11px] text-neon-green">
+            CURRENT PILOT · 独立游戏 Steam 商店页上线前评审
+          </p>
+
           <div style={{ animationDelay: '0.7s' }} className="animate-hero-text flex flex-wrap items-center justify-center gap-3">
             <Link
-              to="/ask"
+              to="/review/new?task=steam_page_review"
               className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
             >
-              <MessageSquareText className="w-5 h-5" strokeWidth={1.25} />
-              对话评审
+              <Zap className="w-5 h-5" strokeWidth={1.25} />
+              评审 Steam 商店页
             </Link>
             <Link
-              to="/review/new"
+              to="/ask"
               className="inline-flex items-center gap-2 px-6 py-3 md:px-8 md:py-4 rounded-xl border border-border text-text-primary font-medium text-sm md:text-base hover:border-neon-green/40 hover:text-neon-green transition-colors"
             >
-              <Zap className="w-4 h-4" strokeWidth={1.25} />
-              手动配置
+              <MessageSquareText className="w-4 h-4" strokeWidth={1.25} />
+              其他评审场景
             </Link>
           </div>
         </div>

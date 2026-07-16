@@ -103,10 +103,18 @@ class Settings:
         # ---- 判断复利闭环（埋线：默认开，记录预测供日后回填验证）----
         self.ledger_enabled: bool = _bool("AL_LEDGER_ENABLED", True)
 
+        # ---- 后台管理面板（埋线：默认关闭，设置 token 才启用）----
+        # 未设置时 /api/admin/* 全部返回 503——安全默认值，绝不无密钥暴露管理接口。
+        self.admin_token: str = os.environ.get("AL_ADMIN_TOKEN", "")
+
     # 便捷判断
     @property
     def is_managed(self) -> bool:
         return self.key_mode in ("managed", "hybrid")
+
+    @property
+    def admin_enabled(self) -> bool:
+        return bool(self.admin_token)
 
     def sanitized(self) -> dict:
         """给 /health 用：绝不泄露密钥。"""
@@ -120,6 +128,7 @@ class Settings:
             "queue_backend": self.queue_backend,
             "ledger_enabled": self.ledger_enabled,
             "review_concurrency": self.review_concurrency,
+            "admin_enabled": self.admin_enabled,
         }
 
 

@@ -111,6 +111,28 @@ cd web/frontend && npx tsc --noEmit             # 前端类型检查
 | `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | |
 | `AL_INTENT_LLM_ENABLED` | `true` | 关掉则意图解析只用启发式（零成本） |
 | `AL_LEDGER_ENABLED` | `true` | 关掉则不记录判断（不建议——这是护城河） |
+| `AL_ADMIN_TOKEN` | 空（后台面板关闭） | 设置后 `/admin` 与 `/api/admin/*` 生效，见 §2.5 |
+
+### 后台管理面板
+
+访问 `http://localhost:5173/admin`（页脚"管理后台"链接，故意不放进顶部导航）。
+
+1. 设置 `AL_ADMIN_TOKEN`（任意强随机字符串）并重启后端——未设置时面板显示"未启用"，
+   接口整体返回 503，这是安全默认值，绝不无密钥暴露管理接口。
+2. 面板输入同一个 token 解锁（`X-Admin-Token` 请求头，与普通用户的 Bearer JWT
+   完全独立，存在单独的 localStorage 键 `al.admin_token`）。
+3. 面板提供四块能力：
+   - **系统概览**：跨用户聚合的评审/用量/判断留档/任务队列统计（不是某个 user_id 的切片）
+   - **运行时配置**：`quota_enabled`、`ratelimit_*`、`key_mode`、`review_concurrency`
+     等白名单项，改了立即生效、**不需要重启进程**——落在新表 `platform_settings`，
+     DB 覆盖值优先于环境变量默认值；"重置"按钮清除覆盖、回落 env 默认值
+   - **平台级 API Key**：托管/混合模式下服务端垫付的 key，复用 `UserApiKey` 表
+     （保留 user_id `__platform__`），此设置优先于环境变量 `ANTHROPIC_API_KEY`
+   - **任务 / 评审巡检**：最近任务与评审的只读列表，按状态筛选
+
+只有白名单里的键可被后台面板调整（见 `app/services/admin_settings_service.py`
+的 `ADJUSTABLE` 字典）——`jwt_secret`、`database_url`、`cors_origins` 这类需要
+重启才能安全生效的基础设施配置，不放进这里，面板也不会显示可编辑项。
 
 ---
 
@@ -308,6 +330,8 @@ alembic upgrade head
 - 上传白名单（扩展名 + 大小 + 强制 UTF-8）
 - 越权防护：查别人的评审/判断一律返回 404（**不泄露资源是否存在**）
 - `/api/health` 只暴露 `server_key_present` 布尔，**绝不回显密钥**
+- 后台管理面板默认关闭（未设 `AL_ADMIN_TOKEN` 时 503），令牌比较用
+  `hmac.compare_digest` 恒定时间比较，平台级 key 同样密文落库、只回显掩码
 
 上生产前还要做的：
 
@@ -315,3 +339,4 @@ alembic upgrade head
 - [ ] `AL_JWT_SECRET` 用密钥管理服务，别写进 `.env` 提交
 - [ ] HTTPS（WS 会自动跟着升级为 wss）
 - [ ] 接入 Sentry 或等价物（`core/logging.py` 已留好接入点）
+- [ ] `AL_ADMIN_TOKEN` 同样用密钥管理服务；后台面板建议只对内网/VPN 开放

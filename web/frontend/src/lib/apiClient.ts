@@ -28,6 +28,7 @@ import {
   type ReviewMode,
   type TaskType,
   type UsageSummary,
+  type ValidationMetrics,
   type Verdict,
 } from './types'
 
@@ -178,6 +179,22 @@ export const api = {
     request<HitRate>(`/api/ledger/hit-rate${personaId ? `?persona_id=${personaId}` : ''}`),
 
   leaderboard: () => request<{ personas: LeaderboardEntry[] }>('/api/ledger/leaderboard'),
+
+  validationMetrics: () => request<ValidationMetrics>('/api/validation/metrics'),
+
+  submitReviewFeedback: (id: string, feedback: {
+    useful: boolean
+    decision_changed?: boolean
+    fixes_suggested?: number
+    fixes_adopted?: number
+    hours_saved?: number
+    willingness_to_pay_usd?: number
+    note?: string
+    adopted_fixes?: string[]
+  }) => request<{ review_id: string; recorded: boolean }>(`/api/validation/reviews/${id}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(feedback),
+  }),
 }
 
 export { ApiError }

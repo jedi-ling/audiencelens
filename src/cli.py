@@ -249,10 +249,76 @@ def parity_check(synthetic, human):
         sys.exit(1)
 
 
+@main.command("benchmark-compare")
+@click.option("--reference", type=click.Path(exists=True), required=True, help="真人研究参考 JSON")
+@click.option("--candidate", "candidates", multiple=True, required=True, help="候选：name=path.json，可重复")
+@click.option("--output", type=click.Path(), default=None, help="保存完整 JSON 结果")
+def benchmark_compare(reference, candidates, output):
+    """统一比较 AudienceLens、单次模型、人工快评等方法。"""
+    from tools.benchmark_compare import compare_methods, load_candidate
+
+    try:
+        with open(reference, "r", encoding="utf-8") as f:
+            reference_data = json.load(f)
+        methods = dict(load_candidate(spec) for spec in candidates)
+        result = compare_methods(methods, reference_data)
+        _print(f"参考样本: n={result['reference_sample_size']}" + ("（低置信度）" if result["low_confidence"] else ""))
+        for row in result["methods"]:
+            cost = "—" if row["cost_usd"] is None else f"${row['cost_usd']:.2f}"
+            duration = "—" if row["duration_minutes"] is None else f"{row['duration_minutes']}m"
+            _print(f"  #{row['rank']} {row['method']}: {row['overall_score']:.3f} | 成本 {cost} | 用时 {duration}")
+        _print(f"胜出方法: {result['winner']} | 分差: {result['score_spread']:.3f}")
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            _print(f"结果已写入: {output}")
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc))
+
+
+@main.command("benchmark-suite")
+@click.option("--manifest", type=click.Path(exists=True), required=True, help="跨案例套件 manifest.json")
+@click.option("--output", type=click.Path(), default=None, help="保存聚合 JSON 结果")
+def benchmark_suite(manifest, output):
+    """运行跨案例基准，报告均值、方差、胜率和配对置信区间。"""
+    from tools.benchmark_suite import run_manifest
+
+    try:
+        result = run_manifest(manifest)
+        confidence = "低置信度" if result["low_confidence"] else ""
+        _print(f"套件: {result['suite_name']} | 案例: {result['case_count']} {confidence}")
+        for row in result["methods"]:
+            _print(f"  {row['method']}: 均值 {row['mean_score']:.3f} ± {row['score_stdev']:.3f} | 胜率 {row['win_rate']:.1%}")
+        paired = result["paired_comparison"]
+        _print(f"{paired['target']} vs {paired['baseline']}: Δ={paired['mean_delta']} | 95% CI={paired['ci95']} | {paired['conclusion']}")
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            _print(f"结果已写入: {output}")
+    except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc))
+
+
+@main.command("benchmark-init")
+@click.option("--dir", "root_dir", type=click.Path(), required=True, help="试点数据根目录")
+@click.option("--case-id", required=True, help="项目匿名编号，如 studio-001")
+@click.option("--title", default="", help="内部项目名称（可留空）")
+def benchmark_init(root_dir, case_id, title):
+    """创建一个不会覆盖已有数据的三方盲测案例。"""
+    from tools.benchmark_scaffold import init_case
+
+    try:
+        result = init_case(root_dir, case_id, title)
+        _print(f"案例已创建: {result['case_dir']}")
+        _print(f"套件清单: {result['manifest']}")
+    except (ValueError, FileExistsError, OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(str(exc))
+
+
 @main.command("stereotype-eval")
 @click.option("--llm", "use_llm", is_flag=True, help="启用 LLM 复审层（需 ANTHROPIC_API_KEY）")
 def stereotype_eval(use_llm):
-    """刻板印象检测评测：在30条标注集上算准确率/精确率/召回率"""
+    """刻板印象检测评测：在标注回归集上算准确率/精确率/召回率"""
     import os
 
     if use_llm and not os.environ.get("ANTHROPIC_API_KEY"):

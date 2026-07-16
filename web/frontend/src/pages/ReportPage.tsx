@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/apiClient'
 import type { Report, RiskLevel, PrimaryStance, Review, ReviewMode, EvaluationScorecard, EthicsReport } from '@/lib/mock-data'
 import { EVALUATION_DIMENSIONS } from '@/lib/mock-data'
 import SeverityBadge from '@/components/SeverityBadge'
@@ -50,6 +51,13 @@ export default function ReportPage() {
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
   const [evaluating, setEvaluating] = useState(false)
   const [redTeaming, setRedTeaming] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState(false)
+  const [feedbackUseful, setFeedbackUseful] = useState<boolean | null>(null)
+  const [decisionChanged, setDecisionChanged] = useState(false)
+  const [adoptedFixes, setAdoptedFixes] = useState<string[]>([])
+  const [hoursSaved, setHoursSaved] = useState(0)
+  const [willingnessToPay, setWillingnessToPay] = useState(0)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const toggleIssue = (issueId: string) => {
@@ -699,6 +707,61 @@ export default function ReportPage() {
           </Link>
         )}
       </div>
+
+      {id && report && !feedbackSent && (
+        <section className="mb-6 rounded-xl border border-neon-green/30 bg-bg-card p-5">
+          <h2 className="font-display text-sm font-semibold text-text-primary">这份报告真的有用吗？</h2>
+          <p className="mt-1 text-xs text-text-muted">反馈将用于衡量建议采纳与决策影响，不用调用次数冒充价值。</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === true ? 'border-neon-green bg-neon-green/10 text-neon-green' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(true)}>有用</button>
+            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === false ? 'border-severity-critical bg-severity-critical/10 text-severity-critical' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(false)}>没帮助</button>
+          </div>
+          {feedbackUseful !== null && (
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <fieldset className="text-xs text-text-secondary sm:col-span-3">
+                <legend className="mb-2">实际准备采纳哪些建议？</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {report.priorityIssues.map((issue) => (
+                    <label key={issue.id} className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
+                      <input type="checkbox" checked={adoptedFixes.includes(issue.title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, issue.title] : current.filter((title) => title !== issue.title))} className="mt-0.5 accent-neon-green" />
+                      <span>{issue.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="text-xs text-text-secondary">预计节省工时
+                <input type="number" min={0} step="0.5" value={hoursSaved} onChange={(e) => setHoursSaved(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
+              </label>
+              <label className="text-xs text-text-secondary">愿意为本次支付（USD）
+                <input type="number" min={0} step="1" value={willingnessToPay} onChange={(e) => setWillingnessToPay(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-text-secondary sm:col-span-2">
+                <input type="checkbox" checked={decisionChanged} onChange={(e) => setDecisionChanged(e.target.checked)} className="accent-neon-green" />
+                报告改变了我的产品或发布决策
+              </label>
+              <button className="rounded-md bg-neon-green px-4 py-2 text-sm font-semibold text-bg-primary" onClick={async () => {
+                setFeedbackError(null)
+                try {
+                  await api.submitReviewFeedback(id, {
+                    useful: feedbackUseful,
+                    decision_changed: decisionChanged,
+                    fixes_suggested: report.priorityIssues.length,
+                    fixes_adopted: adoptedFixes.length,
+                    adopted_fixes: adoptedFixes,
+                    hours_saved: hoursSaved,
+                    willingness_to_pay_usd: willingnessToPay,
+                  })
+                  setFeedbackSent(true)
+                } catch (error) {
+                  setFeedbackError(error instanceof Error ? error.message : '反馈提交失败')
+                }
+              }}>提交反馈</button>
+            </div>
+          )}
+          {feedbackError && <p className="mt-3 text-xs text-severity-critical">{feedbackError}</p>}
+        </section>
+      )}
+      {feedbackSent && <p className="mb-6 text-sm text-neon-green">已记录。后续可在“判断复利”查看价值指标。</p>}
     </div>
   )
 }

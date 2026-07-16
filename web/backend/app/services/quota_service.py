@@ -19,11 +19,15 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.errors import QuotaExceeded
 from app.models import UsageRecord
-from app.services import plan_service
+from app.services import admin_settings_service, plan_service
 
 
 def _day_ago() -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=1)
+
+
+def _quota_enabled(db: Session) -> bool:
+    return admin_settings_service.get(db, "quota_enabled", settings.quota_enabled)
 
 
 def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
@@ -31,6 +35,7 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
 
     plan 参数向后兼容：不传等价于旧行为（free 档限额）。
     """
+    quota_enabled = _quota_enabled(db)
     plan_info = plan_service.get_plan(plan)
     since = _day_ago()
     q = db.query(
@@ -55,15 +60,15 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
     )
 
     return {
-        "quota_enabled": settings.quota_enabled,
+        "quota_enabled": quota_enabled,
         "window": "24h",
         "plan": plan_info["id"],
         "plan_name": plan_info["name"],
         "reviews_used": int(count or 0),
-        "reviews_limit": plan_info["reviews_per_day"] if settings.quota_enabled else None,
+        "reviews_limit": plan_info["reviews_per_day"] if quota_enabled else None,
         "cost_usd_total": round(float(cost or 0.0), 4),
         "cost_usd_on_server_key": round(float(server_cost or 0.0), 4),
-        "cost_usd_limit": plan_info["cost_usd_per_day"] if settings.quota_enabled else None,
+        "cost_usd_limit": plan_info["cost_usd_per_day"] if quota_enabled else None,
     }
 
 
@@ -74,9 +79,9 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     只有走服务端 key（你垫钱）才受配额约束。
 
     plan 参数向后兼容：不传等价于旧行为（按 free 档限额校验）；
-    未知 plan 由 plan_service 回落 free。
+    未知 plan 由 plan_service 回落 free。quota_enabled 支持后台面板实时覆盖。
     """
-    if not settings.quota_enabled or key_source != "server":
+    if not _quota_enabled(db) or key_source != "server":
         return
 
     plan_info = plan_service.get_plan(plan)

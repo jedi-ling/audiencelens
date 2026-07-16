@@ -5,7 +5,7 @@
 
 import os
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, Field
@@ -25,6 +25,7 @@ from app.services import (
     plan_service,
     quota_service,
     review_service,
+    validation_service,
 )
 
 router = APIRouter()
@@ -328,6 +329,17 @@ class VerifyRequest(BaseModel):
     note: Optional[str] = None
 
 
+class ReviewFeedbackRequest(BaseModel):
+    useful: bool
+    decision_changed: bool = False
+    fixes_suggested: int = Field(default=0, ge=0)
+    fixes_adopted: int = Field(default=0, ge=0)
+    hours_saved: float = Field(default=0, ge=0)
+    willingness_to_pay_usd: Optional[float] = Field(default=None, ge=0)
+    note: Optional[str] = None
+    adopted_fixes: Optional[List[str]] = None
+
+
 @router.get("/ledger/judgments")
 async def list_judgments(
     review_id: Optional[str] = None,
@@ -372,3 +384,25 @@ async def leaderboard(
 ):
     """各人格历史命中率排行——"谁的判断最值得听"。"""
     return {"personas": ledger_service.persona_leaderboard(db, identity.user_id)}
+
+
+# ============================== 产品价值验证 ==============================
+
+@router.post("/validation/reviews/{review_id}/feedback")
+async def record_review_feedback(
+    review_id: str,
+    body: ReviewFeedbackRequest,
+    identity: Identity = Depends(current_identity),
+    db: Session = Depends(get_db),
+):
+    """回填报告是否真正影响决策；同一评审重复提交时更新。"""
+    data = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+    return validation_service.upsert_feedback(db, review_id, identity.user_id, data)
+
+
+@router.get("/validation/metrics")
+async def validation_metrics(
+    identity: Identity = Depends(current_identity), db: Session = Depends(get_db)
+):
+    """采用率、决策影响、节省时间与付费意愿。"""
+    return validation_service.metrics(db, identity.user_id)

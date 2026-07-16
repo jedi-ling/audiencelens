@@ -78,6 +78,14 @@ class UpstreamError(AppError):
     message = "上游模型服务异常"
 
 
+class AdminDisabled(AppError):
+    """未设置 AL_ADMIN_TOKEN 时，后台管理接口整体不可用——安全默认值。"""
+
+    status_code = 503
+    code = "admin_disabled"
+    message = "后台管理面板未启用。请在服务端设置 AL_ADMIN_TOKEN 环境变量后重启。"
+
+
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
 

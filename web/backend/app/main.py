@@ -3,10 +3,12 @@
 启动顺序（每一步都可在 app/config.py 里开关）：
     日志 → DB 建表/迁移 → 预热人格与评估器 → 中间件 → 路由 → 错误处理
 
-路由分两层：
+路由分三层：
     api_router      原有业务路由（personas / task-types / reviews v1 / evaluations …）
     platform_router 平台链路（health / auth / keys / intent / uploads / usage /
                     v2 异步评审 / jobs / 判断复利闭环）
+    admin_router    后台管理（运行时配置 / 平台级 key / 系统概览 / 任务与评审巡检），
+                    未设置 AL_ADMIN_TOKEN 时整体 503，见 deps.require_admin
 """
 
 import asyncio
@@ -17,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import router as api_router
+from app.api.admin import router as admin_router
 from app.api.platform import router as platform_router
 from app.config import settings
 from app.core.errors import register_error_handlers
@@ -93,4 +96,5 @@ register_error_handlers(app)
 
 app.include_router(api_router)
 app.include_router(platform_router, prefix="/api")  # /api/health 在 platform 里
+app.include_router(admin_router, prefix="/api")
 app.include_router(ws_router)

@@ -23,9 +23,14 @@ export default function CreateReviewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const preselectedSkill = searchParams.get('skill') as SkillType | null
-  const [step, setStep] = useState<Step>(preselectedSkill ? 1 : 0)
-  const [selectedSkillType, setSelectedSkillType] = useState<SkillType | null>(preselectedSkill)
-  const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null)
+  const requestedTask = searchParams.get('task')
+  const preselectedTask = TASK_TYPES.some((task) => task.id === requestedTask) ? requestedTask : null
+  const inferredSkill = preselectedTask
+    ? SKILLS.find((skill) => skill.task_types.includes(preselectedTask))?.type ?? null
+    : null
+  const [step, setStep] = useState<Step>(preselectedTask ? 2 : preselectedSkill ? 1 : 0)
+  const [selectedSkillType, setSelectedSkillType] = useState<SkillType | null>(preselectedSkill ?? inferredSkill)
+  const [selectedTaskType, setSelectedTaskType] = useState<string | null>(preselectedTask)
   const [selectedCategory, setSelectedCategory] = useState<string>('development')
   const [selectedMode, setSelectedMode] = useState<ReviewMode>('standard')
   const [target, setTarget] = useState('')
