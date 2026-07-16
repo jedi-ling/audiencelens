@@ -254,57 +254,5 @@ export interface WsEvent<T = Record<string, unknown>> {
   data: T
 }
 
-// ---------- 后台管理（Admin，需 X-Admin-Token）----------
-
-export interface AdminOverview {
-  reviews: { total: number; by_status: Record<string, number> }
-  usage_24h: {
-    count: number
-    cost_usd_total: number
-    cost_usd_by_source: Record<string, number>
-  }
-  judgments: { total: number; verified: number }
-  registered_users: number
-  jobs_by_status: Record<string, number>
-}
-
-/** 单项运行时可调配置：env 默认值 vs 后台覆盖值，overridden 标注是否已被面板改过 */
-export interface AdminSettingRow {
-  key: string
-  label: string
-  type: 'bool' | 'int' | 'float' | 'str'
-  choices: string[] | null
-  env_default: unknown
-  effective_value: unknown
-  overridden: boolean
-}
-
-export interface AdminServerKeyStatus {
-  configured: boolean
-  key: { provider: string; masked: string; last_used_at: string | null } | null
-}
-
-export interface AdminJob {
-  id: string
-  kind: string
-  ref_id: string | null
-  user_id: string | null
-  status: string
-  progress: number
-  error_message: string | null
-  created_at: string | null
-  finished_at: string | null
-}
-
-export interface AdminReviewRow {
-  id: string
-  user_id: string | null
-  task_type: string
-  target_title: string | null
-  mode: string
-  status: string
-  total_cost_usd: number
-  error_message: string | null
-  created_at: string | null
-  completed_at: string | null
-}
+// 注：后台管理（Admin* 类型 + adminClient）已拆分到独立项目 web/admin/，
+// 不再嵌入这个用户产品前端里。见 web/admin/src/lib/types.ts。

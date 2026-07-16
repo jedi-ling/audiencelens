@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+@import "tailwindcss";
+
+/*
+ * 沿用主产品的暗色调色板（同一套 hex 值），保持视觉连续性——
+ * 但这是一个独立项目，不 import 主前端的 index.css，避免两个应用
+ * 的构建产物互相耦合。运营后台是被"操作"的工具，不是被"阅读"的营销页，
+ * 所以字体只保留等宽 + 系统无衬线，去掉主产品的展示型字体/发光/粒子特效。
+ */
+@theme {
+  --color-bg-primary: #0a0a0f;
+  --color-bg-secondary: #12121a;
+  --color-bg-card: #16161f;
+  --color-bg-card-hover: #1c1c28;
+  --color-border: #2a2a3a;
+  --color-border-hover: #3a3a4f;
+  --color-neon-green: #00ff88;
+  --color-neon-green-dim: #00cc6a;
+  --color-cyan: #00d4ff;
+  --color-cyan-dim: #00a8cc;
+  --color-warm-orange: #ff6b35;
+  --color-text-primary: #e8e8f0;
+  --color-text-secondary: #8888a0;
+  --color-text-muted: #55556a;
+  --color-severity-critical: #ff3355;
+  --color-severity-medium: #ffbb33;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Noto Sans SC', system-ui, sans-serif;
+}
+
+html, body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-hover); }

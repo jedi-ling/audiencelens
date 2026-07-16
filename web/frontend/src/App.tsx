@@ -15,7 +15,6 @@ const SkillSelectPage = lazy(() => import('@/pages/SkillSelectPage'))
 const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
 const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
-const AdminPage = lazy(() => import('@/pages/AdminPage'))
 
 export default function App() {
   return (
@@ -38,8 +37,6 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/skills" element={<SkillSelectPage />} />
             <Route path="/evaluations/:id" element={<EvaluationPage />} />
-            {/* 管理后台：运行时配置 + 平台 API Key + 系统概览/巡检，需 X-Admin-Token */}
-            <Route path="/admin" element={<AdminPage />} />
           </Route>
         </Routes>
       </Suspense>

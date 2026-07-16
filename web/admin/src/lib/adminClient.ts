@@ -1,27 +1,16 @@
 /**
- * 后台管理 API 客户端 —— 独立于 apiClient.ts。
+ * 后台管理 API 客户端。
  *
- * 认证方式完全不同：普通用户走 Bearer JWT（或匿名），管理员走一个共享密钥
- * （X-Admin-Token 请求头，对应服务端 AL_ADMIN_TOKEN 环境变量），两者不应混用同一个
- * token 存储，所以单独一个 client 文件，而不是塞进 apiClient.ts 里做分支。
- *
- * 服务端未设置 AL_ADMIN_TOKEN 时，所有 /api/admin/* 请求返回 503
- * （code: admin_disabled）——前端据此提示"后台未启用"而不是"密码错误"。
+ * 认证：X-Admin-Token 请求头，对应服务端 AL_ADMIN_TOKEN 环境变量。
+ * 服务端未设置该变量时，所有请求返回 503（code: admin_disabled）。
+ * 令牌只存本项目自己的 localStorage，与用户产品前端的登录态完全独立
+ * （两个应用甚至可以部署在不同域名下）。
  */
 
-import {
-  ApiError,
-  type ApiErrorCode,
-  type AdminJob,
-  type AdminOverview,
-  type AdminReviewRow,
-  type AdminServerKeyStatus,
-  type AdminSettingRow,
-  type Plan,
-} from './types'
+import { ApiError, type ApiErrorCode, type AdminJob, type AdminOverview, type AdminReviewRow, type AdminServerKeyStatus, type AdminSettingRow, type Plan } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
-const ADMIN_TOKEN_KEY = 'al.admin_token'
+const ADMIN_TOKEN_KEY = 'al_admin.token'
 
 export function getAdminToken(): string | null {
   return localStorage.getItem(ADMIN_TOKEN_KEY)

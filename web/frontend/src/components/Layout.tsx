@@ -222,13 +222,6 @@ export default function Layout() {
             >
               隐私政策
             </Link>
-            {/* 管理后台不进顶部导航（避免重新触发导航栏换行），只在页脚留一个入口 */}
-            <Link
-              to="/admin"
-              className="font-mono text-xs text-text-muted hover:text-warm-orange transition-colors"
-            >
-              管理后台
-            </Link>
           </nav>
 
           <div className="flex flex-col items-center md:items-end gap-0.5">

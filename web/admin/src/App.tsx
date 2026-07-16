@@ -1,19 +1,12 @@
-/**
- * 后台管理面板 —— 运营视角，不是终端用户视角。
- *
- * 门禁：服务端未设置 AL_ADMIN_TOKEN 时，所有请求返回 503（admin_disabled），
- * 面板据此提示"未启用"而不是"密码错误"。令牌只存本地 localStorage，
- * 每次请求走 X-Admin-Token 头，不是 Bearer JWT，与普通用户登录态完全独立。
- */
-
 import { useCallback, useEffect, useState } from 'react'
+import { Lock, RefreshCw, Server, Sliders, ListChecks, FileClock } from 'lucide-react'
 import { adminApi, getAdminToken, setAdminToken } from '@/lib/adminClient'
 import { ApiError } from '@/lib/types'
 import type { AdminJob, AdminOverview, AdminReviewRow, AdminServerKeyStatus, AdminSettingRow } from '@/lib/types'
 
 type GateState = 'checking' | 'disabled' | 'locked' | 'unlocked'
 
-export default function AdminPage() {
+export default function App() {
   const [gate, setGate] = useState<GateState>('checking')
   const [tokenInput, setTokenInput] = useState('')
   const [gateError, setGateError] = useState<string | null>(null)
@@ -38,57 +31,84 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    const existing = getAdminToken()
-    void tryUnlock(existing ?? '')
+    void tryUnlock(getAdminToken() ?? '')
   }, [tryUnlock])
 
-  if (gate === 'checking') {
-    return <CenterMessage>检查中…</CenterMessage>
-  }
+  return (
+    <div className="min-h-screen bg-bg-primary">
+      <AppHeader
+        showLock={gate === 'unlocked'}
+        onLock={() => { setAdminToken(null); setGate('locked'); setTokenInput('') }}
+      />
+      <main>
+        {gate === 'checking' && <CenterMessage>检查中…</CenterMessage>}
 
-  if (gate === 'disabled') {
-    return (
-      <CenterMessage>
-        <p className="text-text-primary">后台管理面板未启用</p>
-        <p className="mt-2 max-w-md font-mono text-xs text-text-muted">
-          在服务端设置环境变量 <span className="text-neon-green">AL_ADMIN_TOKEN</span> 后重启即可启用。
-          未设置时该接口整体返回 503，这是安全默认值——绝不无密钥暴露管理接口。
-        </p>
-      </CenterMessage>
-    )
-  }
+        {gate === 'disabled' && (
+          <CenterMessage>
+            <p className="text-text-primary">管理后台未启用</p>
+            <p className="mt-2 max-w-md font-mono text-xs text-text-muted">
+              在后端服务的环境变量中设置 <span className="text-neon-green">AL_ADMIN_TOKEN</span> 后重启即可启用。
+              未设置时该接口整体返回 503 —— 安全默认值，绝不无密钥暴露管理接口。
+            </p>
+          </CenterMessage>
+        )}
 
-  if (gate === 'locked') {
-    return (
-      <CenterMessage>
-        <p className="mb-4 text-text-primary">输入管理员令牌</p>
-        <div className="flex w-full max-w-sm gap-2">
-          <input
-            type="password"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void tryUnlock(tokenInput)}
-            placeholder="AL_ADMIN_TOKEN"
-            className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green transition-colors"
-          />
+        {gate === 'locked' && (
+          <CenterMessage>
+            <div className="mb-4 flex items-center gap-2 text-text-primary">
+              <Lock className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+              输入管理员令牌
+            </div>
+            <div className="flex w-full max-w-sm gap-2">
+              <input
+                type="password"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void tryUnlock(tokenInput)}
+                placeholder="AL_ADMIN_TOKEN"
+                autoFocus
+                className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green transition-colors"
+              />
+              <button
+                onClick={() => void tryUnlock(tokenInput)}
+                className="shrink-0 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
+              >
+                解锁
+              </button>
+            </div>
+            {gateError && <p className="mt-3 font-mono text-xs text-severity-critical">{gateError}</p>}
+          </CenterMessage>
+        )}
+
+        {gate === 'unlocked' && <Dashboard />}
+      </main>
+    </div>
+  )
+}
+
+function AppHeader({ showLock, onLock }: { showLock: boolean; onLock: () => void }) {
+  return (
+    <header className="border-b border-border bg-bg-secondary/60 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-6">
+        <Server className="h-5 w-5 text-neon-green" strokeWidth={1.5} />
+        <span className="font-mono text-sm font-semibold text-text-primary">AudienceLens</span>
+        <span className="font-mono text-xs text-text-muted">/ 管理后台</span>
+        {showLock && (
           <button
-            onClick={() => void tryUnlock(tokenInput)}
-            className="shrink-0 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
+            onClick={onLock}
+            className="ml-auto rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-muted hover:border-severity-critical/40 hover:text-severity-critical transition-colors"
           >
-            解锁
+            锁定
           </button>
-        </div>
-        {gateError && <p className="mt-3 font-mono text-xs text-severity-critical">{gateError}</p>}
-      </CenterMessage>
-    )
-  }
-
-  return <AdminDashboard onLock={() => { setAdminToken(null); setGate('locked'); setTokenInput('') }} />
+        )}
+      </div>
+    </header>
+  )
 }
 
 function CenterMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center px-6 text-center">
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center px-6 text-center">
       {children}
     </div>
   )
@@ -96,9 +116,10 @@ function CenterMessage({ children }: { children: React.ReactNode }) {
 
 // ============================== 仪表盘 ==============================
 
-function AdminDashboard({ onLock }: { onLock: () => void }) {
+function Dashboard() {
   const [overview, setOverview] = useState<AdminOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -112,22 +133,24 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
     void load()
   }, [load])
 
+  const refresh = async () => {
+    setRefreshing(true)
+    await load()
+    setRefreshing(false)
+  }
+
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-text-primary">
-            管理后台<span className="ml-2 font-mono text-xs text-neon-green">// ADMIN_CONSOLE</span>
-          </h1>
-          <p className="mt-1 text-sm text-text-secondary">跨用户的系统视角——配置、平台 Key、任务与评审巡检。</p>
-        </div>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-text-secondary">跨用户的系统视角——运行时配置、平台 Key、任务与评审巡检。</p>
         <button
-          onClick={onLock}
-          className="rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-muted hover:border-severity-critical/40 hover:text-severity-critical transition-colors"
+          onClick={() => void refresh()}
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-secondary hover:border-neon-green/40 hover:text-neon-green transition-colors"
         >
-          锁定
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+          刷新
         </button>
-      </header>
+      </div>
 
       {error && (
         <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
@@ -137,12 +160,12 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
 
       {overview && <OverviewCards data={overview} />}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <SettingsPanel />
         <ServerKeyPanel />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <JobsPanel />
         <ReviewsPanel />
       </div>
@@ -165,26 +188,28 @@ function OverviewCards({ data }: { data: AdminOverview }) {
         value={data.judgments.total}
         sub={`已验证 ${data.judgments.verified} (${percent(data.judgments.verified, data.judgments.total)})`}
       />
-      <Stat label="任务队列" value={Object.values(data.jobs_by_status).reduce((a, b) => a + b, 0)} sub={statusBreakdown(data.jobs_by_status)} />
+      <Stat
+        label="任务队列"
+        value={Object.values(data.jobs_by_status).reduce((a, b) => a + b, 0)}
+        sub={statusBreakdown(data.jobs_by_status)}
+      />
     </section>
   )
 }
 
 function statusBreakdown(rec: Record<string, number>): string {
   const entries = Object.entries(rec)
-  if (!entries.length) return '—'
-  return entries.map(([k, v]) => `${k}:${v}`).join(' · ')
+  return entries.length ? entries.map(([k, v]) => `${k}:${v}`).join(' · ') : '—'
 }
 
 function percent(n: number, total: number): string {
-  if (!total) return '—'
-  return `${Math.round((n / total) * 100)}%`
+  return total ? `${Math.round((n / total) * 100)}%` : '—'
 }
 
 function Stat({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
   return (
     <div className="rounded-xl border border-border bg-bg-card p-4">
-      <div className="font-display text-2xl font-bold tabular-nums text-text-primary">{value}</div>
+      <div className="font-mono text-2xl font-bold tabular-nums text-text-primary">{value}</div>
       <div className="mt-1 text-xs text-text-muted">{label}</div>
       {sub && <div className="mt-2 font-mono text-[10px] text-text-secondary">{sub}</div>}
     </div>
@@ -238,8 +263,10 @@ function SettingsPanel() {
 
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="font-display text-sm font-semibold text-text-primary">
-        运行时配置<span className="ml-2 font-mono text-[10px] text-text-muted">// 改动无需重启</span>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+        <Sliders className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        运行时配置
+        <span className="font-mono text-[10px] font-normal text-text-muted">改动无需重启</span>
       </h2>
       {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
       <div className="mt-4 divide-y divide-border">
@@ -269,15 +296,7 @@ function SettingsPanel() {
   )
 }
 
-function SettingControl({
-  row,
-  disabled,
-  onChange,
-}: {
-  row: AdminSettingRow
-  disabled: boolean
-  onChange: (value: unknown) => void
-}) {
+function SettingControl({ row, disabled, onChange }: { row: AdminSettingRow; disabled: boolean; onChange: (value: unknown) => void }) {
   if (row.type === 'bool') {
     return (
       <input
@@ -370,8 +389,10 @@ function ServerKeyPanel() {
 
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="font-display text-sm font-semibold text-text-primary">
-        平台级 API Key<span className="ml-2 font-mono text-[10px] text-text-muted">// managed/hybrid 模式垫付用</span>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+        <Lock className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        平台级 API Key
+        <span className="font-mono text-[10px] font-normal text-text-muted">managed/hybrid 模式垫付用</span>
       </h2>
       <p className="mt-1 text-xs text-text-muted">
         托管模式下服务端垫付的 key。此处设置优先于环境变量 ANTHROPIC_API_KEY，改动即时生效。
@@ -435,7 +456,10 @@ function JobsPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold text-text-primary">最近任务</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+          <ListChecks className="h-4 w-4 text-cyan" strokeWidth={1.5} />
+          最近任务
+        </h2>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -481,7 +505,10 @@ function ReviewsPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold text-text-primary">最近评审</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+          <FileClock className="h-4 w-4 text-cyan" strokeWidth={1.5} />
+          最近评审
+        </h2>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}

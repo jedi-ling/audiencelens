@@ -4,9 +4,16 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "--port", "5199"],
       "cwd": "web/frontend",
-      "port": 5173
+      "port": 5199
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "web/admin",
+      "port": 5200
     }
   ]
 }

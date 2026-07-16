@@ -24,10 +24,15 @@ pip install -r requirements.txt
 python run.py                      # → http://localhost:8000
                                    #   接口文档 http://localhost:8000/docs
 
-# 前端（另开一个终端）
+# 用户产品前端（另开一个终端）
 cd web/frontend
 npm install
-npm run dev                        # → http://localhost:5173
+npm run dev -- --port 5199         # → http://localhost:5199
+
+# 后台管理（独立项目，需要才起，不随产品前端一起跑；另开一个终端）
+cd web/admin
+npm install
+npm run dev                        # → http://localhost:5200（需先设 AL_ADMIN_TOKEN）
 ```
 
 **验证链路通了**：
@@ -37,15 +42,16 @@ curl http://localhost:8000/api/health
 # 应返回当前生效的开关；server_key_present 是布尔，绝不会回显密钥明文
 ```
 
-打开 <http://localhost:5173/ask>（对话式入口）。BYOK 模式下未填 key 会引导你去设置页——
+打开 <http://localhost:5199/ask>（对话式入口）。BYOK 模式下未填 key 会引导你去设置页——
 这是**故意的**：评审必须用真实模型，模拟数据没有评审价值。
 
 **跑测试**：
 
 ```bash
-python -m pytest tests/ -q                      # 核心引擎 232 项
-cd web/backend && python -m pytest tests/ -q    # 平台链路 37 项
-cd web/frontend && npx tsc --noEmit             # 前端类型检查
+python -m pytest tests/ -q                      # 核心引擎 251 项
+cd web/backend && python -m pytest tests/ -q    # 平台链路 74 项（含后台管理 22 项）
+cd web/frontend && npx tsc --noEmit             # 用户产品前端类型检查
+cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 ```
 
 ---
@@ -111,16 +117,25 @@ cd web/frontend && npx tsc --noEmit             # 前端类型检查
 | `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | |
 | `AL_INTENT_LLM_ENABLED` | `true` | 关掉则意图解析只用启发式（零成本） |
 | `AL_LEDGER_ENABLED` | `true` | 关掉则不记录判断（不建议——这是护城河） |
-| `AL_ADMIN_TOKEN` | 空（后台面板关闭） | 设置后 `/admin` 与 `/api/admin/*` 生效，见 §2.5 |
+| `AL_ADMIN_TOKEN` | 空（后台面板关闭） | 设置后 `web/admin` 与 `/api/admin/*` 生效，见 §2.5 |
 
-### 后台管理面板
+### 后台管理面板（独立应用，不嵌在用户产品里）
 
-访问 `http://localhost:5173/admin`（页脚"管理后台"链接，故意不放进顶部导航）。
+后台管理是 **`web/admin/` 下一个完全独立的前端项目**——自己的 `package.json`、
+自己的端口（5200）、自己的构建产物，不和用户产品前端（`web/frontend`，5199）
+打包在一起、不共享路由。两者只是同一个后端（8000）的两个不同消费者，
+可以分开部署到不同域名（比如把 admin 只挂内网/VPN，产品前端挂公网）。
+
+```bash
+cd web/admin
+npm install
+npm run dev          # http://localhost:5200
+```
 
 1. 设置 `AL_ADMIN_TOKEN`（任意强随机字符串）并重启后端——未设置时面板显示"未启用"，
    接口整体返回 503，这是安全默认值，绝不无密钥暴露管理接口。
-2. 面板输入同一个 token 解锁（`X-Admin-Token` 请求头，与普通用户的 Bearer JWT
-   完全独立，存在单独的 localStorage 键 `al.admin_token`）。
+2. 面板输入同一个 token 解锁（`X-Admin-Token` 请求头，独立的 localStorage 键
+   `al_admin.token`，与用户产品前端的登录态毫无关系）。
 3. 面板提供四块能力：
    - **系统概览**：跨用户聚合的评审/用量/判断留档/任务队列统计（不是某个 user_id 的切片）
    - **运行时配置**：`quota_enabled`、`ratelimit_*`、`key_mode`、`review_concurrency`
@@ -133,6 +148,12 @@ cd web/frontend && npx tsc --noEmit             # 前端类型检查
 只有白名单里的键可被后台面板调整（见 `app/services/admin_settings_service.py`
 的 `ADJUSTABLE` 字典）——`jwt_secret`、`database_url`、`cors_origins` 这类需要
 重启才能安全生效的基础设施配置，不放进这里，面板也不会显示可编辑项。
+
+**生产部署**：`web/admin` 构建后是纯静态文件（`npm run build` → `dist/`），
+和用户产品前端一样丢进任意静态托管；不同的是它不需要暴露在公网——建议只挂
+内网、VPN 或加一层反向代理的 IP 白名单。`vite.config.ts` 的开发代理只在
+`npm run dev` 时生效，生产环境需要后端的 `AL_CORS_ORIGINS` 里加上 admin
+应用实际部署的域名，否则浏览器会因跨域拦截请求。
 
 ---
 
