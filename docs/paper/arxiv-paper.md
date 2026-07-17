@@ -1,8 +1,8 @@
 ---
 title: "AudienceLens: A Multi-Agent Cross-Examination Framework for Synthetic Audience Review"
 authors:
-  - name: Shuoji Team
-    affiliation: Shuoji Research
+  - name: 熵呓工作室
+    affiliation: 熵呓工作室
 abstract: |
   Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation offer a promising alternative by generating synthetic user interviews at scale. However, existing approaches rely on single-turn interactions without cross-examination, lack mechanisms for stance revision, and provide no systematic framework for tracking consensus evolution. We propose and implement a prototype of AudienceLens, a multi-agent cross-examination system for synthetic audience review that addresses these limitations through three core innovations: (1) a three-round debate protocol (position statement, rebuttal, final stance) with fork-isolated persona agents; (2) a vote change mechanism with a confidence threshold of 0.15 and full change provenance; (3) consensus evolution tracking with tipping point detection. The system comprises 75 behavior-driven personas across four specialized skills, accompanied by a preliminary 8-dimension Harness evaluation framework. We propose the identity-behavior decoupling principle and detail an ethics compliance framework aligned with EU AI Act requirements. We discuss limitations including the absence of real-world parity studies and outline a roadmap for empirical validation. We note that this paper presents a system design and prototype implementation; empirical validation with real users remains future work.
 keywords: [multi-agent systems, synthetic audience, cross-examination, persona simulation, LLM evaluation, AI ethics]

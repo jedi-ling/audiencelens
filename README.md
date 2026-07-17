@@ -359,7 +359,7 @@ MIT License — see [LICENSE](LICENSE)
 
 ---
 
-## Made by Shuoji Team
+## Made by 熵呓工作室
 
 ---
 
