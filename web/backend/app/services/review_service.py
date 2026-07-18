@@ -48,8 +48,15 @@ def enqueue_review(
     api_key: str,
     key_source: str,
     user_id: str = "anonymous",
+    provider: str = "anthropic",
+    model: str = None,
+    api_base: str = None,
 ) -> str:
-    """入队一次评审，返回 job_id。"""
+    """入队一次评审，返回 job_id。
+
+    provider/model/api_base：BYOK 选了非 Anthropic 服务商（DeepSeek/Kimi/通义千问/
+    智谱GLM/Ollama…）时透传给引擎，见 src/runner/llm_client.py。
+    """
     job_id = job_service.create_job(
         kind="review", ref_id=review_id, user_id=user_id, payload={"key_source": key_source}
     )
@@ -61,12 +68,22 @@ def enqueue_review(
         key_source,
         user_id,
         job_id,
+        provider,
+        model,
+        api_base,
     )
     return job_id
 
 
 def _execute_review(
-    review_id: str, api_key: str, key_source: str, user_id: str, job_id: str
+    review_id: str,
+    api_key: str,
+    key_source: str,
+    user_id: str,
+    job_id: str,
+    provider: str = "anthropic",
+    model: str = None,
+    api_base: str = None,
 ) -> None:
     """后台执行。异常向上抛给 job_service 记录为 failed。"""
     from runner.cli import run_panel  # 延迟导入：避免启动时就拉起重依赖
@@ -123,6 +140,9 @@ def _execute_review(
             max_concurrency=settings.review_concurrency,
             progress_callback=_on_persona_done,
             api_key=api_key,
+            provider=provider,
+            model_override=model,
+            api_base=api_base,
         )
 
         job_service.update_progress(job_id, 80)

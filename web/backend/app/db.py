@@ -52,6 +52,19 @@ def _legacy_migrations() -> None:
         patches.append("ALTER TABLE reviews ADD COLUMN user_id VARCHAR")
     if "error_message" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN error_message TEXT")
+
+    if "user_api_keys" in inspector.get_table_names():
+        key_columns = {c["name"] for c in inspector.get_columns("user_api_keys")}
+        if "model" not in key_columns:
+            patches.append("ALTER TABLE user_api_keys ADD COLUMN model VARCHAR")
+        if "api_base" not in key_columns:
+            patches.append("ALTER TABLE user_api_keys ADD COLUMN api_base VARCHAR")
+
+    if "users" in inspector.get_table_names():
+        user_columns = {c["name"] for c in inspector.get_columns("users")}
+        if "is_guest" not in user_columns:
+            patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT 0 NOT NULL")
+
     if not patches:
         return
     with engine.connect() as conn:

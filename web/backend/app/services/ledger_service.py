@@ -169,13 +169,17 @@ def verify_judgment(
     return {"judgment_id": judgment_id, "verdict": verdict, "source": source}
 
 
-def hit_rate(db: Session, user_id: str, persona_id: str = None) -> dict:
-    """命中率统计。样本不足时如实标注，不吹牛。"""
-    q = (
-        db.query(Outcome.verdict, func.count(Outcome.id))
-        .join(Judgment, Outcome.judgment_id == Judgment.id)
-        .filter(Judgment.user_id == user_id)
+def hit_rate(db: Session, user_id: Optional[str], persona_id: str = None) -> dict:
+    """命中率统计。样本不足时如实标注，不吹牛。
+
+    user_id=None 时不按用户过滤——用于后台管理面板的跨用户聚合视图；
+    产品侧调用永远传具体 user_id，行为不变。
+    """
+    q = db.query(Outcome.verdict, func.count(Outcome.id)).join(
+        Judgment, Outcome.judgment_id == Judgment.id
     )
+    if user_id is not None:
+        q = q.filter(Judgment.user_id == user_id)
     if persona_id:
         q = q.filter(Judgment.persona_id == persona_id)
     counts = dict(q.group_by(Outcome.verdict).all())
@@ -186,9 +190,10 @@ def hit_rate(db: Session, user_id: str, persona_id: str = None) -> dict:
     unknown = int(counts.get("unknown", 0))
     decided = hit + partial + miss  # unknown 不计入分母
 
-    total_judgments = (
-        db.query(func.count(Judgment.id)).filter(Judgment.user_id == user_id).scalar() or 0
-    )
+    total_q = db.query(func.count(Judgment.id))
+    if user_id is not None:
+        total_q = total_q.filter(Judgment.user_id == user_id)
+    total_judgments = total_q.scalar() or 0
 
     rate = None
     if decided > 0:
@@ -216,8 +221,14 @@ def hit_rate(db: Session, user_id: str, persona_id: str = None) -> dict:
     }
 
 
-def persona_leaderboard(db: Session, user_id: str, limit: int = 20) -> List[dict]:
-    """各人格的历史命中率排行——"哪个人格的判断最值得听"。"""
+def persona_leaderboard(db: Session, user_id: Optional[str], limit: int = 20) -> List[dict]:
+    """各人格的历史命中率排行——"哪个人格的判断最值得听"。
+
+    user_id=None 时跨全体用户聚合——用于后台管理面板的全局人格排行。
+    """
+    filters = [Judgment.persona_id.isnot(None), Outcome.verdict != "unknown"]
+    if user_id is not None:
+        filters.append(Judgment.user_id == user_id)
     rows = (
         db.query(
             Judgment.persona_id,
@@ -226,11 +237,7 @@ def persona_leaderboard(db: Session, user_id: str, limit: int = 20) -> List[dict
             func.sum(case((Outcome.verdict == "partial", 1), else_=0)).label("partials"),
         )
         .join(Outcome, Outcome.judgment_id == Judgment.id)
-        .filter(
-            Judgment.user_id == user_id,
-            Judgment.persona_id.isnot(None),
-            Outcome.verdict != "unknown",
-        )
+        .filter(*filters)
         .group_by(Judgment.persona_id)
         .order_by(func.count(Outcome.id).desc())
         .limit(limit)

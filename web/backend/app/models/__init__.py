@@ -3,7 +3,18 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List as TypingList
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -124,6 +135,9 @@ class User(Base):
     display_name = Column(String, nullable=True)
     plan = Column(String, default="free", nullable=False)  # free | pro | ...（计费用）
     is_active = Column(Boolean, default=True, nullable=False)
+    # 游客身份：CDK 免登录兑换时自动签发（合成邮箱 + 不可登录的随机口令）。
+    # 是真实 User 行——配额/key/评审归属全部复用既有逻辑，只是没有可登录的凭据。
+    is_guest = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     api_keys = relationship("UserApiKey", back_populates="user", cascade="all, delete-orphan")
@@ -136,7 +150,11 @@ class UserApiKey(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
-    provider = Column(String, default="anthropic", nullable=False)  # anthropic|openai|deepseek|ollama
+    provider = Column(String, default="anthropic", nullable=False)  # anthropic | openai_compatible
+    # openai_compatible 档专用：具体模型名 + 自定义端点（DeepSeek/Kimi/通义千问/智谱GLM/Ollama…）。
+    # provider=anthropic 时通常留空，走人格分级选型（见 select_model）；显式填了则覆盖分级。
+    model = Column(String, nullable=True)
+    api_base = Column(String, nullable=True)
     key_ciphertext = Column(Text, nullable=False)
     key_masked = Column(String, nullable=False)  # 仅供前端回显
     is_active = Column(Boolean, default=True, nullable=False)
@@ -279,3 +297,74 @@ class PlatformSetting(Base):
     key = Column(String, primary_key=True)
     value = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# CDK 兑换码
+#
+# 后台批量生成 → 分发给用户 → 免登录兑换获得评审次数（credits）。
+# 次数只对"服务端垫付 key"的评审生效（BYOK 本来就不限量，见 quota_service）。
+# 余额不存 users 表：匿名/游客/注册用户统一走 CreditLedger 流水求和，
+# 与 UsageRecord 同一设计哲学——事实源是流水，不是可变计数器。
+# ---------------------------------------------------------------------------
+
+
+class CdkCode(Base):
+    """一个兑换码。max_uses 允许同一码发给多人（如活动通用码），
+    但同一用户对同一码只能兑一次（CdkRedemption 唯一约束兜底）。"""
+
+    __tablename__ = "cdk_codes"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    code = Column(String, unique=True, index=True, nullable=False)
+    credits = Column(Integer, nullable=False)             # 每次兑换发放的评审次数
+    max_uses = Column(Integer, default=1, nullable=False)  # 可被多少个不同用户兑换
+    used_count = Column(Integer, default=0, nullable=False)
+    expires_at = Column(DateTime, nullable=True)           # NULL = 永不过期
+    is_disabled = Column(Boolean, default=False, nullable=False)
+    batch_id = Column(String, index=True, nullable=True)   # 同一次生成的批次号
+    note = Column(String, nullable=True)                   # 用途备注（如"首发活动"）
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    redemptions = relationship("CdkRedemption", back_populates="cdk_code", cascade="all, delete-orphan")
+
+
+class CdkRedemption(Base):
+    """一次兑换记录。(code_id, user_id) 唯一——同一人不能重复兑同一码。"""
+
+    __tablename__ = "cdk_redemptions"
+    __table_args__ = (UniqueConstraint("code_id", "user_id", name="uq_cdk_code_user"),)
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    code_id = Column(String, ForeignKey("cdk_codes.id"), index=True, nullable=False)
+    user_id = Column(String, index=True, nullable=False)
+    credits = Column(Integer, nullable=False)  # 兑换时的发放量快照（码后来改了也不影响历史）
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    cdk_code = relationship("CdkCode", back_populates="redemptions")
+
+
+class CreditLedger(Base):
+    """评审次数流水：+ 为发放（兑换），- 为消耗（超出套餐限额时垫一次）。
+    余额 = SUM(delta)。只增不改，天然可审计。"""
+
+    __tablename__ = "credit_ledger"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, index=True, nullable=False)
+    delta = Column(Integer, nullable=False)
+    reason = Column(String, nullable=False)  # cdk_redeem | review
+    ref_id = Column(String, nullable=True)   # code_id 或 review 相关标识
+    created_at = Column(DateTime, index=True, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class AdminAuditLog(Base):
+    """管理员操作审计流水——谁在何时改了哪个配置/套餐/平台 Key。只增不改。"""
+
+    __tablename__ = "admin_audit_log"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    action = Column(String, index=True, nullable=False)  # 如 setting.update / plan.override / server_key.set
+    target = Column(String, nullable=True)  # 被改动对象，如 setting key、plan id
+    detail = Column(Text, nullable=True)  # JSON 字符串，记录变更前后的值
+    created_at = Column(DateTime, index=True, default=lambda: datetime.now(timezone.utc), nullable=False)

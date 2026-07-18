@@ -20,6 +20,11 @@ from app.models import PlatformSetting
 # 键 -> (类型转换函数, 描述, 取值范围校验)
 ADJUSTABLE: Dict[str, dict] = {
     "quota_enabled": {"cast": bool, "label": "配额开关"},
+    "quota_mode": {
+        "cast": str,
+        "label": "配额模式（plan=套餐日限 / credits=纯CDK次数制，用完即止）",
+        "choices": ("plan", "credits"),
+    },
     "quota_free_reviews_per_day": {"cast": int, "label": "免费档每日评审次数上限", "min": 0},
     "quota_free_cost_usd_per_day": {"cast": float, "label": "免费档每日成本上限（美元）", "min": 0},
     "ratelimit_enabled": {"cast": bool, "label": "限流开关"},
@@ -103,6 +108,7 @@ def get_all_effective(db: Session) -> list:
     """后台面板用：每一项的当前有效值、是否被覆盖、env 默认值、说明。"""
     env_defaults = {
         "quota_enabled": settings.quota_enabled,
+        "quota_mode": settings.quota_mode,
         "quota_free_reviews_per_day": settings.quota_free_reviews_per_day,
         "quota_free_cost_usd_per_day": settings.quota_free_cost_usd_per_day,
         "ratelimit_enabled": settings.ratelimit_enabled,

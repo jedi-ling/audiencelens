@@ -162,6 +162,8 @@ class PersonaService:
         'vr-immersive': 'platform',
         'accessibility': 'special',
         'educational-serious': 'special',
+        'general-consumer': 'general',
+        'startup-panel': 'general',
     }
 
     @classmethod
@@ -330,22 +332,19 @@ class PersonaService:
 
     @classmethod
     def get_all_personas(cls) -> List[dict]:
+        """聚合视图只取 src/personas/*.yaml 这一份正主数据。
+
+        .claude/agents 与 .trae 下的 persona 是开发工具链的镜像副本，id 与正主
+        完全重复——混进聚合列表会让前端拿到重复 id（React key 冲突，列表 diff
+        直接错乱，角色页的包筛选因此失效）。按包名直连的
+        get_personas_by_pack() 仍保留对这两个来源的回落，供工具链调试用。
+        """
         all_personas = []
         for pack_id, personas in cls.load_all_personas().items():
             for p in personas:
                 p_copy = dict(p)
                 p_copy["_pack"] = pack_id
                 p_copy["source"] = p_copy.get("source", "yaml")
-                all_personas.append(p_copy)
-        for pack_id, personas in cls.load_agents_from_md().items():
-            for p in personas:
-                p_copy = dict(p)
-                p_copy["_pack"] = pack_id
-                all_personas.append(p_copy)
-        for pack_id, personas in cls.load_trae_personas().items():
-            for p in personas:
-                p_copy = dict(p)
-                p_copy["_pack"] = pack_id
                 all_personas.append(p_copy)
         return all_personas
 
@@ -403,26 +402,8 @@ class PersonaService:
                     "category": cls.PACK_CATEGORY_MAP.get(pack_id, 'special'),
                 })
 
-        agents = cls.load_agents_from_md()
-        for pack_id, personas in agents.items():
-            cls._packs_cache.append({
-                "panel_id": pack_id,
-                "name": "Claude Agent Personas",
-                "description": "从 .claude/agents/*.md 加载的 persona 定义",
-                "persona_count": len(personas),
-                "category": "agent",
-            })
-
-        trae = cls.load_trae_personas()
-        for pack_id, personas in trae.items():
-            cls._packs_cache.append({
-                "panel_id": pack_id,
-                "name": f"Trae Persona Pack: {pack_id}",
-                "description": "从 .trae/skills/synthetic-playtest/personas/*.yaml 加载的 persona 定义",
-                "persona_count": len(personas),
-                "category": "trae",
-            })
-
+        # 注：不把 .claude/agents / .trae 的镜像副本列进包清单——
+        # 它们的 panel_id 与正主 yaml 完全重复，会让前端出现同 id 的重复包。
         return cls._packs_cache
 
     @classmethod

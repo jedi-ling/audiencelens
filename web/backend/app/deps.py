@@ -116,9 +116,13 @@ def rate_limit(scope: str = "default", limit: int = None, window: float = 60.0):
 
 
 def resolve_llm_key(
-    identity: Identity = Depends(current_identity), db: Session = Depends(get_db)
+    identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
 ):
-    """解析本次调用该用谁的 key —— 无可用 key 时抛 428 LLMKeyMissing。"""
+    """解析本次调用该用谁的 key —— 无可用 key 时抛 428 LLMKeyMissing。
+
+    用 optional_identity 而非 current_identity：渐进式认证下匿名必须也能发评审
+    （"体验机会"），登录只是让 key 归属和配额落到真实身份而不是共享的 anonymous 桶。
+    """
     return key_service.resolve_key(db, identity.user_id)
 
 

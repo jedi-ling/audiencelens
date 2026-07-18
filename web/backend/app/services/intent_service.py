@@ -30,7 +30,22 @@ VALID_TASK_TYPES = [
     "kickstarter_review",
     "localization_review",
     "discord_community_review",
+    # 通用产品向任务类型（不限游戏）——见 src/personas/general-consumer.yaml
+    "product_feedback_review",
+    "pricing_page_review",
+    "onboarding_review",
+    # 创业项目评审（BP/路演/申报表）——见 src/personas/startup-panel.yaml
+    "pitch_review",
 ]
+
+# 通用任务类型没有命中任何 PACK_KEYWORDS 时的默认人格包——
+# 不能落回 game-core，否则"评一下定价页"这种非游戏请求会被硬塞游戏向人格。
+DEFAULT_PACK_BY_TASK_TYPE = {
+    "product_feedback_review": "general-consumer",
+    "pricing_page_review": "general-consumer",
+    "onboarding_review": "general-consumer",
+    "pitch_review": "startup-panel",
+}
 
 VALID_MODES = ["quick", "standard", "full"]
 
@@ -39,13 +54,20 @@ TASK_KEYWORDS = {
     "steam_page_review": ["steam", "商店页", "store", "页面", "愿望单", "标签", "封面", "宣传图"],
     "demo_first_play": ["demo", "试玩", "首玩", "上手", "新手引导", "教程", "前15分钟", "前 15 分钟"],
     "concept_review": ["概念", "点子", "创意", "核心循环", "玩法设计", "立项", "idea"],
-    "monetization_review": ["付费", "定价", "内购", "氪金", "价格", "月卡", "抽卡", "变现", "付费墙"],
+    # 注意："定价页"不放在这里——那是通用的 pricing_page_review 关键词，
+    # 两者都用"定价"会打平分，而 monetization_review 定义更早、平局时总赢，
+    # 导致非游戏的定价页请求被误判成游戏内购设计评审。
+    "monetization_review": ["付费", "内购", "氪金", "价格", "月卡", "抽卡", "变现", "付费墙"],
     "looking_for_party_post": ["组队", "招募", "找队友", "招人"],
     "update_announcement_review": ["更新公告", "版本更新", "patch", "补丁", "更新日志"],
     "devlog_review": ["开发日志", "devlog", "开发者日志"],
     "kickstarter_review": ["众筹", "kickstarter", "回报档位", "众筹页"],
     "localization_review": ["本地化", "翻译", "汉化", "localization", "多语言"],
     "discord_community_review": ["discord", "社区运营", "社群", "频道"],
+    "product_feedback_review": ["产品反馈", "用户反馈", "反馈收集", "feedback"],
+    "pricing_page_review": ["定价页", "定价方案", "订阅价格", "pricing", "套餐价格"],
+    "onboarding_review": ["引导流程", "onboarding", "首次使用体验", "注册后引导", "产品引导"],
+    "pitch_review": ["bp", "路演", "商业计划书", "创业项目", "融资", "pitch", "孵化器", "申报表", "项目申报"],
 }
 
 MODE_KEYWORDS = {
@@ -61,6 +83,8 @@ PACK_KEYWORDS = {
     "competitive-esport": ["电竞", "竞技", "排位", "对战"],
     "family-casual": ["家庭", "亲子", "休闲", "派对"],
     "indie-creative": ["独立游戏", "indie", "艺术向"],
+    "general-consumer": ["saas", "企业软件", "toB", "toC", "定价页", "产品反馈", "app", "网站"],
+    "startup-panel": ["投资人", "vc", "路演", "孵化器", "商业计划书", "融资"],
 }
 
 
@@ -125,6 +149,8 @@ def parse_intent_heuristic(text: str) -> IntentResult:
     pack = "game-core"
     if pack_scores:
         pack = max(pack_scores.items(), key=lambda kv: kv[1])[0]
+    elif task_type in DEFAULT_PACK_BY_TASK_TYPE:
+        pack = DEFAULT_PACK_BY_TASK_TYPE[task_type]
 
     needs_clarification = task_type is None or confidence < 0.5
     question = None
@@ -155,8 +181,11 @@ _LLM_PROMPT = """你是评审系统的意图解析器。把用户的一句话映
 {task_types}
 
 可选 mode：quick（快速扫一眼）| standard（默认）| full（全面深入/要拍板）
-可选 persona_pack：game-core（默认）| mobile-f2p | vr-immersive | accessibility |
-  educational-serious | competitive-esport | family-casual | indie-creative
+可选 persona_pack：game-core（游戏类任务默认）| mobile-f2p | vr-immersive | accessibility |
+  educational-serious | competitive-esport | family-casual | indie-creative |
+  general-consumer（非游戏的通用产品任务用这个，如 product_feedback_review /
+  pricing_page_review / onboarding_review）|
+  startup-panel（创业项目/BP/路演评审 pitch_review 用这个——投资人/尽调/孵化器视角）
 
 用户输入：
 {text}
@@ -195,7 +224,7 @@ def parse_intent_llm(text: str, api_key: str) -> Optional[IntentResult]:
         if task_type not in VALID_TASK_TYPES:
             task_type = None
         mode = data.get("mode") if data.get("mode") in VALID_MODES else "standard"
-        pack = data.get("persona_pack") or "game-core"
+        pack = data.get("persona_pack") or DEFAULT_PACK_BY_TASK_TYPE.get(task_type, "game-core")
         confidence = float(data.get("confidence") or 0.0)
 
         return IntentResult(

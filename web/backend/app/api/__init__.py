@@ -29,7 +29,9 @@ from app.schemas import (
     SkillTypeResponse,
     TaskTypeResponse,
 )
-from app.services import MaterialExtractor, PersonaService, ReviewService
+from app.db import get_db
+from app.deps import Identity, optional_identity
+from app.services import MaterialExtractor, PersonaService, ReviewService, report_gating
 from app.services.evaluation_service import EvaluationService
 from app.services.ethics_service import EthicsService
 from app.websocket import manager
@@ -109,13 +111,20 @@ def delete_review(review_id: str, session: Session = Depends(get_session)):
 
 
 @router.get("/reviews/{review_id}/report", response_model=ReportResponse)
-def get_report(review_id: str, session: Session = Depends(get_session)):
+def get_report(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
     svc = ReviewService(session)
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    report_json = review.report_json
+    if identity.is_anonymous:
+        report_json = report_gating.gate_report_for_anonymous(report_json)
     return ReportResponse(
-        report_json=review.report_json,
+        report_json=report_json,
         report_markdown=review.report_markdown,
         calibration=review.calibration,
     )
