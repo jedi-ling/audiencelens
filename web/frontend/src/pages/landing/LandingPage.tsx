@@ -75,6 +75,17 @@ export default function LandingPage() {
     })
     cleanups.push(() => chipHandlers.forEach(([c, h]) => c.removeEventListener('click', h)))
 
+    // 首页直接对话：单行输入条提交后带着内容跳去 /ask（SPA 内跳转，不刷新）
+    const heroAsk = root.querySelector<HTMLFormElement>('#heroAsk')
+    const heroAskInput = root.querySelector<HTMLInputElement>('#heroAskInput')
+    const onHeroAskSubmit = (e: Event) => {
+      e.preventDefault()
+      const val = (heroAskInput?.value || '').trim()
+      navigate(val ? '/ask?q=' + encodeURIComponent(val) : '/ask')
+    }
+    heroAsk?.addEventListener('submit', onHeroAskSubmit)
+    cleanups.push(() => heroAsk?.removeEventListener('submit', onHeroAskSubmit))
+
     // 滚动渐显
     const io = new IntersectionObserver(
       (entries) => {

@@ -95,6 +95,18 @@
   padding:6px 14px;background:rgba(255,255,255,.015);cursor:pointer;transition:all .25s}
 .al-landing .chip:hover{border-color:rgba(212,169,78,.45);color:var(--gold);background:var(--gold-soft)}
 .al-landing .hero-cta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:40px}
+.al-landing .hero-ask{display:flex;align-items:center;gap:8px;max-width:480px;margin:0 0 22px;
+  background:var(--bg-card);border:1px solid var(--line-strong);border-radius:12px;padding:5px 6px 5px 16px;
+  box-shadow:0 12px 30px rgba(0,0,0,.3);transition:border-color .2s}
+.al-landing .hero-ask:focus-within{border-color:rgba(212,169,78,.5)}
+.al-landing .hero-ask input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:.88rem;
+  font-family:inherit;min-width:0}
+.al-landing .hero-ask input::placeholder{color:var(--text-mute)}
+.al-landing .hero-ask button{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:.82rem;font-weight:600;
+  color:#14140f;background:var(--gold);border:none;border-radius:8px;padding:9px 15px;cursor:pointer;
+  transition:background .2s}
+.al-landing .hero-ask button:hover{background:var(--gold-bright)}
+@media(max-width:920px){.al-landing .hero-ask{margin-left:auto;margin-right:auto}}
 .al-landing .proof{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--text-mute);font-size:.86rem}
 .al-landing .avatars{display:flex}
 .al-landing .avatars span{width:30px;height:30px;border-radius:50%;border:2px solid var(--bg);margin-left:-9px;
