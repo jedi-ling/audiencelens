@@ -17,7 +17,7 @@ interface MouseState {
   active: boolean;
 }
 
-const COLORS = ['#00ff88', '#00d4ff', '#ff6b35'];
+const COLORS = ['#D4A94E', '#4ECDC4', '#ff6b35'];
 const COLOR_WEIGHTS = [0.6, 0.3, 0.1];
 
 function getRandomColor(): string {

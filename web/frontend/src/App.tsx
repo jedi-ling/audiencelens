@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router'
 import { lazy, Suspense } from 'react'
 import Layout from '@/components/Layout'
 
+const LandingPage = lazy(() => import('@/pages/landing/LandingPage'))
 const HomePage = lazy(() => import('@/pages/HomePage'))
 const CreateReviewPage = lazy(() => import('@/pages/CreateReviewPage'))
 const ReviewProgressPage = lazy(() => import('@/pages/ReviewProgressPage'))
@@ -15,6 +16,8 @@ const SkillSelectPage = lazy(() => import('@/pages/SkillSelectPage'))
 const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
 const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
+const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 
 export default function App() {
   return (
@@ -22,7 +25,10 @@ export default function App() {
       <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
+            {/* 营销落地页作为首页，与 app 共用同一套导航/页脚（一套导航全站通用） */}
+            <Route path="/" element={<LandingPage />} />
+            {/* 旧的 app 内首页保留在 /home，便于回退对照 */}
+            <Route path="/home" element={<HomePage />} />
             {/* 对话式入口：大白话 → 意图解析 → 发起评审 */}
             <Route path="/ask" element={<AskPage />} />
             {/* 判断复利闭环：预测留档 + 回填验证 + 命中率 */}
@@ -34,6 +40,8 @@ export default function App() {
             <Route path="/task-types" element={<TaskTypesPage />} />
             <Route path="/tutorial" element={<TutorialPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/skills" element={<SkillSelectPage />} />
             <Route path="/evaluations/:id" element={<EvaluationPage />} />

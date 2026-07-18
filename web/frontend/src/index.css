@@ -1,54 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+/*
+ * 统一调色板 —— 与营销落地页（REMOVED/landing-page）同一套"金色 · 炭黑"高级规格。
+ * 品牌主色由原霓虹绿改为暖金 #D4A94E，次色由青改为薄荷 #4ECDC4，背景/文字换暖调。
+ * 语义 token 名（neon-green / cyan）保持不变，全站沿用即自动换色，无需逐组件改。
+ * 字体走系统栈（含中文回退），不再依赖 Google Fonts CDN（国内加载慢/被墙）。
+ */
 @theme {
-  --color-bg-primary: #0a0a0f;
-  --color-bg-secondary: #12121a;
-  --color-bg-card: #16161f;
-  --color-bg-card-hover: #1c1c28;
-  --color-border: #2a2a3a;
-  --color-border-hover: #3a3a4f;
-  --color-neon-green: #00ff88;
-  --color-neon-green-dim: #00cc6a;
-  --color-cyan: #00d4ff;
-  --color-cyan-dim: #00a8cc;
-  --color-warm-orange: #ff6b35;
-  --color-warm-orange-dim: #cc5529;
-  --color-text-primary: #e8e8f0;
-  --color-text-secondary: #8888a0;
-  --color-text-muted: #55556a;
-  --color-severity-critical: #ff3355;
-  --color-severity-high: #ff6b35;
-  --color-severity-medium: #ffbb33;
-  --color-severity-low: #00d4ff;
-  --color-status-waiting: #55556a;
-  --color-status-running: #00d4ff;
-  --color-status-completed: #00ff88;
-  --color-status-failed: #ff3355;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-sans: 'Noto Sans SC', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-body: 'Noto Sans SC', sans-serif;
+  --color-bg-primary: #0f0f12;
+  --color-bg-secondary: #16161a;
+  --color-bg-card: #1a1a1f;
+  --color-bg-card-hover: #202027;
+  --color-border: #26262e;
+  --color-border-hover: #37373f;
+  /* 品牌主色：暖金（token 名沿用 neon-green，全站引用不变） */
+  --color-neon-green: #D4A94E;
+  --color-neon-green-dim: #b8923e;
+  /* 次色：薄荷（token 名沿用 cyan） */
+  --color-cyan: #4ECDC4;
+  --color-cyan-dim: #3bb3ab;
+  --color-warm-orange: #e0913c;
+  --color-warm-orange-dim: #b8742c;
+  --color-text-primary: #ECE9E2;
+  --color-text-secondary: #9a9aa5;
+  --color-text-muted: #6b6b76;
+  --color-severity-critical: #ff5a5a;
+  --color-severity-high: #e0913c;
+  --color-severity-medium: #e8c36b;
+  --color-severity-low: #4ECDC4;
+  --color-status-waiting: #6b6b76;
+  --color-status-running: #4ECDC4;
+  --color-status-completed: #D4A94E;
+  --color-status-failed: #ff5a5a;
+  --font-mono: "SF Mono", ui-monospace, "Cascadia Code", "Roboto Mono", "JetBrains Mono", monospace;
+  --font-sans: "Inter", system-ui, -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-display: "Inter", system-ui, -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 
   /*
    * shadcn 风格语义别名 —— Ask/Ledger/Settings 页面按这套命名写的
-   * (bg-card / bg-primary / text-muted-foreground 等)，补上后即刻生效，
-   * 全部映射回暗色霓虹调色板，与其余页面视觉一致。
+   * (bg-card / bg-primary / text-muted-foreground 等)，全部映射到同一套金色调色板。
    */
-  --color-background: #0a0a0f;
-  --color-foreground: #e8e8f0;
-  --color-card: #16161f;
-  --color-card-foreground: #e8e8f0;
-  --color-primary: #00ff88;
-  --color-primary-foreground: #0a0a0f;
-  --color-secondary: #12121a;
-  --color-secondary-foreground: #e8e8f0;
-  --color-muted: #12121a;
-  --color-muted-foreground: #8888a0;
-  --color-accent: #1c1c28;
-  --color-accent-foreground: #00ff88;
-  --color-destructive: #ff3355;
-  --color-destructive-foreground: #e8e8f0;
+  --color-background: #0f0f12;
+  --color-foreground: #ECE9E2;
+  --color-card: #1a1a1f;
+  --color-card-foreground: #ECE9E2;
+  --color-primary: #D4A94E;
+  --color-primary-foreground: #14140f;
+  --color-secondary: #16161a;
+  --color-secondary-foreground: #ECE9E2;
+  --color-muted: #16161a;
+  --color-muted-foreground: #9a9aa5;
+  --color-accent: #202027;
+  --color-accent-foreground: #D4A94E;
+  --color-destructive: #ff5a5a;
+  --color-destructive-foreground: #ECE9E2;
 }
 
 /*
@@ -79,11 +85,11 @@ html, body {
 }
 
 .glow-green {
-  box-shadow: 0 0 15px rgba(0, 255, 136, 0.3), 0 0 30px rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 15px rgba(212,169,78, 0.3), 0 0 30px rgba(212,169,78, 0.1);
 }
 
 .glow-cyan {
-  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 15px rgba(78,205,196, 0.3), 0 0 30px rgba(78,205,196, 0.1);
 }
 
 .glow-orange {
@@ -91,16 +97,16 @@ html, body {
 }
 
 .text-glow-green {
-  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.2);
+  text-shadow: 0 0 10px rgba(212,169,78, 0.5), 0 0 20px rgba(212,169,78, 0.2);
 }
 
 .text-glow-cyan {
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.2);
+  text-shadow: 0 0 10px rgba(78,205,196, 0.5), 0 0 20px rgba(78,205,196, 0.2);
 }
 
 .border-glow-green {
   border-color: var(--color-neon-green);
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2), inset 0 0 10px rgba(0, 255, 136, 0.05);
+  box-shadow: 0 0 10px rgba(212,169,78, 0.2), inset 0 0 10px rgba(212,169,78, 0.05);
 }
 
 .animate-pulse-glow {
@@ -277,8 +283,8 @@ html, body {
 /* 霓虹网格底纹（用于板块背景，配合 mask 渐隐） */
 .grid-lines {
   background-image:
-    linear-gradient(rgba(0, 255, 136, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 136, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(212,169,78, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,169,78, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 

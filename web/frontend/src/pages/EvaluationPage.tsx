@@ -130,8 +130,8 @@ export default function EvaluationPage() {
               <Radar
                 name="评分"
                 dataKey="score"
-                stroke="#00d4ff"
-                fill="#00d4ff"
+                stroke="#4ECDC4"
+                fill="#4ECDC4"
                 fillOpacity={0.2}
                 strokeWidth={2}
               />

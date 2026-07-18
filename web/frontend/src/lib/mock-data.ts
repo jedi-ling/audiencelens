@@ -1,4 +1,4 @@
-import { Lightbulb, Settings, BookOpen, Target, Coins, Store, Rocket, MessageCircle, Globe, Users, FolderOpen, TrendingUp, Smartphone, Volume2, Film, LayoutDashboard } from 'lucide-react'
+import { Lightbulb, Settings, BookOpen, Target, Coins, Store, Rocket, MessageCircle, Globe, Users, FolderOpen, TrendingUp, Smartphone, Volume2, Film, LayoutDashboard, MessageSquareText, Tag, Compass, Briefcase } from 'lucide-react'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
 export type PrimaryStance = 'advocate' | 'neutral' | 'skeptic' | 'blocker'
@@ -346,6 +346,10 @@ export const TASK_TYPES: TaskType[] = [
   { id: 'social_media_post', name: '社媒帖评审', description: '传播性、互动潜力、品牌调性', icon: '📣', category: 'community', IconComponent: Volume2, stance_enum: ['会互动', '划走', '观望'], score_dimensions: ['shareability', 'engagement_potential', 'brand_alignment'] },
   { id: 'video_ad_review', name: '视频广告评审', description: '前3秒钩子、信息密度、CTA', icon: '🎬', category: 'operations', IconComponent: Film, stance_enum: ['会看完', '跳过', '观望'], score_dimensions: ['hook_strength', 'message_clarity', 'cta_effectiveness'] },
   { id: 'landing_page_review', name: '落地页评审', description: '转化路径、信任建立、首屏钩子', icon: '📄', category: 'operations', IconComponent: LayoutDashboard, stance_enum: ['会注册', '离开', '观望'], score_dimensions: ['conversion_clarity', 'trust_building', 'first_impression'] },
+  { id: 'product_feedback_review', name: '产品反馈评审', description: '通用产品反馈收集与解读，不限游戏', icon: '💬', category: 'product', IconComponent: MessageSquareText, stance_enum: ['有价值', '价值有限', '观望'], score_dimensions: ['clarity', 'actionability', 'coverage'] },
+  { id: 'pricing_page_review', name: '定价页评审', description: '定价分层、价值传达、信任信号，不限游戏', icon: '🏷️', category: 'product', IconComponent: Tag, stance_enum: ['会购买', '不会', '观望'], score_dimensions: ['value_for_money', 'clarity', 'trust_signals'] },
+  { id: 'onboarding_review', name: '新手引导评审', description: '首次使用体验、上手摩擦，不限游戏', icon: '🧭', category: 'product', IconComponent: Compass, stance_enum: ['顺利上手', '中途放弃', '观望'], score_dimensions: ['onboarding_friendliness', 'clarity', 'time_to_value'] },
+  { id: 'pitch_review', name: '创业项目评审', description: 'BP/路演/申报表，投资人与尽调视角，不限行业', icon: '💼', category: 'product', IconComponent: Briefcase, stance_enum: ['值得投入', '不值得', '观望'], score_dimensions: ['clarity', 'trust_signals', 'differentiation'] },
 ]
 
 export interface TaskTypeCategory {
@@ -366,12 +370,14 @@ export const TASK_TYPE_CATEGORIES: TaskTypeCategory[] = [
   { id: 'development', name: '开发阶段', description: '游戏开发各阶段的评审', icon: FolderOpen },
   { id: 'operations', name: '运营阶段', description: '发行运营相关评审', icon: TrendingUp },
   { id: 'community', name: '社区阶段', description: '社区与玩家互动评审', icon: Users },
+  { id: 'product', name: '通用产品', description: '不限游戏的通用产品评审', icon: Compass },
 ]
 
 export const PACK_CATEGORIES: PackCategory[] = [
   { id: 'player-type', name: '玩家类型', description: '按玩家特征分类', icon: '🎮' },
   { id: 'platform', name: '平台特性', description: '按平台/设备分类', icon: '🖥️' },
   { id: 'special', name: '特殊用途', description: '特定场景用途', icon: '⭐' },
+  { id: 'general', name: '通用用户', description: '不限游戏的通用用户角度', icon: '🧑‍💼' },
 ]
 
 export const PERSONA_PACKS: PersonaPack[] = [
@@ -383,6 +389,8 @@ export const PERSONA_PACKS: PersonaPack[] = [
   { panel_id: 'vr-immersive', name: 'VR沉浸', description: 'VR/沉浸式体验爱好者', persona_count: 7, category: 'platform' },
   { panel_id: 'educational-serious', name: '教育严肃', description: '教育与严肃游戏使用者', persona_count: 5, category: 'special' },
   { panel_id: 'indie-creative', name: '独立创意', description: '独立游戏爱好者与创作者', persona_count: 9, category: 'player-type' },
+  { panel_id: 'general-consumer', name: '通用消费者', description: '不限游戏的通用产品用户视角，含价值买家、怀疑评论者、B2B决策者等', persona_count: 8, category: 'general' },
+  { panel_id: 'startup-panel', name: '创业评审团', description: '投资人/尽调/孵化器筛选官视角，评BP、路演材料、项目申报表', persona_count: 8, category: 'general' },
 ]
 
 function generateBehaviorProfile(): Record<string, number> {
@@ -598,49 +606,49 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     type: 'synthetic_playtest',
     name: '合成试玩',
     description_zh: '模拟真实玩家试玩体验，从上手到深度体验全流程评估，发现设计盲点与体验断裂',
-    icon: '🎮',
+    icon: '/skills/skill-game.png',
     task_types: ['concept_review', 'demo_first_play', 'devlog_review', 'update_announcement_review'],
     persona_count: 6,
     use_cases: ['新概念验证', 'Demo首玩测试', '版本更新体验评估', '核心循环验证'],
-    color: 'text-orange-400',
-    bg: 'bg-orange-400/10',
-    border: 'border-orange-400/30',
+    color: 'text-neon-green',
+    bg: 'bg-neon-green/10',
+    border: 'border-neon-green/30',
   },
   {
     type: 'audience_panel',
     name: '受众面板',
     description_zh: '组建目标受众虚拟焦点小组，收集不同人群的真实反应与偏好，量化市场接受度',
-    icon: '👥',
+    icon: '/skills/skill-audience.png',
     task_types: ['steam_page_review', 'kickstarter_review', 'app_store_review', 'landing_page_review', 'social_media_post', 'video_ad_review'],
     persona_count: 8,
     use_cases: ['商店页优化', '众筹页评估', '广告效果预测', '落地页转化分析'],
-    color: 'text-blue-400',
-    bg: 'bg-blue-400/10',
-    border: 'border-blue-400/30',
+    color: 'text-neon-green',
+    bg: 'bg-neon-green/10',
+    border: 'border-neon-green/30',
   },
   {
     type: 'red_team_audience',
     name: '红队对抗',
     description_zh: '用对抗性视角主动攻击产品弱点，模拟最挑剔的用户和恶意场景，暴露隐藏风险',
-    icon: '🔴',
+    icon: '/skills/skill-redteam.png',
     task_types: ['monetization_review', 'discord_community_review', 'localization_review', 'update_announcement_review'],
     persona_count: 5,
     use_cases: ['付费模型压力测试', '社区危机预演', '本地化文化风险', '公关危机模拟'],
-    color: 'text-red-400',
-    bg: 'bg-red-400/10',
-    border: 'border-red-400/30',
+    color: 'text-neon-green',
+    bg: 'bg-neon-green/10',
+    border: 'border-neon-green/30',
   },
   {
     type: 'persona_generate',
     name: '人格生成',
     description_zh: '根据产品特征自动生成定制化人格，创建专属评审角色，覆盖特殊用户群体',
-    icon: '✨',
+    icon: '/skills/skill-persona.png',
     task_types: ['concept_review', 'demo_first_play', 'steam_page_review', 'kickstarter_review', 'discord_community_review'],
     persona_count: 10,
     use_cases: ['特定人群定制', '边缘用户覆盖', '跨文化人格', '特殊需求用户'],
-    color: 'text-purple-400',
-    bg: 'bg-purple-400/10',
-    border: 'border-purple-400/30',
+    color: 'text-neon-green',
+    bg: 'bg-neon-green/10',
+    border: 'border-neon-green/30',
   },
 ]
 

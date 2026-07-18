@@ -14,6 +14,12 @@ export type TaskType =
   | 'kickstarter_review'
   | 'localization_review'
   | 'discord_community_review'
+  // 通用产品向任务类型（不限游戏）
+  | 'product_feedback_review'
+  | 'pricing_page_review'
+  | 'onboarding_review'
+  // 创业项目评审（BP/路演/申报表）
+  | 'pitch_review'
 
 export type ReviewMode = 'quick' | 'standard' | 'full'
 
@@ -26,6 +32,8 @@ export type PersonaPack =
   | 'vr-immersive'
   | 'accessibility'
   | 'educational-serious'
+  | 'general-consumer'
+  | 'startup-panel'
 
 /** 后端统一错误契约：{ error: { code, message, detail? } } */
 export type ApiErrorCode =
@@ -80,6 +88,8 @@ export interface Identity {
 
 export interface KeyInfo {
   provider: string
+  model: string | null
+  api_base: string | null
   masked: string
   last_used_at: string | null
 }
@@ -89,6 +99,36 @@ export interface KeyStatus {
   server_key_available: boolean
   keys: KeyInfo[]
 }
+
+/** 非 Anthropic 服务商预设——都遵循 OpenAI 兼容协议，见 src/runner/llm_client.py 同名表。 */
+export interface OpenAICompatiblePreset {
+  id: string
+  name: string
+  api_base: string
+  model: string
+}
+
+export const OPENAI_COMPATIBLE_PRESETS: OpenAICompatiblePreset[] = [
+  { id: 'openai', name: 'OpenAI', api_base: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  { id: 'deepseek', name: 'DeepSeek', api_base: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  { id: 'kimi', name: 'Kimi (月之暗面)', api_base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { id: 'qwen', name: '通义千问', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  { id: 'glm', name: '智谱 GLM', api_base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+  { id: 'ollama', name: 'Ollama 本地模型', api_base: 'http://localhost:11434/v1', model: 'llama3' },
+]
+
+export interface TestConnectionResult {
+  connected: boolean
+  model?: string
+  sample?: string
+  error?: string
+}
+
+/** 评审材料——文字进模板正文，图片单独转多模态内容块（见 llm_client.py）。
+ * 只有视觉能力模型才会真正"看"图；其余模型静默降级为纯文字，不报错阻断评审。 */
+export type Material =
+  | { type: 'text'; text: string }
+  | { type: 'image'; image_data: string; filename?: string }
 
 export interface IntentResult {
   task_type: TaskType | null
@@ -162,12 +202,26 @@ export interface Plan {
 
 export interface UsageSummary {
   quota_enabled: boolean
+  /** plan=套餐日限额；credits=纯 CDK 次数制（每次评审消耗 1 次，用完即止） */
+  quota_mode: 'plan' | 'credits'
   window: string
   reviews_used: number
   reviews_limit: number | null
   cost_usd_total: number
   cost_usd_on_server_key: number
   cost_usd_limit: number | null
+  /** CDK 次数余额：credits 模式下这就是全部额度；plan 模式下是日限用完后的加量 */
+  bonus_credits: number
+}
+
+/** POST /api/cdk/redeem 的响应。匿名兑换（认证开启）会附带游客身份 token——
+ * 前端必须 setToken 存下它，否则次数就找不回来了。 */
+export interface RedeemCdkResult {
+  credits_granted: number
+  balance: number
+  user_id: string
+  token?: string
+  guest?: boolean
 }
 
 // ---------- 判断复利闭环 ----------

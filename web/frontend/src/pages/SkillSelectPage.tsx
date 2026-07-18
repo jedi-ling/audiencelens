@@ -44,7 +44,14 @@ export default function SkillSelectPage() {
 
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl">{skill.icon}</span>
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neon-green/10 border border-neon-green/20">
+                    <img
+                      src={skill.icon}
+                      alt={skill.name}
+                      className="h-7 w-7 object-contain drop-shadow-[0_2px_8px_rgba(212,169,78,0.3)]"
+                      loading="lazy"
+                    />
+                  </span>
                   <div>
                     <h2 className={cn('text-xl font-bold font-display', skill.color)}>
                       {skill.name}

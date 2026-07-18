@@ -234,7 +234,7 @@ export default function HomePage() {
         <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
           <h1
             className="font-display text-4xl sm:text-5xl md:text-9xl font-bold text-gradient-green mb-4 md:mb-6 tracking-tight animate-hero-text"
-            style={{ animationDelay: '0.1s', textShadow: '0 0 20px rgba(0,255,136,0.2)' }}
+            style={{ animationDelay: '0.1s', textShadow: '0 0 20px rgba(212,169,78,0.2)' }}
           >
             AudienceLens
           </h1>
@@ -243,43 +243,44 @@ export default function HomePage() {
             className="text-lg sm:text-xl md:text-3xl text-cyan tracking-[0.1em] md:tracking-[0.15em] mb-3 md:mb-4 animate-hero-text"
             style={{ animationDelay: '0.3s' }}
           >
-            多代理合成玩家评审系统
+            多代理合成用户评审系统
           </p>
 
           <p
             className="font-mono text-[11px] sm:text-xs md:text-sm text-text-muted tracking-wide mb-4 md:mb-6 animate-hero-text"
             style={{ animationDelay: '0.4s' }}
           >
-            <span className="text-neon-green">{'>'}</span> 75 AI players argue about your game
-            <span className="text-warm-orange"> — before real players do.</span>
+            <span className="text-neon-green">{'>'}</span> 75 AI users argue about your product
+            <span className="text-warm-orange"> — before real users do.</span>
           </p>
 
           <p
             className="text-sm md:text-lg text-text-secondary max-w-2xl mx-auto mb-8 md:mb-12 animate-hero-text"
             style={{ animationDelay: '0.5s' }}
           >
-            一整支合成人格评审团独立评审你的游戏或产品，互相交叉质询、当场改票，
-            最后收敛出一份带证据的结构化裁决——定位于真人测试之前的预筛，而非替代真人研究。
+            一整支合成人格评审团独立评审你的产品——不只是游戏，页面文案、定价方案、
+            新手引导、产品概念都能评。互相交叉质询、当场改票，最后收敛出一份带证据的
+            结构化裁决——定位于真人测试之前的预筛，而非替代真人研究。
           </p>
 
           <p className="mx-auto mb-5 w-fit rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 font-mono text-[11px] text-neon-green">
-            CURRENT PILOT · 独立游戏 Steam 商店页上线前评审
+            MULTI-DOMAIN · 游戏 / 产品页面 / 定价方案 / 新手引导，说人话即可开评
           </p>
 
           <div style={{ animationDelay: '0.7s' }} className="animate-hero-text flex flex-wrap items-center justify-center gap-3">
             <Link
-              to="/review/new?task=steam_page_review"
-              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
+              to="/ask"
+              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,169,78,0.3)]"
             >
-              <Zap className="w-5 h-5" strokeWidth={1.25} />
-              评审 Steam 商店页
+              <MessageSquareText className="w-5 h-5" strokeWidth={1.25} />
+              开始对话评审
             </Link>
             <Link
-              to="/ask"
+              to="/task-types"
               className="inline-flex items-center gap-2 px-6 py-3 md:px-8 md:py-4 rounded-xl border border-border text-text-primary font-medium text-sm md:text-base hover:border-neon-green/40 hover:text-neon-green transition-colors"
             >
-              <MessageSquareText className="w-4 h-4" strokeWidth={1.25} />
-              其他评审场景
+              <Zap className="w-4 h-4" strokeWidth={1.25} />
+              看看能评审什么
             </Link>
           </div>
         </div>
@@ -362,13 +363,13 @@ export default function HomePage() {
                   text: 'text-neon-green',
                   bg: 'bg-neon-green/10',
                   border: 'border-neon-green/20',
-                  glow: 'group-hover:shadow-[0_0_30px_rgba(0,255,136,0.15)]',
+                  glow: 'group-hover:shadow-[0_0_30px_rgba(212,169,78,0.15)]',
                 },
                 'cyan': {
                   text: 'text-cyan',
                   bg: 'bg-cyan/10',
                   border: 'border-cyan/20',
-                  glow: 'group-hover:shadow-[0_0_30px_rgba(0,212,255,0.15)]',
+                  glow: 'group-hover:shadow-[0_0_30px_rgba(78,205,196,0.15)]',
                 },
                 'warm-orange': {
                   text: 'text-warm-orange',
@@ -601,7 +602,7 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
             {/* 开源自托管：唯一"现在就能用"的档位，视觉主角 */}
-            <div className="hud-corners rounded-xl border border-neon-green/40 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(0,255,136,0.08)] flex flex-col">
+            <div className="hud-corners rounded-xl border border-neon-green/40 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(212,169,78,0.08)] flex flex-col">
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-bg-secondary font-mono text-[11px]">
                 <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse-glow" />
                 <span className="text-neon-green tracking-wider">SELF_HOSTED</span>
@@ -621,7 +622,7 @@ export default function HomePage() {
                   href="https://github.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-5 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold text-sm hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] transition-all"
+                  className="mt-5 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold text-sm hover:shadow-[0_0_20px_rgba(212,169,78,0.3)] transition-all"
                 >
                   <ExternalLink className="w-4 h-4" strokeWidth={1.25} />
                   GitHub 部署
@@ -675,7 +676,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="hud-corners rounded-xl border border-neon-green/25 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(0,255,136,0.06)]">
+          <div className="hud-corners rounded-xl border border-neon-green/25 bg-bg-card overflow-hidden shadow-[0_0_40px_rgba(212,169,78,0.06)]">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary font-mono text-[11px] text-text-muted">
               <span className="w-2.5 h-2.5 rounded-full bg-severity-critical/80" />
               <span className="w-2.5 h-2.5 rounded-full bg-severity-medium/80" />
@@ -793,7 +794,7 @@ export default function HomePage() {
             <div className="text-center py-16 border border-dashed border-border rounded-xl">
               <Zap className="w-10 h-10 text-text-muted mx-auto mb-4" strokeWidth={1.25} />
               <p className="text-text-secondary mb-2">还没有评审记录</p>
-              <p className="text-text-muted text-sm mb-6">创建你的第一个评审，获取多维度玩家视角</p>
+              <p className="text-text-muted text-sm mb-6">创建你的第一个评审，获取多维度用户视角</p>
               <Link
                 to="/ask"
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-neon-green text-bg-primary font-semibold hover:bg-neon-green-dim transition-colors"
@@ -821,7 +822,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
               to="/ask"
-              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
+              className="inline-flex items-center gap-3 px-8 py-3 md:px-10 md:py-4 rounded-xl bg-neon-green text-bg-primary font-bold text-base md:text-lg hover:scale-105 transition-all duration-300 hover:shadow-[0_0_20px_rgba(212,169,78,0.3)]"
             >
               <MessageSquareText className="w-5 h-5" strokeWidth={1.25} />
               立即开始

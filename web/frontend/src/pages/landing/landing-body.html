@@ -1,0 +1,324 @@
+<!-- HERO -->
+<section class="hero" id="top">
+  <canvas id="heroCanvas" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <div class="hero-badge"><span class="dot"></span>开源 · 多人格交叉质询评审</div>
+        <h1>让 66 个 AI 评审员<br>在你上线前<span class="grad-gold">找到风险</span></h1>
+        <p class="hero-sub">游戏、产品、定价页、众筹页、创业 BP —— 在投入真人测试前，先让一支合成评审团分组独立评审、<b>交叉质询、投票改票</b>，把发布风险摆到你面前。</p>
+
+        <div class="chips">
+          <button class="chip" type="button">Steam 商店页</button>
+          <button class="chip" type="button">SaaS 定价页</button>
+          <button class="chip" type="button">创业 BP 路演</button>
+          <button class="chip" type="button">新手引导流程</button>
+        </div>
+
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/ask">立即体验对话评审 <span class="arw">→</span></a>
+          <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">GitHub 源码</a>
+        </div>
+
+        <div class="proof">
+          <div class="avatars">
+            <span style="background:linear-gradient(135deg,#D4A94E,#E8C36B)">P1</span>
+            <span style="background:linear-gradient(135deg,#4ECDC4,#6fded6)">P2</span>
+            <span style="background:linear-gradient(135deg,#c9a04a,#d4b86a)">P3</span>
+            <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+63</span>
+          </div>
+          <span class="sep"></span>
+          <span><b>66 个人格</b> · <b>14 种场景</b> · <b>440 测试全绿</b></span>
+        </div>
+
+        <div class="hero-models">
+          <span class="lbl">兼容模型</span>
+          <span class="m">Anthropic</span>
+          <span class="m">DeepSeek</span>
+          <span class="m">Kimi</span>
+          <span class="m">通义千问</span>
+          <span class="m">智谱 GLM</span>
+          <span class="m">Ollama</span>
+        </div>
+      </div>
+
+      <!-- 独有视觉：不是通用对话框，而是"交叉质询辩论"实录 -->
+      <div class="debate-card reveal">
+        <div class="debate-head">
+          <span class="debate-tag">◈ 实时交叉质询</span>
+          <span class="debate-round">ROUND 3 / 3</span>
+        </div>
+        <div class="debate-msg oppose">
+          <span class="pav" style="background:linear-gradient(135deg,#4ECDC4,#6fded6)">P05</span>
+          <div class="bubble">
+            <div class="who">P05 · <em>反对 · severity high</em></div>
+            "移动端适配缺失——首屏六成流量来自手机，这条必须优先修。"
+          </div>
+        </div>
+        <div class="debate-flip">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4 4v5h5M20 20v-5h-5M4.5 15a8 8 0 0 0 14.1 3M19.5 9a8 8 0 0 0-14.1-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          被论据说服 · 投票改票
+        </div>
+        <div class="debate-msg agree">
+          <span class="pav" style="background:linear-gradient(135deg,#D4A94E,#E8C36B)">P12</span>
+          <div class="bubble">
+            <div class="who">P12 · <em>已改票 · Δc +0.34</em></div>
+            "同意，之前低估了移动端权重——上线前必须过一轮响应式测试。"
+          </div>
+        </div>
+        <div class="debate-meter">
+          <div class="meter-row"><span>分歧度</span><div class="bar"><i style="width:78%"></i></div><b>78%</b></div>
+          <div class="meter-row"><span>说服力</span><div class="bar mint"><i style="width:64%"></i></div><b>64%</b></div>
+        </div>
+        <div class="debate-foot">TOP-3 争议点 · 8 维质量门控 · 改票全程溯源</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PAIN -->
+<section class="sec" id="pain">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">你现在的处境</div>
+      <h2 class="sec-title">看了一堆 AI 建议，<br>还是不知道该不该上线？</h2>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-card reveal">
+        <div class="n">01 / 真人焦点小组</div>
+        <h3>又慢又贵</h3>
+        <p>招募一场真人焦点小组，$5,000 起步，还要等 2–4 周排期。等你拿到结论，窗口期早就过了。</p>
+        <div class="cost">$5,000+ · 2–4 周</div>
+      </div>
+      <div class="pain-card reveal">
+        <div class="n">02 / 问 ChatGPT</div>
+        <h3>一个人格自言自语</h3>
+        <p>单个模型给你一段"综合建议"，没有冲突、没有反方、没有被质疑过的观点。它总倾向于讨好你。</p>
+        <div class="cost">无冲突 · 无反方</div>
+      </div>
+      <div class="pain-card reveal">
+        <div class="n">03 / 现有合成工具</div>
+        <h3>单轮、闭源、刻板</h3>
+        <p>市面上的合成用户工具大多单轮问答、闭源黑箱，还在强化人口统计刻板印象——你无法验证它凭什么这么说。</p>
+        <div class="cost">单轮 · 黑箱</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GAP -->
+<section class="gap sec-alt">
+  <div class="wrap reveal">
+    <p>它们只给你一个<span class="muted">"综合建议"</span>——<br>不给你<span class="gold">冲突、改票和证据链</span>。</p>
+  </div>
+</section>
+
+<!-- SOLUTION: three-stage -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">工作原理</div>
+      <h2 class="sec-title">判断如何被生成、约束、验证</h2>
+      <p class="sec-desc">不是又一个对话框。AudienceLens 把每一条判断都放进一套可追溯、可复利的闭环里。</p>
+    </div>
+    <div class="stage">
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 01 生成</div>
+          <div class="kw">判断如何被<br><span class="gold">生成</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">◇</div>
+            <div><h4>分组独立评审</h4><p>66 个行为驱动人格按 Pack 分组，先各自独立给出评审意见，避免一开始就互相带节奏。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⇄</div>
+            <div><h4>Top-3 争议点三段式交叉质询</h4><p>系统挑出分歧最大的三个争议点，让持不同立场的人格互相追问论据、暴露盲点。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">✎</div>
+            <div><h4>投票改票溯源</h4><p>质询后允许改票，每一次立场翻转都被记录——你能看到"谁被什么论据说服了"。</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 02 约束</div>
+          <div class="kw">判断如何被<br><span class="gold">约束</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">▤</div>
+            <div><h4>8 维质量门控</h4><p>每场评审经过 8 个维度的 Harness 质量门控，低质量、跑题、空洞的意见会被拦下。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⊘</div>
+            <div><h4>伦理护栏</h4><p>身份与行为解耦，人格基于行为特征而非种族性别定义；内置刻板印象检测自动标记倾向。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⌘</div>
+            <div><h4>证据三级标注</h4><p>每条结论标注证据等级——direct（直接观察）/ inferred（合理推断）/ gap（信息缺口），不让模型糊弄你。</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 03 验证</div>
+          <div class="kw">判断如何被<br><span class="gold">验证</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">⏱</div>
+            <div><h4>预测盖时间戳留档</h4><p>每一条预测都盖上时间戳存档，形成一份"这个人格当时说了什么"的可审计记录。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">↺</div>
+            <div><h4>真人结果回填</h4><p>真人测试跑完后把真实结果回填，系统自动比对预测与现实的差距。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">▲</div>
+            <div><h4>算出人格历史准确率</h4><p>随时间累积，每个人格都有了"历史上准不准"的分数——判断在复利。</p></div>
+          </div>
+          <div class="moat"><b>这是护城河。</b> 判断复利闭环让 AudienceLens 越用越准，而不是每次从零开始猜。</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- NUMBERED FLOW -->
+<section class="sec sec-alt" id="flow">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">四步启动</div>
+      <h2 class="sec-title">从一句话到结构化报告</h2>
+      <p class="sec-desc">全流程自动化，实时推送进度，几分钟拿到发布风险清单。</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么——页面、文案、概念、创业 BP 都行。</p></div>
+      <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面——图片直接进视觉模型上下文。</p></div>
+      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团辩论改票</h4><p>人格分组独立评审 → 交叉质询 → 投票改票，全程可追溯。</p></div>
+      <div class="flow-step reveal"><div class="fn">04</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="sec" id="usecases">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">应用场景</div>
+      <h2 class="sec-title">为每一次"上线前"而生</h2>
+      <p class="sec-desc">一套评审团，覆盖你最怕出错的六种发布节点。</p>
+    </div>
+    <div class="use-grid">
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="红队对抗" loading="lazy"><h3>红队对抗</h3><p>模拟最差用户、攻击者、挑剔投资人，专门暴露致命缺陷与信任崩塌点。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section class="sec sec-alt" id="capabilities">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">核心能力</div>
+      <h2 class="sec-title">评审团背后的工程</h2>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-multimodal.png" alt="多模态评审" loading="lazy"></div>
+        <h3>多模态评审</h3>
+        <p>截图、demo 图、BP 页面直接进视觉模型上下文——评审员真正"看到"你的界面，而不只是读文字描述。非视觉模型自动降级纯文字，不中断评审。</p>
+        <div class="meta">SCREENSHOT · DECK · UI → VISION</div>
+      </div>
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-model.png" alt="模型中立" loading="lazy"></div>
+        <h3>模型中立 · 支持国产</h3>
+        <p>Anthropic 原生 + 任意 OpenAI 兼容服务：DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型都能接。自带 Key，按你的用量计费，带真实链路连接测试。</p>
+        <div class="meta">ANTHROPIC · DEEPSEEK · KIMI · QWEN · GLM · OLLAMA</div>
+      </div>
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-saas.png" alt="开箱即用 SaaS" loading="lazy"></div>
+        <h3>开箱即用的 SaaS</h3>
+        <p>无需注册即可体验：CDK 兑换码免登录换取评审次数，自动创建游客身份。渐进式认证、配额套餐、多租户管理后台全部就绪。</p>
+        <div class="meta">CDK · GUEST · MULTI-TENANT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARE -->
+<section class="sec" id="compare">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">竞品对比</div>
+      <h2 class="sec-title">不是所有合成研究都一样</h2>
+      <p class="sec-desc">质询深度、改票机制、多模态、开源——差异都在这张表里。</p>
+    </div>
+    <div class="tbl-wrap reveal">
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th class="us">AudienceLens</th>
+            <th>SyntheticUsers</th>
+            <th>Outset</th>
+            <th>Yabble</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="dim-key">方法论</td><td class="us">多人格评审团</td><td>访谈式</td><td>真人访谈</td><td>对话式</td></tr>
+          <tr><td class="dim-key">质询深度</td><td class="us"><span class="ck">✓</span> 三段式交叉质询</td><td><span class="cx">✕</span> 单轮</td><td><span class="cx">✕</span> 依赖主持人</td><td><span class="cx">✕</span> 单轮</td></tr>
+          <tr><td class="dim-key">改票机制</td><td class="us"><span class="ck">✓</span> 支持并溯源</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
+          <tr><td class="dim-key">多模态材料</td><td class="us"><span class="ck">✓</span> 截图 / BP 进视觉模型</td><td><span class="cx">✕</span> 仅文字</td><td>真人录屏</td><td><span class="cx">✕</span> 仅文字</td></tr>
+          <tr><td class="dim-key">模型选择</td><td class="us"><span class="ck">✓</span> Anthropic + 国产任选</td><td><span class="cx">✕</span> 绑定自家云</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
+          <tr><td class="dim-key">开源</td><td class="us"><span class="cg">✓</span> MIT 开源</td><td><span class="cx">✕</span> 闭源</td><td><span class="cx">✕</span> 闭源</td><td><span class="cx">✕</span> 闭源</td></tr>
+          <tr><td class="dim-key">价格</td><td class="us"><span class="cg">自带 Key · 按量</span></td><td>$60 / 次</td><td>按项目报价</td><td>$800 / 月</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="sec sec-alt" id="numbers">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">数字说话</div>
+      <h2 class="sec-title">每一项都能在开源仓库里核对</h2>
+      <p class="sec-desc">不是幻灯片概念——逐条可验证。</p>
+    </div>
+    <div class="stats">
+      <div class="stat reveal"><div class="num" data-target="66">66</div><div class="lbl">行为驱动人格</div></div>
+      <div class="stat reveal"><div class="num" data-target="14">14</div><div class="lbl">任务类型</div></div>
+      <div class="stat reveal"><div class="num" data-target="440">440</div><div class="lbl">测试全绿</div></div>
+      <div class="stat reveal"><div class="num" data-target="10">10</div><div class="lbl">人格 Pack</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final" id="try">
+  <div class="wrap">
+    <div class="inner reveal">
+      <h2>现在就试试</h2>
+      <p>66 个 AI 评审员已就位，无需注册即可体验。</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/ask">立即体验对话评审 <span class="arw">→</span></a>
+        <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">GitHub 源码</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->

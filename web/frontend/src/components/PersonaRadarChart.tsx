@@ -84,9 +84,9 @@ export default function PersonaRadarChart({ data, compareData, name1 = '角色 A
           <PolarGrid stroke="#2a2a3a" />
           <PolarAngleAxis dataKey="axis" tick={{ fill: '#8888a0', fontSize, fontFamily: 'Noto Sans SC' }} />
           <PolarRadiusAxis angle={30} domain={[0, 1]} tick={false} axisLine={false} />
-          <Radar name={name1} dataKey="value1" stroke="#00ff88" fill="#00ff88" fillOpacity={0.15} strokeWidth={2} />
+          <Radar name={name1} dataKey="value1" stroke="#D4A94E" fill="#D4A94E" fillOpacity={0.15} strokeWidth={2} />
           {normalizedCompare && (
-            <Radar name={name2} dataKey="value2" stroke="#00d4ff" fill="#00d4ff" fillOpacity={0.15} strokeWidth={2} />
+            <Radar name={name2} dataKey="value2" stroke="#4ECDC4" fill="#4ECDC4" fillOpacity={0.15} strokeWidth={2} />
           )}
           {normalizedCompare && (
             <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: '#8888a0' }} />

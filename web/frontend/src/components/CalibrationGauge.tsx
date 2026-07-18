@@ -11,7 +11,7 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
   const angle = (percentage / 100) * 180
 
   const getColor = () => {
-    if (percentage >= 80) return '#00ff88'
+    if (percentage >= 80) return '#D4A94E'
     if (percentage >= 60) return '#ffbb33'
     if (percentage >= 40) return '#ff6b35'
     return '#ff3355'

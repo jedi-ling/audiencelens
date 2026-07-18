@@ -22,11 +22,14 @@ import {
   type Judgment,
   type KeyStatus,
   type LeaderboardEntry,
+  type Material,
   type PersonaPack,
   type Plan,
+  type RedeemCdkResult,
   type ReviewDetail,
   type ReviewMode,
   type TaskType,
+  type TestConnectionResult,
   type UsageSummary,
   type ValidationMetrics,
   type Verdict,
@@ -105,14 +108,33 @@ export const api = {
 
   getKeys: () => request<KeyStatus>('/api/keys'),
 
-  saveKey: (apiKey: string, provider = 'anthropic') =>
-    request<{ provider: string; masked: string }>('/api/keys', {
-      method: 'POST',
-      body: JSON.stringify({ api_key: apiKey, provider }),
-    }),
+  saveKey: (
+    apiKey: string,
+    provider = 'anthropic',
+    opts: { model?: string; apiBase?: string } = {},
+  ) =>
+    request<{ provider: string; model: string | null; api_base: string | null; masked: string }>(
+      '/api/keys',
+      {
+        method: 'POST',
+        body: JSON.stringify({ api_key: apiKey, provider, model: opts.model, api_base: opts.apiBase }),
+      },
+    ),
 
   deleteKey: (provider = 'anthropic') =>
     request<{ deleted: number }>(`/api/keys/${provider}`, { method: 'DELETE' }),
+
+  /** 测连接：不传 apiKey 就测"当前已保存"的那把——测的是评审真正会走的链路，不是摆设。 */
+  testKey: (opts: { apiKey?: string; provider?: string; model?: string; apiBase?: string } = {}) =>
+    request<TestConnectionResult>('/api/keys/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        api_key: opts.apiKey,
+        provider: opts.provider ?? 'anthropic',
+        model: opts.model,
+        api_base: opts.apiBase,
+      }),
+    }),
 
   // ---------------- 对话式入口：意图解析 ----------------
 
@@ -122,22 +144,22 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
 
-  // ---------------- 上传 ----------------
+  // ---------------- 上传（文本抽取成文字材料 / 图片转 data URI 供多模态） ----------------
 
   upload: (file: File) => {
     const fd = new FormData()
     fd.append('file', file)
-    return request<{ filename: string; stored_as: string; size: number; text: string }>(
-      '/api/uploads',
-      { method: 'POST', body: fd },
-    )
+    return request<
+      | { filename: string; kind: 'text'; stored_as: string; size: number; text: string }
+      | { filename: string; kind: 'image'; size: number; image_data: string }
+    >('/api/uploads', { method: 'POST', body: fd })
   },
 
   // ---------------- 评审（v2 异步链路）----------------
 
   createReview: (params: {
     task_type: TaskType
-    artifact: { title?: string; materials: { type: string; text: string }[] }
+    artifact: { title?: string; materials: Material[] }
     mode?: ReviewMode
     persona_pack?: PersonaPack
   }) =>
@@ -152,6 +174,15 @@ export const api = {
     request<{ id: string; status: string; progress: number; error_message: string | null }>(
       `/api/jobs/${id}`,
     ),
+
+  // ---------------- CDK 兑换码 ----------------
+
+  /** 兑换 CDK。匿名兑换成功会返回游客 token——调用方负责 setToken 存下来。 */
+  redeemCdk: (code: string) =>
+    request<RedeemCdkResult>('/api/cdk/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
 
   // ---------------- 用量 / 配额 / 套餐 ----------------
 

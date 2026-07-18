@@ -25,6 +25,7 @@ interface SessionState {
   saveKey: (apiKey: string, provider?: string) => Promise<void>
   deleteKey: (provider?: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, displayName?: string) => Promise<void>
   logout: () => void
 
   /** 当前是否可以发起评审（BYOK 模式下必须有 key） */
@@ -75,6 +76,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   login: async (email, password) => {
     const { token } = await api.login(email, password)
+    setToken(token)
+    const identity = await api.me()
+    set({ identity })
+    await get().refreshKeys()
+  },
+
+  register: async (email, password, displayName) => {
+    const { token } = await api.register(email, password, displayName)
     setToken(token)
     const identity = await api.me()
     set({ identity })

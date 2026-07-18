@@ -1,4 +1,5 @@
 import type { Review, Report, Persona, PersonaPack, Preset, WSMessage, Example, ReviewModeConfig, TaskTypeDetail, ReviewResultData, SkillType, SkillDetail, EvaluationScorecard, EthicsReport } from './mock-data'
+import { getToken } from './apiClient'
 
 export async function fetchReviews(): Promise<Review[]> {
   const res = await fetch('/api/reviews')
@@ -13,7 +14,11 @@ export async function fetchReview(id: string): Promise<Review> {
 }
 
 export async function fetchReport(reviewId: string): Promise<{ report_json: Report; report_markdown: string; calibration: unknown }> {
-  const res = await fetch(`/api/reviews/${reviewId}/report`)
+  // 带上登录态：后端按是否登录裁剪报告详情（体验版 vs 完整版），不带 token 就只能拿到匿名的体验版。
+  const token = getToken()
+  const res = await fetch(`/api/reviews/${reviewId}/report`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
   if (!res.ok) throw new Error(`Failed to fetch report: ${res.statusText}`)
   return res.json()
 }
@@ -94,65 +99,6 @@ export function connectReviewWS(
   return () => {
     ws.close()
   }
-}
-
-export interface LLMFormat {
-  name: string
-  description: string
-  default_base: string
-  requires_api_key: boolean
-}
-
-export interface LLMPreset {
-  id: string
-  name: string
-  api_format: string
-  model: string
-  api_base: string
-  has_env_key: boolean
-}
-
-export async function fetchLLMFormats(): Promise<Record<string, LLMFormat>> {
-  const res = await fetch('/api/settings/llm/formats')
-  if (!res.ok) throw new Error(`Failed to fetch LLM formats: ${res.statusText}`)
-  return res.json()
-}
-
-export async function fetchLLMPresets(): Promise<LLMPreset[]> {
-  const res = await fetch('/api/settings/llm/presets')
-  if (!res.ok) throw new Error(`Failed to fetch LLM presets: ${res.statusText}`)
-  return res.json()
-}
-
-export async function saveLLMSettings(data: {
-  api_format: string
-  api_key?: string
-  model: string
-  api_base?: string
-  session_id?: string
-}): Promise<{ status: string }> {
-  const res = await fetch('/api/settings/llm', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error(`Failed to save LLM settings: ${res.statusText}`)
-  return res.json()
-}
-
-export async function testLLMConnection(data: {
-  api_format: string
-  api_key?: string
-  model: string
-  api_base?: string
-}): Promise<{ connected: boolean; model?: string; error?: string }> {
-  const res = await fetch('/api/settings/llm/test', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error(`Failed to test LLM connection: ${res.statusText}`)
-  return res.json()
 }
 
 export async function fetchTaskTypes(): Promise<TaskTypeDetail[]> {

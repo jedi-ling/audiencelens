@@ -1,56 +1,126 @@
+/**
+ * 评审报告页 —— 渲染真实评审引擎（src/runner/aggregator.py）的原始输出。
+ *
+ * 字段契约以 aggregate_report() 的返回体为准（snake_case：executive_summary /
+ * priority_fixes / persona_notes / major_disagreements / information_gaps /
+ * compliance…），不是 mock-data.ts 里那套演示用的虚构 schema——历史上这页
+ * 曾经按 mock 结构（riskLevel/priorityIssues/stanceDistribution）做盲转型，
+ * 真实报告一进来就整页崩，这里是修复后的版本。
+ *
+ * 登录态分级：匿名用户拿到的 report_json 带 is_gated=true（后端
+ * report_gating.py 裁剪过），走 GatedReportTeaser 分支。
+ */
+
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/apiClient'
-import type { Report, RiskLevel, PrimaryStance, Review, ReviewMode, EvaluationScorecard, EthicsReport } from '@/lib/mock-data'
+import type { Review, ReviewMode, EvaluationScorecard, EthicsReport, Severity } from '@/lib/mock-data'
 import { EVALUATION_DIMENSIONS } from '@/lib/mock-data'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, Download, ChevronDown, ChevronUp, AlertTriangle, Quote, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon } from 'lucide-react'
+import { ArrowLeft, Download, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale } from 'lucide-react'
 
-const riskConfig: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
-  green: { label: '低风险', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30' },
-  yellow: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
-  orange: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
-  red: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
+// ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
+
+interface RealPriorityFix {
+  priority?: number
+  issue?: string
+  severity?: string
+  why_it_matters?: string
+  affected_personas?: string[]
+  suggested_fix?: string
+  score?: number
 }
 
-const stanceColors: Record<PrimaryStance, string> = {
-  advocate: '#00ff88',
-  neutral: '#ffbb33',
-  skeptic: '#ff6b35',
-  blocker: '#ff3355',
+interface RealPersonaNote {
+  persona_id: string
+  persona_name?: string
+  stance?: string
+  /** 兼容：部分旧数据/测试数据用 primary_stance 字段名 */
+  primary_stance?: string
+  evidence_top3?: string[]
+  top_issues?: string[]
+  continue_triggers?: string[]
+  quit_triggers?: string[]
 }
 
-const stanceLabels: Record<PrimaryStance, string> = {
-  advocate: '支持',
-  neutral: '中立',
-  skeptic: '质疑',
-  blocker: '反对',
+interface RealDisagreement {
+  topic?: string
+  persona_stances?: Array<{ persona_id?: string; stance?: string; evidence?: string }>
+  resolution_suggestion?: string
 }
 
-const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; icon: string }> = {
+interface RealReport {
+  meta?: { task_type?: string; target?: string; generated_at?: string; is_synthetic?: boolean } | null
+  executive_summary?: { primary_recommendation?: string; release_risk?: string; evidence_quality?: string } | null
+  consensus?: { agreed_points?: string[]; questioned_points?: string[] } | null
+  major_disagreements?: RealDisagreement[]
+  priority_fixes?: RealPriorityFix[]
+  persona_notes?: RealPersonaNote[]
+  information_gaps?: string[]
+  next_human_test?: { suggested_tasks?: string[]; recruit_types?: string[]; next_materials?: string[] } | null
+  cross_examination?: unknown
+  compliance?: { status?: string; ethics_score?: number; recommended_steps?: string[] } | null
+  simulation_notice?: string | null
+  is_gated?: boolean
+  gated_counts?: { priority_fixes_hidden?: number; persona_notes_hidden?: number }
+}
+
+interface RealCalibration {
+  role_consistency?: { average?: number } | null
+  coverage?: { average_distance?: number } | null
+  hallucination?: { average?: number } | null
+  overall_pass?: boolean
+}
+
+// ---------- 展示映射 ----------
+
+const RISK_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  low: { label: '低风险', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30' },
+  medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
+  high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
+  critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
+}
+
+const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
+  strong: '充分',
+  medium: '中等',
+  weak: '偏弱',
+  insufficient: '不足',
+}
+
+// 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
+const STANCE_PALETTE = ['#D4A94E', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '#a78bfa']
+
+const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; icon: string }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', icon: '⚡' },
   standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', icon: '✅' },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', icon: '🔬' },
 }
 
+const VALID_SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low']
+
+function noteStance(note: RealPersonaNote): string {
+  return note.stance ?? note.primary_stance ?? '未表态'
+}
+
 export default function ReportPage() {
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
-  const [report, setReport] = useState<Report | null>(null)
+  const [report, setReport] = useState<RealReport | null>(null)
+  const [calibration, setCalibration] = useState<RealCalibration | null>(null)
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null)
   const [reportHtml, setReportHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set())
+  const [expandedIssues, setExpandedIssues] = useState<Set<number>>(new Set())
   const [showHtmlReport, setShowHtmlReport] = useState(false)
   const [evaluationScorecard, setEvaluationScorecard] = useState<EvaluationScorecard | null>(null)
   const [ethicsReports, setEthicsReports] = useState<EthicsReport[]>([])
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
   const [evaluating, setEvaluating] = useState(false)
-  const [redTeaming, setRedTeaming] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
   const [feedbackUseful, setFeedbackUseful] = useState<boolean | null>(null)
   const [decisionChanged, setDecisionChanged] = useState(false)
@@ -60,11 +130,11 @@ export default function ReportPage() {
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const toggleIssue = (issueId: string) => {
+  const toggleIssue = (index: number) => {
     setExpandedIssues((prev) => {
       const next = new Set(prev)
-      if (next.has(issueId)) next.delete(issueId)
-      else next.add(issueId)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
       return next
     })
   }
@@ -73,23 +143,19 @@ export default function ReportPage() {
     if (!id) return
     const loadData = async () => {
       try {
-        const [reviewData, reportData] = await Promise.all([
-          fetchReview(id),
-          fetchReport(id),
-        ])
+        const [reviewData, reportData] = await Promise.all([fetchReview(id), fetchReport(id)])
         setReview(reviewData)
         if (reportData.report_json) {
-          const reportObj = reportData.report_json as Report
-          if (reportData.calibration) {
-            reportObj.calibration = reportData.calibration as Report['calibration']
-          }
-          setReport(reportObj)
+          setReport(reportData.report_json as unknown as RealReport)
+        }
+        if (reportData.calibration) {
+          setCalibration(reportData.calibration as RealCalibration)
         }
         if (reportData.report_markdown) {
           setReportMarkdown(reportData.report_markdown)
         }
       } catch {
-        // ignore
+        // 报告尚未生成时走下面的空态分支
       } finally {
         setLoading(false)
       }
@@ -101,24 +167,16 @@ export default function ReportPage() {
     if (!id) return
     fetchReviewResult(id)
       .then((result) => {
-        if (result.report_html) {
-          setReportHtml(result.report_html)
-        }
-        if (result.report_md && !reportMarkdown) {
-          setReportMarkdown(result.report_md)
-        }
+        if (result.report_html) setReportHtml(result.report_html)
+        if (result.report_md && !reportMarkdown) setReportMarkdown(result.report_md)
       })
       .catch(() => {})
   }, [id, reportMarkdown])
 
   useEffect(() => {
     if (!id) return
-    fetchEvaluation(id)
-      .then((data) => setEvaluationScorecard(data))
-      .catch(() => {})
-    fetchEthicsReport(id)
-      .then((data) => setEthicsReports(data))
-      .catch(() => {})
+    fetchEvaluation(id).then(setEvaluationScorecard).catch(() => {})
+    fetchEthicsReport(id).then(setEthicsReports).catch(() => {})
   }, [id])
 
   useEffect(() => {
@@ -141,6 +199,10 @@ export default function ReportPage() {
     )
   }
 
+  if (report?.is_gated) {
+    return <GatedReportTeaser review={review} gated={report} />
+  }
+
   if (!review || !report) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
@@ -150,9 +212,26 @@ export default function ReportPage() {
     )
   }
 
-  const risk = riskConfig[report.riskLevel]
+  const summary = report.executive_summary
+  const risk = RISK_CONFIG[summary?.release_risk ?? ''] ?? RISK_CONFIG.medium
   const reviewMode = (review.mode ?? 'standard') as ReviewMode
-  const modeBadge = modeBadgeConfig[reviewMode] ?? modeBadgeConfig.standard
+  const modeBadge = MODE_BADGE[reviewMode] ?? MODE_BADGE.standard
+  const priorityFixes = report.priority_fixes ?? []
+  const personaNotes = report.persona_notes ?? []
+  const disagreements = report.major_disagreements ?? []
+  const informationGaps = report.information_gaps ?? []
+
+  // 立场分布由 persona_notes 现场统计（引擎不单独输出这一项）
+  const stanceCounts = new Map<string, number>()
+  for (const note of personaNotes) {
+    const s = noteStance(note)
+    stanceCounts.set(s, (stanceCounts.get(s) ?? 0) + 1)
+  }
+  const stanceData = Array.from(stanceCounts.entries()).map(([name, value], i) => ({
+    name,
+    value,
+    color: STANCE_PALETTE[i % STANCE_PALETTE.length],
+  }))
 
   const handleExport = (format: 'json' | 'markdown' | 'html') => {
     let content: string
@@ -189,7 +268,9 @@ export default function ReportPage() {
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-semibold text-text-primary truncate">{review.target_title}</h1>
+          <h1 className="text-xl font-semibold text-text-primary truncate">
+            {review.target_title || report.meta?.target || '评审报告'}
+          </h1>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-sm text-text-secondary">评审报告</p>
             <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', modeBadge.bg, modeBadge.color)}>
@@ -226,6 +307,12 @@ export default function ReportPage() {
         </div>
       </div>
 
+      {report.simulation_notice && (
+        <div className="mb-6 rounded-xl border-2 border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
+          {report.simulation_notice}
+        </div>
+      )}
+
       {reportHtml && (
         <div className="mb-6">
           <button
@@ -260,183 +347,330 @@ export default function ReportPage() {
         </div>
       )}
 
+      {/* ---------- 执行摘要 / 发布风险 ---------- */}
       <div className={cn('rounded-xl border-2 p-4 md:p-6 mb-6', risk.bg, risk.border)}>
         <div className="flex items-center gap-3 mb-3">
           <AlertTriangle className={cn('w-5 h-5 md:w-6 md:h-6', risk.color)} strokeWidth={1.25} />
-          <h2 className={cn('text-base md:text-lg font-bold font-display', risk.color)}>发布风险评估：{risk.label}</h2>
+          <h2 className={cn('text-base md:text-lg font-bold font-display', risk.color)}>
+            发布风险评估：{risk.label}
+          </h2>
         </div>
-        <p className="text-text-secondary leading-relaxed text-sm md:text-base">{report.riskSummary}</p>
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div>
+            <dt className="text-xs text-text-muted">评审团主流立场</dt>
+            <dd className="mt-1 font-medium text-text-primary">{summary?.primary_recommendation || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-text-muted">证据充分度</dt>
+            <dd className="mt-1 font-medium text-text-primary">
+              {EVIDENCE_QUALITY_LABELS[summary?.evidence_quality ?? ''] ?? summary?.evidence_quality ?? '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-text-muted">共识点 / 存疑点</dt>
+            <dd className="mt-1 font-medium text-text-primary">
+              {(report.consensus?.agreed_points?.length ?? 0)} / {(report.consensus?.questioned_points?.length ?? 0)}
+            </dd>
+          </div>
+        </dl>
       </div>
 
+      {/* ---------- 立场分布 + 校准指标 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-4">立场分布</h3>
-          <div className="min-h-[180px] md:min-h-[220px]">
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={report.stanceDistribution.map((d) => ({
-                  name: stanceLabels[d.stance],
-                  value: d.count,
-                  stance: d.stance,
-                }))}
-                cx="50%"
-                cy="50%"
-                innerRadius={40}
-                outerRadius={70}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {report.stanceDistribution.map((d, i) => (
-                  <Cell key={i} fill={stanceColors[d.stance]} fillOpacity={0.8} stroke={stanceColors[d.stance]} strokeWidth={1} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
-                itemStyle={{ color: '#e8e8f0' }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-2">
-            {report.stanceDistribution.map((d) => (
-              <div key={d.stance} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stanceColors[d.stance] }} />
-                <span className="text-text-secondary">{stanceLabels[d.stance]}</span>
-                <span className="font-mono text-text-muted">{d.count}</span>
+          <h3 className="text-sm font-medium text-text-muted mb-4">立场分布（{personaNotes.length} 个人格）</h3>
+          {stanceData.length > 0 ? (
+            <>
+              <div className="min-h-[180px] md:min-h-[220px]">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={stanceData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {stanceData.map((d, i) => (
+                        <Cell key={i} fill={d.color} fillOpacity={0.8} stroke={d.color} strokeWidth={1} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
+                      itemStyle={{ color: '#e8e8f0' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-2">
+                {stanceData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                    <span className="text-text-secondary">{d.name}</span>
+                    <span className="font-mono text-text-muted">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="py-8 text-center text-xs text-text-muted">暂无人格立场数据</p>
+          )}
         </div>
 
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <h3 className="text-sm font-medium text-text-muted mb-4">校准指标</h3>
-          <div className="flex justify-around">
-            <CalibrationGauge label="一致性" value={report.calibration.consistency} />
-            <CalibrationGauge label="覆盖率" value={report.calibration.coverage} />
-            <CalibrationGauge label="幻觉率" value={1 - report.calibration.hallucination} />
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-text-primary mb-4">优先修复项</h3>
-        <div className="flex flex-col gap-3">
-          {report.priorityIssues.map((issue) => {
-            const expanded = expandedIssues.has(issue.id)
-            return (
-              <div key={issue.id} className="rounded-xl border border-border bg-bg-card overflow-hidden">
-                <button
-                  onClick={() => toggleIssue(issue.id)}
-                  className="w-full flex items-center gap-3 px-4 md:px-5 py-4 text-left hover:bg-bg-card-hover transition-colors"
-                >
-                  <SeverityBadge severity={issue.severity} />
-                  <span className="flex-1 text-sm font-medium text-text-primary">{issue.title}</span>
-                  {expanded ? (
-                    <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
-                  )}
-                </button>
-                {expanded && (
-                  <div className="px-4 md:px-5 pb-4 border-t border-border pt-3">
-                    <p className="text-sm text-text-secondary mb-3">{issue.description}</p>
-                    {issue.evidence.length > 0 && (
-                      <div className="mb-3">
-                        <h4 className="text-xs font-medium text-text-muted mb-1.5">证据</h4>
-                        <ul className="space-y-1">
-                          {issue.evidence.map((e, i) => (
-                            <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                              <span className="text-cyan mt-0.5">•</span>
-                              {e}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {issue.affectedPersonas.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-medium text-text-muted mb-1.5">相关角色</h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {issue.affectedPersonas.map((p) => (
-                            <span key={p} className="px-2 py-0.5 rounded bg-bg-secondary text-xs text-text-secondary">
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+          {calibration ? (
+            <>
+              <div className="flex justify-around">
+                <CalibrationGauge label="角色一致性" value={calibration.role_consistency?.average ?? 0} />
+                <CalibrationGauge label="视角覆盖度" value={calibration.coverage?.average_distance ?? 0} />
+                {calibration.hallucination != null && (
+                  <CalibrationGauge label="无幻觉率" value={1 - (calibration.hallucination.average ?? 0)} />
                 )}
               </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-text-primary mb-4">角色视角</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {report.personaPerspectives.map((pp) => (
-            <div key={pp.personaId} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-medium text-text-primary">{pp.personaName}</span>
-                <span className="text-xs text-text-muted">{pp.archetype}</span>
-                <span
-                  className="ml-auto text-xs font-medium px-2 py-0.5 rounded"
-                  style={{
-                    backgroundColor: stanceColors[pp.stance as PrimaryStance]
-                      ? `${stanceColors[pp.stance as PrimaryStance]}1a`
-                      : undefined,
-                    color: stanceColors[pp.stance as PrimaryStance] ?? undefined,
-                  }}
-                >
-                  {stanceLabels[pp.stance as PrimaryStance] ?? pp.stance}
-                </span>
-              </div>
-
-              <div className="flex items-start gap-2 mb-3 bg-bg-secondary/50 rounded-lg p-3">
-                <Quote className="w-4 h-4 text-text-muted shrink-0 mt-0.5" strokeWidth={1.25} />
-                <p className="text-sm text-text-secondary italic leading-relaxed">{pp.quote}</p>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-text-muted">置信度</span>
-                <span className="font-mono text-cyan">{(pp.confidence * 100).toFixed(0)}%</span>
-              </div>
-
-              {pp.keyEvidence.length > 0 && (
-                <div className="mt-2">
-                  <h4 className="text-xs text-text-muted mb-1">关键证据</h4>
-                  <ul className="space-y-0.5">
-                    {pp.keyEvidence.map((e, i) => (
-                      <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                        <span className="text-neon-green mt-0.5">•</span>
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {calibration.overall_pass != null && (
+                <p className={cn(
+                  'mt-3 text-center text-xs font-medium',
+                  calibration.overall_pass ? 'text-neon-green' : 'text-warm-orange'
+                )}>
+                  {calibration.overall_pass ? '校准通过' : '校准未达标——结论请谨慎采信'}
+                </p>
               )}
-            </div>
-          ))}
+            </>
+          ) : (
+            <p className="py-8 text-center text-xs text-text-muted">本次评审未运行校准检查</p>
+          )}
         </div>
       </div>
 
-      {report.informationGaps.length > 0 && (
-        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-4">信息缺口</h3>
-          <ul className="space-y-2">
-            {report.informationGaps.map((gap, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-                <span className="text-warm-orange font-display shrink-0">{i + 1}.</span>
-                {gap}
-              </li>
-            ))}
-          </ul>
+      {/* ---------- 优先修复项 ---------- */}
+      {priorityFixes.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">优先修复项</h3>
+          <div className="flex flex-col gap-3">
+            {priorityFixes.map((fix, index) => {
+              const expanded = expandedIssues.has(index)
+              const severity = VALID_SEVERITIES.includes(fix.severity as Severity)
+                ? (fix.severity as Severity)
+                : 'medium'
+              return (
+                <div key={index} className="rounded-xl border border-border bg-bg-card overflow-hidden">
+                  <button
+                    onClick={() => toggleIssue(index)}
+                    className="w-full flex items-center gap-3 px-4 md:px-5 py-4 text-left hover:bg-bg-card-hover transition-colors"
+                  >
+                    <span className="font-mono text-xs text-text-muted shrink-0">#{fix.priority ?? index + 1}</span>
+                    <SeverityBadge severity={severity} />
+                    <span className="flex-1 text-sm font-medium text-text-primary">{fix.issue}</span>
+                    {expanded ? (
+                      <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
+                    )}
+                  </button>
+                  {expanded && (
+                    <div className="px-4 md:px-5 pb-4 border-t border-border pt-3">
+                      {fix.why_it_matters && (
+                        <div className="mb-3">
+                          <h4 className="text-xs font-medium text-text-muted mb-1">为什么重要</h4>
+                          <p className="text-sm text-text-secondary">{fix.why_it_matters}</p>
+                        </div>
+                      )}
+                      {fix.suggested_fix && (
+                        <div className="mb-3">
+                          <h4 className="text-xs font-medium text-text-muted mb-1">修复建议</h4>
+                          <p className="text-sm text-text-secondary">{fix.suggested_fix}</p>
+                        </div>
+                      )}
+                      {(fix.affected_personas?.length ?? 0) > 0 && (
+                        <div>
+                          <h4 className="text-xs font-medium text-text-muted mb-1.5">提出的人格</h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {fix.affected_personas!.map((p) => (
+                              <span key={p} className="px-2 py-0.5 rounded bg-bg-secondary text-xs text-text-secondary">
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
+      {/* ---------- 人格视角 ---------- */}
+      {personaNotes.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-cyan" strokeWidth={1.25} />
+            <h3 className="text-lg font-semibold text-text-primary">人格视角</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {personaNotes.map((note) => {
+              const stanceIndex = stanceData.findIndex((s) => s.name === noteStance(note))
+              const stanceColor = STANCE_PALETTE[Math.max(stanceIndex, 0) % STANCE_PALETTE.length]
+              return (
+                <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="font-medium text-text-primary">{note.persona_name ?? note.persona_id}</span>
+                    <span className="text-xs text-text-muted font-mono">{note.persona_id}</span>
+                    <span
+                      className="ml-auto text-xs font-medium px-2 py-0.5 rounded"
+                      style={{ backgroundColor: `${stanceColor}1a`, color: stanceColor }}
+                    >
+                      {noteStance(note)}
+                    </span>
+                  </div>
+
+                  {(note.top_issues?.length ?? 0) > 0 && (
+                    <div className="mb-2">
+                      <h4 className="text-xs text-text-muted mb-1">关键议题</h4>
+                      <ul className="space-y-0.5">
+                        {note.top_issues!.map((issue, i) => (
+                          <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                            <span className="text-warm-orange mt-0.5">•</span>
+                            {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(note.evidence_top3?.length ?? 0) > 0 && (
+                    <div>
+                      <h4 className="text-xs text-text-muted mb-1">关键证据</h4>
+                      <ul className="space-y-0.5">
+                        {note.evidence_top3!.map((e, i) => (
+                          <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                            <span className="text-neon-green mt-0.5">•</span>
+                            {e}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---------- 主要分歧 ---------- */}
+      {disagreements.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Scale className="w-5 h-5 text-warm-orange" strokeWidth={1.25} />
+            <h3 className="text-lg font-semibold text-text-primary">主要分歧</h3>
+          </div>
+          <div className="flex flex-col gap-3">
+            {disagreements.map((d, i) => (
+              <div key={i} className="rounded-xl border border-warm-orange/20 bg-bg-card p-4 md:p-5">
+                <p className="text-sm font-medium text-text-primary mb-2">{d.topic}</p>
+                {(d.persona_stances?.length ?? 0) > 0 && (
+                  <ul className="space-y-1.5 mb-2">
+                    {d.persona_stances!.map((ps, j) => (
+                      <li key={j} className="text-xs text-text-secondary flex items-start gap-2">
+                        <span className="shrink-0 font-mono text-text-muted">{ps.persona_id}</span>
+                        <span className="shrink-0 px-1.5 rounded bg-bg-secondary text-text-primary">{ps.stance}</span>
+                        <span>{ps.evidence}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {d.resolution_suggestion && (
+                  <p className="text-xs text-text-muted">建议：{d.resolution_suggestion}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {informationGaps.length > 0 && (
+          <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <HelpCircle className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
+              <h3 className="text-sm font-semibold text-text-primary">信息缺口</h3>
+            </div>
+            <ul className="space-y-2">
+              {informationGaps.map((gap, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
+                  <span className="text-warm-orange font-display shrink-0">{i + 1}.</span>
+                  {gap}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {report.next_human_test && (
+          <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <h3 className="text-sm font-semibold text-text-primary mb-4">建议的下一步真人验证</h3>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-xs text-text-muted mb-1">验证任务</dt>
+                <dd className="text-text-secondary">
+                  {(report.next_human_test.suggested_tasks ?? []).join('；') || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted mb-1">建议招募的人群</dt>
+                <dd className="text-text-secondary">
+                  {(report.next_human_test.recruit_types ?? []).join('、') || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-text-muted mb-1">需要补充的材料</dt>
+                <dd className="text-text-secondary">
+                  {(report.next_human_test.next_materials ?? []).join('；') || '—'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </div>
+
+      {/* ---------- 伦理合规 ---------- */}
+      {report.compliance && (
+        <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-4 h-4 text-purple-400" strokeWidth={1.25} />
+            <h3 className="text-sm font-semibold text-text-primary">人格伦理合规</h3>
+            <span className={cn(
+              'ml-auto text-xs px-2 py-0.5 rounded font-medium',
+              (report.compliance.ethics_score ?? 0) >= 80
+                ? 'bg-neon-green/10 text-neon-green'
+                : (report.compliance.ethics_score ?? 0) >= 50
+                  ? 'bg-severity-medium/10 text-severity-medium'
+                  : 'bg-severity-critical/10 text-severity-critical'
+            )}>
+              {report.compliance.status ?? '—'} · {report.compliance.ethics_score ?? '—'} 分
+            </span>
+          </div>
+          {(report.compliance.recommended_steps?.length ?? 0) > 0 && (
+            <ul className="space-y-1">
+              {report.compliance.recommended_steps!.map((step, i) => (
+                <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                  <span className="text-purple-400 mt-0.5">▸</span>
+                  {step}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* ---------- 评估评分卡（独立端点，与 report_json 无关） ---------- */}
       {evaluationScorecard && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -508,7 +742,7 @@ export default function ReportPage() {
                   return {
                     name: dim?.name ?? r.dimension,
                     score: r.score,
-                    fill: r.passed ? '#00ff88' : '#ff3355',
+                    fill: r.passed ? '#D4A94E' : '#ff3355',
                   }
                 })}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
@@ -575,6 +809,7 @@ export default function ReportPage() {
         </div>
       )}
 
+      {/* ---------- 伦理报告（独立端点） ---------- */}
       {ethicsReports.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -676,27 +911,6 @@ export default function ReportPage() {
           {evaluating ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <FlaskConical className="w-4 h-4" strokeWidth={1.25} />}
           运行评估
         </button>
-        <button
-          onClick={async () => {
-            if (!id) return
-            setRedTeaming(true)
-            try {
-              await runEvaluation(id)
-            } catch {} finally {
-              setRedTeaming(false)
-            }
-          }}
-          disabled={redTeaming}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all',
-            redTeaming
-              ? 'bg-bg-card text-text-muted cursor-not-allowed'
-              : 'bg-red-400/10 text-red-400 border border-red-400/30 hover:bg-red-400/20'
-          )}
-        >
-          {redTeaming ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <Shield className="w-4 h-4" strokeWidth={1.25} />}
-          运行红队
-        </button>
         {evaluationScorecard && (
           <Link
             to={`/evaluations/${id}`}
@@ -708,7 +922,8 @@ export default function ReportPage() {
         )}
       </div>
 
-      {id && report && !feedbackSent && (
+      {/* ---------- 价值回填 ---------- */}
+      {id && !feedbackSent && (
         <section className="mb-6 rounded-xl border border-neon-green/30 bg-bg-card p-5">
           <h2 className="font-display text-sm font-semibold text-text-primary">这份报告真的有用吗？</h2>
           <p className="mt-1 text-xs text-text-muted">反馈将用于衡量建议采纳与决策影响，不用调用次数冒充价值。</p>
@@ -718,17 +933,22 @@ export default function ReportPage() {
           </div>
           {feedbackUseful !== null && (
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <fieldset className="text-xs text-text-secondary sm:col-span-3">
-                <legend className="mb-2">实际准备采纳哪些建议？</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {report.priorityIssues.map((issue) => (
-                    <label key={issue.id} className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
-                      <input type="checkbox" checked={adoptedFixes.includes(issue.title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, issue.title] : current.filter((title) => title !== issue.title))} className="mt-0.5 accent-neon-green" />
-                      <span>{issue.title}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              {priorityFixes.length > 0 && (
+                <fieldset className="text-xs text-text-secondary sm:col-span-3">
+                  <legend className="mb-2">实际准备采纳哪些建议？</legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {priorityFixes.map((fix, i) => {
+                      const title = fix.issue ?? `建议 ${i + 1}`
+                      return (
+                        <label key={i} className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
+                          <input type="checkbox" checked={adoptedFixes.includes(title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, title] : current.filter((t) => t !== title))} className="mt-0.5 accent-neon-green" />
+                          <span>{title}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+              )}
               <label className="text-xs text-text-secondary">预计节省工时
                 <input type="number" min={0} step="0.5" value={hoursSaved} onChange={(e) => setHoursSaved(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
               </label>
@@ -745,7 +965,7 @@ export default function ReportPage() {
                   await api.submitReviewFeedback(id, {
                     useful: feedbackUseful,
                     decision_changed: decisionChanged,
-                    fixes_suggested: report.priorityIssues.length,
+                    fixes_suggested: priorityFixes.length,
                     fixes_adopted: adoptedFixes.length,
                     adopted_fixes: adoptedFixes,
                     hours_saved: hoursSaved,
@@ -761,42 +981,114 @@ export default function ReportPage() {
           {feedbackError && <p className="mt-3 text-xs text-severity-critical">{feedbackError}</p>}
         </section>
       )}
-      {feedbackSent && <p className="mb-6 text-sm text-neon-green">已记录。后续可在“判断复利”查看价值指标。</p>}
+      {feedbackSent && <p className="mb-6 text-sm text-neon-green">已记录。后续可在"判断复利"查看价值指标。</p>}
     </div>
   )
 }
 
-function generateMarkdown(report: Report): string {
-  if (!report) return ''
+// ---------- 匿名体验版 ----------
+
+function GatedReportTeaser({ review, gated }: { review: Review | null; gated: RealReport }) {
+  const summary = gated.executive_summary
+  const fix = gated.priority_fixes?.[0]
+  const fixesHidden = gated.gated_counts?.priority_fixes_hidden ?? 0
+  const notesHidden = gated.gated_counts?.persona_notes_hidden ?? 0
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <Link to={review ? `/review/${review.id}` : '/'} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
+          <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
+        </Link>
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">{review?.target_title ?? '评审报告'}</h1>
+          <p className="text-sm text-text-secondary">体验版报告</p>
+        </div>
+      </div>
+
+      {summary && (
+        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
+          <h2 className="text-sm font-medium text-text-muted mb-3">执行摘要</h2>
+          <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-text-muted text-xs">发布风险</dt>
+              <dd className="mt-1 font-medium text-text-primary">
+                {RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-muted text-xs">证据充分度</dt>
+              <dd className="mt-1 font-medium text-text-primary">
+                {EVIDENCE_QUALITY_LABELS[summary.evidence_quality ?? ''] ?? summary.evidence_quality ?? '—'}
+              </dd>
+            </div>
+            {summary.primary_recommendation && (
+              <div className="col-span-2 sm:col-span-3">
+                <dt className="text-text-muted text-xs">主要建议</dt>
+                <dd className="mt-1 font-medium text-text-primary">{summary.primary_recommendation}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+
+      {fix && (
+        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
+          <h2 className="text-sm font-medium text-text-muted mb-3">优先修复项（预览）</h2>
+          <p className="font-medium text-text-primary">{fix.issue}</p>
+          {fix.why_it_matters && <p className="mt-1 text-sm text-text-secondary">{fix.why_it_matters}</p>}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-neon-green/30 bg-neon-green/5 p-6 text-center">
+        <Lock className="w-6 h-6 text-neon-green mx-auto mb-3" strokeWidth={1.5} />
+        <p className="text-text-primary font-medium">
+          还有 {fixesHidden} 条优先修复项、{notesHidden} 条角色视角未展示
+        </p>
+        <p className="mt-1 text-sm text-text-secondary">登录后可查看完整报告，且报告会保存在你的历史记录里</p>
+        <Link
+          to="/login"
+          className="mt-4 inline-block rounded-lg bg-neon-green px-5 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
+        >
+          登录查看完整报告
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+// ---------- 导出兜底（无服务端 markdown 时按真实字段现拼） ----------
+
+function generateMarkdown(report: RealReport): string {
   const lines: string[] = []
+  const summary = report.executive_summary
   lines.push('# 评审报告')
   lines.push('')
-  lines.push(`## 发布风险评估：${riskConfig[report.riskLevel as RiskLevel].label}`)
-  lines.push('')
-  lines.push(report.riskSummary)
-  lines.push('')
-  lines.push('## 立场分布')
-  lines.push('')
-  report.stanceDistribution.forEach((d: { stance: PrimaryStance; count: number }) => {
-    lines.push(`- ${stanceLabels[d.stance]}: ${d.count}`)
-  })
-  lines.push('')
-  lines.push('## 优先修复项')
-  lines.push('')
-  report.priorityIssues.forEach((issue) => {
-    lines.push(`### [${issue.severity.toUpperCase()}] ${issue.title}`)
+  if (summary) {
+    lines.push(`## 发布风险：${RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '未知'}`)
     lines.push('')
-    lines.push(issue.description)
+    lines.push(`- 主流立场：${summary.primary_recommendation ?? '—'}`)
+    lines.push(`- 证据充分度：${EVIDENCE_QUALITY_LABELS[summary.evidence_quality ?? ''] ?? summary.evidence_quality ?? '—'}`)
     lines.push('')
-    if (issue.evidence.length) {
-      lines.push('**证据：**')
-      issue.evidence.forEach((e: string) => lines.push(`- ${e}`))
+  }
+  const fixes = report.priority_fixes ?? []
+  if (fixes.length) {
+    lines.push('## 优先修复项')
+    lines.push('')
+    for (const fix of fixes) {
+      lines.push(`### [${(fix.severity ?? 'medium').toUpperCase()}] ${fix.issue ?? ''}`)
+      lines.push('')
+      if (fix.why_it_matters) lines.push(fix.why_it_matters)
+      if (fix.suggested_fix) lines.push(`**建议**：${fix.suggested_fix}`)
       lines.push('')
     }
-  })
-  lines.push('## 信息缺口')
-  lines.push('')
-  report.informationGaps.forEach((g: string, i: number) => lines.push(`${i + 1}. ${g}`))
-  lines.push('')
+  }
+  const gaps = report.information_gaps ?? []
+  if (gaps.length) {
+    lines.push('## 信息缺口')
+    lines.push('')
+    gaps.forEach((g, i) => lines.push(`${i + 1}. ${g}`))
+    lines.push('')
+  }
   return lines.join('\n')
 }

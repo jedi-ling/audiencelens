@@ -11,6 +11,8 @@ const PACK_NAME_MAP: Record<string, string> = {
   'educational-serious': '教育严肃',
   'family-casual': '休闲家庭',
   'indie-creative': '独立创意',
+  'general-consumer': '通用消费者',
+  'startup-panel': '创业评审团',
 }
 
 interface PersonaState {
