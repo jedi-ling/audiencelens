@@ -15,7 +15,11 @@ web/backend/libs/
 
 # Standalone repos (separate GitHub repos)
 audiencelens-harness/
-audiencelens-v0.2-harness/
+# 注意：audiencelens-v0.2-harness/ 已转正入库——它是 web/backend 运行时读取的
+# 评委规则集（ethics/evaluation 服务），fresh clone 缺了它会静默降级为内置规则。
+
+# Web build output (admin/frontend dist)
+web/admin/dist/
 
 # Utility scripts
 copy-files.ps1

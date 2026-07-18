@@ -1,0 +1,19 @@
+required_sections:
+  - Disclaimer
+  - Executive Verdict
+  - Game Assumption Summary
+  - Player Panel
+  - Persona Reviews
+  - Consensus Findings
+  - Segment Disagreements
+  - Top Blockers
+  - Top Opportunities
+  - Priority Actions
+  - Real Playtest Questions
+  - Harness Self-Check
+
+critical_requirements:
+  - "Must not claim to predict real fun or market success."
+  - "Must include P0/P1/P2 actions."
+  - "Must include persona-specific differences."
+  - "Must treat demographic and MBTI fields as weak modifiers only."

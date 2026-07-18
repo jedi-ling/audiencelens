@@ -1,0 +1,12 @@
+panel_id: game-mixed
+version: "0.2"
+description: Mixed game audience panel for synthetic playtests.
+personas:
+  - core_indie_player
+  - casual_mobile_player
+  - steam_browser
+  - streamer_creator
+  - system_depth_player
+  - visual_first_player
+  - story_immersion_player
+  - toxic_reviewer

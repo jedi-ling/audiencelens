@@ -1,0 +1,10 @@
+panel_id: red-team-default
+version: "0.2"
+description: Red-team audience panel for harsh objection discovery.
+personas:
+  - toxic_reviewer
+  - competitor_loyalist
+  - price_sensitive_buyer
+  - impatient_first_time_user
+  - publisher_skeptic
+  - churn_prone_user

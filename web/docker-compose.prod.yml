@@ -1,0 +1,23 @@
+# 生产叠加层：Caddy 终结 TLS（自动申请/续期 Let's Encrypt 证书）。
+# 用法：
+#   1. cp .env.production.example .env 并填写（含 FRONTEND_BIND=127.0.0.1:8080 和 SITE_DOMAIN）
+#   2. docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - SITE_DOMAIN=${SITE_DOMAIN:-localhost}
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:

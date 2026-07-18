@@ -1,0 +1,10 @@
+panel_id: game-steam-page
+version: "0.2"
+description: Steam store page review panel.
+personas:
+  - steam_browser
+  - core_indie_player
+  - visual_first_player
+  - streamer_creator
+  - toxic_reviewer
+  - publisher_scout

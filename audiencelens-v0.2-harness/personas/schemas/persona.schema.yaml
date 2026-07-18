@@ -1,0 +1,24 @@
+schema_version: "0.2"
+description: "AudienceLens persona schema. Demographics and MBTI-like traits are weak modifiers only."
+
+required_fields:
+  - id
+  - name
+  - archetype
+  - identity_summary
+  - demographics
+  - personality_modifiers
+  - behavioral_profile
+  - motivations
+  - likes
+  - dislikes
+  - decision_rules
+  - quit_triggers
+  - continue_triggers
+  - first_scan_focus
+  - review_output
+
+anti_stereotype_rules:
+  - "Never say a persona reacts a certain way because of gender alone."
+  - "Never say a persona reacts a certain way because of MBTI alone."
+  - "Always tie feedback to behavior profile, context, decision rules, and input evidence."

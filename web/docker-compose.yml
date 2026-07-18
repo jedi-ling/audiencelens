@@ -1,15 +1,40 @@
+# 基础编排：backend + 用户前端 + 后台管理面板。
+# 变量从同目录 .env 读取（模板见 .env.production.example）。
+# 生产 TLS 叠加：docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ../src:/app/src:ro
+      # 评委规则集（ethics/evaluation 服务启动时读取；缺失会降级为内置规则）
+      - ../audiencelens-v0.2-harness:/audiencelens-v0.2-harness:ro
       - backend-data:/app/data
     environment:
+      - AL_ENV=${AL_ENV:-development}
+      - AL_CORS_ORIGINS=${AL_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      - AL_JWT_SECRET=${AL_JWT_SECRET:-dev-insecure-secret-change-me}
+      - AL_ENCRYPTION_KEY=${AL_ENCRYPTION_KEY:-}
+      - AL_ADMIN_TOKEN=${AL_ADMIN_TOKEN:-}
+      - AL_AUTH_ENABLED=${AL_AUTH_ENABLED:-false}
+      - AL_KEY_MODE=${AL_KEY_MODE:-byok}
+      - AL_QUOTA_ENABLED=${AL_QUOTA_ENABLED:-false}
+      - AL_QUOTA_MODE=${AL_QUOTA_MODE:-plan}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AL_RATELIMIT_PER_MINUTE=${AL_RATELIMIT_PER_MINUTE:-60}
+      - AL_RATELIMIT_REVIEW_PER_HOUR=${AL_RATELIMIT_REVIEW_PER_HOUR:-20}
+      - AL_QUEUE_WORKERS=${AL_QUEUE_WORKERS:-2}
+      - AUDIENCELENS_MAX_CONCURRENCY=${AUDIENCELENS_MAX_CONCURRENCY:-6}
+      - AL_DATABASE_URL=${AL_DATABASE_URL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
@@ -17,7 +42,21 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      # 默认直接占 80（无 TLS 的裸跑）。上 Caddy 时在 .env 设
+      # FRONTEND_BIND=127.0.0.1:8080 让出公网 80/443，由 Caddy 终结 TLS。
+      - "${FRONTEND_BIND:-80}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # 运营后台：只绑本机回环，不暴露公网。
+  # 远程访问走 SSH 隧道：ssh -L 5200:127.0.0.1:5200 服务器 → 浏览器开 http://localhost:5200
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:5200:80"
     depends_on:
       - backend
     restart: unless-stopped

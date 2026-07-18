@@ -55,6 +55,18 @@ class Settings:
         self.jwt_secret: str = os.environ.get("AL_JWT_SECRET", "dev-insecure-secret-change-me")
         self.jwt_ttl_seconds: int = _int("AL_JWT_TTL_SECONDS", 7 * 24 * 3600)
         self.anonymous_user_id: str = "anonymous"
+        # BYOK/平台 key 落库加密的密钥，与 JWT 签名密钥分离——
+        # 轮换 JWT 密钥只会踢掉登录态，不该让所有已存的 API key 变成解不开的密文。
+        # 未设置时回落 jwt_secret（兼容存量数据：旧密文都是用 jwt_secret 加密的）。
+        self.encryption_key: str = os.environ.get("AL_ENCRYPTION_KEY") or self.jwt_secret
+
+        # 生产环境裸奔检查：默认 JWT 密钥同时守着登录态和 key 加密，
+        # production 下必须显式配置，否则拒绝启动（fail fast 好过带病上线）。
+        if self.env == "production" and self.jwt_secret == "dev-insecure-secret-change-me":
+            raise RuntimeError(
+                "AL_ENV=production 但 AL_JWT_SECRET 仍是开发默认值。"
+                "请设置强随机密钥后再启动（openssl rand -hex 32）。"
+            )
 
         # ---- LLM key 解析策略（埋线：BYOK vs 托管）----
         # "byok"    : 只用用户自带 key（服务端不垫钱）
@@ -65,6 +77,10 @@ class Settings:
 
         # ---- 配额 / 计费（埋线：默认关闭，打开即生效）----
         self.quota_enabled: bool = _bool("AL_QUOTA_ENABLED", False)
+        # plan   = 按套餐日限额（免费档每天 N 次，CDK 次数在日限用完后垫）
+        # credits = 纯次数制：每次服务端 key 评审消耗 1 次 CDK 余额，用完即止，无每日刷新
+        #           ——"一个码 10 次，用完就没了"，适合 CDK 发码运营
+        self.quota_mode: str = os.environ.get("AL_QUOTA_MODE", "plan").lower()
         self.quota_free_reviews_per_day: int = _int("AL_QUOTA_FREE_REVIEWS_PER_DAY", 5)
         self.quota_free_cost_usd_per_day: float = float(
             os.environ.get("AL_QUOTA_FREE_COST_USD_PER_DAY", "1.0")
@@ -95,6 +111,16 @@ class Settings:
             ).split(",")
             if e.strip()
         }
+        # 图片走独立白名单：不进 upload_allowed_ext（那个是"抽取成文字材料"的格式），
+        # 图片是原样转 data URI 塞进多模态请求，见 src/runner/llm_client.py
+        self.upload_allowed_image_ext: set = {
+            e.strip().lower()
+            for e in os.environ.get(
+                "AL_UPLOAD_ALLOWED_IMAGE_EXT", ".png,.jpg,.jpeg,.webp,.gif"
+            ).split(",")
+            if e.strip()
+        }
+        self.upload_max_image_bytes: int = _int("AL_UPLOAD_MAX_IMAGE_BYTES", 8 * 1024 * 1024)
 
         # ---- 意图解析（埋线：无 key 时降级为启发式规则）----
         self.intent_llm_enabled: bool = _bool("AL_INTENT_LLM_ENABLED", True)
