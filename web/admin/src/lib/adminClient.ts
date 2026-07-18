@@ -7,7 +7,30 @@
  * （两个应用甚至可以部署在不同域名下）。
  */
 
-import { ApiError, type ApiErrorCode, type AdminJob, type AdminOverview, type AdminReviewRow, type AdminServerKeyStatus, type AdminSettingRow, type Plan } from './types'
+import {
+  ApiError,
+  type AdminAuditLogEntry,
+  type AdminCostStats,
+  type AdminJobDetail,
+  type AdminJobList,
+  type AdminLedgerOverview,
+  type AdminOverview,
+  type AdminPersonaPackStat,
+  type AdminPlan,
+  type AdminReviewDetail,
+  type AdminReviewList,
+  type AdminServerKeyStatus,
+  type AdminSettingRow,
+  type AdminTaskTypeStat,
+  type AdminTimeseries,
+  type AdminUserList,
+  type ApiErrorCode,
+  type CdkGenerateResult,
+  type CdkList,
+  type ListFilters,
+  type PlanEditableField,
+  type TestConnectionResult,
+} from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
 const ADMIN_TOKEN_KEY = 'al_admin.token'
@@ -51,8 +74,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
+function listQuery(filters: ListFilters = {}): string {
+  const params = new URLSearchParams()
+  if (filters.status) params.set('status', filters.status)
+  if (filters.userId) params.set('user_id', filters.userId)
+  if (filters.limit != null) params.set('limit', String(filters.limit))
+  if (filters.offset != null) params.set('offset', String(filters.offset))
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
 export const adminApi = {
   overview: () => request<AdminOverview>('/api/admin/overview'),
+
+  timeseries: (days = 14) => request<AdminTimeseries>(`/api/admin/timeseries?days=${days}`),
+
+  ledger: () => request<AdminLedgerOverview>('/api/admin/ledger'),
 
   listSettings: () => request<{ settings: AdminSettingRow[] }>('/api/admin/settings'),
 
@@ -65,22 +102,102 @@ export const adminApi = {
   resetSetting: (key: string) =>
     request<{ key: string; cleared: boolean }>(`/api/admin/settings/${key}`, { method: 'DELETE' }),
 
-  serverKeyStatus: () => request<AdminServerKeyStatus>('/api/admin/server-key'),
+  serverKeyStatus: (provider = 'anthropic') =>
+    request<AdminServerKeyStatus>(`/api/admin/server-key?provider=${provider}`),
 
-  setServerKey: (apiKey: string, provider = 'anthropic') =>
-    request<{ provider: string; masked: string }>('/api/admin/server-key', {
-      method: 'PUT',
-      body: JSON.stringify({ api_key: apiKey, provider }),
-    }),
+  setServerKey: (
+    apiKey: string,
+    provider = 'anthropic',
+    opts: { model?: string; apiBase?: string } = {},
+  ) =>
+    request<{ provider: string; model: string | null; api_base: string | null; masked: string }>(
+      '/api/admin/server-key',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ api_key: apiKey, provider, model: opts.model, api_base: opts.apiBase }),
+      },
+    ),
+
+  /** 真实测一次已保存的平台 key——走评审真正会用的那条链路，不是摆设。 */
+  testServerKey: (provider = 'anthropic') =>
+    request<TestConnectionResult>(`/api/admin/server-key/test?provider=${provider}`, { method: 'POST' }),
 
   deleteServerKey: (provider = 'anthropic') =>
     request<{ deleted: number }>(`/api/admin/server-key?provider=${provider}`, { method: 'DELETE' }),
 
-  plans: () => request<{ plans: Plan[] }>('/api/admin/plans'),
+  // ---------- CDK 兑换码 ----------
 
-  listJobs: (status?: string) =>
-    request<{ jobs: AdminJob[] }>(`/api/admin/jobs${status ? `?status=${status}` : ''}`),
+  generateCdk: (params: {
+    count: number
+    credits: number
+    max_uses?: number
+    expires_in_days?: number
+    note?: string
+  }) =>
+    request<CdkGenerateResult>('/api/admin/cdk/generate', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 
-  listReviews: (status?: string) =>
-    request<{ reviews: AdminReviewRow[] }>(`/api/admin/reviews${status ? `?status=${status}` : ''}`),
+  listCdk: (opts: { status?: string; limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams()
+    if (opts.status) q.set('status', opts.status)
+    if (opts.limit != null) q.set('limit', String(opts.limit))
+    if (opts.offset != null) q.set('offset', String(opts.offset))
+    const qs = q.toString()
+    return request<CdkList>(`/api/admin/cdk${qs ? `?${qs}` : ''}`)
+  },
+
+  disableCdk: (codeId: string) =>
+    request<{ id: string; disabled: boolean }>(`/api/admin/cdk/${codeId}/disable`, {
+      method: 'PUT',
+    }),
+
+  plans: () => request<{ plans: AdminPlan[] }>('/api/admin/plans'),
+
+  setPlanField: (planId: string, field: PlanEditableField, value: unknown) =>
+    request<AdminPlan>(`/api/admin/plans/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ field, value }),
+    }),
+
+  resetPlanField: (planId: string, field: PlanEditableField) =>
+    request<AdminPlan>(`/api/admin/plans/${planId}/${field}`, { method: 'DELETE' }),
+
+  auditLog: (limit = 100) => request<{ entries: AdminAuditLogEntry[] }>(`/api/admin/audit-log?limit=${limit}`),
+
+  listJobs: (filters: ListFilters = {}) => request<AdminJobList>(`/api/admin/jobs${listQuery(filters)}`),
+
+  jobDetail: (id: string) => request<AdminJobDetail>(`/api/admin/jobs/${id}`),
+
+  listReviews: (filters: ListFilters = {}) =>
+    request<AdminReviewList>(`/api/admin/reviews${listQuery(filters)}`),
+
+  reviewDetail: (id: string) => request<AdminReviewDetail>(`/api/admin/reviews/${id}`),
+
+  deleteReview: (id: string) =>
+    request<{ deleted: string }>(`/api/admin/reviews/${id}`, { method: 'DELETE' }),
+
+  listUsers: (opts: { q?: string; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.q) params.set('q', opts.q)
+    if (opts.limit != null) params.set('limit', String(opts.limit))
+    if (opts.offset != null) params.set('offset', String(opts.offset))
+    const qs = params.toString()
+    return request<AdminUserList>(`/api/admin/users${qs ? `?${qs}` : ''}`)
+  },
+
+  updateUser: (id: string, body: { plan?: string; is_active?: boolean }) =>
+    request<{ id: string; email: string; plan: string; is_active: boolean }>(
+      `/api/admin/users/${id}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  statsTaskTypes: () =>
+    request<{ task_types: AdminTaskTypeStat[] }>('/api/admin/stats/task-types'),
+
+  statsPersonaPacks: () =>
+    request<{ persona_packs: AdminPersonaPackStat[] }>('/api/admin/stats/persona-packs'),
+
+  statsCosts: (days = 30) => request<AdminCostStats>(`/api/admin/stats/costs?days=${days}`),
 }
