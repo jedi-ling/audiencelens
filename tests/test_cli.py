@@ -174,7 +174,7 @@ class TestRunSinglePersona:
         )
         assert result["persona_id"] == "P01-indie-core-operator"
         assert result["prompt"] != ""
-        assert result["model"] == "claude-sonnet"
+        assert result["model"] == "claude-sonnet-4-20250514"
         assert result["cost"] == 0.0
         assert result["error"] is None
         assert result["output"] is not None
@@ -200,7 +200,7 @@ class TestRunSinglePersona:
             artifact_texts=["游戏核心循环是探索-战斗-成长"],
             config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
         )
-        assert result["model"] == "claude-sonnet"
+        assert result["model"] == "claude-sonnet-4-20250514"
 
     def test_model_selection_haiku(self, budget_config):
         os.environ.pop("ANTHROPIC_API_KEY", None)
@@ -238,7 +238,7 @@ class TestRunSinglePersona:
             artifact_texts=["某游戏截图"],
             config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
         )
-        assert result["model"] == "claude-haiku"
+        assert result["model"] == "claude-haiku-4-5-20251001"
 
     def test_simulated_output_has_required_fields(self, sample_persona, budget_config):
         os.environ.pop("ANTHROPIC_API_KEY", None)

@@ -1,16 +1,18 @@
 version: 0.1.0
 max_cost_per_run_usd: 2.0
-default_model: claude-sonnet
-fallback_model: claude-haiku
-premium_model: claude-opus
+# 真实 Anthropic 模型 ID——早期版本这里写的是 "claude-sonnet" 这种占位别名，
+# 传给 Anthropic API 会直接 404。见 src/runner/llm_client.py 的调用点。
+default_model: claude-sonnet-4-20250514
+fallback_model: claude-haiku-4-5-20251001
+premium_model: claude-opus-4-20250514
 model_pricing:
-  claude-haiku:
-    input_per_mtok: 0.25
-    output_per_mtok: 1.25
-  claude-sonnet:
+  claude-haiku-4-5-20251001:
+    input_per_mtok: 1.0
+    output_per_mtok: 5.0
+  claude-sonnet-4-20250514:
     input_per_mtok: 3.0
     output_per_mtok: 15.0
-  claude-opus:
+  claude-opus-4-20250514:
     input_per_mtok: 15.0
     output_per_mtok: 75.0
 retry:

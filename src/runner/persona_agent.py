@@ -66,7 +66,12 @@ def _convert_handlebars_to_jinja2(template_str: str) -> str:
 
 def render_prompt(
     persona: dict, task_type: str, artifact_summary: str, template_path: str, artifact_bundle: dict = None
-) -> str:
+):
+    """返回纯文本 str，除非 artifact_bundle 里带了图片材料——那种情况下返回 OpenAI Vision
+    格式的内容块列表 [{"type":"text",...}, {"type":"image_url",...}]，交给
+    src/runner/llm_client.py 按目标 provider 转换成各自认的格式（见该模块 chat_completion）。
+    文字材料（type=="text"）照旧渲染进模板正文；图片材料（type=="image"，
+    image_data 是 data URI）单独拼成内容块，不进模板文本。"""
     with open(template_path, "r", encoding="utf-8") as f:
         template_str = f.read()
 
@@ -81,12 +86,14 @@ def render_prompt(
     decision_rules = persona.get("decision_rules", [])
     primary_decision_rule = decision_rules[0] if decision_rules else ""
 
-    artifact_materials = []
+    all_materials = []
     if artifact_bundle:
-        artifact_materials = artifact_bundle.get("materials", [])
+        all_materials = artifact_bundle.get("materials", [])
+    artifact_materials = [m for m in all_materials if m.get("type") != "image"]
+    image_materials = [m for m in all_materials if m.get("type") == "image" and m.get("image_data")]
 
     template = Template(template_str)
-    return template.render(
+    text_prompt = template.render(
         persona_yaml_minified=persona_yaml_minified,
         mbti=mbti,
         persona_name=persona_name,
@@ -96,6 +103,14 @@ def render_prompt(
         artifact_summary=artifact_summary,
         artifact_materials=artifact_materials,
     )
+
+    if not image_materials:
+        return text_prompt
+
+    content = [{"type": "text", "text": text_prompt}]
+    for m in image_materials:
+        content.append({"type": "image_url", "image_url": {"url": m["image_data"]}})
+    return content
 
 
 def parse_persona_output(raw_output: str) -> dict:
@@ -152,12 +167,14 @@ def estimate_cost(
 
 
 def select_model(persona: dict, budget_config: dict) -> str:
+    """按人格的 model_hint 分级选真实 Anthropic 模型 ID（不是 "claude-sonnet" 这种占位别名——
+    那种字符串传给 Anthropic API 会直接 404，见 budget.yaml 历史遗留的写法）。"""
     model_hint = persona.get("model_hint")
     if model_hint:
         model_map = {
-            "haiku": budget_config.get("fallback_model", "claude-haiku"),
-            "sonnet": budget_config.get("default_model", "claude-sonnet"),
-            "opus": budget_config.get("premium_model", "claude-opus"),
+            "haiku": budget_config.get("fallback_model", "claude-haiku-4-5-20251001"),
+            "sonnet": budget_config.get("default_model", "claude-sonnet-4-20250514"),
+            "opus": budget_config.get("premium_model", "claude-opus-4-20250514"),
         }
         return model_map.get(model_hint, f"claude-{model_hint}")
-    return budget_config.get("default_model", "claude-sonnet")
+    return budget_config.get("default_model", "claude-sonnet-4-20250514")

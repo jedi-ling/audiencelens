@@ -27,6 +27,10 @@ TASK_TYPE_DESCRIPTIONS = {
     "kickstarter_review": "众筹页：活动页、回报档位、支持者信任",
     "localization_review": "本地化：翻译质量、文化适配",
     "discord_community_review": "Discord 社区：社区管理、语气、互动模式",
+    "product_feedback_review": "产品反馈评审：通用产品反馈收集与解读，不限游戏",
+    "pricing_page_review": "定价页评审：定价分层、价值传达、信任信号，不限游戏",
+    "onboarding_review": "新手引导评审：首次使用体验、上手摩擦，不限游戏",
+    "pitch_review": "创业项目评审：BP/路演/申报表，投资人与尽调视角，不限行业",
 }
 
 PERSONA_PACKS = [
@@ -38,6 +42,8 @@ PERSONA_PACKS = [
     "vr-immersive",
     "accessibility",
     "educational-serious",
+    "general-consumer",
+    "startup-panel",
 ]
 
 VALID_MODES = ("quick", "standard", "full")

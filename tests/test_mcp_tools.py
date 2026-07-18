@@ -8,13 +8,17 @@ class TestDiscoveryTools:
         result = mcp_tools.list_task_types()
         ids = [t["id"] for t in result["task_types"]]
         assert "steam_page_review" in ids
-        assert len(ids) == 10
+        assert "product_feedback_review" in ids  # 通用产品向任务类型（不限游戏）
+        assert "pitch_review" in ids  # 创业项目评审
+        assert len(ids) == 14
         assert all(t["description"] for t in result["task_types"])
 
     def test_list_persona_packs(self):
         result = mcp_tools.list_persona_packs()
         assert "game-core" in result["persona_packs"]
-        assert len(result["persona_packs"]) == 8
+        assert "general-consumer" in result["persona_packs"]  # 通用产品向人格包（不限游戏）
+        assert "startup-panel" in result["persona_packs"]  # 创业评审团
+        assert len(result["persona_packs"]) == 10
 
     def test_list_personas_default_pack(self):
         result = mcp_tools.list_personas()

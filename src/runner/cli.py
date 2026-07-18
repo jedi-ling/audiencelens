@@ -16,6 +16,7 @@ try:
         run_cross_exam_protocol,
     )
     from .evidence_precheck import precheck_panel
+    from .llm_client import chat_completion
     from .panel_selector import load_personas, load_presets, select_panel
     from .persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
     from .validator import load_schema, validate_output
@@ -28,6 +29,7 @@ except ImportError:
         run_cross_exam_protocol,
     )
     from runner.evidence_precheck import precheck_panel
+    from runner.llm_client import chat_completion
     from runner.panel_selector import load_personas, load_presets, select_panel
     from runner.persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
     from runner.validator import load_schema, validate_output
@@ -49,6 +51,12 @@ VALID_TASK_TYPES = [
     "kickstarter_review",
     "localization_review",
     "discord_community_review",
+    # 通用产品向任务类型（不限游戏）——见 src/personas/general-consumer.yaml
+    "product_feedback_review",
+    "pricing_page_review",
+    "onboarding_review",
+    # 创业项目评审（BP/路演/申报表）——见 src/personas/startup-panel.yaml
+    "pitch_review",
 ]
 
 
@@ -116,13 +124,22 @@ def run_single_persona(
     config: dict,
     artifact_bundle: dict = None,
     api_key: str = None,
+    provider: str = "anthropic",
+    model_override: Optional[str] = None,
+    api_base: Optional[str] = None,
 ) -> dict:
     """api_key 显式传入优先于环境变量——多用户服务端并发跑评审时，
-    绝不能靠进程全局的 os.environ 注入 key（会在用户间串 key）。"""
+    绝不能靠进程全局的 os.environ 注入 key（会在用户间串 key）。
+
+    provider/api_base：BYOK 支持任意 OpenAI 兼容服务商（DeepSeek/Kimi/通义千问/智谱GLM/
+    Ollama…），不再只认 Anthropic，见 src/runner/llm_client.py。
+    model_override：非 Anthropic 服务商没有"haiku/sonnet/opus"分级概念，必须传一个具体
+    模型名；显式传了就优先于人格的 model_hint 分级（用户在 BYOK 里选了具体模型即是本意）。
+    """
     budget_config = config.get("budget", {})
     persona_prompt_path = config.get("persona_prompt_path", "")
 
-    model = select_model(persona, budget_config)
+    model = model_override or select_model(persona, budget_config)
 
     prompt = render_prompt(persona, task_type, artifact_summary, persona_prompt_path, artifact_bundle)
 
@@ -131,17 +148,13 @@ def run_single_persona(
 
     if api_key:
         try:
-            import anthropic
-
-            client = anthropic.Anthropic(api_key=api_key)
-            response = client.messages.create(
+            raw_output, input_tokens, output_tokens = chat_completion(
                 model=model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
+                api_key=api_key,
+                provider=provider,
+                api_base=api_base,
             )
-            raw_output = response.content[0].text
-            input_tokens = response.usage.input_tokens
-            output_tokens = response.usage.output_tokens
             cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
             output = parse_persona_output(raw_output)
             return {
@@ -189,13 +202,19 @@ def run_panel(
     max_concurrency: int = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
     api_key: str = None,
+    provider: str = "anthropic",
+    model_override: Optional[str] = None,
+    api_base: Optional[str] = None,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
     默认 None 时行为与旧版完全一致。
 
     api_key：显式传入优先于环境变量。服务端多用户并发时必须显式传，
-    避免通过进程全局 os.environ 注入导致用户间串 key（安全+计费问题）。"""
+    避免通过进程全局 os.environ 注入导致用户间串 key（安全+计费问题）。
+
+    provider/model_override/api_base：BYOK 选了非 Anthropic 服务商时透传下去，
+    见 run_single_persona 的同名参数说明。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -266,6 +285,9 @@ def run_panel(
         result = run_single_persona(
             persona, task_type, artifact_summary, artifact_texts, config, artifact_bundle,
             api_key=effective_api_key,
+            provider=provider,
+            model_override=model_override,
+            api_base=api_base,
         )
         if progress_callback is not None:
             with progress_lock:

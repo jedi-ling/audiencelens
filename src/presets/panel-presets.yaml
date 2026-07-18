@@ -60,3 +60,27 @@ presets:
     optional_personas: [P02, P29]
     min_panel_size: 4
     max_panel_size: 8
+  product_feedback_review:
+    description: 通用产品反馈评审（不限游戏）
+    default_personas: [P47, P49, P50, P51, P52]
+    optional_personas: [P46, P48]
+    min_panel_size: 3
+    max_panel_size: 7
+  pricing_page_review:
+    description: 定价页评审（不限游戏）
+    default_personas: [P46, P48, P47, P53]
+    optional_personas: [P49]
+    min_panel_size: 3
+    max_panel_size: 5
+  onboarding_review:
+    description: 新手引导评审（不限游戏）
+    default_personas: [P49, P52, P50, P51]
+    optional_personas: [P46]
+    min_panel_size: 3
+    max_panel_size: 5
+  pitch_review:
+    description: 创业项目/BP/路演评审（不限行业）
+    default_personas: [P54, P55, P57, P58, P59, P61]
+    optional_personas: [P56, P60]
+    min_panel_size: 4
+    max_panel_size: 8

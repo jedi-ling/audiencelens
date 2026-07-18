@@ -179,47 +179,49 @@ class TestParsePersonaOutput:
 
 class TestEstimateCost:
     def test_sonnet_pricing(self, budget_config):
-        cost = estimate_cost(1000, 500, "claude-sonnet", budget_config)
+        cost = estimate_cost(1000, 500, "claude-sonnet-4-20250514", budget_config)
         expected = (1000 / 1_000_000) * 3.0 + (500 / 1_000_000) * 15.0
         assert abs(cost - expected) < 1e-10
 
     def test_haiku_pricing(self, budget_config):
-        cost = estimate_cost(2000, 1000, "claude-haiku", budget_config)
-        expected = (2000 / 1_000_000) * 0.25 + (1000 / 1_000_000) * 1.25
+        cost = estimate_cost(2000, 1000, "claude-haiku-4-5-20251001", budget_config)
+        expected = (2000 / 1_000_000) * 1.0 + (1000 / 1_000_000) * 5.0
         assert abs(cost - expected) < 1e-10
 
     def test_opus_pricing(self, budget_config):
-        cost = estimate_cost(500, 200, "claude-opus", budget_config)
+        cost = estimate_cost(500, 200, "claude-opus-4-20250514", budget_config)
         expected = (500 / 1_000_000) * 15.0 + (200 / 1_000_000) * 75.0
         assert abs(cost - expected) < 1e-10
 
     def test_zero_tokens(self, budget_config):
-        cost = estimate_cost(0, 0, "claude-sonnet", budget_config)
+        cost = estimate_cost(0, 0, "claude-sonnet-4-20250514", budget_config)
         assert cost == 0.0
 
 
 class TestSelectModel:
+    """真实 Anthropic 模型 ID，不是 "claude-sonnet" 这种传给 API 会 404 的占位别名。"""
+
     def test_persona_with_model_hint(self, budget_config):
         persona = {"model_hint": "opus"}
         result = select_model(persona, budget_config)
-        assert result == "claude-opus"
+        assert result == "claude-opus-4-20250514"
 
     def test_persona_with_sonnet_hint(self, budget_config):
         persona = {"model_hint": "sonnet"}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet"
+        assert result == "claude-sonnet-4-20250514"
 
     def test_persona_with_haiku_hint(self, budget_config):
         persona = {"model_hint": "haiku"}
         result = select_model(persona, budget_config)
-        assert result == "claude-haiku"
+        assert result == "claude-haiku-4-5-20251001"
 
     def test_persona_without_model_hint_uses_default(self, budget_config):
         persona = {}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet"
+        assert result == "claude-sonnet-4-20250514"
 
     def test_persona_with_none_model_hint_uses_default(self, budget_config):
         persona = {"model_hint": None}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet"
+        assert result == "claude-sonnet-4-20250514"

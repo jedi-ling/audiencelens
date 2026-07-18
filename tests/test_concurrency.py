@@ -129,7 +129,7 @@ class TestExplicitApiKey:
         real = runner_cli.run_single_persona
 
         def spy(persona, task_type, artifact_summary, artifact_texts, config,
-                artifact_bundle=None, api_key=None):
+                artifact_bundle=None, api_key=None, **kwargs):
             seen.append(api_key)
             # 强制走模拟输出路径，避免真调 API
             return real(persona, task_type, artifact_summary, artifact_texts,
@@ -148,7 +148,7 @@ class TestExplicitApiKey:
         real = runner_cli.run_single_persona
 
         def spy(persona, task_type, artifact_summary, artifact_texts, config,
-                artifact_bundle=None, api_key=None):
+                artifact_bundle=None, api_key=None, **kwargs):
             seen.append(api_key)
             return real(persona, task_type, artifact_summary, artifact_texts,
                         config, artifact_bundle, api_key=None)
