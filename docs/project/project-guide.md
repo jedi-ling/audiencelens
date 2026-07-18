@@ -39,7 +39,7 @@ AudienceLens-Skills/          ← GitHub 开源版（CCGS 标准）
 │   └── docs/                 ← 5 个内部文档
 ├── .trae/skills/             ← Trae 技能目录（与 .claude 同步）
 ├── tools/
-│   └── parity-check.py       ← 一致性验证工具
+│   └── parity_check.py       ← 一致性验证工具
 ├── docs/
 │   ├── methodology.md        ← 方法论
 │   ├── roadmap.md            ← 路线图
@@ -95,7 +95,7 @@ AudienceLens-Server/          ← 服务器部署版
 - [x] 增强交叉质询模板（32行→231行，三轮辩论+改票+置信度）
 - [x] 补强伦理框架（OCEAN 对标 + EU AI Act + 合规差异）
 - [x] 优化 HTML 评价书（验证指标+交叉质询记录+合规横幅）
-- [x] 添加一致性验证脚本（parity-check.py）
+- [x] 添加一致性验证脚本（parity_check.py）
 - [x] 创建 audience-panel 完整文件（20 persona + 全套支撑）
 - [x] 创建 red-team 完整文件（5 persona + 全套支撑）
 - [x] 优化 Harness 评估器（量化阈值+自动评分）
@@ -127,7 +127,7 @@ AudienceLens-Server/          ← 服务器部署版
 
 | # | 任务 | 说明 | 预期产出 |
 |---|------|------|---------|
-| 1 | **真实用户对比验证** | 找 5-10 个真人评审同一产品，用 parity-check.py 计算一致性 | 一致性数据（目标 ≥80%） |
+| 1 | **真实用户对比验证** | 找 5-10 个真人评审同一产品，用 parity_check.py 计算一致性 | 一致性数据（目标 ≥80%） |
 | 2 | **第一个公开案例** | 找一个独立游戏开发者或产品团队做免费评审 | 案例文章 + 评价书截图 |
 | 3 | **arXiv 投稿** | 完善论文（加入真实验证数据），提交 arXiv | 学术背书 |
 
@@ -162,7 +162,7 @@ AudienceLens-Server/          ← 服务器部署版
 | **arXiv 论文** | `AudienceLens-Skills/docs/arxiv-paper.md` |
 | **基准测试** | `AudienceLens-Skills/docs/benchmark-report.md` |
 | **竞品对比** | `AudienceLens-Skills/docs/competitive-landscape.md` |
-| **一致性验证** | `AudienceLens-Skills/tools/parity-check.py` |
+| **一致性验证** | `AudienceLens-Skills/tools/parity_check.py` |
 | **伦理守则** | `AudienceLens-Skills/.claude/skills/synthetic-playtest/ethics.md` |
 | **交叉质询模板** | `AudienceLens-Skills/.claude/skills/synthetic-playtest/templates/cross-exam-prompt.md` |
 | **路线图** | `AudienceLens-Skills/docs/roadmap.md` |
@@ -178,7 +178,7 @@ AudienceLens-Server/          ← 服务器部署版
 | 后端 | Python 3.11+ / FastAPI |
 | 前端 | React 18 + TypeScript + Tailwind CSS |
 | 部署 | Docker + docker-compose |
-| 验证 | parity-check.py（纯 Python 标准库） |
+| 验证 | parity_check.py（纯 Python 标准库） |
 | 评估 | Harness 8 维度框架 |
 
 ---

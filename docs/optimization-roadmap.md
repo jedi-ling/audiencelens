@@ -55,7 +55,7 @@ python -m src.cli ablation concept_review examples/steam-page-sample/artifact.js
 
 ## P3：工程收尾（1 天，无 API key 也能做）
 
-1. **仓库根目录清理**：`_fix_contrast.py`、`fix_contrast.py`、`_sync_css.py`、`_write_parity.py`、`sync_and_create.py`、`patch_template.py`、`validate_syntax.py`、`write_report.py`、各 `write-*.ps1`、`copy-files.ps1`、`modify-paper.ps1` 是一次性脚本，移入 `scripts/archive/` 或删除；`audiencelens-landing-page.zip`、根目录 `index.html`、`docs/landing-page.html`（与 `docs/landing-page/` 重复）确认后删除；`audiencelens-harness/` 与 `audiencelens-v0.2-harness/` 两个平行目录与 `src/harness/` 的关系需要确认，保留一份
+1. ~~**仓库根目录清理**~~ ✅ 已完成（2026-07-19）：一次性脚本已移入 `scripts/archive/`；`audiencelens-landing-page.zip`/根目录 `index.html`/`docs/landing-page.html` 在此前会话中已删除；`tools/parity-check.py` 死代码副本已删除（保留 `tools/parity_check.py`，并同步修正了各文档引用）；重复的 `arxiv-paper*.md` 已统一到 `docs/paper/`；`docs/project-guide.md`/`docs/operation-guide.html` 顶层副本已删除（保留 `docs/project/` 下的版本）；`demo-report.html`/`demo-summary.md`/`CODE_WIKI.md` 孤立文件已删除。三个 harness 关系已在 [ARCHITECTURE.md](ARCHITECTURE.md) 补充说明：`src/harness/` 是内置引擎，`audiencelens-v0.2-harness/` 是后端运行时依赖（已修复其双重嵌套的目录结构问题），`audiencelens-harness/` 是完全独立的开源发行仓库（有自己的 `.git`，不做迁移——其 `.git/config` 里发现疑似明文 GitHub PAT，建议尽快轮换）
 2. **CLI 入口统一**：`pyproject.toml` 已提交但内容未审查过，把 `python -m src.cli` 注册为 console_script（如 `audiencelens` 命令），README 全部命令示例随之更新；`src/runner/cli.py` 的 `main()` 保留但在 README 里不再作为首选入口
 3. **`VALID_TASK_TYPES` 不一致**：`src/runner/cli.py:40` 只列了 6 种任务类型，README 宣传 10 种（缺 devlog_review、kickstarter_review、localization_review、discord_community_review）。补齐或改 README，二选一
 4. **Python 版本确认**：环境里 pytest 跑在 Python 3.8（`AppData\Roaming\Python\Python38`），但 README 徽章写 3.11+。统一口径，并确认 `sentence-transformers` 在目标版本可装

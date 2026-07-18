@@ -242,8 +242,8 @@ def parity_check(synthetic, human):
         _print(f"\n综合得分: {overall:.3f} | 等级: {_grade(overall)}")
 
     except ImportError:
-        _print("提示: parity-check 模块需要适配")
-        _print(f"  命令: python tools/parity-check.py --synthetic {synthetic} --human {human}")
+        _print("提示: parity_check 模块需要适配")
+        _print(f"  命令: python tools/parity_check.py --synthetic {synthetic} --human {human}")
     except Exception as e:
         _print(f"错误: {e}")
         sys.exit(1)

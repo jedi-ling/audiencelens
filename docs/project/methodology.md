@@ -14,7 +14,7 @@ AudienceLens 使用合成人格（Synthetic Persona）作为预验证工具。
   → 交叉质询增强版
   → 合成共识与分歧
   → 运行 Harness 质量检查
-  → 一致性验证（tools/parity-check.py）
+  → 一致性验证（tools/parity_check.py）
   → 产出行动计划
 ```
 
@@ -79,7 +79,7 @@ AudienceLens 改进了传统的"让分歧最大的两个 persona 互问"方式�
 
 ## 一致性验证
 
-使用 `tools/parity-check.py` 对合成评审与真人评审进行一致性验证，从四个维度衡量：
+使用 `tools/parity_check.py` 对合成评审与真人评审进行一致性验证，从四个维度衡量：
 
 | 维度 | 权重 | 说明 |
 |------|------|------|

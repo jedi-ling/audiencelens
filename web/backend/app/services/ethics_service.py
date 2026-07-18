@@ -11,7 +11,7 @@ from app.models import EthicsReport as EthicsReportModel
 from app.models import PersonaOutput
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-HARNESS_DIR = os.path.join(PROJECT_ROOT, "audiencelens-v0.2-harness", "audiencelens-v0.2-harness", "harness")
+HARNESS_DIR = os.path.join(PROJECT_ROOT, "audiencelens-v0.2-harness", "harness")
 
 STEREOTYPE_PATTERNS: List[Tuple[str, str, str]] = [
     (r"因为[她他].*是.*(?:女|男|女性|男性).*,.*所以", "gender_assumption", "基于性别的刻板假设"),

@@ -10,7 +10,7 @@
   - 结构化论证阶段（主张 + 依据 + 推理链）
   - 立场更新机制（confidence 漂移检测 + 立场迁移记录 + 收敛判定）
   - 跨技能质询适配（synthetic-playtest / audience-panel / red-team-audience）
-- **一致性验证工具**：tools/parity-check.py
+- **一致性验证工具**：tools/parity_check.py
   - 主题重叠度（Jaccard + 最佳匹配均值）
   - 评分相关性（Spearman rank correlation）
   - 立场对齐度（卡方距离分布相似度）
@@ -26,7 +26,7 @@
 ### 改进
 
 - CLAUDE.md 新增 Skills 表格（含 .claude/.trae 双路径引用）
-- CLAUDE.md 新增 Tools 章节（引用 parity-check.py）
+- CLAUDE.md 新增 Tools 章节（引用 parity_check.py）
 - CLAUDE.md 新增 Competitive Landscape 章节
 - methodology.md 新增交叉质询增强版详细描述
 - methodology.md 新增一致性验证章节

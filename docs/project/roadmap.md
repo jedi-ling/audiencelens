@@ -28,7 +28,7 @@
 - ✅ 75 个 Persona（50 游戏 + 20 产品 + 5 红队）
 - ✅ 交叉质询增强版（结构化论证 + 立场更新机制 + 收敛判定）
 - ✅ 跨技能质询适配（synthetic-playtest / audience-panel / red-team-audience）
-- ✅ 一致性验证工具（tools/parity-check.py）
+- ✅ 一致性验证工具（tools/parity_check.py）
 - ✅ 竞品对比文档（docs/competitive-landscape.md）
 - ✅ 10 个 Hook 脚本
 - ✅ .claude/skills/ 和 .trae/skills/ 双路径支持

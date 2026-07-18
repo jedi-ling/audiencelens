@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models import EvaluationResult, EvaluationScorecard, Review
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-HARNESS_DIR = os.path.join(PROJECT_ROOT, "audiencelens-v0.2-harness", "audiencelens-v0.2-harness", "harness")
+HARNESS_DIR = os.path.join(PROJECT_ROOT, "audiencelens-v0.2-harness", "harness")
 EVALUATORS_DIR = os.path.join(HARNESS_DIR, "evaluators")
 RUBRICS_DIR = os.path.join(HARNESS_DIR, "rubrics")
 
