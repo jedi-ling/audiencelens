@@ -21,8 +21,8 @@
 # 后端
 cd web/backend
 pip install -r requirements.txt
-python run.py                      # → http://localhost:8000
-                                   #   接口文档 http://localhost:8000/docs
+python run.py                      # → http://localhost:8001（与 vite 代理目标一致）
+                                   #   接口文档 http://localhost:8001/docs
 
 # 用户产品前端（另开一个终端）
 cd web/frontend
@@ -38,7 +38,7 @@ npm run dev                        # → http://localhost:5200（需先设 AL_AD
 **验证链路通了**：
 
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:8001/api/health
 # 应返回当前生效的开关；server_key_present 是布尔，绝不会回显密钥明文
 ```
 
@@ -49,7 +49,7 @@ curl http://localhost:8000/api/health
 
 ```bash
 python -m pytest tests/ -q                      # 核心引擎 251 项
-cd web/backend && python -m pytest tests/ -q    # 平台链路 74 项（含后台管理 22 项）
+cd web/backend && python -m pytest tests/ -q    # 平台链路 134 项（含后台管理 54 项、认证与报告分级 9 项、通用产品 12 项、创业评审团 7 项）
 cd web/frontend && npx tsc --noEmit             # 用户产品前端类型检查
 cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 ```
@@ -73,25 +73,65 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AL_AUTH_ENABLED` | `false` | false = 全匿名（开源单机形态） |
+| `AL_AUTH_ENABLED` | `false` | false = `/auth/register`\`/login` 关闭；true = 开放注册登录 |
 | `AL_JWT_SECRET` | `dev-insecure-...` | **生产必须改**；同时用于加密用户 key |
 | `AL_JWT_TTL_SECONDS` | `604800`（7天） | 令牌有效期 |
 
 > ⚠️ `AL_JWT_SECRET` 同时是**用户 API Key 的加密主密钥**。改它会导致已存的
 > 用户 key 解密失败（系统会当作"无 key"让用户重填，不会崩）。轮换前请通知用户。
 
+**这不是"全匿名 vs 强制登录"的二选一开关**——打开 `AL_AUTH_ENABLED` 只是让注册/登录
+接口可用，评审、Key 管理、意图解析这些路由用的是 `optional_identity`（`app/deps.py`），
+不带 token 永远回落匿名，不会 401。这是"体验机会 + 登录看详情"的技术基础：
+匿名用户随时能试用评审功能，登录只是解锁个人归属和完整报告详情（见架构文档 §2.6）——
+不是把产品从"开源单机"切换成"必须登录"的托管形态。
+
 ### LLM Key 策略
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `AL_KEY_MODE` | `byok` | `byok`（用户自带）/ `managed`（你的 key）/ `hybrid`（先用户后你） |
-| `ANTHROPIC_API_KEY` | 空 | 服务端 key；`managed`/`hybrid` 下必填 |
+| `ANTHROPIC_API_KEY` | 空 | 服务端 key（Anthropic 原生档）；`managed`/`hybrid` 下必填 |
+
+**多服务商**：BYOK/平台 key 都不再限定 Anthropic——`provider` 可选 `anthropic` 或
+`openai_compatible`（DeepSeek/Kimi/通义千问/智谱GLM/Ollama 等任意兼容 `/chat/completions`
+协议的服务），后者需额外填 `model` 和 `api_base`。出口统一走 `src/runner/llm_client.py`：
+不依赖 litellm（本仓库 Python 3.8 环境装不上，见模块 docstring），Anthropic 走官方 SDK，
+其余走裸 `httpx.post`。`/api/keys/test`、`/api/admin/server-key/test` 测的就是这条真实链路。
+
+**多模态**：`/api/uploads` 对图片扩展名（`.png/.jpg/.jpeg/.webp/.gif`）走独立分支，
+转成 `data:` URI 而非抽取文字；评审引擎把图片和文字一起塞进 OpenAI Vision 格式的内容块，
+只有 `llm_client.VISION_CAPABLE_PREFIXES` 里的视觉模型才会真正"看"，其余模型静默降级为纯文字。
+
+**CDK 兑换码**：后台面板批量生成（数量/每码次数/可兑人数/有效期/备注），用户在设置页
+免登录兑换。匿名兑换（认证开启时）自动签发游客身份——真实 User 行 + JWT，次数落到访客
+各自头上而不是共享匿名桶；前端把 token 存 localStorage，清缓存即丢（游客形态的固有代价）。
+兑换接口限流 10 次/分钟防暴力枚举，且所有不可用状态（不存在/停用/过期/用完）
+对外话术统一，不给枚举者可区分信号。次数只对服务端垫付 key 生效（BYOK 本来就不限量）。
+
+**两种配额模式**（`AL_QUOTA_MODE`，后台面板可实时切换）：
+
+| 模式 | 语义 | 适用场景 |
+|---|---|---|
+| `plan`（默认） | 套餐日限额；CDK 次数在日限用完后垫。成本日上限是硬闸，次数不能绕过 | 有免费额度的 SaaS 形态 |
+| `credits` | 纯次数制："一个码 10 次，用完就没了"。每次评审消耗 1 次余额，余额 0 → 402 引导兑换；无每日刷新、无套餐日限 | CDK 发码运营——用户没有免费额度，全靠兑换 |
+
+`credits` 模式下总成本由发码量控制（单次评审有 budget.yaml 的 `max_cost_per_run_usd` 封顶）。
+CDK 发码运营的典型部署组合：
+
+```bash
+AL_AUTH_ENABLED=true      # 匿名兑换自动签发游客身份的前提
+AL_QUOTA_ENABLED=true
+AL_QUOTA_MODE=credits
+AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
+```
 
 ### 配额与限流
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `AL_QUOTA_ENABLED` | `false` | **注意：关着也照常记账**，随时可开始计费 |
+| `AL_QUOTA_MODE` | `plan` | `plan`（套餐日限）/ `credits`（纯 CDK 次数制，用完即止）——见"两种配额模式" |
 | `AL_QUOTA_FREE_REVIEWS_PER_DAY` | `5` | 仅约束走服务端 key 的评审 |
 | `AL_QUOTA_FREE_COST_USD_PER_DAY` | `1.0` | 同上 |
 | `AL_RATELIMIT_ENABLED` | `true` | |
@@ -136,18 +176,33 @@ npm run dev          # http://localhost:5200
    接口整体返回 503，这是安全默认值，绝不无密钥暴露管理接口。
 2. 面板输入同一个 token 解锁（`X-Admin-Token` 请求头，独立的 localStorage 键
    `al_admin.token`，与用户产品前端的登录态毫无关系）。
-3. 面板提供四块能力：
-   - **系统概览**：跨用户聚合的评审/用量/判断留档/任务队列统计（不是某个 user_id 的切片）
+3. 面板提供以下能力：
+   - **系统概览**：跨用户聚合的评审/用量/判断留档/任务队列统计（不是某个 user_id 的切片），
+     附一张近 N 天评审量/状态分布/成本的趋势图（无第三方图表库，纯 SVG，够用即可）
+   - **判断复利（全局）**：`ledger_service.hit_rate`/`persona_leaderboard` 传 `user_id=None`
+     跨全体用户聚合的命中率与人格排行——产品的护城河指标第一次能在后台看到全局视角
    - **运行时配置**：`quota_enabled`、`ratelimit_*`、`key_mode`、`review_concurrency`
-     等白名单项，改了立即生效、**不需要重启进程**——落在新表 `platform_settings`，
+     等白名单项，改了立即生效、**不需要重启进程**——落在表 `platform_settings`，
      DB 覆盖值优先于环境变量默认值；"重置"按钮清除覆盖、回落 env 默认值
    - **平台级 API Key**：托管/混合模式下服务端垫付的 key，复用 `UserApiKey` 表
      （保留 user_id `__platform__`），此设置优先于环境变量 `ANTHROPIC_API_KEY`
-   - **任务 / 评审巡检**：最近任务与评审的只读列表，按状态筛选
+   - **套餐（可编辑）**：pro/team 的月价与每日额度可在面板直接改，同样落
+     `platform_settings`（键名前缀 `plan_override:`）、改动立即生效、可逐字段重置；
+     free 档的额度沿用 `quota_free_*` 配置项，这里不重复放开，避免两套覆盖机制打架
+   - **用户管理**：注册用户列表（带评审数/累计成本聚合）、按邮箱搜索、改套餐、
+     停用/启用——停用立即生效（登录被拒、已有 token 失效），全部写入审计日志
+   - **统计分析**：任务类型分布（完成/失败分段条形图）、人格包使用量、
+     成本构成（BYOK vs 平台垫付占比 + 消耗 Top 用户）
+   - **操作审计**：谁在何时改了哪个配置/套餐/平台 Key/用户（`admin_audit_log` 表，只增不改；
+     当前只有单一共享令牌，不区分具体管理员身份，多管理员场景需要先接入独立身份体系）
+   - **任务 / 评审巡检**：支持按 `status`/`user_id`/时间范围过滤 + 分页的列表，
+     点击一行可下钻查看完整详情（含 `payload`/`report_json` 等原始数据）；
+     评审可从详情抽屉删除（二次确认 + 审计，计费流水不随评审删除）
 
 只有白名单里的键可被后台面板调整（见 `app/services/admin_settings_service.py`
-的 `ADJUSTABLE` 字典）——`jwt_secret`、`database_url`、`cors_origins` 这类需要
-重启才能安全生效的基础设施配置，不放进这里，面板也不会显示可编辑项。
+的 `ADJUSTABLE` 字典，套餐字段见 `plan_service.OVERRIDABLE_PLAN_FIELDS`）——
+`jwt_secret`、`database_url`、`cors_origins` 这类需要重启才能安全生效的基础设施
+配置，不放进这里，面板也不会显示可编辑项。
 
 **生产部署**：`web/admin` 构建后是纯静态文件（`npm run build` → `dist/`），
 和用户产品前端一样丢进任意静态托管；不同的是它不需要暴露在公网——建议只挂
