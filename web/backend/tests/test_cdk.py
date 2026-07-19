@@ -318,3 +318,46 @@ class TestUsageExposesBalance:
         r = client.get("/api/usage")
         assert r.status_code == 200
         assert r.json()["bonus_credits"] == 9
+
+
+class TestAtomicity:
+    """并发双花防线：检查与扣减必须是同一条原子语句。"""
+
+    def test_consume_cannot_go_negative(self, client, db):
+        from app.services import cdk_service
+
+        user_id = "atomic-user-1"
+        db.add(CreditLedger(user_id=user_id, delta=1, reason="cdk_redeem"))
+        db.commit()
+        # 余额 1：第一次成功，第二次必须失败（而不是把余额扣成 -1）
+        assert cdk_service.try_consume_credit(db, user_id) is True
+        assert cdk_service.try_consume_credit(db, user_id) is False
+        assert cdk_service.credit_balance(db, user_id) == 0
+
+    def test_consume_zero_balance_rejected(self, client, db):
+        from app.services import cdk_service
+
+        assert cdk_service.try_consume_credit(db, "atomic-user-2") is False
+        assert cdk_service.credit_balance(db, "atomic-user-2") == 0
+
+    def test_redeem_cannot_exceed_max_uses(self, client, db):
+        from app.services import cdk_service
+
+        code_str = _generate(client, credits=5, max_uses=1)["codes"][0]
+        cdk_service.redeem(db, code_str, "atomic-user-3")
+        # 第二个用户兑同一单次码：条件 UPDATE 拿不到名额，必须失败
+        with pytest.raises(cdk_service.CdkError):
+            cdk_service.redeem(db, code_str, "atomic-user-4")
+        row = db.query(CdkCode).filter(CdkCode.code == code_str).first()
+        assert row.used_count == 1  # 没有被并发超发
+
+    def test_redeem_duplicate_user_rolls_back_increment(self, client, db):
+        from app.services import cdk_service
+
+        code_str = _generate(client, credits=5, max_uses=10)["codes"][0]
+        cdk_service.redeem(db, code_str, "atomic-user-5")
+        with pytest.raises(cdk_service.CdkError):
+            cdk_service.redeem(db, code_str, "atomic-user-5")
+        row = db.query(CdkCode).filter(CdkCode.code == code_str).first()
+        assert row.used_count == 1  # 重复兑换的自增被回滚
+        assert cdk_service.credit_balance(db, "atomic-user-5") == 5  # 只发了一次

@@ -28,13 +28,50 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 
 def init_db() -> None:
-    """建表 + 轻量迁移。
+    """建表 + 轻量迁移 + 孤儿任务收尸。
 
     生产环境应改用 Alembic（见 docs/MAINTENANCE.md「数据库迁移」）。
     这里的 create_all 只新增缺失的表，不会改动已有表结构。
     """
     Base.metadata.create_all(engine)
     _legacy_migrations()
+    _reap_orphans()
+
+
+def _reap_orphans() -> None:
+    """进程重启后，上一个进程遗留的 queued/running 任务永远不会有人接手
+    （队列在内存里）——不收尸的话对应评审就一直"进行中"转圈到天荒地老。
+    启动时统一标记 failed，用户端能看到明确的失败提示并重新发起。"""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import text
+
+    msg = "服务重启，任务中断——请重新发起评审"
+    now = datetime.now(timezone.utc)
+    with engine.connect() as conn:
+        jobs = conn.execute(
+            text(
+                "UPDATE jobs SET status='failed', error_message=:msg, finished_at=:now "
+                "WHERE status IN ('queued','running')"
+            ),
+            {"msg": msg, "now": now},
+        )
+        reviews = conn.execute(
+            text(
+                "UPDATE reviews SET status='failed', error_message=:msg, completed_at=:now "
+                "WHERE status IN ('pending','running')"
+            ),
+            {"msg": msg, "now": now},
+        )
+        conn.commit()
+    if jobs.rowcount or reviews.rowcount:
+        import logging
+
+        logging.getLogger("audiencelens").warning(
+            "启动收尸：标记 %d 个孤儿 job、%d 个孤儿 review 为 failed",
+            jobs.rowcount,
+            reviews.rowcount,
+        )
 
 
 def _legacy_migrations() -> None:

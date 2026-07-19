@@ -140,12 +140,23 @@ export default function AskPage() {
     }
   }
 
+  const MAX_ATTACHMENTS = 8 // data URI 全量驻留内存，不设上限的话几十张截图能把页面拖垮
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     setUploading(true)
     try {
       for (const file of Array.from(files)) {
         try {
+          if (attachments.length >= MAX_ATTACHMENTS) {
+            appendMessage({
+              id: nextId(),
+              role: 'assistant',
+              kind: 'error',
+              text: `最多附带 ${MAX_ATTACHMENTS} 张图片——先移除几张再继续上传`,
+            })
+            break
+          }
           const result = await api.upload(file)
           if (result.kind === 'image') {
             setAttachments((prev) => [
@@ -182,6 +193,9 @@ export default function AskPage() {
 
   const confirmAndCreate = async (msgId: string, intent: IntentResult) => {
     if (!intent.task_type) return
+    // 全局防重：多张确认卡片共存时，任何一张在提交中都不允许再发——
+    // 否则双击/连点会创建出两个评审
+    if (submittingId !== null) return
     setSubmittingId(msgId)
     try {
       const artifactText = historyRef.current.join('\n')

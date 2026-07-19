@@ -99,7 +99,7 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
               无套餐日限——总成本由发码量控制（单次评审有 budget.yaml
               的 max_cost_per_run_usd 封顶）。
 
-    消耗发生在校验通过的瞬间（同一事务外，见 cdk_service.consume_credit 注释）：
+    消耗发生在校验通过的瞬间（原子扣减，见 cdk_service.try_consume_credit）：
     极端情况下评审入队失败会白扣 1 次，v1 接受这个代价换实现简单。
     """
     if not _quota_enabled(db) or key_source != "server":
@@ -109,12 +109,12 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
 
     mode = admin_settings_service.get(db, "quota_mode", settings.quota_mode)
     if mode == "credits":
-        if cdk_service.credit_balance(db, user_id) <= 0:
+        # 查余额和扣减是同一条原子语句——并发请求不可能把余额扣成负数
+        if not cdk_service.try_consume_credit(db, user_id):
             raise QuotaExceeded(
                 "评审次数已用完。请兑换 CDK 获得次数，"
                 "或填写自己的 API Key（BYOK）以不受限制使用。"
             )
-        cdk_service.consume_credit(db, user_id)
         return
 
     plan_info = plan_service.get_plan(plan, db)
@@ -152,8 +152,7 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
         or 0
     )
     if count >= reviews_limit:
-        if cdk_service.credit_balance(db, user_id) > 0:
-            cdk_service.consume_credit(db, user_id)
+        if cdk_service.try_consume_credit(db, user_id):
             return
         raise QuotaExceeded(
             f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"

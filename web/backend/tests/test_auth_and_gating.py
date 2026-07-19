@@ -175,3 +175,50 @@ class TestResolveLlmKeyProgressiveAuth:
         )
         assert r.status_code == 428
         assert r.json()["error"]["code"] == "llm_key_missing"
+
+
+class TestWebSocketOwnership:
+    """WS 归属校验：登录用户的评审只有本人能订阅。"""
+
+    def _mk_review(self, db, user_id):
+        from app.models import Review
+
+        row = Review(
+            user_id=user_id,
+            task_type="concept_review",
+            artifact_bundle={"text": "x"},
+            status="running",
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row.id
+
+    def test_stranger_cannot_subscribe_to_owned_review(self, client, db):
+        import pytest as _pytest
+        from starlette.websockets import WebSocketDisconnect
+
+        rid = self._mk_review(db, "owner-user-1")
+        # 不带 token（匿名）订阅别人的评审 → 服务端在握手后立即关闭
+        with _pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect(f"/ws/review/{rid}"):
+                pass
+        assert exc.value.code == 4403
+
+    def test_owner_can_subscribe_with_token(self, client, db):
+        from app.config import settings
+        from app.core.security import create_token
+
+        rid = self._mk_review(db, "owner-user-2")
+        token = create_token("owner-user-2", settings.jwt_secret, 300)
+        with client.websocket_connect(f"/ws/review/{rid}?token={token}"):
+            pass  # 能建立连接不被拒即通过
+
+    def test_unknown_review_closed(self, client):
+        import pytest as _pytest
+        from starlette.websockets import WebSocketDisconnect
+
+        with _pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect("/ws/review/no-such-id"):
+                pass
+        assert exc.value.code == 4404

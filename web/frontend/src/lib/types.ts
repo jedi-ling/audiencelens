@@ -300,6 +300,7 @@ export type WsEventName =
   | 'review.started'
   | 'review.progress'
   | 'review.persona_completed'
+  | 'review.cancelled'
   | 'review.completed'
   | 'review.failed'
 

@@ -65,7 +65,8 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     _require_auth_enabled()
     email = body.email.strip().lower()
     if db.query(User).filter(User.email == email).first():
-        raise BadRequest("该邮箱已注册")
+        # 不说"已注册"——那等于替枚举者确认这个邮箱存在账号
+        raise BadRequest("该邮箱不可用，请更换邮箱；若已有账号请直接登录")
     user = User(
         email=email,
         password_hash=hash_password(body.password),
@@ -82,7 +83,12 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
 async def login(body: LoginRequest, db: Session = Depends(get_db)):
     _require_auth_enabled()
     user = db.query(User).filter(User.email == body.email.strip().lower()).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    if not user:
+        # 对不存在的邮箱也算一次哈希——抹平"跳过验证"带来的响应时长差，
+        # 否则计时攻击能区分邮箱是否注册过
+        verify_password(body.password, hash_password("timing-equalizer"))
+        raise Unauthorized("邮箱或密码错误")
+    if not verify_password(body.password, user.password_hash):
         raise Unauthorized("邮箱或密码错误")
     if not user.is_active:
         raise Unauthorized("账号已停用")
@@ -256,10 +262,23 @@ async def upload_file(
     前端把它塞进 material {type: "image", image_data: ...} 交给多模态模型直接"看"。"""
     ext = os.path.splitext(file.filename or "")[1].lower()
 
+    async def _read_capped(limit: int, label: str) -> bytes:
+        """分块读并在超限的那一刻立即中止——不能先把整个 body 吸进内存再检查，
+        否则一个超大请求体就能打爆进程内存（大小检查形同虚设）。"""
+        chunks = []
+        total = 0
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > limit:
+                raise BadRequest(f"{label}超过上限 {limit // 1024 // 1024} MB")
+            chunks.append(chunk)
+        return b"".join(chunks)
+
     if ext in settings.upload_allowed_image_ext:
-        raw = await file.read()
-        if len(raw) > settings.upload_max_image_bytes:
-            raise BadRequest(f"图片超过上限 {settings.upload_max_image_bytes // 1024 // 1024} MB")
+        raw = await _read_capped(settings.upload_max_image_bytes, "图片")
         import base64
 
         media_type = _IMAGE_MEDIA_TYPES.get(ext, "application/octet-stream")
@@ -278,9 +297,7 @@ async def upload_file(
             f"图片类允许：{', '.join(sorted(settings.upload_allowed_image_ext))}"
         )
 
-    raw = await file.read()
-    if len(raw) > settings.upload_max_bytes:
-        raise BadRequest(f"文件超过上限 {settings.upload_max_bytes // 1024 // 1024} MB")
+    raw = await _read_capped(settings.upload_max_bytes, "文件")
 
     try:
         text = raw.decode("utf-8")

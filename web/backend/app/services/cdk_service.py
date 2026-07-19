@@ -14,7 +14,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import CdkCode, CdkRedemption, CreditLedger
@@ -176,14 +177,32 @@ def redeem(db: Session, code_str: str, user_id: str) -> dict:
     if already:
         raise CdkError("你已经兑换过这个码了")
 
-    row.used_count += 1
+    # used_count 的检查与自增必须是同一条语句——上面的预检只是快速失败，
+    # 并发时两个请求都可能通过预检，靠这里的条件 UPDATE 保证不超发
+    claimed = db.execute(
+        text(
+            "UPDATE cdk_codes SET used_count = used_count + 1 "
+            "WHERE id = :cid AND is_disabled = 0 AND used_count < max_uses "
+            "AND (expires_at IS NULL OR expires_at >= :now)"
+        ),
+        {"cid": row.id, "now": datetime.utcnow()},
+    )
+    if claimed.rowcount != 1:
+        db.rollback()
+        raise CdkError("兑换码无效或已被使用")
+
     db.add(CdkRedemption(code_id=row.id, user_id=user_id, credits=row.credits))
     db.add(
         CreditLedger(
             user_id=user_id, delta=row.credits, reason="cdk_redeem", ref_id=row.id
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # (code_id, user_id) 唯一约束兜底：并发重复兑换时回滚（连同上面的自增一起撤销）
+        db.rollback()
+        raise CdkError("你已经兑换过这个码了")
     return {"credits_granted": row.credits, "balance": credit_balance(db, user_id)}
 
 
@@ -196,7 +215,24 @@ def credit_balance(db: Session, user_id: str) -> int:
     return int(total or 0)
 
 
-def consume_credit(db: Session, user_id: str, ref_id: Optional[str] = None) -> None:
-    """消耗一次。调用方（quota_service）自己保证余额充足后再调。"""
-    db.add(CreditLedger(user_id=user_id, delta=-1, reason="review", ref_id=ref_id))
+def try_consume_credit(db: Session, user_id: str, ref_id: Optional[str] = None) -> bool:
+    """原子地"查余额并扣一次"：余额 > 0 才插入 -1 流水，返回是否扣成功。
+
+    检查与扣减在同一条 INSERT...SELECT...WHERE 里完成——两个并发请求
+    不可能都在余额 1 时通过（分开的 check-then-consume 会把余额扣成负数）。
+    """
+    result = db.execute(
+        text(
+            "INSERT INTO credit_ledger (id, user_id, delta, reason, ref_id, created_at) "
+            "SELECT :id, :uid, -1, 'review', :ref, :now "
+            "WHERE (SELECT COALESCE(SUM(delta), 0) FROM credit_ledger WHERE user_id = :uid) > 0"
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "uid": user_id,
+            "ref": ref_id,
+            "now": datetime.utcnow(),
+        },
+    )
     db.commit()
+    return result.rowcount == 1

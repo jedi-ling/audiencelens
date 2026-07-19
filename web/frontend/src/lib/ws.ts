@@ -11,6 +11,7 @@
  */
 
 import type { WsEvent, WsEventName } from './types'
+import { getToken } from './apiClient'
 
 type Handler = (event: WsEvent) => void
 
@@ -23,7 +24,7 @@ export interface ReviewSocketOptions {
   maxRetries?: number
 }
 
-const TERMINAL: WsEventName[] = ['review.completed', 'review.failed']
+const TERMINAL: WsEventName[] = ['review.completed', 'review.failed', 'review.cancelled']
 
 export function connectReviewSocket(reviewId: string, opts: ReviewSocketOptions) {
   const { onEvent, onOpen, onClose, onUnavailable, maxRetries = 5 } = opts
@@ -34,7 +35,12 @@ export function connectReviewSocket(reviewId: string, opts: ReviewSocketOptions)
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const base = (import.meta.env.VITE_API_BASE as string) || window.location.origin
-  const wsUrl = base.replace(/^http/, 'ws') + `/ws/review/${reviewId}`
+  // 浏览器 WS 不能带自定义 header，token 走查询参数——后端据此校验评审归属
+  const token = getToken()
+  const wsUrl =
+    base.replace(/^http/, 'ws') +
+    `/ws/review/${reviewId}` +
+    (token ? `?token=${encodeURIComponent(token)}` : '')
 
   const open = () => {
     if (closedByUs) return

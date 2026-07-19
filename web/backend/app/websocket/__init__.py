@@ -71,6 +71,24 @@ WS_EVENTS = (
 )
 
 
+def _resolve_ws_user(websocket: WebSocket) -> str:
+    """从 ?token= 解析身份；无 token 或 token 无效一律按匿名处理。
+
+    浏览器 WebSocket API 不能带自定义 header，所以 token 走查询参数。
+    与 HTTP 侧 optional_identity 同一哲学：不 401，静默回落匿名。
+    """
+    token = websocket.query_params.get("token") or ""
+    if not token:
+        return settings.anonymous_user_id
+    try:
+        from app.core.security import decode_token
+
+        payload = decode_token(token, settings.jwt_secret)
+        return str(payload.get("sub") or settings.anonymous_user_id)
+    except Exception:
+        return settings.anonymous_user_id
+
+
 @router.websocket("/ws/review/{review_id}")
 async def review_websocket(websocket: WebSocket, review_id: str):
     # 安全措施：验证 WebSocket 连接的 origin，防止跨站劫持攻击
@@ -78,6 +96,26 @@ async def review_websocket(websocket: WebSocket, review_id: str):
     if origin and origin not in ALLOWED_WS_ORIGINS:
         await websocket.close(code=4001, reason="Origin not allowed")
         return
+
+    # 归属校验：登录用户的评审只有本人能订阅——
+    # 不做这一步的话，任何人拿到 review_id 就能旁听别人的报告内容
+    from app.db import SessionLocal
+    from app.models import Review
+
+    db = SessionLocal()
+    try:
+        review = db.get(Review, review_id)
+    finally:
+        db.close()
+    if review is None:
+        await websocket.close(code=4404, reason="Review not found")
+        return
+    owner = review.user_id or settings.anonymous_user_id
+    if owner != settings.anonymous_user_id:
+        if _resolve_ws_user(websocket) != owner:
+            await websocket.close(code=4403, reason="Not your review")
+            return
+
     if manager._loop is None:
         manager.set_loop(asyncio.get_running_loop())
     await manager.connect(review_id, websocket)

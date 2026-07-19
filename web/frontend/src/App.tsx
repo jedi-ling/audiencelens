@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router'
-import { lazy, Suspense } from 'react'
+import { Component, lazy, Suspense, type ReactNode } from 'react'
 import Layout from '@/components/Layout'
 
 const LandingPage = lazy(() => import('@/pages/landing/LandingPage'))
@@ -19,9 +19,36 @@ const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 
+/** Suspense 不捕获加载错误——发版后旧 chunk 404 会直接白屏，必须有边界兜底。 */
+class ChunkErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg-primary text-text-secondary">
+          <p className="text-sm">页面加载失败——可能是刚发布了新版本。</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg border border-neon-green/30 bg-neon-green/10 px-4 py-2 text-sm text-neon-green transition-all hover:bg-neon-green/20"
+          >
+            刷新页面
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ChunkErrorBoundary>
       <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route element={<Layout />}>
@@ -48,6 +75,7 @@ export default function App() {
           </Route>
         </Routes>
       </Suspense>
+      </ChunkErrorBoundary>
     </BrowserRouter>
   )
 }
