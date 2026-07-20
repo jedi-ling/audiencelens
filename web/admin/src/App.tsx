@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Lock, RefreshCw, Server } from 'lucide-react'
+import { Activity, Lock, LayoutDashboard, RefreshCw, ScrollText, Server, Settings2, Ticket, Users } from 'lucide-react'
 import { adminApi, getAdminToken, setAdminToken } from '@/lib/adminClient'
 import { ApiError } from '@/lib/types'
 import type { AdminOverview } from '@/lib/types'
@@ -101,8 +101,8 @@ export default function App() {
 
 function AppHeader({ showLock, onLock }: { showLock: boolean; onLock: () => void }) {
   return (
-    <header className="border-b border-border bg-bg-secondary/60 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-6">
+    <header className="sticky top-0 z-40 border-b border-border bg-bg-secondary/60 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-6">
         <Server className="h-5 w-5 text-neon-green" strokeWidth={1.5} />
         <span className="font-mono text-sm font-semibold text-text-primary">AudienceLens</span>
         <span className="font-mono text-xs text-text-muted">/ 管理后台</span>
@@ -129,11 +129,23 @@ function CenterMessage({ children }: { children: React.ReactNode }) {
 
 // ============================== 仪表盘 ==============================
 
+type SectionId = 'overview' | 'users' | 'billing' | 'config' | 'ops' | 'audit'
+
+const SECTIONS: { id: SectionId; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }>; desc: string }[] = [
+  { id: 'overview', label: '总览', icon: LayoutDashboard, desc: '核心指标、趋势与分布' },
+  { id: 'users', label: '用户', icon: Users, desc: '用户管理与判断复利' },
+  { id: 'billing', label: '套餐与 CDK', icon: Ticket, desc: '套餐矩阵、兑换码发放' },
+  { id: 'config', label: '运行时配置', icon: Settings2, desc: '开关覆盖与平台 Key' },
+  { id: 'ops', label: '任务巡检', icon: Activity, desc: '队列与评审明细' },
+  { id: 'audit', label: '审计日志', icon: ScrollText, desc: '管理操作留痕' },
+]
+
 function Dashboard() {
   const [overview, setOverview] = useState<AdminOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [section, setSection] = useState<SectionId>('overview')
 
   const load = useCallback(async () => {
     try {
@@ -154,62 +166,119 @@ function Dashboard() {
     setRefreshing(false)
   }
 
+  const active = SECTIONS.find((s) => s.id === section)!
+
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-text-secondary">跨用户的系统视角——运行时配置、平台 Key、判断复利、任务与评审巡检。</p>
-        <button
-          onClick={() => void refresh()}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-secondary hover:border-neon-green/40 hover:text-neon-green transition-colors"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
-          刷新
-        </button>
-      </div>
+    <div className="mx-auto flex max-w-[88rem] gap-6 px-6 py-6">
+      {/* 分区导航：桌面侧栏 */}
+      <aside className="hidden w-52 shrink-0 lg:block">
+        <nav className="sticky top-20 space-y-1">
+          {SECTIONS.map((s) => {
+            const Icon = s.icon
+            const isActive = s.id === section
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSection(s.id)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                  isActive
+                    ? 'border-l-2 border-neon-green bg-neon-green/10 text-neon-green'
+                    : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                {s.label}
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
 
-      {error && (
-        <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
-          {error}
-        </div>
-      )}
-
-      {overview && <OverviewCards data={overview} />}
-
-      <div key={refreshKey} className="contents">
-        <div className="mt-6">
-          <TimeseriesChart />
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <TaskTypeStatsPanel />
-          <CostInsightsPanel />
-        </div>
-
-        <div className="mt-6">
-          <UsersPanel />
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <LedgerPanel />
-          <PlansPanel />
-        </div>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <SettingsPanel />
-          <ServerKeyPanel />
-        </div>
-
-        <div className="mt-6">
-          <CdkPanel />
+      <div className="min-w-0 flex-1">
+        {/* 分区导航：窄屏横向页签 */}
+        <div className="mb-4 flex gap-1 overflow-x-auto lg:hidden">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSection(s.id)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors ${
+                s.id === section
+                  ? 'bg-neon-green/15 text-neon-green'
+                  : 'bg-bg-card text-text-secondary'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <JobsPanel />
-          <ReviewsPanel />
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-semibold text-text-primary">{active.label}</h1>
+            <p className="mt-0.5 text-xs text-text-muted">{active.desc}</p>
+          </div>
+          <button
+            onClick={() => void refresh()}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-secondary hover:border-neon-green/40 hover:text-neon-green transition-colors"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+            刷新
+          </button>
         </div>
 
-        <div className="mt-6">
-          <AuditLogPanel />
+        {error && (
+          <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
+            {error}
+          </div>
+        )}
+
+        <div key={refreshKey} className="contents">
+          {section === 'overview' && (
+            <>
+              {overview && <OverviewCards data={overview} />}
+              <div className="mt-6">
+                <TimeseriesChart />
+              </div>
+              <div className="mt-6 grid gap-6 xl:grid-cols-2">
+                <TaskTypeStatsPanel />
+                <CostInsightsPanel />
+              </div>
+            </>
+          )}
+
+          {section === 'users' && (
+            <>
+              <UsersPanel />
+              <div className="mt-6">
+                <LedgerPanel />
+              </div>
+            </>
+          )}
+
+          {section === 'billing' && (
+            <>
+              <PlansPanel />
+              <div className="mt-6">
+                <CdkPanel />
+              </div>
+            </>
+          )}
+
+          {section === 'config' && (
+            <div className="grid gap-6 xl:grid-cols-2">
+              <SettingsPanel />
+              <ServerKeyPanel />
+            </div>
+          )}
+
+          {section === 'ops' && (
+            <div className="grid gap-6 xl:grid-cols-2">
+              <JobsPanel />
+              <ReviewsPanel />
+            </div>
+          )}
+
+          {section === 'audit' && <AuditLogPanel />}
         </div>
       </div>
     </div>
