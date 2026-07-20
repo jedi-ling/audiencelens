@@ -1,9 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import Layout from '@/components/Layout'
 
 const LandingPage = lazy(() => import('@/pages/landing/LandingPage'))
-const HomePage = lazy(() => import('@/pages/HomePage'))
 const CreateReviewPage = lazy(() => import('@/pages/CreateReviewPage'))
 const ReviewProgressPage = lazy(() => import('@/pages/ReviewProgressPage'))
 const ReportPage = lazy(() => import('@/pages/ReportPage'))
@@ -54,8 +53,6 @@ export default function App() {
           <Route element={<Layout />}>
             {/* 营销落地页作为首页，与 app 共用同一套导航/页脚（一套导航全站通用） */}
             <Route path="/" element={<LandingPage />} />
-            {/* 旧的 app 内首页保留在 /home，便于回退对照 */}
-            <Route path="/home" element={<HomePage />} />
             {/* 对话式入口：大白话 → 意图解析 → 发起评审 */}
             <Route path="/ask" element={<AskPage />} />
             {/* 判断复利闭环：预测留档 + 回填验证 + 命中率 */}
@@ -72,6 +69,8 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/skills" element={<SkillSelectPage />} />
             <Route path="/evaluations/:id" element={<EvaluationPage />} />
+            {/* 未知路径统一回首页——此前完全没有兜底，/home 下线后验证出这个空白页问题 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </Suspense>
