@@ -15,6 +15,7 @@ const SkillSelectPage = lazy(() => import('@/pages/SkillSelectPage'))
 const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
 const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
+const ReviewHistoryPage = lazy(() => import('@/pages/ReviewHistoryPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 
@@ -57,6 +58,8 @@ export default function App() {
             <Route path="/ask" element={<AskPage />} />
             {/* 判断复利闭环：预测留档 + 回填验证 + 命中率 */}
             <Route path="/ledger" element={<LedgerPage />} />
+            {/* 评审历史列表——/api/reviews 现已按身份过滤，见后端 _check_review_owner */}
+            <Route path="/history" element={<ReviewHistoryPage />} />
             <Route path="/review/new" element={<CreateReviewPage />} />
             <Route path="/review/:id" element={<ReviewProgressPage />} />
             <Route path="/review/:id/report" element={<ReportPage />} />

@@ -7,6 +7,7 @@ import { useSessionStore } from '@/store/session-store'
 const navItems = [
   { path: '/', label: '首页' },
   { path: '/ask', label: '对话评审' },
+  { path: '/history', label: '评审历史' },
   { path: '/ledger', label: '判断复利' },
   { path: '/tutorial', label: '使用教程' },
   { path: '/skills', label: '技能中心' },

@@ -298,7 +298,7 @@ export default function ReviewProgressPage() {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
         <p className="text-text-secondary">未找到评审记录</p>
-        <Link to="/" className="text-cyan hover:text-cyan-dim mt-4 inline-block">返回首页</Link>
+        <Link to="/history" className="text-cyan hover:text-cyan-dim mt-4 inline-block">返回评审历史</Link>
       </div>
     )
   }
@@ -330,7 +330,7 @@ export default function ReviewProgressPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/" className="p-2 rounded-lg hover:bg-bg-card transition-colors">
+        <Link to="/history" className="p-2 rounded-lg hover:bg-bg-card transition-colors">
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
         </Link>
         <div className="flex-1 min-w-0">
