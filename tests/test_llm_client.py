@@ -79,7 +79,7 @@ class TestChatCompletionAnthropic:
         assert text == "hi there"
         assert in_tok == 10
         assert out_tok == 5
-        fake_anthropic_module.Anthropic.assert_called_once_with(api_key="sk-ant-test", base_url=None)
+        fake_anthropic_module.Anthropic.assert_called_once_with(api_key="sk-ant-test", base_url=None, timeout=120.0)
         fake_client.messages.create.assert_called_once()
         _, kwargs = fake_client.messages.create.call_args
         assert kwargs["model"] == "claude-sonnet-4-20250514"
@@ -105,7 +105,7 @@ class TestChatCompletionAnthropic:
             )
 
         fake_anthropic_module.Anthropic.assert_called_once_with(
-            api_key="sk-ant-test", base_url="https://relay.example.com/anthropic"
+            api_key="sk-ant-test", base_url="https://relay.example.com/anthropic", timeout=120.0
         )
 
     def test_multimodal_content_reaches_anthropic_when_vision_capable(self):

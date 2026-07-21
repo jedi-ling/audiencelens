@@ -166,6 +166,44 @@ class TestKeyTestEndpoint:
         assert r.status_code == 200
         assert r.json()["connected"] is False
 
+    def test_slow_upstream_does_not_block_other_requests(self, client):
+        """test_connection 是同步网络调用——之前直接在 async 路由里跑，会堵死事件循环，
+        一个卡住的第三方中转会拖垮所有其他请求（不止这一个）。现在丢进线程池了，验证
+        一个"慢"的连接测试进行中，/api/health 这类无关请求依旧能立刻响应。"""
+        import threading
+        import time
+
+        release = threading.Event()
+
+        def slow_test_connection(**kwargs):
+            release.wait(timeout=5)
+            return {"connected": True, "model": kwargs.get("model"), "sample": "ok"}
+
+        results = {}
+
+        def run_slow_request():
+            with patch("runner.llm_client.test_connection", side_effect=slow_test_connection):
+                results["slow"] = client.post(
+                    "/api/keys/test",
+                    json={"api_key": "sk-ant-slow", "provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+                )
+
+        t = threading.Thread(target=run_slow_request)
+        t.start()
+        time.sleep(0.2)  # 让慢请求先进入 test_connection 并卡住
+
+        start = time.time()
+        health = client.get("/api/health")
+        elapsed = time.time() - start
+
+        release.set()
+        t.join(timeout=5)
+
+        assert health.status_code == 200
+        assert elapsed < 2.0  # 事件循环没被堵住——不用等慢请求跑完的 5s 超时
+        assert results["slow"].status_code == 200
+        assert results["slow"].json()["connected"] is True
+
 
 class TestAdminServerKeyMultiProvider:
     def _enable_admin(self, monkeypatch):

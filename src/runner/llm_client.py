@@ -79,7 +79,10 @@ def _anthropic_chat(
 
     # api_base 留空时用 SDK 默认（官方 api.anthropic.com）；填了就走第三方中转/代理——
     # cc-switch 那类工具管理的"聚合商/relay"场景，Anthropic 侧同样存在，不是 OpenAI 兼容独有。
-    client = anthropic.Anthropic(api_key=api_key, base_url=api_base or None)
+    # 显式给个超时（openai 兼容那条路径 httpx.post 一直是 120s）：SDK 默认超时很长，
+    # 一个不回应的中转会长时间占着调用它的线程（测试连接在线程池里跑，评审在 worker 线程池里跑，
+    # 但线程池都是有限资源，一直占用迟早耗尽）。
+    client = anthropic.Anthropic(api_key=api_key, base_url=api_base or None, timeout=120.0)
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,

@@ -196,13 +196,19 @@ async def test_key(
 
     import sys
 
+    from starlette.concurrency import run_in_threadpool
+
     _SRC = os.path.join(settings.repo_root, "src")
     if _SRC not in sys.path:
         sys.path.insert(0, _SRC)
     from runner.llm_client import test_connection
 
-    return test_connection(
-        model=effective_model, api_key=api_key, provider=body.provider, api_base=api_base
+    # test_connection 是同步网络调用（anthropic SDK / httpx.post，非 async）——
+    # 直接 await 会在单一事件循环里原地阻塞，一个卡住的第三方中转会拖死整个后端
+    # 对所有用户的响应（不止这一个请求）。丢进线程池，事件循环不受影响。
+    return await run_in_threadpool(
+        test_connection,
+        model=effective_model, api_key=api_key, provider=body.provider, api_base=api_base,
     )
 
 

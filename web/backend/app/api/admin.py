@@ -221,9 +221,14 @@ async def test_server_key(provider: str = "anthropic", db: Session = Depends(get
     if _SRC not in sys.path:
         sys.path.insert(0, _SRC)
     from runner.llm_client import test_connection
+    from starlette.concurrency import run_in_threadpool
 
     model = row.model or settings.intent_model
-    return test_connection(model=model, api_key=api_key, provider=provider, api_base=row.api_base)
+    # 同上（platform.py 的 /keys/test）：test_connection 是同步网络调用，
+    # 直接 await 会堵死事件循环，卡住的中转会拖垮整个后端的响应能力。
+    return await run_in_threadpool(
+        test_connection, model=model, api_key=api_key, provider=provider, api_base=row.api_base
+    )
 
 
 @router.delete("/server-key")
