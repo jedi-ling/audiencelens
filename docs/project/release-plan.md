@@ -18,10 +18,10 @@
 
 ## 上线形态决策（三选一）
 
-**A. 静态落地页先行（最快，0 后端）**
-只把 `REMOVED/landing-page/index.html` 发布到静态托管（GitHub Pages / Cloudflare Pages / Vercel）。收集意向，产品仍走本地/开源。1 小时内可完成。
+**A.（已废弃）静态落地页先行**
+原计划是把独立设计源单独发布到静态托管收集意向。落地页已并入产品前端（`web/frontend/src/pages/landing/`），不再维护独立静态源文件，此选项作废——上线直接走 B。
 
-**B. BYOK 开放版（推荐的第一个真发布）**
+**B. BYOK 开放版（推荐的第一个真发布，落地页已随全栈一起上线）**
 单台 VPS + docker compose 全栈上线：用户自带 API key 评审，服务端不垫钱、无配额压力、无支付需求。
 - 风险最小：没有 key 泄露赔付面（BYOK 明文只进不出）、没有成本失控面
 - CDK 码可作为增值钩子提前发（`AL_QUOTA_MODE=credits`）
@@ -31,7 +31,7 @@
 `AL_KEY_MODE=hybrid` + `AL_AUTH_ENABLED=true` + `AL_QUOTA_ENABLED=true` + 平台 key 垫付。
 成本敞口和滥用风险都需要运营投入，建议在 B 版跑出真实用户后再切。
 
-> 默认推进 **A + B 并行**：落地页立即上线开始积累流量，B 版作为 v1.0 主体。
+> 默认推进 **B**：全栈上线即带落地页，无需单独的静态发布步骤。
 
 ## v1.0（B 版）工作清单
 
