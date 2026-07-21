@@ -654,9 +654,10 @@ class ReviewService:
     def __init__(self, session: Session):
         self.session = session
 
-    def create_review(self, task_type: str, artifact_bundle: dict, persona_pack: Optional[str] = None, selected_personas: Optional[List[str]] = None, mode: str = "standard") -> Review:
+    def create_review(self, task_type: str, artifact_bundle: dict, persona_pack: Optional[str] = None, selected_personas: Optional[List[str]] = None, mode: str = "standard", user_id: str = "anonymous") -> Review:
         review = Review(
             id=str(uuid.uuid4()),
+            user_id=user_id,
             task_type=task_type,
             target_title=artifact_bundle.get("title"),
             artifact_bundle=artifact_bundle,
@@ -675,8 +676,12 @@ class ReviewService:
     def get_review(self, review_id: str) -> Optional[Review]:
         return self.session.get(Review, review_id)
 
-    def list_reviews(self, offset: int = 0, limit: int = 20) -> List[Review]:
+    def list_reviews(self, offset: int = 0, limit: int = 20, user_id: Optional[str] = None) -> List[Review]:
+        """user_id 传了就只列这个人的评审——不传（内部/管理用途）才是全量。
+        对外的 /api/reviews 路由必须传，否则任何登录用户都能看到所有人的评审历史。"""
         stmt = select(Review).order_by(Review.created_at.desc()).offset(offset).limit(limit)
+        if user_id is not None:
+            stmt = stmt.where(Review.user_id == user_id)
         return list(self.session.scalars(stmt).all())
 
     def delete_review(self, review_id: str) -> bool:

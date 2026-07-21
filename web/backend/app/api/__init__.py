@@ -58,6 +58,7 @@ def create_review(
     data: ReviewCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
 ):
     svc = ReviewService(session)
     review = svc.create_review(
@@ -66,6 +67,7 @@ def create_review(
         persona_pack=data.persona_pack,
         selected_personas=data.selected_personas,
         mode=data.mode.value if hasattr(data.mode, 'value') else data.mode,
+        user_id=identity.user_id,
     )
 
     def _run():
@@ -81,31 +83,53 @@ def create_review(
     return review
 
 
+def _check_review_owner(review: Review, identity: Identity) -> None:
+    """review.user_id 为空视为无主历史数据（早于 user_id 字段/迁移遗留），不拦；
+    否则必须跟当前身份一致。用 404 而不是 403——不向非本人确认"这个 ID 存在"。
+    注意：AL_AUTH_ENABLED=false 时所有匿名请求共享同一个 "anonymous" user_id，
+    这种单机/开源形态下互相能看到彼此的评审是设计使然（判断复利、CDK 额度也是
+    同一个共享桶），不是这次修复要解决的问题——这里堵的是"登录用户能看别人账号"的洞。"""
+    if review.user_id and review.user_id != identity.user_id:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+
 @router.get("/reviews", response_model=List[ReviewResponse])
 def list_reviews(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
 ):
     svc = ReviewService(session)
-    return svc.list_reviews(offset=offset, limit=limit)
+    return svc.list_reviews(offset=offset, limit=limit, user_id=identity.user_id)
 
 
 @router.get("/reviews/{review_id}", response_model=ReviewResponse)
-def get_review(review_id: str, session: Session = Depends(get_session)):
+def get_review(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
     svc = ReviewService(session)
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
     return review
 
 
 @router.delete("/reviews/{review_id}")
-def delete_review(review_id: str, session: Session = Depends(get_session)):
+def delete_review(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
     svc = ReviewService(session)
-    deleted = svc.delete_review(review_id)
-    if not deleted:
+    review = svc.get_review(review_id)
+    if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
+    svc.delete_review(review_id)
     return {"detail": "Deleted"}
 
 
@@ -119,6 +143,7 @@ def get_report(
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
     report_json = review.report_json
     if identity.is_anonymous:
         report_json = report_gating.gate_report_for_anonymous(report_json)
@@ -130,11 +155,16 @@ def get_report(
 
 
 @router.get("/reviews/{review_id}/result", response_model=ReviewResult)
-def get_review_result(review_id: str, session: Session = Depends(get_session)):
+def get_review_result(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
     svc = ReviewService(session)
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
     report_html = None
     if review.report_json:
         try:
