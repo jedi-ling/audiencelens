@@ -1,17 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import './landing.css'
-import './landing-in-app.css' // 并入 app Layout 后的手写适配（hero 顶距等）
-// 落地页正文由 REMOVED/landing-page/index.html 抽取而来（extract_landing.py）。
-// 改设计请改独立页再重跑脚本，别手改这两个自动生成文件。
-// React 版正文已去掉自带 nav/footer——由共享 Layout 提供。
+import './landing-in-app.css' // hero 顶距等适配，与共享 Layout 拼接用
+// landing-body.html / landing.css 就是落地页的正文本体——直接改这两个文件即可，
+// 不再有独立的静态设计源（曾经有过，已下线；本 React 版就是唯一权威版本）。
 import landingBody from './landing-body.html?raw'
 
 /**
- * 营销落地页 —— 作为 `/` 路由，挂在 app Layout 之外（它自带导航与页脚，
- * 用金色主题，与 app 内部的 neon-green 界面刻意区分）。
- * 结构/样式复用独立静态页（dangerouslySetInnerHTML + 作用域化到 .al-landing 的 CSS），
- * 交互脚本搬进下面的 useEffect，并把内部链接改成 React Router 跳转，实现 SPA 无刷新链路。
+ * 营销落地页 —— 作为 `/` 路由，与 app 共用同一套 Layout（导航/页脚），
+ * 金色主题与 app 内部的 neon-green 界面刻意区分。
+ * 正文走 dangerouslySetInnerHTML + 作用域化到 .al-landing 的 CSS，
+ * 交互脚本在下面的 useEffect 里，内部链接已改成 React Router 跳转，实现 SPA 无刷新链路。
  */
 export default function LandingPage() {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -66,10 +65,18 @@ export default function LandingPage() {
     root.addEventListener('click', onRootClick)
     cleanups.push(() => root.removeEventListener('click', onRootClick))
 
-    // 示例 chips → 带着文案跳对话评审入口
+    // 示例 chips → 带着文案跳对话评审入口。
+    // 两组文案风格不同：hero 顶部 .chips 是名词短语（"Steam 商店页"），需要拼前缀；
+    // 输入框下方 .chips-examples 是完整祈使句（"评审我的 Steam 商店页"），直接透传，
+    // 否则会拼成"帮我评审一下我的评审我的 Steam 商店页"这种病句。
     const chipHandlers: Array<[Element, () => void]> = []
     root.querySelectorAll<HTMLElement>('.chip').forEach((c) => {
-      const h = () => navigate('/ask?q=' + encodeURIComponent('帮我评审一下我的' + (c.textContent || '').trim()))
+      const isExample = c.closest('.chips-examples') !== null
+      const h = () => {
+        const text = (c.textContent || '').trim()
+        const q = isExample ? text : '帮我评审一下我的' + text
+        navigate('/ask?q=' + encodeURIComponent(q))
+      }
       c.addEventListener('click', h)
       chipHandlers.push([c, h])
     })
@@ -100,6 +107,41 @@ export default function LandingPage() {
     )
     root.querySelectorAll('.reveal').forEach((el) => io.observe(el))
     cleanups.push(() => io.disconnect())
+
+    // P0-3：辩论卡片 stagger 入场（反对→翻票→赞同），尊重 prefers-reduced-motion
+    // 仅在 hero 首次进入视口时触发一次，避免反复播放
+    const debateCard = root.querySelector<HTMLElement>('.debate-card')
+    if (debateCard) {
+      const opposeEl = debateCard.querySelector<HTMLElement>('.debate-msg.oppose')
+      const flipEl = debateCard.querySelector<HTMLElement>('.debate-flip')
+      const agreeEl = debateCard.querySelector<HTMLElement>('.debate-msg.agree')
+      const debateTargets = [opposeEl, flipEl, agreeEl].filter(Boolean) as HTMLElement[]
+      const debateTimers: number[] = []
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches
+      if (!reduceMotion) {
+        // 初始隐藏，等待 IntersectionObserver 触发入场
+        debateTargets.forEach((el) => el.classList.add('debate-stagger'))
+        const debateIo = new IntersectionObserver(
+          (entries) => {
+            const en = entries[0]
+            if (!en.isIntersecting) return
+            debateIo.disconnect()
+            // 反对 200ms / 翻票 600ms / 赞同 1000ms 的 stagger 节奏
+            const delays = [200, 600, 1000]
+            debateTargets.forEach((el, idx) => {
+              const t = window.setTimeout(() => el.classList.add('debate-stagger-in'), delays[idx] || 0)
+              debateTimers.push(t)
+            })
+          },
+          { threshold: 0.25 },
+        )
+        debateIo.observe(debateCard)
+        cleanups.push(() => {
+          debateTimers.forEach((t) => window.clearTimeout(t))
+          debateIo.disconnect()
+        })
+      }
+    }
 
     // 数字计数（HTML 默认已是真数字，动画作增强）
     const counted = new WeakSet<Element>()

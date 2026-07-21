@@ -1,8 +1,8 @@
 /*
- * 落地页并入 app 共享 Layout 后的适配（手写，不会被 extract 脚本覆盖）。
- * 独立静态版仍自带 nav/footer；React 版用 Layout 的顶栏与页脚，故：
- *  - 去掉独立版为固定导航预留的 128px 顶部留白
- *  - hero 高度扣掉 app 顶栏（sticky, h-16 = 64px），避免首屏溢出
+ * 落地页并入 app 共享 Layout 后的适配：landing-body.html 原本给自带的
+ * 固定导航预留了留白，现在用 app 的顶栏（sticky, h-16 = 64px）代替，故：
+ *  - 去掉那段 128px 顶部留白
+ *  - hero 高度扣掉顶栏高度，避免首屏溢出
  */
 .al-landing {
   min-height: auto;

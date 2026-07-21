@@ -20,6 +20,14 @@
           <button type="submit">开始 <span class="arw">→</span></button>
         </form>
 
+        <!-- P1-3：输入框下方示例 chips，复用 .chip 样式，被 LandingPage.tsx 中的统一 chips 拦截逻辑自动捕获 -->
+        <div class="chips chips-examples">
+          <button class="chip" type="button">评审我的 Steam 商店页</button>
+          <button class="chip" type="button">看看我的定价页</button>
+          <button class="chip" type="button">测试新手引导</button>
+          <button class="chip" type="button">红队攻击我的 BP</button>
+        </div>
+
         <div class="hero-cta">
           <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">GitHub 源码</a>
         </div>
@@ -221,12 +229,13 @@
       <p class="sec-desc">一套评审团，覆盖你最怕出错的六种发布节点。</p>
     </div>
     <div class="use-grid">
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="红队对抗" loading="lazy"><h3>红队对抗</h3><p>模拟最差用户、攻击者、挑剔投资人，专门暴露致命缺陷与信任崩塌点。</p></div>
+      <!-- P1-5：use-card 图标加 onerror 隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy" onerror="this.style.display='none'"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy" onerror="this.style.display='none'"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy" onerror="this.style.display='none'"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy" onerror="this.style.display='none'"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy" onerror="this.style.display='none'"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="红队对抗" loading="lazy" onerror="this.style.display='none'"><h3>红队对抗</h3><p>模拟最差用户、攻击者、挑剔投资人，专门暴露致命缺陷与信任崩塌点。</p></div>
     </div>
   </div>
 </section>
