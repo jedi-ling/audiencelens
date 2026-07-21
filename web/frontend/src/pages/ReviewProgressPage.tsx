@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import type { Review, WSMessage, ReviewMode } from '@/lib/mock-data'
 import type { ReviewDetail } from '@/lib/types'
 import { usePersonaStore } from '@/store/persona-store'
-import { ArrowLeft, FileText, DollarSign, Clock, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, FileText, DollarSign, Clock, Loader2, CheckCircle2, AlertCircle, Zap, ListChecks, Microscope, Swords, BarChart3, Hourglass } from 'lucide-react'
 
 type PhaseStatus = 'waiting' | 'running' | 'completed'
 
@@ -30,10 +30,10 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
   cancelled: { label: '已取消', color: 'text-text-muted', bg: 'bg-status-waiting' },
 }
 
-const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; icon: string }> = {
-  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', icon: '⚡' },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', icon: '✅' },
-  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', icon: '🔬' },
+const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
+  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
+  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', Icon: ListChecks },
+  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
 function getPersonaProgress(status: string): number {
@@ -102,6 +102,8 @@ export default function ReviewProgressPage() {
   }, [id])
 
   useEffect(() => {
+    // 挂载时拉取评审数据——数据获取属于合法的 effect 用途
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadReview().finally(() => setLoading(false))
   }, [loadReview])
 
@@ -340,7 +342,7 @@ export default function ReviewProgressPage() {
               const mb = modeBadgeConfig[reviewMode] ?? modeBadgeConfig.standard
               return (
                 <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', mb.bg, mb.color)}>
-                  <span>{mb.icon}</span>
+                  <mb.Icon className="w-3 h-3" strokeWidth={1.5} />
                   {mb.label}
                 </span>
               )
@@ -356,6 +358,20 @@ export default function ReviewProgressPage() {
             <span className="hidden sm:inline">查看报告</span>
           </Link>
         )}
+      </div>
+
+      {/* 总进度条：与对话评审页同一套金色视觉语言 */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="text-text-muted">总进度</span>
+          <span className="font-medium text-text-secondary">{overallProgress}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-bg-card">
+          <div
+            className="h-full rounded-full bg-neon-green transition-all duration-700"
+            style={{ width: `${overallProgress}%` }}
+          />
+        </div>
       </div>
 
       {/* 失败：如实展示 error_message */}
@@ -427,7 +443,10 @@ export default function ReviewProgressPage() {
       {/* v2 链路：事件流没带 persona_outputs 时，用总进度条 + 逐人格打勾展示 */}
       {totalCount === 0 && !terminal && (
         <div className="mb-8 rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-3">评审进行中</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <Hourglass className="w-4 h-4 text-cyan" strokeWidth={1.5} />
+            <h3 className="text-sm font-medium text-text-primary">评审进行中</h3>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
               <div
@@ -464,8 +483,31 @@ export default function ReviewProgressPage() {
                     po.status === 'running' ? 'border-cyan/20' : 'border-border'
                   )}
                 >
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className={cn('w-2.5 h-2.5 rounded-full', psc.bg, po.status === 'running' && 'animate-pulse-glow')} />
+                  <div className="flex items-center gap-2.5 mb-3">
+                    {/* 人格头像：与对话评审页同一套圆形身份标识语言 */}
+                    <div className="relative shrink-0">
+                      <div
+                        className={cn(
+                          'flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold',
+                          po.status === 'completed'
+                            ? 'border-neon-green/40 bg-neon-green/10 text-neon-green'
+                            : po.status === 'running'
+                              ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                              : po.status === 'failed'
+                                ? 'border-severity-critical/40 bg-severity-critical/10 text-severity-critical'
+                                : 'border-border bg-bg-secondary text-text-muted',
+                        )}
+                      >
+                        {(po.persona_name ?? '?').slice(0, 1)}
+                      </div>
+                      <div
+                        className={cn(
+                          'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-bg-card',
+                          psc.bg,
+                          po.status === 'running' && 'animate-pulse-glow',
+                        )}
+                      />
+                    </div>
                     <span className="font-medium text-text-primary text-sm">{po.persona_name}</span>
                     {persona && <span className="text-xs text-text-muted">{persona.archetype}</span>}
                   </div>
@@ -516,7 +558,12 @@ export default function ReviewProgressPage() {
                   key={pid}
                   className="rounded-xl border-2 border-neon-green/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-neon-green shrink-0" strokeWidth={1.25} />
+                  <div className="relative shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-neon-green/40 bg-neon-green/10 text-xs font-semibold text-neon-green">
+                      {(persona?.name ?? pid).slice(0, 1)}
+                    </div>
+                    <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-neon-green bg-bg-card rounded-full" strokeWidth={2} />
+                  </div>
                   <span className="font-medium text-text-primary text-sm truncate">
                     {persona?.name ?? pid}
                   </span>
@@ -543,7 +590,22 @@ export default function ReviewProgressPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-3">交叉质询</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <Swords className="w-4 h-4 text-warm-orange" strokeWidth={1.5} />
+            <h3 className="text-sm font-medium text-text-primary">交叉质询</h3>
+            <span
+              className={cn(
+                'ml-auto text-xs',
+                crossExamPhase === 'completed'
+                  ? 'text-neon-green'
+                  : crossExamPhase === 'running'
+                    ? 'text-cyan'
+                    : 'text-text-muted',
+              )}
+            >
+              {crossExamPhase === 'completed' ? '已完成' : crossExamPhase === 'running' ? '进行中' : '等待中'}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
               <div
@@ -556,7 +618,22 @@ export default function ReviewProgressPage() {
         </div>
 
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-3">聚合分析</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className="w-4 h-4 text-neon-green" strokeWidth={1.5} />
+            <h3 className="text-sm font-medium text-text-primary">聚合分析</h3>
+            <span
+              className={cn(
+                'ml-auto text-xs',
+                aggregationPhase === 'completed'
+                  ? 'text-neon-green'
+                  : aggregationPhase === 'running'
+                    ? 'text-cyan'
+                    : 'text-text-muted',
+              )}
+            >
+              {aggregationPhase === 'completed' ? '已完成' : aggregationPhase === 'running' ? '进行中' : '等待中'}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
               <div

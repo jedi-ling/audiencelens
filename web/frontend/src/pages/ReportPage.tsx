@@ -21,7 +21,7 @@ import { EVALUATION_DIMENSIONS } from '@/lib/mock-data'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, Download, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -95,10 +95,10 @@ const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
 // 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
 const STANCE_PALETTE = ['#D4A94E', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '#a78bfa']
 
-const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; icon: string }> = {
-  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', icon: '⚡' },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', icon: '✅' },
-  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', icon: '🔬' },
+const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
+  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
+  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', Icon: ListChecks },
+  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
 const VALID_SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low']
@@ -274,7 +274,7 @@ export default function ReportPage() {
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-sm text-text-secondary">评审报告</p>
             <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', modeBadge.bg, modeBadge.color)}>
-              <span>{modeBadge.icon}</span>
+              <modeBadge.Icon className="w-3 h-3" strokeWidth={1.5} />
               {modeBadge.label}模式
             </span>
           </div>
@@ -284,7 +284,6 @@ export default function ReportPage() {
             onClick={() => handleExport('json')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-neon-green/30 hover:text-neon-green transition-all"
           >
-            <Download className="w-3.5 h-3.5" strokeWidth={1.25} />
             <File className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">JSON</span>
           </button>
@@ -292,7 +291,6 @@ export default function ReportPage() {
             onClick={() => handleExport('markdown')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-cyan/30 hover:text-cyan transition-all"
           >
-            <Download className="w-3.5 h-3.5" strokeWidth={1.25} />
             <FileText className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">MD</span>
           </button>
@@ -300,7 +298,6 @@ export default function ReportPage() {
             onClick={() => handleExport('html')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-warm-orange/30 hover:text-warm-orange transition-all"
           >
-            <Download className="w-3.5 h-3.5" strokeWidth={1.25} />
             <Globe className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">HTML</span>
           </button>
@@ -518,7 +515,18 @@ export default function ReportPage() {
               const stanceColor = STANCE_PALETTE[Math.max(stanceIndex, 0) % STANCE_PALETTE.length]
               return (
                 <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    {/* 人格头像：与进度页同一套圆形身份标识，描边跟随立场色 */}
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold"
+                      style={{
+                        borderColor: `${stanceColor}66`,
+                        backgroundColor: `${stanceColor}1a`,
+                        color: stanceColor,
+                      }}
+                    >
+                      {(note.persona_name ?? note.persona_id).slice(0, 1)}
+                    </div>
                     <span className="font-medium text-text-primary">{note.persona_name ?? note.persona_id}</span>
                     <span className="text-xs text-text-muted font-mono">{note.persona_id}</span>
                     <span
@@ -725,7 +733,9 @@ export default function ReportPage() {
                       ? 'bg-neon-green/10 text-neon-green'
                       : 'bg-severity-critical/10 text-severity-critical'
                   )}>
-                    {evaluationScorecard.passed ? '✅ 通过' : '❌ 未通过'}
+                    {evaluationScorecard.passed
+                      ? <><CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />通过</>
+                      : <><XCircle className="w-3.5 h-3.5" strokeWidth={1.5} />未通过</>}
                   </span>
                   <p className="text-xs text-text-muted mt-1">
                     {evaluationScorecard.results.filter((r) => r.passed).length}/{evaluationScorecard.results.length} 维度通过
@@ -822,10 +832,12 @@ export default function ReportPage() {
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-text-primary">{er.persona_id}</span>
                   <span className={cn(
-                    'text-xs px-2 py-0.5 rounded font-medium',
+                    'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium',
                     er.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
-                    {er.passed ? '✅ 通过' : '❌ 未通过'}
+                    {er.passed
+                      ? <><CheckCircle2 className="w-3 h-3" strokeWidth={1.5} />通过</>
+                      : <><XCircle className="w-3 h-3" strokeWidth={1.5} />未通过</>}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mb-3">
@@ -896,7 +908,9 @@ export default function ReportPage() {
             try {
               const result = await runEvaluation(id)
               setEvaluationScorecard(result)
-            } catch {} finally {
+            } catch {
+              // 评估请求失败：保留页面现有内容，仅结束加载态
+            } finally {
               setEvaluating(false)
             }
           }}

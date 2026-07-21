@@ -23,6 +23,8 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const isCreatePage = location.pathname === '/review/new'
+  // 对话评审是全高聊天界面，footer 会把页面顶出视口、抢滚动条
+  const isAskPage = location.pathname === '/ask'
   const [menuOpen, setMenuOpen] = useState(false)
   const { config, identity, bootstrap, logout } = useSessionStore()
 
@@ -250,6 +252,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
+      {!isAskPage && (
       <footer className="relative border-t border-transparent py-8 shrink-0">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -291,6 +294,7 @@ export default function Layout() {
           </div>
         </div>
       </footer>
+      )}
     </div>
   )
 }
