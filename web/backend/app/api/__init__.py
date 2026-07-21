@@ -298,7 +298,62 @@ def list_examples():
 
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024
-ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".doc", ".docx", ".json", ".yaml", ".yml"}
+# .doc（旧版二进制格式）故意不在这里——python-docx 只认 .docx（zip+XML），解不了 .doc，
+# 之前把它写进"支持列表"是没兑现的承诺，见下面 _extract_text_from_file 的报错提示。
+ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".json", ".yaml", ".yml"}
+TEXT_EXTENSIONS = {".txt", ".md", ".json", ".yaml", ".yml"}
+
+
+def _extract_text_from_file(content: bytes, ext: str) -> str:
+    """按扩展名解析成纯文字。txt 系走编码解码；pdf/docx 走各自的解析库——
+    之前不管什么格式都硬当 UTF-8/GBK 文本解码，PDF/DOCX 是二进制格式，
+    上传就直接报"无法解析文件编码"，等于 UI 上写的支持是空头支票。"""
+    if ext == ".pdf":
+        import io
+
+        from pypdf import PdfReader
+        from pypdf.errors import PdfReadError
+
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            if reader.is_encrypted:
+                raise HTTPException(status_code=400, detail="PDF 文件已加密，暂不支持解析加密文档")
+            pages = [page.extract_text() or "" for page in reader.pages]
+        except PdfReadError:
+            raise HTTPException(status_code=400, detail="PDF 文件已损坏或格式无法识别")
+        text = "\n\n".join(p for p in pages if p.strip())
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="PDF 未提取到文字内容（可能是纯图片扫描件，暂不支持 OCR）")
+        return text
+
+    if ext == ".docx":
+        import io
+        import zipfile
+
+        from docx import Document
+        from docx.opc.exceptions import PackageNotFoundError
+
+        try:
+            doc = Document(io.BytesIO(content))
+        except (PackageNotFoundError, zipfile.BadZipFile):
+            raise HTTPException(status_code=400, detail="DOCX 文件已损坏或不是有效的 Word 文档")
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                paragraphs.extend(cell.text for cell in row.cells if cell.text.strip())
+        text = "\n".join(paragraphs)
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="DOCX 未提取到文字内容")
+        return text
+
+    # 纯文本格式：txt/md/json/yaml/yml
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            return content.decode("gbk")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="无法解析文件编码，请上传 UTF-8 或 GBK 编码的文本文件")
 
 
 @router.post("/extract-materials", response_model=ExtractedMaterialsResponse)
@@ -308,7 +363,13 @@ async def extract_materials(
 ):
     filename = file.filename or "unknown"
     _, ext = os.path.splitext(filename)
-    if ext.lower() not in ALLOWED_EXTENSIONS:
+    ext = ext.lower()
+    if ext == ".doc":
+        raise HTTPException(
+            status_code=400,
+            detail="不支持旧版 .doc 格式（仅支持 .docx）。请用 Word 另存为 .docx 后重新上传。",
+        )
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件类型: {ext}，允许的类型: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
@@ -324,14 +385,7 @@ async def extract_materials(
         raise HTTPException(status_code=400, detail=f"文件大小超过限制（最大 {MAX_UPLOAD_SIZE // (1024 * 1024)}MB）")
 
     safe_filename = str(uuid.uuid4()) + ext
-
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        try:
-            text = content.decode("gbk")
-        except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="无法解析文件编码，请上传 UTF-8 或 GBK 编码的文本文件")
+    text = _extract_text_from_file(content, ext)
 
     result = MaterialExtractor.extract(task_type, text, safe_filename)
     return result

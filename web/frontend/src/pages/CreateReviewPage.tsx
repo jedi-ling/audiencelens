@@ -516,7 +516,7 @@ export default function CreateReviewPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.md,.json,.pdf,.doc,.docx"
+                  accept=".txt,.md,.json,.pdf,.docx"
                   multiple
                   onChange={handleFileInputChange}
                   className="hidden"
@@ -534,7 +534,7 @@ export default function CreateReviewPage() {
                       拖拽文件到此处，或<span className="text-neon-green">点击上传</span>
                     </p>
                     <p className="text-xs text-text-muted mt-1">
-                      支持 .txt .md .json .pdf .doc .docx · AI 自动提取结构化材料
+                      支持 .txt .md .json .pdf .docx（不支持旧版 .doc）· AI 自动提取结构化材料
                     </p>
                   </>
                 )}
