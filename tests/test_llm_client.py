@@ -79,10 +79,34 @@ class TestChatCompletionAnthropic:
         assert text == "hi there"
         assert in_tok == 10
         assert out_tok == 5
-        fake_anthropic_module.Anthropic.assert_called_once_with(api_key="sk-ant-test")
+        fake_anthropic_module.Anthropic.assert_called_once_with(api_key="sk-ant-test", base_url=None)
         fake_client.messages.create.assert_called_once()
         _, kwargs = fake_client.messages.create.call_args
         assert kwargs["model"] == "claude-sonnet-4-20250514"
+
+    def test_custom_api_base_reaches_anthropic_sdk(self):
+        """Anthropic 也有第三方中转/代理场景（cc-switch 的 aggregator/relay 分类），
+        api_base 不该被 anthropic 分支静默丢弃——这是曾经存在过的真 bug。"""
+        fake_response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="ok")],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+        )
+        fake_client = MagicMock()
+        fake_client.messages.create.return_value = fake_response
+        fake_anthropic_module = SimpleNamespace(Anthropic=MagicMock(return_value=fake_client))
+
+        with patch.dict(sys.modules, {"anthropic": fake_anthropic_module}):
+            chat_completion(
+                model="claude-sonnet-4-20250514",
+                prompt="Hi",
+                api_key="sk-ant-test",
+                provider="anthropic",
+                api_base="https://relay.example.com/anthropic",
+            )
+
+        fake_anthropic_module.Anthropic.assert_called_once_with(
+            api_key="sk-ant-test", base_url="https://relay.example.com/anthropic"
+        )
 
     def test_multimodal_content_reaches_anthropic_when_vision_capable(self):
         fake_response = SimpleNamespace(

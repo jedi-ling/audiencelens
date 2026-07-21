@@ -326,37 +326,42 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* 模型名 + API Base（仅 OpenAI 兼容需要；Anthropic 可留空走人格分级选型） */}
-          {byokProvider === 'openai_compatible' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="block text-xs text-text-muted mb-1.5">模型名称</label>
-                <input
-                  type="text"
-                  value={byokModel}
-                  onChange={(e) => {
-                    setByokModel(e.target.value)
-                    resetTest()
-                  }}
-                  placeholder="deepseek-chat"
-                  className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-text-muted mb-1.5">API Base URL</label>
-                <input
-                  type="text"
-                  value={byokApiBase}
-                  onChange={(e) => {
-                    setByokApiBase(e.target.value)
-                    resetTest()
-                  }}
-                  placeholder="https://api.deepseek.com"
-                  className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
-                />
-              </div>
+          {/* 模型名 + API Base：两个服务商都能填。
+              openai_compatible 必填模型名（没有统一默认值）；
+              anthropic 都留空则走人格分级自动选型（haiku/sonnet/opus），
+              但也支持指定具体模型 ID，或填第三方中转/代理的 base_url（不是只有 OpenAI 兼容才有这种场景）。 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">
+                模型 ID {byokProvider === 'anthropic' && <span className="text-text-muted/70">（留空自动按人格分级选型）</span>}
+              </label>
+              <input
+                type="text"
+                value={byokModel}
+                onChange={(e) => {
+                  setByokModel(e.target.value)
+                  resetTest()
+                }}
+                placeholder={byokProvider === 'anthropic' ? 'claude-sonnet-4-5-20250929（留空自动选）' : 'deepseek-v4-pro'}
+                className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">
+                API Base URL {byokProvider === 'anthropic' && <span className="text-text-muted/70">（留空用官方地址）</span>}
+              </label>
+              <input
+                type="text"
+                value={byokApiBase}
+                onChange={(e) => {
+                  setByokApiBase(e.target.value)
+                  resetTest()
+                }}
+                placeholder={byokProvider === 'anthropic' ? 'https://api.anthropic.com（或第三方中转地址）' : 'https://api.deepseek.com'}
+                className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
+              />
+            </div>
+          </div>
 
           {/* Key 输入 + 测试/保存 */}
           <div className="flex items-center gap-2">

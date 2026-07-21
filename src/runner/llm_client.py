@@ -68,11 +68,18 @@ def _to_anthropic_content(content: PromptContent):
 
 
 def _anthropic_chat(
-    model: str, content: PromptContent, api_key: str, max_tokens: int, temperature: float
+    model: str,
+    content: PromptContent,
+    api_key: str,
+    max_tokens: int,
+    temperature: float,
+    api_base: Optional[str] = None,
 ) -> Tuple[str, int, int]:
     import anthropic
 
-    client = anthropic.Anthropic(api_key=api_key)
+    # api_base 留空时用 SDK 默认（官方 api.anthropic.com）；填了就走第三方中转/代理——
+    # cc-switch 那类工具管理的"聚合商/relay"场景，Anthropic 侧同样存在，不是 OpenAI 兼容独有。
+    client = anthropic.Anthropic(api_key=api_key, base_url=api_base or None)
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,
@@ -141,7 +148,7 @@ def chat_completion(
         prompt = "\n\n".join(b.get("text", "") for b in prompt if b.get("type") == "text")
 
     if provider == "anthropic":
-        return _anthropic_chat(model, prompt, api_key, max_tokens, temperature)
+        return _anthropic_chat(model, prompt, api_key, max_tokens, temperature, api_base=api_base)
     effective_base = api_base or OPENAI_COMPATIBLE_PRESETS["openai"]["api_base"]
     return _openai_compatible_chat(model, prompt, api_key, effective_base, max_tokens, temperature)
 

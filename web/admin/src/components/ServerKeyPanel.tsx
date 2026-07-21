@@ -195,30 +195,38 @@ export function ServerKeyPanel() {
         </div>
       )}
 
-      {provider === 'openai_compatible' && (
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-          <input
-            type="text"
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value)
-              resetTest()
-            }}
-            placeholder="模型名称，如 deepseek-v4-pro"
-            className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-cyan transition-colors"
-          />
-          <input
-            type="text"
-            value={apiBase}
-            onChange={(e) => {
-              setApiBase(e.target.value)
-              resetTest()
-            }}
-            placeholder="API Base，如 https://api.deepseek.com"
-            className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-cyan transition-colors"
-          />
-        </div>
-      )}
+      {/* 模型 ID + API Base：两个服务商都能填。anthropic 留空则按人格分级自动选型，
+          但也支持指定具体模型、或填第三方中转/代理地址——不是只有 OpenAI 兼容才有这种场景。 */}
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+        <input
+          type="text"
+          value={model}
+          onChange={(e) => {
+            setModel(e.target.value)
+            resetTest()
+          }}
+          placeholder={
+            provider === 'anthropic'
+              ? '模型 ID，留空自动按人格分级选型'
+              : '模型名称，如 deepseek-v4-pro'
+          }
+          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-cyan transition-colors"
+        />
+        <input
+          type="text"
+          value={apiBase}
+          onChange={(e) => {
+            setApiBase(e.target.value)
+            resetTest()
+          }}
+          placeholder={
+            provider === 'anthropic'
+              ? 'API Base，留空用官方地址，或填第三方中转'
+              : 'API Base，如 https://api.deepseek.com'
+          }
+          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-cyan transition-colors"
+        />
+      </div>
 
       <div className="mt-3 flex gap-2">
         <input
