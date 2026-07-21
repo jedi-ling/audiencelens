@@ -7,4 +7,3 @@ anthropic
 httpx
 websockets
 python-multipart
-litellm

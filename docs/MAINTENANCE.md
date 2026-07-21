@@ -294,6 +294,21 @@ def encrypt_secret(plaintext: str, secret: str) -> str:
 只需替换这两个函数，**调用方（key_service）无感**。
 换之前存量密文需要迁移（读旧格式 → 写新格式的一次性脚本）。
 
+### 4.3.5 服务商预设保鲜（定期做）
+
+`OPENAI_COMPATIBLE_PRESETS` 里每个服务商的默认模型名，三处各存一份手抄副本，改的时候三处都要动：
+
+1. `src/runner/llm_client.py`（Python 核心引擎，唯一真正参与请求的一份）
+2. `web/frontend/src/lib/types.ts`（用户 BYOK 设置页下拉预设）
+3. `web/admin/src/lib/types.ts`（后台平台 Key 面板下拉预设）
+
+这些默认值只是"填个能用的起点"，不是强制——用户/管理员随时能手改模型名。但服务商换代很快
+（2026-07 一次核实就发现 DeepSeek 三天后硬下线旧模型名、Kimi legacy 系列已停新用户注册、
+智谱刚发新旗舰），建议每季度用 WebSearch 核实一遍各服务商最新文档，三处同步更新。
+
+> 顺带：`VISION_CAPABLE_PREFIXES`（同文件）决定哪些模型会真正"看"图片素材，新模型系列
+> 发布时也要检查是否需要把前缀加进去，否则该模型明明支持视觉能力，评审时却被静默降级成纯文字。
+
 ### 4.4 换外部队列（多副本部署时必须）
 
 内存线程池只在单进程内有效。多副本部署时任务会丢。

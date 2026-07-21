@@ -98,44 +98,6 @@ class ExtractedMaterialsResponse(BaseModel):
     materials: Dict[str, str]
 
 
-class LLMSettingsRequest(BaseModel):
-    api_format: str
-    api_key: str = ""
-    model: str
-    api_base: Optional[str] = None
-    session_id: str = "default"
-
-    @field_validator("api_format")
-    @classmethod
-    def validate_api_format(cls, v):
-        if v not in ("anthropic", "openai_compatible"):
-            raise ValueError("api_format must be 'anthropic' or 'openai_compatible'")
-        return v
-
-    @field_validator("model")
-    @classmethod
-    def validate_model(cls, v):
-        if len(v) > 128:
-            raise ValueError("model 字段过长")
-        if not v.strip():
-            raise ValueError("model 不能为空")
-        return v.strip()
-
-    @field_validator("api_key")
-    @classmethod
-    def validate_api_key(cls, v):
-        if len(v) > 4096:
-            raise ValueError("api_key 字段过长")
-        return v
-
-    @field_validator("session_id")
-    @classmethod
-    def validate_session_id(cls, v):
-        if len(v) > 128:
-            raise ValueError("session_id 字段过长")
-        return v
-
-
 class ReviewSession(BaseModel):
     id: str
     task_type: str

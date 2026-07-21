@@ -106,7 +106,7 @@ async def me(identity: Identity = Depends(optional_identity)):
 class SaveKeyRequest(BaseModel):
     api_key: str
     provider: str = "anthropic"  # "anthropic" | "openai_compatible"
-    model: Optional[str] = None  # openai_compatible 档必填（如 "deepseek-chat"）
+    model: Optional[str] = None  # openai_compatible 档必填（如 "deepseek-v4-pro"）
     api_base: Optional[str] = None  # openai_compatible 档的自定义端点
 
 

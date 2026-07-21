@@ -204,7 +204,7 @@ export function ServerKeyPanel() {
               setModel(e.target.value)
               resetTest()
             }}
-            placeholder="模型名称，如 deepseek-chat"
+            placeholder="模型名称，如 deepseek-v4-pro"
             className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-cyan transition-colors"
           />
           <input

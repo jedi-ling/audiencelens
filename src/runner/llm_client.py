@@ -16,19 +16,23 @@ from typing import List, Optional, Tuple, Union
 
 PromptContent = Union[str, List[dict]]
 
-# 各服务商在官网文档里给出的 OpenAI 兼容 base_url——设置页/BYOK 面板的下拉预设复用这份。
+# 各服务商在官网文档里给出的 OpenAI 兼容 base_url——设置页/BYOK 面板的下拉预设复用这份
+# （前端 web/frontend/src/lib/types.ts、web/admin/src/lib/types.ts 各有一份手抄副本，
+# 三处需要保持一致；模型名核实于 2026-07-21，见 docs/project/methodology.md）。
 OPENAI_COMPATIBLE_PRESETS = {
-    "openai": {"name": "OpenAI", "api_base": "https://api.openai.com/v1", "model": "gpt-4o"},
-    "deepseek": {"name": "DeepSeek", "api_base": "https://api.deepseek.com", "model": "deepseek-chat"},
-    "kimi": {"name": "Kimi (月之暗面)", "api_base": "https://api.moonshot.cn/v1", "model": "moonshot-v1-8k"},
+    "openai": {"name": "OpenAI", "api_base": "https://api.openai.com/v1", "model": "gpt-5.2"},
+    "deepseek": {"name": "DeepSeek", "api_base": "https://api.deepseek.com", "model": "deepseek-v4-pro"},
+    "kimi": {"name": "Kimi (月之暗面)", "api_base": "https://api.moonshot.cn/v1", "model": "kimi-k3"},
     "qwen": {"name": "通义千问", "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus"},
-    "glm": {"name": "智谱 GLM", "api_base": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-4"},
+    "glm": {"name": "智谱 GLM", "api_base": "https://open.bigmodel.cn/api/paas/v4", "model": "glm-5"},
     "ollama": {"name": "Ollama 本地模型", "api_base": "http://localhost:11434/v1", "model": "llama3"},
 }
 
 # 已知具备视觉能力的模型——多模态材料只在这些模型上才有意义，其余模型静默丢弃图片块
 # （不报错阻断评审：没有视觉能力的模型至少还能读文字材料）。
-VISION_CAPABLE_PREFIXES = ("claude-", "gpt-4o", "gpt-4-turbo", "gpt-4-vision", "qwen-vl", "glm-4v")
+VISION_CAPABLE_PREFIXES = (
+    "claude-", "gpt-4o", "gpt-4-turbo", "gpt-4-vision", "gpt-5", "qwen-vl", "glm-4v", "glm-5",
+)
 
 
 class LLMCallError(Exception):

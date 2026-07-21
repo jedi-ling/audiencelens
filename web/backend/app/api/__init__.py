@@ -13,7 +13,6 @@ from app.schemas import (
     EvaluationResultResponse,
     EvaluationScorecardResponse,
     EthicsReportResponse,
-    LLMSettingsRequest,
     PackSummary,
     PersonaGenerateRequest,
     PersonaOutputResponse,
@@ -336,42 +335,6 @@ async def extract_materials(
 
     result = MaterialExtractor.extract(task_type, text, safe_filename)
     return result
-
-
-@router.get("/settings/llm/formats")
-def list_llm_formats():
-    from app.services.llm_service import LLMService
-    return LLMService.get_formats()
-
-
-@router.get("/settings/llm/presets")
-def list_llm_presets():
-    from app.services.llm_service import LLMService
-    return LLMService.get_presets()
-
-
-@router.post("/settings/llm")
-def save_llm_settings(request: LLMSettingsRequest):
-    from app.services.llm_service import LLMService
-    LLMService.save_config(
-        session_id=request.session_id,
-        api_format=request.api_format,
-        model=request.model,
-        api_key=request.api_key,
-        api_base=request.api_base,
-    )
-    return {"status": "saved"}
-
-
-@router.post("/settings/llm/test")
-def test_llm_connection(request: LLMSettingsRequest):
-    from app.services.llm_service import LLMService
-    return LLMService.test_connection(
-        api_format=request.api_format,
-        model=request.model,
-        api_key=request.api_key or None,
-        api_base=request.api_base,
-    )
 
 
 @router.post("/evaluations/{review_id}", response_model=EvaluationScorecardResponse)
