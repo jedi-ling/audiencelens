@@ -11,12 +11,16 @@
  * 拼接用户历史发言等价于给它更多上下文，不需要后端改造就能获得"越聊越准"的效果。
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
+import { fetchReviews, deleteReview } from '@/lib/api'
 import { useSessionStore } from '@/store/session-store'
+import { TASK_TYPES } from '@/lib/mock-data'
 import type { IntentResult, Material } from '@/lib/types'
+import type { Review } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
 
@@ -75,25 +79,25 @@ function confidenceLevel(confidence: number): { label: string; barClass: string 
   return { label: '偏低', barClass: 'bg-warm-orange' }
 }
 
-/** 助手身份头像 —— 让对话双方一眼可辨 */
+/** 助手身份头像 —— 金色渐变徽记 + 微光，让对话双方一眼可辨 */
 function AssistantAvatar() {
   return (
-    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neon-green/30 bg-neon-green/10">
-      <Sparkles className="h-3.5 w-3.5 text-neon-green" strokeWidth={1.5} />
+    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neon-green/40 bg-gradient-to-br from-neon-green/25 to-neon-green-dim/5 shadow-[0_0_12px_rgba(212,169,78,0.25)]">
+      <Sparkles className="h-3.5 w-3.5 text-gold-cream" strokeWidth={1.5} />
     </div>
   )
 }
 
-/** 等待反馈：三点跳动，替代静态"思考中…" */
+/** 等待反馈：三点跳动（金色、1.4s 阻尼节奏），替代静态"思考中…" */
 function ThinkingIndicator() {
   return (
-    <div className="flex items-start gap-2.5">
+    <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
-      <div className="flex items-center gap-1.5 rounded-xl border border-border bg-bg-secondary px-4 py-3.5">
+      <div className="flex items-center gap-1.5 rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-3.5">
         {[0, 150, 300].map((delay) => (
           <span
             key={delay}
-            className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-muted"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neon-green/80 [animation-duration:1.4s]"
             style={{ animationDelay: `${delay}ms` }}
           />
         ))}
@@ -128,9 +132,57 @@ export default function AskPage() {
   const listRef = useRef<HTMLDivElement>(null) // 消息列表容器：滚动只发生在它内部，不能带动 window
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await fetchReviews()
+      setReviewHistory(data)
+      setHistoryError(null)
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : '加载失败')
+    }
+  }, [])
+
   useEffect(() => {
     void bootstrap()
-  }, [bootstrap])
+    void loadHistory()
+  }, [bootstrap, loadHistory])
+
+  const startNewConversation = () => {
+    historyRef.current = []
+    setAttachments([])
+    setInput('')
+    setShowExamples(true)
+    setMessages([
+      {
+        id: nextId(),
+        role: 'assistant',
+        kind: 'text',
+        text: '我是 AudienceLens 的评审助手。说说你想评审什么——一个页面、一份文案、一个产品概念都行，我会组一个多角度的用户评审团来看。',
+        ts: Date.now(),
+      },
+    ])
+  }
+
+  const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm('确定删除这条评审记录吗？此操作无法撤销。')) return
+    setDeletingId(id)
+    try {
+      await deleteReview(id)
+      setReviewHistory((prev) => (prev ? prev.filter((r) => r.id !== id) : prev))
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   // 从落地页 chip / CTA 带来的 ?q=... 预填输入框（不自动发送，让用户能改）
   useEffect(() => {
@@ -260,6 +312,7 @@ export default function AskPage() {
       })
       appendMessage({ id: nextId(), role: 'assistant', kind: 'text', text: '评审团已经开庭，带你去看实时进度…' })
       setAttachments([])
+      void loadHistory() // 新评审马上出现在左侧历史里
       navigate(`/review/${res.review_id}`)
     } catch (e) {
       if (e instanceof ApiError && e.needsApiKey) {
@@ -280,8 +333,27 @@ export default function AskPage() {
   const ready = canReview()
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-3xl flex-col px-4 py-6">
+    <div className="flex h-[calc(100vh-4rem)]">
+      <HistorySidebar
+        open={sidebarOpen}
+        history={reviewHistory}
+        error={historyError}
+        deletingId={deletingId}
+        onNewConversation={startNewConversation}
+        onNavigate={(path) => navigate(path)}
+        onDelete={handleDeleteHistory}
+      />
+
+      <div className="mx-auto flex min-w-0 flex-1 flex-col px-4 py-6 md:max-w-3xl">
       <header className="mb-4 flex items-center gap-2">
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-secondary hover:text-text-primary transition-colors"
+          aria-label={sidebarOpen ? '收起历史侧栏' : '展开历史侧栏'}
+          title={sidebarOpen ? '收起历史侧栏' : '展开历史侧栏'}
+        >
+          {sidebarOpen ? <PanelLeftClose className="h-4 w-4" strokeWidth={1.5} /> : <PanelLeftOpen className="h-4 w-4" strokeWidth={1.5} />}
+        </button>
         <Sparkles className="h-5 w-5 text-neon-green" strokeWidth={1.5} />
         <div>
           <h1 className="text-lg font-semibold text-text-primary font-display">对话评审</h1>
@@ -307,7 +379,7 @@ export default function AskPage() {
         </div>
       )}
 
-      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto rounded-xl border border-border bg-bg-card/60 p-4">
+      <div ref={listRef} className="chat-backdrop flex-1 space-y-4 overflow-y-auto rounded-xl border border-border bg-bg-card/60 p-4">
         {messages.map((m) => (
           <ChatBubble
             key={m.id}
@@ -340,7 +412,7 @@ export default function AskPage() {
             {EXAMPLES.map((ex) => (
               <button
                 key={ex}
-                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-neon-green/40 hover:text-text-primary transition-colors"
+                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-neon-green/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
                 onClick={() => void send(ex)}
               >
                 {ex}
@@ -413,7 +485,7 @@ export default function AskPage() {
           }}
         />
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary shadow-[0_0_16px_rgba(212,169,78,0.35)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_0_24px_rgba(212,169,78,0.5)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
           disabled={busy || !input.trim()}
           aria-label="发送"
@@ -455,7 +527,93 @@ export default function AskPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
+  )
+}
+
+function HistorySidebar({
+  open,
+  history,
+  error,
+  deletingId,
+  onNewConversation,
+  onNavigate,
+  onDelete,
+}: {
+  open: boolean
+  history: Review[] | null
+  error: string | null
+  deletingId: string | null
+  onNewConversation: () => void
+  onNavigate: (path: string) => void
+  onDelete: (e: React.MouseEvent, id: string) => void
+}) {
+  return (
+    <aside
+      className={cn(
+        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary/40 transition-all duration-200',
+        open ? 'w-64' : 'w-0 border-r-0'
+      )}
+    >
+      <div className="flex h-full w-64 flex-col">
+        <div className="shrink-0 p-3">
+          <button
+            onClick={onNewConversation}
+            className="flex w-full items-center gap-2 rounded-lg border border-neon-green/30 bg-neon-green/10 px-3 py-2 text-sm font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            新建对话
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">评审历史</p>
+
+          {error && <p className="px-1 text-xs text-severity-critical">{error}</p>}
+
+          {history === null ? (
+            <div className="flex items-center gap-2 px-1 py-3 text-xs text-text-muted">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+              加载中…
+            </div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center gap-1.5 px-1 py-6 text-center text-xs text-text-muted">
+              <Inbox className="h-5 w-5" strokeWidth={1.25} />
+              还没有评审记录
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {history.map((r) => {
+                const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
+                const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => onNavigate(target)}
+                    className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    <button
+                      onClick={(e) => onDelete(e, r.id)}
+                      disabled={deletingId === r.id}
+                      className="shrink-0 rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-severity-critical/10 hover:text-severity-critical group-hover:opacity-100 disabled:opacity-50"
+                      aria-label="删除"
+                    >
+                      {deletingId === r.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
+                      ) : (
+                        <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+                      )}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </aside>
   )
 }
 
@@ -476,12 +634,12 @@ function ChatBubble({
 
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
+      <div className="flex justify-end animate-message-in">
         <div className="flex max-w-[75%] flex-col items-end">
-          <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap">
+          <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(212,169,78,0.25)]">
             {message.text}
           </div>
-          <span className="mt-1 text-[10px] text-text-muted">{timeLabel}</span>
+          <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
       </div>
     )
@@ -489,13 +647,13 @@ function ChatBubble({
 
   if (message.kind === 'text') {
     return (
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex max-w-[75%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-border bg-bg-secondary px-4 py-2.5 text-sm leading-relaxed text-text-primary">
+          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-2.5 text-sm leading-relaxed text-text-primary">
             {message.text}
           </div>
-          <span className="mt-1 text-[10px] text-text-muted">{timeLabel}</span>
+          <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
       </div>
     )
@@ -503,17 +661,17 @@ function ChatBubble({
 
   if (message.kind === 'error') {
     return (
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex max-w-[75%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-severity-critical/40 bg-severity-critical/10 px-4 py-2.5 text-sm leading-relaxed text-text-primary">
+          <div className="rounded-xl rounded-tl-sm border border-severity-critical/40 border-l-[3px] border-l-severity-critical bg-severity-critical/10 px-4 py-2.5 text-sm leading-relaxed text-text-primary">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
               <div>
                 {message.text}
                 {message.needsKey && (
                   <button
-                    className="ml-2 text-neon-green underline underline-offset-2 hover:text-neon-green-dim"
+                    className="ml-2 text-neon-green underline underline-offset-2 hover:text-gold-cream"
                     onClick={onGoSettings}
                   >
                     去填写 API Key
@@ -522,7 +680,7 @@ function ChatBubble({
               </div>
             </div>
           </div>
-          <span className="mt-1 text-[10px] text-text-muted">{timeLabel}</span>
+          <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
       </div>
     )
@@ -530,17 +688,17 @@ function ChatBubble({
 
   if (message.kind === 'clarify') {
     return (
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex max-w-[80%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-border bg-bg-secondary px-4 py-3 text-sm">
+          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-3 text-sm">
             <p className="leading-relaxed text-text-primary">{message.question}</p>
             {message.candidates.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {message.candidates.map((c) => (
                   <button
                     key={c}
-                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary hover:border-neon-green/40 hover:bg-bg-card-hover transition-colors"
+                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-neon-green/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
                     onClick={() => onPickCandidate(c)}
                   >
                     {TASK_LABELS[c] ?? c}
@@ -549,7 +707,7 @@ function ChatBubble({
               </div>
             )}
           </div>
-          <span className="mt-1 text-[10px] text-text-muted">{timeLabel}</span>
+          <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
       </div>
     )
@@ -559,12 +717,12 @@ function ChatBubble({
   const intent = message.intent
   const conf = confidenceLevel(intent.confidence)
   return (
-    <div className="flex items-start gap-2.5">
+    <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
       <div className="flex w-full max-w-[85%] flex-col">
-        <div className="rounded-xl rounded-tl-sm border border-neon-green/25 bg-bg-secondary px-5 py-4 text-sm">
-          <p className="text-xs text-text-muted">我明白了，你想做的是</p>
-          <h3 className="mt-1 text-base font-semibold text-text-primary font-display">
+        <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
+          <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
           </h3>
 
@@ -579,14 +737,14 @@ function ChatBubble({
 
           <div className="mt-3.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-text-muted">匹配把握</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">匹配把握</span>
               <span className="font-medium text-text-secondary">
                 {conf.label}（{(intent.confidence * 100).toFixed(0)}%）
               </span>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
               <div
-                className={`h-full rounded-full ${conf.barClass} transition-all`}
+                className={`h-full rounded-full ${conf.barClass} shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all`}
                 style={{ width: `${Math.round(intent.confidence * 100)}%` }}
               />
             </div>
@@ -598,14 +756,14 @@ function ChatBubble({
           </div>
 
           <button
-            className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
+            className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(212,169,78,0.3)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_4px_24px_rgba(212,169,78,0.4)] disabled:opacity-50"
             onClick={() => onConfirm(intent)}
             disabled={busy}
           >
             {busy ? '开庭中…' : '开庭评审 →'}
           </button>
         </div>
-        <span className="mt-1 text-[10px] text-text-muted">{timeLabel}</span>
+        <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
       </div>
     </div>
   )

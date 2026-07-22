@@ -38,7 +38,6 @@ export default function Layout() {
     window.scrollTo(0, 0)
   }, [location.pathname])
 
-  const authEnabled = config?.auth_enabled ?? false
   const loggedIn = !!identity && !identity.is_anonymous
 
   const handleLogout = () => {
@@ -127,23 +126,21 @@ export default function Layout() {
               </Link>
             )}
 
-            {authEnabled && (
-              loggedIn ? (
-                <button
-                  onClick={handleLogout}
-                  title={identity?.email ?? undefined}
-                  className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
-                >
-                  <span className="max-w-[8rem] truncate">{identity?.email}</span>
-                </button>
-              ) : (
-                <Link
-                  to="/login"
-                  className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
-                >
-                  <span>登录</span>
-                </Link>
-              )
+            {loggedIn ? (
+              <button
+                onClick={handleLogout}
+                title={identity?.email ?? undefined}
+                className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
+              >
+                <span className="max-w-[8rem] truncate">{identity?.email}</span>
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
+              >
+                <span>登录</span>
+              </Link>
             )}
           </div>
 
@@ -198,23 +195,21 @@ export default function Layout() {
               </Link>
             )}
 
-            {authEnabled && (
-              loggedIn ? (
-                <button
-                  onClick={() => { setMenuOpen(false); handleLogout() }}
-                  className="flex items-center px-4 py-3 mt-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
-                >
-                  <span className="truncate">{identity?.email}</span>
-                </button>
-              ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center px-4 py-3 mt-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
-                >
-                  <span>登录</span>
-                </Link>
-              )
+            {loggedIn ? (
+              <button
+                onClick={() => { setMenuOpen(false); handleLogout() }}
+                className="flex items-center px-4 py-3 mt-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
+              >
+                <span className="truncate">{identity?.email}</span>
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center px-4 py-3 mt-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
+              >
+                <span>登录</span>
+              </Link>
             )}
 
             <div className="mt-4 pt-3 border-t border-border">
