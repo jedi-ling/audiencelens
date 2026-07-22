@@ -344,7 +344,7 @@ export default function AskPage() {
         onDelete={handleDeleteHistory}
       />
 
-      <div className="mx-auto flex min-w-0 flex-1 flex-col px-4 py-6 md:max-w-3xl">
+      <div className="flex min-w-0 flex-1 flex-col px-6 py-6">
       <header className="mb-4 flex items-center gap-2">
         <button
           onClick={() => setSidebarOpen((v) => !v)}
