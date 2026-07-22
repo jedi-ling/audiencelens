@@ -141,9 +141,13 @@ export default function AskPage() {
   // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。
   const [pinnedSkill, setPinnedSkill] = useState<{ type: string; name: string } | null>(null)
   const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
+  const [pinnedProject, setPinnedProject] = useState<string | null>(null)
   const [skillPickerOpen, setSkillPickerOpen] = useState(false)
   const [typePickerOpen, setTypePickerOpen] = useState(false)
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [typeSearch, setTypeSearch] = useState('')
+  const [newProjectName, setNewProjectName] = useState('')
+  const [dragging, setDragging] = useState(false) // 拖拽文件悬停在聊天区上方时的视觉反馈
 
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -200,6 +204,7 @@ export default function AskPage() {
     ])
     setPinnedSkill(null)
     setPinnedTaskType(null)
+    setPinnedProject(null)
   }
 
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
@@ -257,6 +262,7 @@ export default function AskPage() {
         ...parsed,
         task_type: pinnedTaskType ? (pinnedTaskType.id as IntentResult['task_type']) : parsed.task_type,
         skill_type: pinnedSkill ? (pinnedSkill.type as IntentResult['skill_type']) : parsed.skill_type,
+        project_key: pinnedProject ?? parsed.project_key,
         needs_clarification: pinnedTaskType ? false : parsed.needs_clarification,
       }
       if (intent.needs_clarification) {
@@ -284,7 +290,7 @@ export default function AskPage() {
 
   const MAX_ATTACHMENTS = 8 // data URI 全量驻留内存，不设上限的话几十张截图能把页面拖垮
 
-  const handleFiles = async (files: FileList | null) => {
+  const handleFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
     setUploading(true)
     try {
@@ -326,6 +332,30 @@ export default function AskPage() {
 
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
+  }
+
+  // 拖拽/粘贴上传——和点击附件按钮走同一条 handleFiles 通道，行为完全一致
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (e.dataTransfer.types.includes('Files')) setDragging(true)
+  }
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) setDragging(false)
+  }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    void handleFiles(e.dataTransfer.files)
+  }
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.items)
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null)
+    if (files.length > 0) {
+      e.preventDefault() // 有文件就按上传处理，不把图片当文本粘进输入框
+      void handleFiles(files)
+    }
   }
 
   const pickCandidate = (candidate: string) => {
@@ -426,7 +456,16 @@ export default function AskPage() {
         </div>
       )}
 
-      <div ref={listRef} className="chat-backdrop flex-1 space-y-4 overflow-y-auto rounded-xl border border-border bg-bg-card/60 p-4">
+      <div
+        ref={listRef}
+        className={cn(
+          'chat-backdrop relative flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
+          dragging ? 'border-neon-green/60 bg-neon-green/5' : 'border-border bg-bg-card/60'
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {messages.map((m) => (
           <ChatBubble
             key={m.id}
@@ -439,7 +478,19 @@ export default function AskPage() {
           />
         ))}
         {busy && <ThinkingIndicator />}
+        {dragging && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed border-neon-green/60 bg-bg-primary/70 backdrop-blur-sm">
+            <p className="flex items-center gap-2 text-sm font-medium text-neon-green">
+              <ImageIcon className="h-5 w-5" strokeWidth={1.5} />
+              松开以上传截图/文件
+            </p>
+          </div>
+        )}
       </div>
+      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted shrink-0">
+        <Paperclip className="h-3 w-3" strokeWidth={1.5} />
+        支持拖拽文件到上方对话区，或直接 Ctrl+V 粘贴截图
+      </p>
 
       {/* 示例入口常驻：首轮后自动收起，随时可再展开 */}
       <div className="mt-3 shrink-0">
@@ -497,7 +548,7 @@ export default function AskPage() {
         </div>
       )}
 
-      {(pinnedSkill || pinnedTaskType) && (
+      {(pinnedSkill || pinnedTaskType || pinnedProject) && (
         <div className="mt-3 flex flex-wrap gap-2 shrink-0">
           {pinnedSkill && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
@@ -513,6 +564,15 @@ export default function AskPage() {
               <Target className="h-3 w-3" strokeWidth={2} />
               类型 · {pinnedTaskType.name}
               <button onClick={() => setPinnedTaskType(null)} className="hover:text-text-primary transition-colors" aria-label="取消类型">
+                <X className="h-3 w-3" strokeWidth={2} />
+              </button>
+            </span>
+          )}
+          {pinnedProject && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
+              <FolderOpen className="h-3 w-3" strokeWidth={2} />
+              项目 · {pinnedProject}
+              <button onClick={() => setPinnedProject(null)} className="hover:text-text-primary transition-colors" aria-label="取消项目">
                 <X className="h-3 w-3" strokeWidth={2} />
               </button>
             </span>
@@ -627,12 +687,89 @@ export default function AskPage() {
           )}
         </div>
 
+        {/* 选/建长期评审项目：新建输入名字，或从历史里挑一个已有项目继续——
+            钉住后同名的评审会在侧栏/历史页自动聚合，不用每次都在话里念"创建...长期评审项目"。 */}
+        <div className="relative shrink-0">
+          <button
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+              pinnedProject ? 'bg-warm-orange/15 text-warm-orange' : 'text-text-muted hover:bg-bg-secondary hover:text-text-primary'
+            )}
+            onClick={() => {
+              setProjectPickerOpen((v) => !v)
+              setSkillPickerOpen(false)
+              setTypePickerOpen(false)
+            }}
+            aria-label="选择长期评审项目"
+            title="加入长期评审项目——之后的评审会按项目名聚合成时间线"
+          >
+            <FolderOpen className="h-4 w-4" strokeWidth={2} />
+          </button>
+          {projectPickerOpen && (
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-2 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              <p className="px-1 pb-1.5 text-xs text-text-muted">新建项目</p>
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newProjectName.trim()) {
+                      setPinnedProject(newProjectName.trim())
+                      setNewProjectName('')
+                      setProjectPickerOpen(false)
+                    }
+                  }}
+                  placeholder="给项目起个名字…"
+                  className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1.5 text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green/40"
+                />
+                <button
+                  disabled={!newProjectName.trim()}
+                  onClick={() => {
+                    setPinnedProject(newProjectName.trim())
+                    setNewProjectName('')
+                    setProjectPickerOpen(false)
+                  }}
+                  className="shrink-0 rounded-md bg-neon-green px-2.5 py-1.5 text-xs font-medium text-bg-primary disabled:opacity-40"
+                >
+                  创建
+                </button>
+              </div>
+              {(() => {
+                const existing = Array.from(new Set((reviewHistory ?? []).map((r) => r.project_key).filter((k): k is string => !!k)))
+                if (existing.length === 0) return null
+                return (
+                  <>
+                    <p className="px-1 pb-1 pt-2.5 text-xs text-text-muted">继续已有项目</p>
+                    <div className="max-h-40 overflow-y-auto">
+                      {existing.map((key) => (
+                        <button
+                          key={key}
+                          className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
+                          onClick={() => {
+                            setPinnedProject(key)
+                            setProjectPickerOpen(false)
+                          }}
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warm-orange" strokeWidth={1.5} />
+                          <span className="truncate">{key}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          )}
+        </div>
+
         <textarea
           className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
           placeholder="说说你想评审什么…（Enter 发送，Shift+Enter 换行）"
           value={input}
           disabled={busy}
           onChange={(e) => setInput(e.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
