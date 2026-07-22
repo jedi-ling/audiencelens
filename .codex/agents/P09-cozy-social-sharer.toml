@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P09-cozy-social-sharer"
 description = """治愈社交分享型 - 好玩的标准之一，是"我想不想把它发给朋友/和朋友一起进来"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

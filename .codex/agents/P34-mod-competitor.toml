@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P34-mod-competitor"
 description = "Mod竞技玩家 - 他不玩原版——原版只是他自定义竞技规则的起点。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

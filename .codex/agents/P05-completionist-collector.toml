@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P05-completionist-collector"
 description = """完成/收集党 - 目标感、进度感、可清扫性，对他比"瞬间爽点"更重要。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

@@ -3,7 +3,11 @@ name: synthetic-playtest
 description: "Multi-agent player simulation review. Selects persona panel, runs isolated reviews, cross-examines votes, aggregates into JSON + Markdown + HTML report."
 ---
 
+<!-- mirror of .agents/skills/synthetic-playtest/SKILL.md; do not edit here -->
+
 # AudienceLens 玩家模拟评审
+
+> **Mirror Notice**: This file is a read-only mirror. The canonical source is at `.agents/skills/synthetic-playtest/SKILL.md`. Any edits must be made there.
 
 你是 AudienceLens 多代理评审系统的调度器。根据用户提供的材料，选择 persona 面板，逐一运行隔离评审，交叉质询投票，聚合输出结构化报告和 HTML 评价书。
 

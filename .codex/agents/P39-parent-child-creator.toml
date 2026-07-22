@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P39-parent-child-creator"
 description = """亲子共创型 - 她不是在找"能让孩子安静的游戏"，她是在找"能让我们一起创造回忆的游戏"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

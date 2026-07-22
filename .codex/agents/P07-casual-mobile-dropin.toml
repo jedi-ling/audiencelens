@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P07-casual-mobile-dropin"
 description = "轻度碎片玩家 - 只要上手不累、几分钟就能进入状态，她就愿意给你机会。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

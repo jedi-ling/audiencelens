@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P01-indie-core-operator"
 description = """核心独立探索者 - 更在意"这游戏是否真的有自己的一套东西"，而不是单纯polish和规模。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

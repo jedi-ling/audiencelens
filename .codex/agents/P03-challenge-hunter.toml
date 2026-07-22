@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P03-challenge-hunter"
 description = "挑战动作党 - 他只想知道一件事：打起来手感到底行不行。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

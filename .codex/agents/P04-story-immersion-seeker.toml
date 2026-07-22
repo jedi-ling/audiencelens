@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P04-story-immersion-seeker"
 description = "叙事沉浸党 - 她要的是被世界和人物吸进去，不是被设定词典砸晕。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

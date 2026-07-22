@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P06-indie-narrative-designer"
 description = "叙事设计师 - 专业叙事设计视角，关注分支叙事结构、对话系统、情感节奏。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

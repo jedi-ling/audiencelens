@@ -6,6 +6,48 @@ on:
   pull_request:
 
 jobs:
+  skill-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SKILL.md canonical consistency
+        run: |
+          CANONICAL=".agents/skills/synthetic-playtest/SKILL.md"
+          MIRRORS=(".claude/skills/synthetic-playtest/SKILL.md" ".trae/skills/synthetic-playtest/SKILL.md")
+          
+          # Extract frontmatter name from canonical
+          CANONICAL_NAME=$(grep -m1 '^name:' "$CANONICAL" | sed 's/name: *//')
+          CANONICAL_PHASES=$(grep -c '^## Phase' "$CANONICAL" || true)
+          
+          for mirror in "${MIRRORS[@]}"; do
+            if [ ! -f "$mirror" ]; then
+              echo "::error::Mirror file missing: $mirror"
+              exit 1
+            fi
+            
+            # Check mirror banner exists
+            if ! grep -q '<!-- mirror of .agents/skills/synthetic-playtest/SKILL.md; do not edit here -->' "$mirror"; then
+              echo "::error::Mirror banner missing in $mirror"
+              exit 1
+            fi
+            
+            # Check frontmatter name matches
+            MIRROR_NAME=$(grep -m1 '^name:' "$mirror" | sed 's/name: *//')
+            if [ "$CANONICAL_NAME" != "$MIRROR_NAME" ]; then
+              echo "::error::Frontmatter name diverged: canonical=$CANONICAL_NAME, mirror=$MIRROR_NAME in $mirror"
+              exit 1
+            fi
+            
+            # Check Phase count matches
+            MIRROR_PHASES=$(grep -c '^## Phase' "$mirror" || true)
+            if [ "$CANONICAL_PHASES" != "$MIRROR_PHASES" ]; then
+              echo "::error::Phase count diverged: canonical=$CANONICAL_PHASES, mirror=$MIRROR_PHASES in $mirror"
+              exit 1
+            fi
+          done
+          
+          echo "SKILL.md consistency check passed"
+
   core-engine:
     runs-on: ubuntu-latest
     steps:
@@ -48,3 +90,9 @@ jobs:
         run: |
           npm ci
           npm run build
+      # 仅 admin 跑单测；frontend 尚未引入测试框架，避免给 matrix 加噪声。
+      # 复用同一 setup-node 缓存（cache-dependency-path 已按 app 分键），npm ci 已就绪。
+      - name: Admin unit tests
+        if: matrix.app == 'admin'
+        working-directory: web/admin
+        run: npx vitest run --reporter=dot

@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P21-fragmented-whale"
 description = "碎片时间鲸鱼 - 他花的每一分钱都要换到明确的价值感，但碎片时间里他愿意为效率买单。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P32-team-coordinator"
 description = """团队协作者 - 她评判竞技游戏的标准是"和陌生人组队时，系统能不能让我不靠吼就能赢"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

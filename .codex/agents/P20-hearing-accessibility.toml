@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P20-hearing-accessibility"
 description = "听觉辅助需求 - 她不需要你把声音去掉，她需要你把声音说的每件事都用眼睛再说一遍。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

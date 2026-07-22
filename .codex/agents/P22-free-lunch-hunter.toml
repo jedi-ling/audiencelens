@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P22-free-lunch-hunter"
 description = """免费午餐猎人 - 她的哲学是"能白嫖绝不花一分钱，但白嫖也要嫖得有尊严"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

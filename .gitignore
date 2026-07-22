@@ -22,6 +22,9 @@ audiencelens-harness/
 # Web build output (admin/frontend dist)
 web/admin/dist/
 
+# 本地 AI 工具产物（Qoder 分析报告等，机器专属）
+.qoder/
+
 # Utility scripts
 copy-files.ps1
 modify-paper.ps1

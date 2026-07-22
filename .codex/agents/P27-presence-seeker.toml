@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P27-presence-seeker"
 description = """沉浸体验追求 - 他买VR不是为了"玩游戏"，而是为了"去过另一种生活"——临场感是唯一的硬通货。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

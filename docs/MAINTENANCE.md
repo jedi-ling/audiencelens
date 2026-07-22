@@ -17,8 +17,17 @@
 
 ## 1. 本地起服务
 
+> **后端推荐用 supervisor 脚本起**：`bash logs/backend-supervisor.sh`。
+> 崩溃自动重启、日志统一写到 `logs/backend.log`，排查时直接 grep 即可。
+>
+> ⚠️ 这是**开发辅助脚本**，**不是**部署入口——生产部署看 §5（`web/docker-compose.prod.yml`），
+> 不要把 supervisor 搬到容器里，更不要拿它代替进程管理器。
+
 ```bash
-# 后端
+# 后端（推荐：supervisor 脚本，自动重启 + 日志落到 logs/backend.log）
+bash logs/backend-supervisor.sh
+
+# 后端（手动：需要看前台输出或自己接进程管理器时）
 cd web/backend
 pip install -r requirements.txt
 python run.py                      # → http://localhost:8001（与 vite 代理目标一致）

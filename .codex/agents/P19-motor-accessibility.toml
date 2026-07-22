@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P19-motor-accessibility"
 description = "运动辅助需求 - 他们不是不想操作，而是需要游戏承认——不是所有人的手都能同时按住五个键。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

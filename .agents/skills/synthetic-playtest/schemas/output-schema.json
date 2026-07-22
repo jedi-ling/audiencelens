@@ -1,0 +1,230 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "output-schema",
+  "title": "Single Persona Review Output Schema",
+  "description": "单个 Persona 评审输出的 JSON Schema",
+  "type": "object",
+  "required": [
+    "persona_id",
+    "persona_name",
+    "persona_version",
+    "task_type",
+    "primary_stance",
+    "confidence",
+    "evidence_sufficiency",
+    "evidence",
+    "scores",
+    "key_issues",
+    "continue_triggers",
+    "quit_triggers",
+    "first_scan_observations",
+    "must_comment_on_check",
+    "missing_information",
+    "voice_sample",
+    "meta"
+  ],
+  "properties": {
+    "persona_id": {
+      "type": "string",
+      "description": "Persona 标识"
+    },
+    "persona_name": {
+      "type": "string",
+      "description": "Persona 名称"
+    },
+    "persona_version": {
+      "type": "string",
+      "description": "Persona 版本"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "steam_page_review",
+        "demo_first_play",
+        "concept_review",
+        "monetization_review",
+        "looking_for_party_post",
+        "update_announcement_review",
+        "kickstarter_review",
+        "discord_community_review",
+        "devlog_review",
+        "localization_review"
+      ],
+      "description": "评审任务类型"
+    },
+    "primary_stance": {
+      "type": "string",
+      "minLength": 1,
+      "description": "主要立场（自由文本，prompt 中按 task_type 约束枚举）"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "对该立场的确信程度 0-1"
+    },
+    "evidence_sufficiency": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "基于现有证据做出判断的充分程度 0-1"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["content", "inference_level"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "证据内容"
+          },
+          "inference_level": {
+            "type": "string",
+            "enum": ["direct", "inferred", "gap"],
+            "description": "推断层级：直接/推断/缺口"
+          },
+          "source_location": {
+            "type": "string",
+            "description": "来源位置（direct 时建议填写）"
+          },
+          "inference_basis": {
+            "type": "string",
+            "description": "推断依据（inferred 时建议填写）"
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "description": "证据列表"
+    },
+    "scores": {
+      "type": "object",
+      "required": ["base", "task_specific"],
+      "properties": {
+        "base": {
+          "type": "object",
+          "required": ["clarity", "trust"],
+          "properties": {
+            "clarity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "description": "清晰度 1-5"
+            },
+            "trust": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "description": "信任度 1-5"
+            }
+          },
+          "additionalProperties": false
+        },
+        "task_specific": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "description": "动态任务维度评分，键为维度名，值为 1-5 整数。按 task_type 必须包含对应维度：kickstarter_review=[trust_building, value_perception, urgency_communication, community_mobilization]; discord_community_review=[community_atmosphere, developer_engagement, information_value, organization_governance]; devlog_review=[transparency, information_density, expectation_management, narrative_appeal]; localization_review=[text_accuracy, cultural_adaptation, ui_adaptation, terminology_consistency, contextual_fidelity]"
+        }
+      },
+      "additionalProperties": false
+    },
+    "key_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "title", "why_it_matters", "suggested_fix"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "严重程度"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "问题标题"
+          },
+          "why_it_matters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "为何重要"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "建议修复方式"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "关键问题列表"
+    },
+    "continue_triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "继续触发条件"
+    },
+    "quit_triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "放弃触发条件"
+    },
+    "first_scan_observations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "首次浏览观察"
+    },
+    "must_comment_on_check": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "description": "必须评论项检查，键为评论项，值为是否已覆盖"
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "缺失信息列表"
+    },
+    "voice_sample": {
+      "type": "string",
+      "minLength": 1,
+      "description": "1-2 句角色原声评价"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["caveats", "is_synthetic"],
+      "properties": {
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "注意事项，至少1条"
+        },
+        "is_synthetic": {
+          "type": "boolean",
+          "const": true,
+          "description": "标记为合成输出（恒为 true）"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P18-cognitive-load-sensitive"
 description = "认知负担敏感 - 她不是玩不了复杂游戏，而是需要游戏尊重她的注意力带宽——一次只给一件事。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P15-toxic-skeptic-reviewer"
 description = """毒舌怀疑型差评者 - 他的存在意义不是"代表真理"，而是帮你提前暴露最容易挨喷的点。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

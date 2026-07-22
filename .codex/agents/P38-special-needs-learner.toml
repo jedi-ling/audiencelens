@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P38-special-needs-learner"
 description = """特殊教育需求者 - 她不是在要求"特殊待遇"，她是在告诉开发者"你的设计把谁排除在了门外"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

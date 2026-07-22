@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P26-vr-motion-sensitive"
 description = """VR晕动敏感 - 她想爱上VR，但她的前庭系统每次都在说"再想想"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

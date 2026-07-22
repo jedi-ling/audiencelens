@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P11-taptap-comment-scout"
 description = "TapTap口碑型浏览者 - 她看评论、版本日志和开发者回应的频率，几乎和看玩法一样重。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

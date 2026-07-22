@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P43-generational-bridge"
 description = "跨代桥梁型 - 他们的标准只有一个：这游戏能不能让8岁和80岁同时找到乐趣，而不是一个人在玩另一个人在看。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

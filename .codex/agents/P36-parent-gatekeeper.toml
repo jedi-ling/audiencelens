@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P36-parent-gatekeeper"
 description = """家长把关人 - 他不是反对游戏，他是在替孩子问"这个东西会拿走什么、会留下什么"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

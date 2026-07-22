@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P10-steam-wishlist-browser"
 description = """Steam愿望单浏览者 - 他不是真的在"评审游戏"，他是在做一个20秒内的愿望单/离开判断。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

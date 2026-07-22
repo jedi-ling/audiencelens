@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P37-lifelong-learner"
 description = """终身学习者 - 他们不是在"玩游戏"，他们是在用游戏这种媒介完成一次自我教育。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

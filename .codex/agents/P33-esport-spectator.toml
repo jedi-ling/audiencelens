@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P33-esport-spectator"
 description = "观赛参与者 - 他花在看比赛和讨论meta上的时间，可能比实际打游戏还多。 Invoke when synthetic-playtest needs this persona's perspective."
 developer_instructions = """

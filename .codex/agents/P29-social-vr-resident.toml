@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P29-social-vr-resident"
 description = """社交VR居民 - VR对他们来说不是游戏机，是第二个家——他们关心的是"这个空间里有没有我想见的人"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P23-social-driven-mobile"
 description = """社交驱动型 - 他玩游戏的第一理由是"我公会/朋友在玩"，第二理由才是游戏本身。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """

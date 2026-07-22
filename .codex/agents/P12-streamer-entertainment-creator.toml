@@ -1,3 +1,4 @@
+﻿skill = "synthetic-playtest"
 name = "P12-streamer-entertainment-creator"
 description = """主播/内容创作者 - 他看的是"能不能出节目效果"，不是"能不能一个人安静地沉浸"。 Invoke when synthetic-playtest needs this persona's perspective."""
 developer_instructions = """
