@@ -9,6 +9,7 @@ build/
 
 # Virtual environments
 .venv/
+.venv-backend/
 venv/
 ENV/
 web/backend/libs/
@@ -60,7 +61,10 @@ web/frontend/dist/
 .env.local
 
 # Logs
+# - *.log covers any .log file anywhere in the repo (legacy + npm-debug etc.)
+# - /logs/ covers the dev runtime directory (backend-supervisor.sh + backend.log + future runtime artifacts)
 *.log
+/logs/
 
 # Coverage
 htmlcov/
