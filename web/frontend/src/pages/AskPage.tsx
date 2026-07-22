@@ -157,8 +157,6 @@ export default function AskPage() {
   const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  // 点历史里的一条评审——始终停留在这个对话页，用弹窗看，不做任何页面跳转
-  const [modalReviewId, setModalReviewId] = useState<string | null>(null)
 
   // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
   const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
@@ -210,6 +208,31 @@ export default function AskPage() {
     setPinnedSkill(null)
     setPinnedTaskType(null)
     setPinnedProject(null)
+  }
+
+  /** 点历史侧栏一条评审——不跳走、不弹窗，而是把这条评审"当年"对应的对话
+   * 还原回主聊天区：用户原话重新变成一条用户气泡，评审结果还是那张 AI
+   * 卡片（跟刚创建时一模一样，同一个 useReviewStatus，已完成的会立刻
+   * 显示摘要，没跑完的会接着推进度）——没有持久化过完整对话记录，
+   * 这是从 Review 自身数据能还原出的最接近"回到当时那个对话"的版本。 */
+  const openReviewConversation = (r: Review) => {
+    const bundle = r.artifact_bundle as { materials?: { type: string; text?: string }[] } | undefined
+    const userText =
+      bundle?.materials?.find((m) => m.type === 'text' && m.text)?.text ||
+      r.target_title ||
+      TASK_TYPES.find((t) => t.id === r.task_type)?.name ||
+      '（历史评审）'
+    historyRef.current = [userText]
+    setAttachments([])
+    setInput('')
+    setShowExamples(false)
+    setPinnedSkill(null)
+    setPinnedTaskType(null)
+    setPinnedProject(null)
+    setMessages([
+      { id: nextId(), role: 'user', text: userText, ts: Date.now() },
+      { id: nextId(), role: 'assistant', kind: 'review', reviewId: r.id, ts: Date.now() },
+    ])
   }
 
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
@@ -422,7 +445,7 @@ export default function AskPage() {
         error={historyError}
         deletingId={deletingId}
         onNewConversation={startNewConversation}
-        onOpenReview={(id) => setModalReviewId(id)}
+        onOpenReview={openReviewConversation}
         onDelete={handleDeleteHistory}
       />
 
@@ -833,8 +856,6 @@ export default function AskPage() {
           </div>
         </div>
       )}
-
-      {modalReviewId && <ReviewModal reviewId={modalReviewId} onClose={() => setModalReviewId(null)} />}
       </div>
     </div>
   )
@@ -874,7 +895,7 @@ function HistorySidebar({
   error: string | null
   deletingId: string | null
   onNewConversation: () => void
-  onOpenReview: (id: string) => void
+  onOpenReview: (review: Review) => void
   onDelete: (e: React.MouseEvent, id: string) => void
 }) {
   return (
@@ -918,7 +939,7 @@ function HistorySidebar({
                 return (
                   <div
                     key={r.id}
-                    onClick={() => onOpenReview(r.id)}
+                    onClick={() => onOpenReview(r)}
                     className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                   >
                     <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -1111,34 +1132,6 @@ function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewS
         </>
       )}
     </>
-  )
-}
-
-/** 点历史侧栏里的一条评审——始终停留在对话页，用弹窗看，不做任何页面跳转。 */
-function ReviewModal({ reviewId, onClose }: { reviewId: string; onClose: () => void }) {
-  const reviewState = useReviewStatus(reviewId)
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-primary/80 p-6 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-xl border border-neon-green/30 bg-bg-secondary p-5 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审详情</p>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
-            aria-label="关闭"
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
-        <ReviewStatusBody reviewId={reviewId} reviewState={reviewState} />
-      </div>
-    </div>
   )
 }
 
