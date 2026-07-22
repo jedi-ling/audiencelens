@@ -13,12 +13,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, deleteReview, fetchPersonas } from '@/lib/api'
 import { useSessionStore } from '@/store/session-store'
-import { TASK_TYPES } from '@/lib/mock-data'
+import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
 import type { IntentResult, Material } from '@/lib/types'
 import type { Review } from '@/lib/mock-data'
 
@@ -137,6 +137,14 @@ export default function AskPage() {
   const listRef = useRef<HTMLDivElement>(null) // 消息列表容器：滚动只发生在它内部，不能带动 window
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // 输入框工具栏：手动钉住技能/任务类型，绕开"靠 AI 从大白话里猜"——
+  // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。
+  const [pinnedSkill, setPinnedSkill] = useState<{ type: string; name: string } | null>(null)
+  const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false)
+  const [typePickerOpen, setTypePickerOpen] = useState(false)
+  const [typeSearch, setTypeSearch] = useState('')
+
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
@@ -190,6 +198,8 @@ export default function AskPage() {
         ts: Date.now(),
       },
     ])
+    setPinnedSkill(null)
+    setPinnedTaskType(null)
   }
 
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
@@ -240,7 +250,15 @@ export default function AskPage() {
     setBusy(true)
     try {
       const combined = historyRef.current.join('\n')
-      const intent = await api.parseIntent(combined)
+      const parsed = await api.parseIntent(combined)
+      // 钉住的技能/任务类型是用户明确选的，直接覆盖 AI 猜的结果——
+      // 钉了任务类型就不用再走"置信度不够就追问"这一步。
+      const intent: IntentResult = {
+        ...parsed,
+        task_type: pinnedTaskType ? (pinnedTaskType.id as IntentResult['task_type']) : parsed.task_type,
+        skill_type: pinnedSkill ? (pinnedSkill.type as IntentResult['skill_type']) : parsed.skill_type,
+        needs_clarification: pinnedTaskType ? false : parsed.needs_clarification,
+      }
       if (intent.needs_clarification) {
         appendMessage({
           id: nextId(),
@@ -479,6 +497,29 @@ export default function AskPage() {
         </div>
       )}
 
+      {(pinnedSkill || pinnedTaskType) && (
+        <div className="mt-3 flex flex-wrap gap-2 shrink-0">
+          {pinnedSkill && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
+              <Zap className="h-3 w-3" strokeWidth={2} />
+              技能 · {pinnedSkill.name}
+              <button onClick={() => setPinnedSkill(null)} className="hover:text-text-primary transition-colors" aria-label="取消技能">
+                <X className="h-3 w-3" strokeWidth={2} />
+              </button>
+            </span>
+          )}
+          {pinnedTaskType && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
+              <Target className="h-3 w-3" strokeWidth={2} />
+              类型 · {pinnedTaskType.name}
+              <button onClick={() => setPinnedTaskType(null)} className="hover:text-text-primary transition-colors" aria-label="取消类型">
+                <X className="h-3 w-3" strokeWidth={2} />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex items-end gap-2 rounded-xl border border-border bg-bg-card p-2 shrink-0 transition-opacity">
         <input
           ref={fileInputRef}
@@ -501,6 +542,91 @@ export default function AskPage() {
             <Paperclip className="h-4 w-4" strokeWidth={2} />
           )}
         </button>
+
+        {/* 选技能：弹层里只列能真正影响评审 prompt 的两个技能（红队/受众面板）——
+            合成试玩是默认流程没必要选，人格生成是完全不同的动作不该混进来。 */}
+        <div className="relative shrink-0">
+          <button
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+              pinnedSkill ? 'bg-cyan/15 text-cyan' : 'text-text-muted hover:bg-bg-secondary hover:text-text-primary'
+            )}
+            onClick={() => {
+              setSkillPickerOpen((v) => !v)
+              setTypePickerOpen(false)
+            }}
+            aria-label="选择技能"
+            title="选技能——不用等 AI 猜，直接指定评审视角"
+          >
+            <Zap className="h-4 w-4" strokeWidth={2} />
+          </button>
+          {skillPickerOpen && (
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              {SKILLS.filter((s) => s.type === 'red_team_audience' || s.type === 'audience_panel').map((s) => (
+                <button
+                  key={s.type}
+                  className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-card-hover"
+                  onClick={() => {
+                    setPinnedSkill({ type: s.type, name: s.name })
+                    setSkillPickerOpen(false)
+                  }}
+                >
+                  <span className="text-sm font-medium text-text-primary">{s.name}</span>
+                  <span className="text-xs text-text-muted">{s.description_zh}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 选任务类型：可搜索列表，选中即钉住，绕开置信度不够时的追问一步 */}
+        <div className="relative shrink-0">
+          <button
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+              pinnedTaskType ? 'bg-warm-orange/15 text-warm-orange' : 'text-text-muted hover:bg-bg-secondary hover:text-text-primary'
+            )}
+            onClick={() => {
+              setTypePickerOpen((v) => !v)
+              setSkillPickerOpen(false)
+            }}
+            aria-label="选择评审类型"
+            title="选评审类型——直接指定，不用等 AI 猜"
+          >
+            <Target className="h-4 w-4" strokeWidth={2} />
+          </button>
+          {typePickerOpen && (
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-1.5 border-b border-border px-2 py-1.5">
+                <Search className="h-3.5 w-3.5 text-text-muted shrink-0" strokeWidth={2} />
+                <input
+                  autoFocus
+                  value={typeSearch}
+                  onChange={(e) => setTypeSearch(e.target.value)}
+                  placeholder="搜索评审类型…"
+                  className="w-full bg-transparent text-sm text-text-primary placeholder-text-muted outline-none"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {TASK_TYPES.filter((t) => t.name.includes(typeSearch) || t.id.includes(typeSearch)).map((t) => (
+                  <button
+                    key={t.id}
+                    className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-card-hover"
+                    onClick={() => {
+                      setPinnedTaskType({ id: t.id, name: t.name })
+                      setTypePickerOpen(false)
+                      setTypeSearch('')
+                    }}
+                  >
+                    <span className="text-sm font-medium text-text-primary">{t.name}</span>
+                    <span className="text-xs text-text-muted">{t.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <textarea
           className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
           placeholder="说说你想评审什么…（Enter 发送，Shift+Enter 换行）"
