@@ -157,6 +157,8 @@ export default function AskPage() {
   const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // 点历史里的一条评审——始终停留在这个对话页，用弹窗看，不做任何页面跳转
+  const [modalReviewId, setModalReviewId] = useState<string | null>(null)
 
   // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
   const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
@@ -420,7 +422,7 @@ export default function AskPage() {
         error={historyError}
         deletingId={deletingId}
         onNewConversation={startNewConversation}
-        onNavigate={(path) => navigate(path)}
+        onOpenReview={(id) => setModalReviewId(id)}
         onDelete={handleDeleteHistory}
       />
 
@@ -831,6 +833,8 @@ export default function AskPage() {
           </div>
         </div>
       )}
+
+      {modalReviewId && <ReviewModal reviewId={modalReviewId} onClose={() => setModalReviewId(null)} />}
       </div>
     </div>
   )
@@ -862,7 +866,7 @@ function HistorySidebar({
   error,
   deletingId,
   onNewConversation,
-  onNavigate,
+  onOpenReview,
   onDelete,
 }: {
   open: boolean
@@ -870,7 +874,7 @@ function HistorySidebar({
   error: string | null
   deletingId: string | null
   onNewConversation: () => void
-  onNavigate: (path: string) => void
+  onOpenReview: (id: string) => void
   onDelete: (e: React.MouseEvent, id: string) => void
 }) {
   return (
@@ -910,12 +914,11 @@ function HistorySidebar({
             (() => {
               const { projects, ungrouped } = groupHistoryByProject(history)
               const renderItem = (r: Review) => {
-                const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
                 const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
                 return (
                   <div
                     key={r.id}
-                    onClick={() => onNavigate(target)}
+                    onClick={() => onOpenReview(r.id)}
                     className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                   >
                     <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -959,6 +962,186 @@ function HistorySidebar({
   )
 }
 
+type ReviewState = {
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  progress: number
+  detail?: ReviewDetail
+  error?: string
+}
+
+/** 追踪一个评审的实时状态——聊天卡片和历史侧栏弹窗共用这一份逻辑。
+ *
+ * 关键点：打开的可能是刚创建、正在跑的评审（WS 会实时推事件），
+ * 也可能是历史里一个早就跑完的旧评审（WS 频道早就没人发事件了，
+ * 直接订阅只会永远停在"评审中"）。所以先拉一次当前详情兜底：
+ * 已经是终态就直接用，还在跑才订阅 WS/轮询。 */
+function useReviewStatus(reviewId: string | null): ReviewState {
+  const [state, setState] = useState<ReviewState>({ status: 'pending', progress: 0 })
+
+  useEffect(() => {
+    if (!reviewId) return
+    let active = true
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+    let socket: ReturnType<typeof connectReviewSocket> | null = null
+
+    const finish = (detail: ReviewDetail) => {
+      if (!active) return
+      if (detail.status === 'completed') {
+        setState({ status: 'completed', progress: 100, detail })
+      } else if (detail.status === 'failed') {
+        setState({ status: 'failed', progress: 0, error: detail.error_message ?? '评审失败' })
+      }
+    }
+
+    void api.getReview(reviewId).then((detail) => {
+      if (!active) return
+      if (detail.status === 'completed' || detail.status === 'failed') {
+        finish(detail)
+        return // 已是终态，没有事件会再来，不用订阅
+      }
+      setState((s) => ({ ...s, status: detail.status === 'running' ? 'running' : 'pending' }))
+
+      socket = connectReviewSocket(reviewId, {
+        onEvent: (evt: WsEvent) => {
+          if (!active) return
+          if (evt.event === 'review.progress') {
+            const progress = (evt.data as { progress?: number }).progress
+            setState((s) => ({ ...s, status: 'running', progress: progress ?? s.progress }))
+          } else if (evt.event === 'review.started') {
+            setState((s) => ({ ...s, status: 'running' }))
+          } else if (evt.event === 'review.completed') {
+            void api.getReview(reviewId).then(finish)
+          } else if (evt.event === 'review.failed') {
+            const err = (evt.data as { error?: string }).error
+            setState({ status: 'failed', progress: 0, error: err ?? '评审失败' })
+          }
+        },
+        onUnavailable: () => {
+          // WS 连不上：兜底轮询到终态为止
+          pollTimer = setInterval(() => {
+            void api.getReview(reviewId).then((d) => {
+              if (d.status === 'completed' || d.status === 'failed') {
+                if (pollTimer) clearInterval(pollTimer)
+                finish(d)
+              }
+            })
+          }, 3000)
+        },
+      })
+    })
+
+    return () => {
+      active = false
+      socket?.close()
+      if (pollTimer) clearInterval(pollTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewId])
+
+  return state
+}
+
+/** 评审状态的展示内容——聊天气泡和弹窗只是外壳不同，内容完全一致。 */
+function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewState: ReviewState }) {
+  return (
+    <>
+      {(reviewState.status === 'pending' || reviewState.status === 'running') && (
+        <>
+          <p className="flex items-center gap-2 font-medium text-text-primary">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neon-green" strokeWidth={2} />
+            评审团正在评审中…
+          </p>
+          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
+            <div
+              className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all duration-500"
+              style={{ width: `${reviewState.progress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-text-muted">跑完之前你可以继续在这聊别的，我不会打断你。</p>
+        </>
+      )}
+
+      {reviewState.status === 'failed' && (
+        <div className="flex items-start gap-2">
+          <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
+          <div>
+            <p className="font-medium text-text-primary">评审失败了</p>
+            <p className="mt-1 text-text-secondary">{reviewState.error}</p>
+          </div>
+        </div>
+      )}
+
+      {reviewState.status === 'completed' && (
+        <>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审完成</p>
+          <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
+            {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
+          </h3>
+          {reviewState.detail?.report?.executive_summary?.primary_recommendation && (
+            <p className="mt-2 text-text-secondary leading-relaxed line-clamp-4">
+              {reviewState.detail.report.executive_summary.primary_recommendation}
+            </p>
+          )}
+          <div className="mt-2.5 flex flex-wrap gap-2 text-xs text-text-muted">
+            {reviewState.detail?.report?.executive_summary?.release_risk && (
+              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                风险 · {reviewState.detail.report.executive_summary.release_risk}
+              </span>
+            )}
+            {reviewState.detail?.report?.priority_fixes && (
+              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                {reviewState.detail.report.priority_fixes.length} 条优先修复项
+              </span>
+            )}
+            {reviewState.detail?.total_cost_usd !== undefined && (
+              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                花费 ${reviewState.detail.total_cost_usd.toFixed(3)}
+              </span>
+            )}
+          </div>
+          <a
+            href={`/review/${reviewId}/report`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neon-green hover:text-neon-green-dim transition-colors"
+          >
+            查看完整报告（新标签页打开，不打断这边的对话）
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+          </a>
+        </>
+      )}
+    </>
+  )
+}
+
+/** 点历史侧栏里的一条评审——始终停留在对话页，用弹窗看，不做任何页面跳转。 */
+function ReviewModal({ reviewId, onClose }: { reviewId: string; onClose: () => void }) {
+  const reviewState = useReviewStatus(reviewId)
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-primary/80 p-6 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-xl border border-neon-green/30 bg-bg-secondary p-5 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审详情</p>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+        <ReviewStatusBody reviewId={reviewId} reviewState={reviewState} />
+      </div>
+    </div>
+  )
+}
+
 function ChatBubble({
   message,
   busy,
@@ -979,65 +1162,10 @@ function ChatBubble({
   // hooks 必须在所有条件 return 之前调用，故放在这里而不是 confirm 分支里。
   const [removedPersonas, setRemovedPersonas] = useState<Set<string>>(new Set())
 
-  // 评审卡片的进度追踪——WS 推事件，完了拉一次详情渲染摘要。
-  // hooks 必须在条件 return 之前，故对非 review 消息也声明（reviewId 传 null 时 effect 直接跳过）。
-  const [reviewState, setReviewState] = useState<{
-    status: 'pending' | 'running' | 'completed' | 'failed'
-    progress: number
-    detail?: ReviewDetail
-    error?: string
-  }>({ status: 'pending', progress: 0 })
+  // 评审卡片的进度追踪。hooks 必须在条件 return 之前，故对非 review 消息也声明
+  // （reviewId 传 null 时 hook 内部直接跳过）。
   const reviewIdForEffect = message.role === 'assistant' && message.kind === 'review' ? message.reviewId : null
-
-  useEffect(() => {
-    if (!reviewIdForEffect) return
-    let active = true
-    let pollTimer: ReturnType<typeof setInterval> | null = null
-
-    const finish = (detail: ReviewDetail) => {
-      if (!active) return
-      if (detail.status === 'completed') {
-        setReviewState({ status: 'completed', progress: 100, detail })
-      } else if (detail.status === 'failed') {
-        setReviewState({ status: 'failed', progress: 0, error: detail.error_message ?? '评审失败' })
-      }
-    }
-
-    const socket = connectReviewSocket(reviewIdForEffect, {
-      onEvent: (evt: WsEvent) => {
-        if (!active) return
-        if (evt.event === 'review.progress') {
-          const progress = (evt.data as { progress?: number }).progress
-          setReviewState((s) => ({ ...s, status: 'running', progress: progress ?? s.progress }))
-        } else if (evt.event === 'review.started') {
-          setReviewState((s) => ({ ...s, status: 'running' }))
-        } else if (evt.event === 'review.completed') {
-          void api.getReview(reviewIdForEffect).then(finish)
-        } else if (evt.event === 'review.failed') {
-          const err = (evt.data as { error?: string }).error
-          setReviewState({ status: 'failed', progress: 0, error: err ?? '评审失败' })
-        }
-      },
-      onUnavailable: () => {
-        // WS 连不上：兜底轮询到终态为止
-        pollTimer = setInterval(() => {
-          void api.getReview(reviewIdForEffect).then((detail) => {
-            if (detail.status === 'completed' || detail.status === 'failed') {
-              if (pollTimer) clearInterval(pollTimer)
-              finish(detail)
-            }
-          })
-        }, 3000)
-      },
-    })
-
-    return () => {
-      active = false
-      socket.close()
-      if (pollTimer) clearInterval(pollTimer)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewIdForEffect])
+  const reviewState = useReviewStatus(reviewIdForEffect)
 
   if (message.role === 'user') {
     return (
@@ -1099,71 +1227,7 @@ function ChatBubble({
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
           <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
-            {(reviewState.status === 'pending' || reviewState.status === 'running') && (
-              <>
-                <p className="flex items-center gap-2 font-medium text-text-primary">
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neon-green" strokeWidth={2} />
-                  评审团正在评审中…
-                </p>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
-                  <div
-                    className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all duration-500"
-                    style={{ width: `${reviewState.progress}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-text-muted">跑完之前你可以继续在这聊别的，我不会打断你。</p>
-              </>
-            )}
-
-            {reviewState.status === 'failed' && (
-              <div className="flex items-start gap-2">
-                <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
-                <div>
-                  <p className="font-medium text-text-primary">评审失败了</p>
-                  <p className="mt-1 text-text-secondary">{reviewState.error}</p>
-                </div>
-              </div>
-            )}
-
-            {reviewState.status === 'completed' && (
-              <>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审完成</p>
-                <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
-                  {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
-                </h3>
-                {reviewState.detail?.report?.executive_summary?.primary_recommendation && (
-                  <p className="mt-2 text-text-secondary leading-relaxed line-clamp-4">
-                    {reviewState.detail.report.executive_summary.primary_recommendation}
-                  </p>
-                )}
-                <div className="mt-2.5 flex flex-wrap gap-2 text-xs text-text-muted">
-                  {reviewState.detail?.report?.executive_summary?.release_risk && (
-                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                      风险 · {reviewState.detail.report.executive_summary.release_risk}
-                    </span>
-                  )}
-                  {reviewState.detail?.report?.priority_fixes && (
-                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                      {reviewState.detail.report.priority_fixes.length} 条优先修复项
-                    </span>
-                  )}
-                  {reviewState.detail?.total_cost_usd !== undefined && (
-                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                      花费 ${reviewState.detail.total_cost_usd.toFixed(3)}
-                    </span>
-                  )}
-                </div>
-                <a
-                  href={`/review/${message.reviewId}/report`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neon-green hover:text-neon-green-dim transition-colors"
-                >
-                  查看完整报告（新标签页打开，不打断这边的对话）
-                  <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-                </a>
-              </>
-            )}
+            <ReviewStatusBody reviewId={message.reviewId} reviewState={reviewState} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
