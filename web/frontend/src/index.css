@@ -16,6 +16,8 @@
   /* 品牌主色：暖金（token 名沿用 neon-green，全站引用不变） */
   --color-neon-green: #D4A94E;
   --color-neon-green-dim: #b8923e;
+  /* 金色系第二级：奶油金，用于暗底上的强调文字（标题/关键数值） */
+  --color-gold-cream: #fce1b6;
   /* 次色：薄荷（token 名沿用 cyan） */
   --color-cyan: #4ECDC4;
   --color-cyan-dim: #3bb3ab;
@@ -125,6 +127,34 @@ html, body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/*
+ * 对话消息入场： fade + translateY + 轻微 scale，缓动 0.52s cubic-bezier(0.22,1,0.36,1) ——
+ * 有"落位"的阻尼感而不是匀速飘入；尊重 reduced-motion。
+ */
+.animate-message-in {
+  animation: messageIn 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-message-in { animation: none; }
+}
+
+/*
+ * 聊天区背景质感：顶部一抹金色径向辉光 + 22px 点阵网格（极低不透明度），
+ * 让大面积暗色容器有纵深，而不是一块死黑。
+ */
+.chat-backdrop {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(212, 169, 78, 0.06), transparent 70%),
+    radial-gradient(circle, rgba(212, 169, 78, 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 22px 22px;
 }
 
 .font-display {
