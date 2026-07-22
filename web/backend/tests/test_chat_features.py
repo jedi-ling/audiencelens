@@ -115,6 +115,61 @@ class TestSelectedPersonasReachEngine:
         assert calls[0]["selected_personas"] == ["P01-indie-core-operator", "P02-systems-theorycrafter"]
 
 
+class TestModeReachesEngine:
+    def test_mode_passed_through_to_run_panel(self, client, db, monkeypatch):
+        """曾经的真 bug：v2 链路的 mode 只落库和展示，从没传给 run_panel——
+        选"快速"实际跑的是全量流程，人数不减、交叉质证照跑、钱照花。"""
+        from app.services import key_service
+
+        import runner.cli
+
+        calls = []
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: (calls.append(kw), _fake_result())[1])
+        key_service.save_user_key(db, "anonymous", "sk-ant-mode-test")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "m", "materials": [{"type": "text", "text": "x"}]},
+                "mode": "quick",
+            },
+        )
+        assert r.status_code == 202
+        _poll_job_until_terminal(client, r.json()["job_id"])
+        assert calls[0]["mode"] == "quick"
+
+
+class TestV2DetailExposesChatFields:
+    def test_detail_returns_skill_personas_project(self, client, db, monkeypatch):
+        from app.services import key_service
+
+        import runner.cli
+
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: _fake_result())
+        key_service.save_user_key(db, "anonymous", "sk-ant-detail-test")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "d", "materials": [{"type": "text", "text": "x"}]},
+                "persona_pack": "game-core",
+                "selected_personas": ["P01-indie-core-operator"],
+                "skill_type": "red_team_audience",
+                "project_key": "详情字段验证",
+            },
+        )
+        assert r.status_code == 202
+        review_id = r.json()["review_id"]
+
+        detail = client.get("/api/v2/reviews/{0}".format(review_id)).json()
+        assert detail["persona_pack"] == "game-core"
+        assert detail["selected_personas"] == ["P01-indie-core-operator"]
+        assert detail["skill_type"] == "red_team_audience"
+        assert detail["project_key"] == "详情字段验证"
+
+
 class TestProjectKeyGrouping:
     def test_project_key_stored_and_returned(self, client, db, monkeypatch):
         from app.services import key_service

@@ -40,6 +40,15 @@ SIMULATION_WARNING = (
     "请勿将本次结果用于任何决策。设置 ANTHROPIC_API_KEY 后重新运行以获得真实评审。"
 )
 
+# 评审深度档位对引擎的三个实际效果：人数上限、是否交叉质证、是否校准检查。
+# 与 web/backend/app/services/__init__.py 的 REVIEW_MODES 保持一致（那边多了给
+# 前端展示用的 persona_count_range 下限和 description，这里只留引擎用得到的）。
+REVIEW_MODE_CONFIG = {
+    "quick": {"max_personas": 3, "cross_examination": False, "calibration": False},
+    "standard": {"max_personas": 6, "cross_examination": True, "calibration": False},
+    "full": {"max_personas": 8, "cross_examination": True, "calibration": True},
+}
+
 VALID_TASK_TYPES = [
     "steam_page_review",
     "demo_first_play",
@@ -206,6 +215,7 @@ def run_panel(
     model_override: Optional[str] = None,
     api_base: Optional[str] = None,
     selected_personas: Optional[List[str]] = None,
+    mode: Optional[str] = None,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -220,7 +230,12 @@ def run_panel(
     selected_personas：显式指定要哪几个具体角色（id 列表），跳过 select_panel
     按 task_type 预设自动选人的逻辑——对话里"呼叫角色"用这个。id 一个都不在
     personas_path 对应人格包里时（拼错/串包），静默回落到自动选人，不让评审
-    因为一次无效的显式指定就直接跑空面板。"""
+    因为一次无效的显式指定就直接跑空面板。
+
+    mode：评审深度档位（quick/standard/full，见 REVIEW_MODE_CONFIG）——控制人数
+    上限、是否交叉质证、是否校准检查。None（CLI/旧调用方）保持历史行为：不截人数、
+    交叉质证和校准都跑，等价于 full。此前 Web v2 链路的 mode 只落库不进引擎，
+    "快速扫一眼"实际跑的是全量流程，人数和钱都没省——这个参数就是补那条断链的。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -276,6 +291,10 @@ def run_panel(
         panel = select_panel(task_type, personas, presets)
         panel_selected = panel["selected"]
         panel_skipped = panel["skipped"]
+
+    mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
+    if mode_config and len(panel_selected) > mode_config["max_personas"]:
+        panel_selected = panel_selected[: mode_config["max_personas"]]
 
     precheck = precheck_panel(panel_selected, artifact_bundle)
     valid_personas = precheck["valid_personas"]
@@ -336,8 +355,9 @@ def run_panel(
             r["validation"] = validation
             persona_outputs.append(r["output"])
 
+    cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
     cross_exam_data = None
-    if persona_outputs and cross_exam_prompt_path:
+    if cross_exam_enabled and persona_outputs and cross_exam_prompt_path:
         controversy_points = extract_controversy_points(persona_outputs)
         if controversy_points:
             cross_exam_prompt = render_cross_exam_prompt(
@@ -358,7 +378,8 @@ def run_panel(
     if simulated:
         report["simulation_notice"] = SIMULATION_WARNING
 
-    calibration = run_calibration_check(persona_outputs, artifact_texts)
+    calibration_enabled = mode_config["calibration"] if mode_config else True
+    calibration = run_calibration_check(persona_outputs, artifact_texts) if calibration_enabled else None
 
     markdown = ""
     if report_template_path:

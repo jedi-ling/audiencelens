@@ -1,11 +1,33 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { SKILLS, TASK_TYPES } from '@/lib/mock-data'
 import type { SkillType } from '@/lib/mock-data'
+import { fetchSkills } from '@/lib/api'
 import { ArrowRight, Layers, Users } from 'lucide-react'
 
 export default function SkillSelectPage() {
   const navigate = useNavigate()
+
+  // 后端 /api/skills 是"哪些技能可用"的事实源；本地 SKILLS 只负责 UI 装饰
+  // （图标/配色/用例文案）。API 挂了就回落本地全量列表，页面不白屏。
+  const [availableTypes, setAvailableTypes] = useState<Set<string> | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchSkills()
+      .then((list) => {
+        if (!cancelled) setAvailableTypes(new Set(list.map((s) => s.skill_type)))
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableTypes(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const skills = availableTypes ? SKILLS.filter((s) => availableTypes.has(s.type)) : SKILLS
 
   const handleSelectSkill = (skillType: SkillType) => {
     navigate(`/review/new?skill=${skillType}`)
@@ -23,7 +45,7 @@ export default function SkillSelectPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {SKILLS.map((skill) => {
+        {skills.map((skill) => {
           const relatedTaskCount = skill.task_types.length
           const relatedTaskNames = skill.task_types
             .map((tt) => TASK_TYPES.find((t) => t.id === tt)?.name)

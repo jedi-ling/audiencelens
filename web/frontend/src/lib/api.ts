@@ -136,7 +136,9 @@ export async function fetchReviewResult(reviewId: string): Promise<ReviewResultD
   return res.json()
 }
 
-export async function fetchSkills(): Promise<SkillDetail[]> {
+/** 后端 /api/skills 的真实响应形状（SkillTypeResponse）——之前这里声明成
+ * SkillDetail 是错的，也从来没人调用过；技能中心页现在以它为"哪些技能可用"的事实源。 */
+export async function fetchSkills(): Promise<{ skill_type: string; name: string; description: string }[]> {
   const res = await authedFetch('/api/skills')
   if (!res.ok) throw new Error(`Failed to fetch skills: ${res.statusText}`)
   return res.json()

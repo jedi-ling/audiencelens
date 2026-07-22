@@ -347,6 +347,21 @@ export default function ReviewProgressPage() {
                 </span>
               )
             })()}
+            {detail?.skill_type && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-cyan/10 text-cyan">
+                技能 · {detail.skill_type === 'red_team_audience' ? '红队受众' : detail.skill_type === 'audience_panel' ? '受众面板' : detail.skill_type}
+              </span>
+            )}
+            {detail?.selected_personas && detail.selected_personas.length > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-cyan/10 text-cyan">
+                指定角色 · {detail.selected_personas.length} 位
+              </span>
+            )}
+            {detail?.project_key && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warm-orange/10 text-warm-orange">
+                项目 · {detail.project_key}
+              </span>
+            )}
           </div>
         </div>
         {status === 'completed' && (

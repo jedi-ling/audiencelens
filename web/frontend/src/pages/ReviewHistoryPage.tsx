@@ -22,6 +22,7 @@ import {
   Microscope,
   AlertCircle,
   Inbox,
+  FolderOpen,
 } from 'lucide-react'
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -40,6 +41,26 @@ const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: st
 
 function taskTypeName(taskType: string): string {
   return TASK_TYPES.find((t) => t.id === taskType)?.name ?? taskType
+}
+
+/** 同 project_key 的评审聚合成"长期评审项目"分组（与 /ask 侧栏同一逻辑）；
+ * 列表已按 created_at 倒序，分组内/分组间顺序天然保留。 */
+function groupByProject(reviews: Review[]): { projects: { key: string; items: Review[] }[]; ungrouped: Review[] } {
+  const order: string[] = []
+  const map = new Map<string, Review[]>()
+  const ungrouped: Review[] = []
+  for (const r of reviews) {
+    if (r.project_key) {
+      if (!map.has(r.project_key)) {
+        map.set(r.project_key, [])
+        order.push(r.project_key)
+      }
+      map.get(r.project_key)!.push(r)
+    } else {
+      ungrouped.push(r)
+    }
+  }
+  return { projects: order.map((key) => ({ key, items: map.get(key)! })), ungrouped }
 }
 
 function formatTime(iso: string): string {
@@ -119,8 +140,9 @@ export default function ReviewHistoryPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {reviews.map((r) => {
+        (() => {
+          const { projects, ungrouped } = groupByProject(reviews)
+          const renderRow = (r: Review) => {
             const sc = statusConfig[r.status] ?? statusConfig.pending
             const mb = modeBadgeConfig[r.mode] ?? modeBadgeConfig.standard
             const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
@@ -179,8 +201,27 @@ export default function ReviewHistoryPage() {
                 </button>
               </div>
             )
-          })}
-        </div>
+          }
+          return (
+            <div className="space-y-5">
+              {projects.map((group) => (
+                <div key={group.key}>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-warm-orange">
+                    <FolderOpen className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                    <span className="min-w-0 truncate">{group.key}</span>
+                    <span className="text-xs text-text-muted">长期评审项目 · {group.items.length} 次评审</span>
+                  </div>
+                  <div className="space-y-2.5 border-l-2 border-warm-orange/20 pl-3">
+                    {group.items.map(renderRow)}
+                  </div>
+                </div>
+              ))}
+              {ungrouped.length > 0 && (
+                <div className="space-y-2.5">{ungrouped.map(renderRow)}</div>
+              )}
+            </div>
+          )
+        })()
       )}
     </div>
   )

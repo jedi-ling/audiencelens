@@ -164,6 +164,10 @@ export interface ReviewDetail {
   id: string
   task_type: TaskType
   mode: ReviewMode
+  persona_pack: string | null
+  selected_personas: string[] | null
+  skill_type: string | null
+  project_key: string | null
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
   error_message: string | null
   created_at: string | null

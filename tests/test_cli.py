@@ -327,6 +327,64 @@ class TestRunPanel:
         persona_ids = {n["persona_id"] for n in result["report"]["persona_notes"]}
         assert persona_ids == {"P01-indie-core-operator"}
 
+    @staticmethod
+    def _rich_bundle():
+        """材料类型覆盖整个人格包的 evidence_types_needed 全集——
+        让 precheck 一个人都不跳过，人数断言才真正测的是 mode 截断而不是证据筛选。"""
+        import yaml as _yaml
+
+        with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
+            pack = _yaml.safe_load(f)
+        evidence_types = set()
+        for p in pack["personas"]:
+            evidence_types.update(p.get("evidence_types_needed", []))
+        return {
+            "task_type": "concept_review",
+            "target": "覆盖全证据类型的测试包",
+            "materials": [{"type": t, "text": f"{t} 的占位材料"} for t in sorted(evidence_types)],
+        }
+
+    def test_quick_mode_caps_personas_and_skips_cross_exam_and_calibration(self):
+        """mode 曾经只落库不进引擎——"快速扫一眼"实际跑的是全量流程。
+        quick 档必须：人数 ≤3、无交叉质证、无校准。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=self._rich_bundle(),
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="quick",
+        )
+        assert result["cost_summary"]["persona_count"] <= 3
+        assert result["calibration"] is None
+
+    def test_no_mode_keeps_legacy_full_behavior(self):
+        """CLI/旧调用方不传 mode：不截人数（concept_review 预设面板 >3 人）、
+        校准照跑——保持历史行为不回归。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=self._rich_bundle(),
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+        )
+        assert result["calibration"] is not None
+        assert result["cost_summary"]["persona_count"] > 3
+
     def test_selected_personas_with_no_match_falls_back_to_auto_select(self, sample_artifact_bundle):
         """id 全部拼错/串包时不能跑出一个空面板——静默回落到自动选人。"""
         os.environ.pop("ANTHROPIC_API_KEY", None)

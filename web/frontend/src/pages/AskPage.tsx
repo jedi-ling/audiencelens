@@ -16,7 +16,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
-import { fetchReviews, deleteReview } from '@/lib/api'
+import { fetchReviews, deleteReview, fetchPersonas } from '@/lib/api'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES } from '@/lib/mock-data'
 import type { IntentResult, Material } from '@/lib/types'
@@ -142,6 +142,24 @@ export default function AskPage() {
   const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
+  const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPersonas()
+      .then((list) => {
+        if (cancelled) return
+        const map: Record<string, string> = {}
+        for (const p of list) map[p.id] = p.archetype || p.name
+        setPersonaNames(map)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const loadHistory = useCallback(async () => {
     try {
@@ -297,7 +315,7 @@ export default function AskPage() {
     void send(`就是${TASK_LABELS[candidate] ?? candidate}`)
   }
 
-  const confirmAndCreate = async (msgId: string, intent: IntentResult) => {
+  const confirmAndCreate = async (msgId: string, intent: IntentResult, personasOverride?: string[]) => {
     if (!intent.task_type) return
     // 全局防重：多张确认卡片共存时，任何一张在提交中都不允许再发——
     // 否则双击/连点会创建出两个评审
@@ -314,7 +332,10 @@ export default function AskPage() {
         artifact: { title: artifactText.slice(0, 60), materials },
         mode: intent.mode,
         persona_pack: intent.persona_pack,
-        selected_personas: intent.matched_personas.length > 0 ? intent.matched_personas : undefined,
+        selected_personas: (() => {
+          const chosen = personasOverride ?? intent.matched_personas
+          return chosen.length > 0 ? chosen : undefined
+        })(),
         skill_type: intent.skill_type,
         project_key: intent.project_key,
       })
@@ -394,7 +415,8 @@ export default function AskPage() {
             message={m}
             busy={submittingId === m.id}
             onPickCandidate={pickCandidate}
-            onConfirm={(intent) => void confirmAndCreate(m.id, intent)}
+            personaNames={personaNames}
+            onConfirm={(intent, personas) => void confirmAndCreate(m.id, intent, personas)}
             onGoSettings={() => navigate('/settings')}
           />
         ))}
@@ -666,17 +688,22 @@ function HistorySidebar({
 function ChatBubble({
   message,
   busy,
+  personaNames,
   onPickCandidate,
   onConfirm,
   onGoSettings,
 }: {
   message: ChatMessage
   busy: boolean
+  personaNames: Record<string, string>
   onPickCandidate: (candidate: string) => void
-  onConfirm: (intent: IntentResult) => void
+  onConfirm: (intent: IntentResult, personas?: string[]) => void
   onGoSettings: () => void
 }) {
   const timeLabel = formatTime(message.ts)
+  // 确认卡片上被用户手动移除的角色（呼叫角色可开庭前调整）。
+  // hooks 必须在所有条件 return 之前调用，故放在这里而不是 confirm 分支里。
+  const [removedPersonas, setRemovedPersonas] = useState<Set<string>>(new Set())
 
   if (message.role === 'user') {
     return (
@@ -762,6 +789,7 @@ function ChatBubble({
   // confirm —— 转化关键节点：大标题 + 把握可视化 + 次要信息 chip 化
   const intent = message.intent
   const conf = confidenceLevel(intent.confidence)
+  const activePersonas = intent.matched_personas.filter((id) => !removedPersonas.has(id))
   return (
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
@@ -784,17 +812,54 @@ function ChatBubble({
                 技能 · {SKILL_LABELS[intent.skill_type] ?? intent.skill_type}
               </span>
             )}
-            {intent.matched_personas.length > 0 && (
-              <span className="rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
-                角色 · 已指定 {intent.matched_personas.length} 位
-              </span>
-            )}
             {intent.project_key && (
               <span className="rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
                 项目 · {intent.project_key}
               </span>
             )}
           </div>
+
+          {intent.matched_personas.length > 0 && (
+            <div className="mt-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                指定角色（点 × 可移除，移除全部则回到自动选人）
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {intent.matched_personas.map((pid) => {
+                  const removed = removedPersonas.has(pid)
+                  const label = personaNames[pid] ?? pid
+                  return (
+                    <span
+                      key={pid}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-all',
+                        removed
+                          ? 'border-border bg-bg-card text-text-muted line-through opacity-60'
+                          : 'border-cyan/30 bg-cyan/10 text-cyan'
+                      )}
+                    >
+                      {label}
+                      <button
+                        onClick={() =>
+                          setRemovedPersonas((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(pid)) next.delete(pid)
+                            else next.add(pid)
+                            return next
+                          })
+                        }
+                        className="ml-0.5 hover:text-text-primary transition-colors"
+                        aria-label={removed ? `恢复 ${label}` : `移除 ${label}`}
+                        title={removed ? '点击恢复' : '点击移除'}
+                      >
+                        {removed ? '↺' : '×'}
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="mt-3.5">
             <div className="flex items-center justify-between text-xs">
@@ -818,7 +883,7 @@ function ChatBubble({
 
           <button
             className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(212,169,78,0.3)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_4px_24px_rgba(212,169,78,0.4)] disabled:opacity-50"
-            onClick={() => onConfirm(intent)}
+            onClick={() => onConfirm(intent, activePersonas)}
             disabled={busy}
           >
             {busy ? '开庭中…' : '开庭评审 →'}
