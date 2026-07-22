@@ -1063,7 +1063,24 @@ function useReviewStatus(reviewId: string | null): ReviewState {
 }
 
 /** 评审状态的展示内容——聊天气泡和弹窗只是外壳不同，内容完全一致。 */
+const RISK_BADGE: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  low: { label: '低风险', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30' },
+  medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
+  high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
+  critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
+}
+
+const SEVERITY_DOT: Record<string, string> = {
+  low: 'bg-text-muted',
+  medium: 'bg-severity-medium',
+  high: 'bg-warm-orange',
+  critical: 'bg-severity-critical',
+}
+
 function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewState: ReviewState }) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const risk = RISK_BADGE[reviewState.detail?.report?.executive_summary?.release_risk ?? '']
+
   return (
     <>
       {(reviewState.status === 'pending' || reviewState.status === 'running') && (
@@ -1093,45 +1110,169 @@ function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewS
       )}
 
       {reviewState.status === 'completed' && (
-        <>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审完成</p>
-          <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
-            {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
-          </h3>
-          {reviewState.detail?.report?.executive_summary?.primary_recommendation && (
-            <p className="mt-2 text-text-secondary leading-relaxed line-clamp-4">
-              {reviewState.detail.report.executive_summary.primary_recommendation}
-            </p>
-          )}
-          <div className="mt-2.5 flex flex-wrap gap-2 text-xs text-text-muted">
-            {reviewState.detail?.report?.executive_summary?.release_risk && (
-              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                风险 · {reviewState.detail.report.executive_summary.release_risk}
-              </span>
-            )}
-            {reviewState.detail?.report?.priority_fixes && (
-              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                {reviewState.detail.report.priority_fixes.length} 条优先修复项
-              </span>
-            )}
-            {reviewState.detail?.total_cost_usd !== undefined && (
-              <span className="rounded-md border border-border bg-bg-card px-2 py-1">
-                花费 ${reviewState.detail.total_cost_usd.toFixed(3)}
+        <div className="rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="min-w-0 truncate text-[15px] font-semibold text-gold-cream font-display">
+              {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
+            </h3>
+            {risk && (
+              <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium', risk.color, risk.bg, risk.border)}>
+                {risk.label}
               </span>
             )}
           </div>
+
+          {reviewState.detail?.report?.executive_summary?.primary_recommendation && (
+            <p className="mt-2 text-[13px] leading-relaxed text-text-secondary line-clamp-3">
+              {reviewState.detail.report.executive_summary.primary_recommendation}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center gap-3 text-[11px] text-text-muted">
+            {reviewState.detail?.report?.priority_fixes && (
+              <span className="flex items-center gap-1">
+                <FileWarning className="h-3 w-3" strokeWidth={1.75} />
+                {reviewState.detail.report.priority_fixes.length} 条修复项
+              </span>
+            )}
+            {reviewState.detail?.report?.persona_notes && (
+              <span className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" strokeWidth={1.75} />
+                {reviewState.detail.report.persona_notes.length} 位角色
+              </span>
+            )}
+            {reviewState.detail?.total_cost_usd !== undefined && (
+              <span>${reviewState.detail.total_cost_usd.toFixed(3)}</span>
+            )}
+          </div>
+
+          <button
+            onClick={() => setReportOpen(true)}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+          >
+            查看完整报告
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
+        </div>
+      )}
+
+      {reportOpen && reviewState.detail && (
+        <ReportModal reviewId={reviewId} detail={reviewState.detail} onClose={() => setReportOpen(false)} />
+      )}
+    </>
+  )
+}
+
+/** 评审卡片"查看完整报告"打开的弹窗——摘要+优先修复项+角色简报，
+ * 数据直接复用已经拉到手的 detail，不用再发一次请求。图表/persona 详细对比
+ * 那些更重的可视化留在独立报告页，弹窗底部给一个入口跳过去。 */
+function ReportModal({ reviewId, detail, onClose }: { reviewId: string; detail: ReviewDetail; onClose: () => void }) {
+  const summary = detail.report?.executive_summary
+  const risk = RISK_BADGE[summary?.release_risk ?? '']
+  const priorityFixes = detail.report?.priority_fixes ?? []
+  const personaNotes = detail.report?.persona_notes ?? []
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-primary/80 p-6 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-neon-green/30 bg-bg-secondary shadow-[0_0_36px_rgba(212,169,78,0.08)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold text-gold-cream font-display">
+              {TASK_LABELS[detail.task_type ?? ''] ?? detail.task_type}
+            </h2>
+            <p className="text-xs text-text-muted">完整报告</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded p-1.5 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">结论</p>
+            {risk && (
+              <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', risk.color, risk.bg, risk.border)}>
+                {risk.label}
+              </span>
+            )}
+            {summary?.evidence_quality && (
+              <span className="rounded-full border border-border bg-bg-card px-2 py-0.5 text-[11px] text-text-muted">
+                证据 · {summary.evidence_quality}
+              </span>
+            )}
+          </div>
+          {summary?.primary_recommendation && (
+            <p className="mt-1.5 leading-relaxed text-text-primary">{summary.primary_recommendation}</p>
+          )}
+
+          {priorityFixes.length > 0 && (
+            <div className="mt-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                优先修复项 · {priorityFixes.length}
+              </p>
+              <div className="mt-2 space-y-2">
+                {priorityFixes.map((fix, i) => (
+                  <div key={i} className="flex gap-2 rounded-lg border border-border bg-bg-card/40 p-2.5">
+                    <span
+                      className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', SEVERITY_DOT[fix.severity ?? 'medium'])}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary">{fix.title}</p>
+                      {fix.why_it_matters && <p className="mt-0.5 text-xs text-text-secondary">{fix.why_it_matters}</p>}
+                      {fix.suggested_fix && (
+                        <p className="mt-1 text-xs text-neon-green">建议：{fix.suggested_fix}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {personaNotes.length > 0 && (
+            <div className="mt-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                角色简报 · {personaNotes.length}
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {personaNotes.map((note, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-bg-card/40 px-2.5 py-2">
+                    <span className="min-w-0 truncate text-text-primary">{note.persona_name ?? note.persona_id}</span>
+                    <span className="shrink-0 text-xs text-text-muted">
+                      {note.primary_stance ?? '—'}
+                      {note.key_issues && note.key_issues.length > 0 ? ` · ${note.key_issues.length} 条意见` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3 text-xs text-text-muted">
+          <span>花费 ${detail.total_cost_usd.toFixed(3)}</span>
           <a
             href={`/review/${reviewId}/report`}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neon-green hover:text-neon-green-dim transition-colors"
+            className="flex items-center gap-1 text-neon-green hover:text-neon-green-dim transition-colors"
           >
-            查看完整报告（新标签页打开，不打断这边的对话）
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+            在独立页面打开（含图表）
+            <ArrowRight className="h-3 w-3" strokeWidth={2} />
           </a>
-        </>
-      )}
-    </>
+        </div>
+      </div>
+    </div>
   )
 }
 
