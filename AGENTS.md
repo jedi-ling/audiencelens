@@ -16,14 +16,17 @@ AudienceLens — 全栈合成观众评审系统（CLI + FastAPI + React 19）。
 ## 变更校验
 
 ```bash
-# 核心引擎测试（267 项）
+# 核心引擎测试（272 项）
 python -m pytest tests/ -q
 
-# 平台链路测试（173 项）
+# 平台链路测试（221 项）
 (cd web/backend && python -m pytest tests/ -q)
 
 # 前端构建（TypeScript 编译 + Vite 打包）
 (cd web/frontend && npm run build)
+
+# 后台面板单测（10 项，Vitest）
+(cd web/admin && npm run test)
 ```
 
 ## 伦理
