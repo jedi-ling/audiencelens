@@ -239,12 +239,19 @@ async def parse_intent(
     无 key 也能用：自动降级到启发式规则档（返回 method=heuristic 如实声明）。
     """
     api_key = None
+    provider = "anthropic"
+    model = None
+    api_base = None
     try:
-        api_key = key_service.resolve_key(db, identity.user_id).key
+        resolved = key_service.resolve_key(db, identity.user_id)
+        api_key = resolved.key
+        provider = resolved.provider
+        model = resolved.model
+        api_base = resolved.api_base
     except Exception:
         api_key = None  # 没 key 就走启发式，不阻断
 
-    result = intent_service.parse_intent(body.text, api_key)
+    result = intent_service.parse_intent(body.text, api_key, provider=provider, model=model, api_base=api_base)
     return result.to_dict()
 
 

@@ -196,25 +196,42 @@ confidence 是你对 task_type 判断的把握（0-1）。若无法确定，task
 并在 clarifying_question 里写一句要问用户的话。"""
 
 
-def parse_intent_llm(text: str, api_key: str) -> Optional[IntentResult]:
-    """LLM 档。任何异常返回 None，由调用方降级到启发式。"""
-    try:
-        import anthropic
+def parse_intent_llm(
+    text: str,
+    api_key: str,
+    provider: str = "anthropic",
+    model: Optional[str] = None,
+    api_base: Optional[str] = None,
+) -> Optional[IntentResult]:
+    """LLM 档。任何异常返回 None，由调用方降级到启发式。
 
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model=settings.intent_model,
+    走 runner.llm_client 统一出口——不再假定官方 Anthropic 端点。此前这里直接
+    anthropic.Anthropic(api_key=api_key) 手搓调用，完全没用到用户 BYOK 配的
+    provider/api_base/model：配了第三方中转（DeepSeek/Kimi/MiniMax 等 Anthropic
+    兼容中转）的用户，key 拿去打官方 api.anthropic.com 必然认证失败被吞掉，
+    静默退化成启发式档，界面上完全看不出发生了什么——像是"填了 key 也没用"。
+    """
+    try:
+        import os
+        import sys
+
+        _src = os.path.join(settings.repo_root, "src")
+        if _src not in sys.path:
+            sys.path.insert(0, _src)
+        from runner.llm_client import chat_completion
+
+        effective_model = model or settings.intent_model
+        raw, _in_tok, _out_tok = chat_completion(
+            model=effective_model,
+            prompt=_LLM_PROMPT.format(
+                task_types="\n".join(f"- {t}" for t in VALID_TASK_TYPES), text=text
+            ),
+            api_key=api_key,
+            provider=provider,
+            api_base=api_base,
             max_tokens=512,
-            messages=[
-                {
-                    "role": "user",
-                    "content": _LLM_PROMPT.format(
-                        task_types="\n".join(f"- {t}" for t in VALID_TASK_TYPES), text=text
-                    ),
-                }
-            ],
         )
-        raw = resp.content[0].text.strip()
+        raw = raw.strip()
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if not m:
             return None
@@ -241,10 +258,16 @@ def parse_intent_llm(text: str, api_key: str) -> Optional[IntentResult]:
         return None
 
 
-def parse_intent(text: str, api_key: Optional[str] = None) -> IntentResult:
+def parse_intent(
+    text: str,
+    api_key: Optional[str] = None,
+    provider: str = "anthropic",
+    model: Optional[str] = None,
+    api_base: Optional[str] = None,
+) -> IntentResult:
     """对外入口：优先 LLM，失败自动降级启发式（永不因为解析失败而阻断用户）。"""
     if api_key and settings.intent_llm_enabled:
-        result = parse_intent_llm(text, api_key)
+        result = parse_intent_llm(text, api_key, provider=provider, model=model, api_base=api_base)
         if result is not None:
             return result
     return parse_intent_heuristic(text)
