@@ -5,7 +5,8 @@
  *   用户发消息 → 把本轮之前的所有用户发言拼接起来 → POST /api/intent/parse
  *        → 置信度不够就追问，用户的回答会和之前的话拼在一起再解析一次
  *        → 足够自信后展示确认卡片 → 确认 → POST /api/v2/reviews
- *        → 跳到进度页，WS 推送实时进度
+ *        → 评审卡片直接嵌进同一个对话（WS 推进度），不跳走——
+ *          评审跑着的时候你还能继续聊，跑完了报告摘要也在这条对话里冒出来。
  *
  * 拼接而非维护真正的多轮对话状态，是因为 intent_service 本身是无状态的单次解析——
  * 拼接用户历史发言等价于给它更多上下文，不需要后端改造就能获得"越聊越准"的效果。
@@ -13,13 +14,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, deleteReview, fetchPersonas } from '@/lib/api'
+import { connectReviewSocket } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
-import type { IntentResult, Material } from '@/lib/types'
+import type { IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
 import type { Review } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
@@ -64,6 +66,7 @@ type ChatMessageBase =
   | { id: string; role: 'assistant'; kind: 'clarify'; question: string; candidates: string[] }
   | { id: string; role: 'assistant'; kind: 'confirm'; intent: IntentResult }
   | { id: string; role: 'assistant'; kind: 'error'; text: string; needsKey?: boolean }
+  | { id: string; role: 'assistant'; kind: 'review'; reviewId: string }
 
 type ChatMessage = ChatMessageBase & { ts: number }
 
@@ -387,10 +390,10 @@ export default function AskPage() {
         skill_type: intent.skill_type,
         project_key: intent.project_key,
       })
-      appendMessage({ id: nextId(), role: 'assistant', kind: 'text', text: '评审团已经开庭，带你去看实时进度…' })
+      // 评审卡片直接嵌进这条对话——不跳走，用户可以边等边继续聊
+      appendMessage({ id: nextId(), role: 'assistant', kind: 'review', reviewId: res.review_id })
       setAttachments([])
       void loadHistory() // 新评审马上出现在左侧历史里
-      navigate(`/review/${res.review_id}`)
     } catch (e) {
       if (e instanceof ApiError && e.needsApiKey) {
         appendMessage({ id: nextId(), role: 'assistant', kind: 'error', text: e.message, needsKey: true })
@@ -603,6 +606,11 @@ export default function AskPage() {
           )}
         </button>
 
+        <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+
+        {/* 三个"钉住选择"按钮共享一个浅色胶囊容器，和上传按钮的独立感区分开——
+            视觉上明确"这一组都是覆盖 AI 猜测结果的手动指定"。 */}
+        <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-bg-secondary/60 p-0.5">
         {/* 选技能：弹层里只列能真正影响评审 prompt 的两个技能（红队/受众面板）——
             合成试玩是默认流程没必要选，人格生成是完全不同的动作不该混进来。 */}
         <div className="relative shrink-0">
@@ -762,6 +770,9 @@ export default function AskPage() {
             </div>
           )}
         </div>
+        </div>
+
+        <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
 
         <textarea
           className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
@@ -968,6 +979,66 @@ function ChatBubble({
   // hooks 必须在所有条件 return 之前调用，故放在这里而不是 confirm 分支里。
   const [removedPersonas, setRemovedPersonas] = useState<Set<string>>(new Set())
 
+  // 评审卡片的进度追踪——WS 推事件，完了拉一次详情渲染摘要。
+  // hooks 必须在条件 return 之前，故对非 review 消息也声明（reviewId 传 null 时 effect 直接跳过）。
+  const [reviewState, setReviewState] = useState<{
+    status: 'pending' | 'running' | 'completed' | 'failed'
+    progress: number
+    detail?: ReviewDetail
+    error?: string
+  }>({ status: 'pending', progress: 0 })
+  const reviewIdForEffect = message.role === 'assistant' && message.kind === 'review' ? message.reviewId : null
+
+  useEffect(() => {
+    if (!reviewIdForEffect) return
+    let active = true
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+
+    const finish = (detail: ReviewDetail) => {
+      if (!active) return
+      if (detail.status === 'completed') {
+        setReviewState({ status: 'completed', progress: 100, detail })
+      } else if (detail.status === 'failed') {
+        setReviewState({ status: 'failed', progress: 0, error: detail.error_message ?? '评审失败' })
+      }
+    }
+
+    const socket = connectReviewSocket(reviewIdForEffect, {
+      onEvent: (evt: WsEvent) => {
+        if (!active) return
+        if (evt.event === 'review.progress') {
+          const progress = (evt.data as { progress?: number }).progress
+          setReviewState((s) => ({ ...s, status: 'running', progress: progress ?? s.progress }))
+        } else if (evt.event === 'review.started') {
+          setReviewState((s) => ({ ...s, status: 'running' }))
+        } else if (evt.event === 'review.completed') {
+          void api.getReview(reviewIdForEffect).then(finish)
+        } else if (evt.event === 'review.failed') {
+          const err = (evt.data as { error?: string }).error
+          setReviewState({ status: 'failed', progress: 0, error: err ?? '评审失败' })
+        }
+      },
+      onUnavailable: () => {
+        // WS 连不上：兜底轮询到终态为止
+        pollTimer = setInterval(() => {
+          void api.getReview(reviewIdForEffect).then((detail) => {
+            if (detail.status === 'completed' || detail.status === 'failed') {
+              if (pollTimer) clearInterval(pollTimer)
+              finish(detail)
+            }
+          })
+        }, 3000)
+      },
+    })
+
+    return () => {
+      active = false
+      socket.close()
+      if (pollTimer) clearInterval(pollTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewIdForEffect])
+
   if (message.role === 'user') {
     return (
       <div className="flex justify-end animate-message-in">
@@ -1015,6 +1086,84 @@ function ChatBubble({
                 )}
               </div>
             </div>
+          </div>
+          <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (message.kind === 'review') {
+    return (
+      <div className="flex items-start gap-2.5 animate-message-in">
+        <AssistantAvatar />
+        <div className="flex w-full max-w-[85%] flex-col">
+          <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
+            {(reviewState.status === 'pending' || reviewState.status === 'running') && (
+              <>
+                <p className="flex items-center gap-2 font-medium text-text-primary">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neon-green" strokeWidth={2} />
+                  评审团正在评审中…
+                </p>
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
+                  <div
+                    className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all duration-500"
+                    style={{ width: `${reviewState.progress}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-text-muted">跑完之前你可以继续在这聊别的，我不会打断你。</p>
+              </>
+            )}
+
+            {reviewState.status === 'failed' && (
+              <div className="flex items-start gap-2">
+                <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
+                <div>
+                  <p className="font-medium text-text-primary">评审失败了</p>
+                  <p className="mt-1 text-text-secondary">{reviewState.error}</p>
+                </div>
+              </div>
+            )}
+
+            {reviewState.status === 'completed' && (
+              <>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">评审完成</p>
+                <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
+                  {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
+                </h3>
+                {reviewState.detail?.report?.executive_summary?.primary_recommendation && (
+                  <p className="mt-2 text-text-secondary leading-relaxed line-clamp-4">
+                    {reviewState.detail.report.executive_summary.primary_recommendation}
+                  </p>
+                )}
+                <div className="mt-2.5 flex flex-wrap gap-2 text-xs text-text-muted">
+                  {reviewState.detail?.report?.executive_summary?.release_risk && (
+                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                      风险 · {reviewState.detail.report.executive_summary.release_risk}
+                    </span>
+                  )}
+                  {reviewState.detail?.report?.priority_fixes && (
+                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                      {reviewState.detail.report.priority_fixes.length} 条优先修复项
+                    </span>
+                  )}
+                  {reviewState.detail?.total_cost_usd !== undefined && (
+                    <span className="rounded-md border border-border bg-bg-card px-2 py-1">
+                      花费 ${reviewState.detail.total_cost_usd.toFixed(3)}
+                    </span>
+                  )}
+                </div>
+                <a
+                  href={`/review/${message.reviewId}/report`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-neon-green hover:text-neon-green-dim transition-colors"
+                >
+                  查看完整报告（新标签页打开，不打断这边的对话）
+                  <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+                </a>
+              </>
+            )}
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>

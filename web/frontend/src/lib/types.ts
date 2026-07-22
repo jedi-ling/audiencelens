@@ -177,8 +177,16 @@ export interface ReviewDetail {
   calibration: unknown
 }
 
+/** 见 src/runner/aggregator.py aggregate_report()——不是一句话摘要，
+ * 而是结构化的三段结论（在哪个环节形成，供 ReportPage/对话卡片各自取用）。 */
+export interface ExecutiveSummary {
+  primary_recommendation: string
+  release_risk: string
+  evidence_quality: string
+}
+
 export interface ReviewReport {
-  executive_summary?: string
+  executive_summary?: ExecutiveSummary
   consensus?: unknown
   major_disagreements?: unknown[]
   priority_fixes?: PriorityFix[]
