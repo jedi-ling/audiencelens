@@ -17,6 +17,8 @@ class ReviewCreate(BaseModel):
     persona_pack: Optional[str] = None
     selected_personas: Optional[List[str]] = None
     mode: ReviewMode = ReviewMode.standard
+    skill_type: Optional[str] = None
+    project_key: Optional[str] = None
 
 
 class PersonaOutputResponse(BaseModel):
@@ -41,6 +43,8 @@ class ReviewResponse(BaseModel):
     artifact_bundle: Dict[str, Any]
     persona_pack: Optional[str] = None
     selected_personas: Optional[List[str]] = None
+    skill_type: Optional[str] = None
+    project_key: Optional[str] = None
     mode: str = "standard"
     status: str
     created_at: datetime

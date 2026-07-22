@@ -162,6 +162,9 @@ export const api = {
     artifact: { title?: string; materials: Material[] }
     mode?: ReviewMode
     persona_pack?: PersonaPack
+    selected_personas?: string[]
+    skill_type?: string | null
+    project_key?: string | null
   }) =>
     request<CreateReviewResponse>('/api/v2/reviews', {
       method: 'POST',

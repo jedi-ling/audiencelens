@@ -559,6 +559,24 @@ class PersonaService:
                 return detail
         return None
 
+    # 只有这两种技能对应"评审时换一种视角看"，能真正影响 prompt 取向；
+    # synthetic_playtest 是默认流程（无需额外提示），persona_generate 是生成角色
+    # 这个完全不同的动作，不该通过"创建评审"这个入口触发，所以不给它提示语。
+    _SKILL_PROMPT_HINTS = {
+        SkillType.RED_TEAM_AUDIENCE.value: (
+            "本次评审请采用红队/对抗性视角：优先挖掘产品的弱点、风险和「劝退点」，"
+            "而不是常规的体验反馈——目标是帮团队在正式上线前找出最容易被喷、被弃、被吐槽的地方。"
+        ),
+        SkillType.AUDIENCE_PANEL.value: (
+            "本次评审请以非游戏、大众消费产品的视角来看——不要套用硬核玩家的评判标准，"
+            "关注普通用户/消费者会不会用、看不看得懂、愿不愿意留下。"
+        ),
+    }
+
+    @classmethod
+    def get_skill_prompt_hint(cls, skill_type: Optional[str]) -> str:
+        return cls._SKILL_PROMPT_HINTS.get(skill_type or "", "")
+
     @classmethod
     def generate_personas(cls, domain: str, audience: str = "", goals: str = "", count: int = 4) -> List[dict]:
         """根据领域、受众和目标生成 persona YAML 定义列表"""
@@ -650,19 +668,45 @@ personas:
         return personas
 
 
+def apply_skill_hint(artifact_bundle: dict, skill_type: Optional[str]) -> dict:
+    """技能标签要真正影响评审，而不只是落库当个标签——把提示语当成一条材料，
+    塞进 render_prompt 已经在读的 artifact_bundle.materials 里，每个人格都会看到。
+    没有对应提示语（如 skill_type 为空、synthetic_playtest、persona_generate）时原样返回。"""
+    hint = PersonaService.get_skill_prompt_hint(skill_type)
+    if not hint:
+        return artifact_bundle
+    bundle = dict(artifact_bundle or {})
+    materials = list(bundle.get("materials") or [])
+    materials.insert(0, {"type": "text", "text": f"[评审技能：{skill_type}] {hint}"})
+    bundle["materials"] = materials
+    return bundle
+
+
 class ReviewService:
     def __init__(self, session: Session):
         self.session = session
 
-    def create_review(self, task_type: str, artifact_bundle: dict, persona_pack: Optional[str] = None, selected_personas: Optional[List[str]] = None, mode: str = "standard", user_id: str = "anonymous") -> Review:
+    def create_review(
+        self,
+        task_type: str,
+        artifact_bundle: dict,
+        persona_pack: Optional[str] = None,
+        selected_personas: Optional[List[str]] = None,
+        mode: str = "standard",
+        user_id: str = "anonymous",
+        skill_type: Optional[str] = None,
+        project_key: Optional[str] = None,
+    ) -> Review:
         review = Review(
             id=str(uuid.uuid4()),
             user_id=user_id,
             task_type=task_type,
             target_title=artifact_bundle.get("title"),
-            artifact_bundle=artifact_bundle,
+            artifact_bundle=apply_skill_hint(artifact_bundle, skill_type),
             persona_pack=persona_pack,
             selected_personas=selected_personas,
+            skill_type=skill_type,
+            project_key=project_key,
             mode=mode,
             status="pending",
             created_at=datetime.now(timezone.utc),

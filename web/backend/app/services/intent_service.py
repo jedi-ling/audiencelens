@@ -99,9 +99,82 @@ class IntentResult:
     clarifying_question: Optional[str] = None
     method: str = "heuristic"  # heuristic | llm
     candidates: List[str] = field(default_factory=list)
+    # 插入技能：只有 red_team_audience / audience_panel 真正改变 prompt 取向
+    # （见 web/backend/app/services/__init__.py 的 get_skill_prompt_hint）。
+    skill_type: Optional[str] = None
+    # 呼叫角色：用户点名想要的具体人格 id（必须落在 persona_pack 对应的包内）。
+    matched_personas: List[str] = field(default_factory=list)
+    # 长期评审项目：用户给的项目名，前端按它把历次评审聚合成时间线（纯字符串分组，无独立实体）。
+    project_key: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+# 只有这两种技能能通过对话触发——synthetic_playtest 是默认流程，persona_generate
+# 是"生成角色"这个完全不同的动作，不该借评审创建这个入口触发。
+CHAT_SKILL_TYPES = ["red_team_audience", "audience_panel"]
+
+SKILL_KEYWORDS = {
+    "red_team_audience": ["红队", "找茬", "挑刺", "对抗性", "唱反调", "使劲喷", "往死里挑", "红队受众"],
+    "audience_panel": ["大众消费者视角", "非游戏受众", "普通消费者视角", "受众面板"],
+}
+
+_PERSONA_CALL_TRIGGERS = ["叫上", "带上", "召唤", "呼叫角色", "指定角色", "这几个角色", "这个角色来", "加上这个角色"]
+
+_PROJECT_TRIGGER_RE = re.compile(r"长期评审项目|长期项目|评审项目")
+_QUOTED_NAME_RE = re.compile(r"[「『\"“']([^」』\"”']{1,30})[」』\"”']")
+_PROJECT_NAME_RE = re.compile(r"([^\s，。！？,\.!?]{2,20})(?:的)?(?:长期评审项目|长期项目|评审项目)")
+
+
+def _match_skill_heuristic(text: str) -> Optional[str]:
+    for skill_type, words in SKILL_KEYWORDS.items():
+        if any(w in text for w in words):
+            return skill_type
+    return None
+
+
+def _match_personas(hint_text: str, pack_key: str) -> List[str]:
+    """拿一段文字（用户原话，或 LLM 抽出来的短语）去匹配 pack_key 对应人格包里
+    每个角色的 archetype/name 字段——命中即视为"点名要这个角色"。"""
+    if not hint_text:
+        return []
+    try:
+        from app.services import PersonaService
+
+        packs = PersonaService.load_all_personas()
+    except Exception:
+        return []
+    personas = packs.get(pack_key, [])
+    matched = []
+    for p in personas:
+        archetype = (p.get("archetype") or "").strip()
+        name = (p.get("name") or "").strip()
+        if archetype and archetype in hint_text:
+            matched.append(p["id"])
+        elif name and len(name) >= 2 and name in hint_text:
+            matched.append(p["id"])
+    return matched
+
+
+def _has_persona_call_trigger(text: str) -> bool:
+    return any(w in text for w in _PERSONA_CALL_TRIGGERS)
+
+
+def _extract_project_key(text: str) -> Optional[str]:
+    if not _PROJECT_TRIGGER_RE.search(text):
+        return None
+    m = _QUOTED_NAME_RE.search(text)
+    if m:
+        key = m.group(1).strip()
+        if key:
+            return key
+    m2 = _PROJECT_NAME_RE.search(text)
+    if m2:
+        key = m2.group(1).strip()
+        if key:
+            return key
+    return None
 
 
 # ---------------- 启发式档（零成本、离线、可单测）----------------
@@ -160,6 +233,10 @@ def parse_intent_heuristic(text: str) -> IntentResult:
             "游戏概念，还是付费设计？"
         )
 
+    skill_type = _match_skill_heuristic(text)
+    matched_personas = _match_personas(text, pack) if _has_persona_call_trigger(text) else []
+    project_key = _extract_project_key(text)
+
     return IntentResult(
         task_type=task_type,
         mode=mode,
@@ -170,6 +247,9 @@ def parse_intent_heuristic(text: str) -> IntentResult:
         clarifying_question=question,
         method="heuristic",
         candidates=candidates,
+        skill_type=skill_type,
+        matched_personas=matched_personas,
+        project_key=project_key,
     )
 
 
@@ -187,11 +267,22 @@ _LLM_PROMPT = """你是评审系统的意图解析器。把用户的一句话映
   pricing_page_review / onboarding_review）|
   startup-panel（创业项目/BP/路演评审 pitch_review 用这个——投资人/尽调/孵化器视角）
 
+可选 skill_type（用户明确要求某种特殊评审方式才填，不确定就填 null，不要瞎猜）：
+  red_team_audience —— 用户要求"红队""找茬""对抗性""专挑毛病"式评审
+  audience_panel —— 用户明确要求"非游戏/大众消费者视角"而非硬核玩家视角
+
+persona_hint：用户如果明确点名想要某类具体角色参与评审（如"叫上毒舌差评的""带上价格敏感的买家"），
+  提取一段能匹配角色特征的短语放这里；没有明确点名就填 null。
+
+project_key：用户如果明确说要创建/延续一个"长期评审项目"并给出了项目名，把项目名放这里；
+  没有明确提到"项目"概念就填 null。
+
 用户输入：
 {text}
 
 只输出 JSON，不要其他内容：
-{{"task_type": "...", "mode": "...", "persona_pack": "...", "confidence": 0.0, "clarifying_question": null}}
+{{"task_type": "...", "mode": "...", "persona_pack": "...", "confidence": 0.0, "clarifying_question": null,
+  "skill_type": null, "persona_hint": null, "project_key": null}}
 confidence 是你对 task_type 判断的把握（0-1）。若无法确定，task_type 填 null，
 并在 clarifying_question 里写一句要问用户的话。"""
 
@@ -244,6 +335,17 @@ def parse_intent_llm(
         pack = data.get("persona_pack") or DEFAULT_PACK_BY_TASK_TYPE.get(task_type, "game-core")
         confidence = float(data.get("confidence") or 0.0)
 
+        skill_type = data.get("skill_type")
+        if skill_type not in CHAT_SKILL_TYPES:
+            skill_type = None
+        persona_hint = (data.get("persona_hint") or "").strip()
+        matched_personas = _match_personas(persona_hint, pack) if persona_hint else []
+        project_key = data.get("project_key")
+        if isinstance(project_key, str):
+            project_key = project_key.strip()[:60] or None
+        else:
+            project_key = None
+
         return IntentResult(
             task_type=task_type,
             mode=mode,
@@ -253,6 +355,9 @@ def parse_intent_llm(
             needs_clarification=task_type is None,
             clarifying_question=data.get("clarifying_question"),
             method="llm",
+            skill_type=skill_type,
+            matched_personas=matched_personas,
+            project_key=project_key,
         )
     except Exception:
         return None

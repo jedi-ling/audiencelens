@@ -205,6 +205,7 @@ def run_panel(
     provider: str = "anthropic",
     model_override: Optional[str] = None,
     api_base: Optional[str] = None,
+    selected_personas: Optional[List[str]] = None,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -214,7 +215,12 @@ def run_panel(
     避免通过进程全局 os.environ 注入导致用户间串 key（安全+计费问题）。
 
     provider/model_override/api_base：BYOK 选了非 Anthropic 服务商时透传下去，
-    见 run_single_persona 的同名参数说明。"""
+    见 run_single_persona 的同名参数说明。
+
+    selected_personas：显式指定要哪几个具体角色（id 列表），跳过 select_panel
+    按 task_type 预设自动选人的逻辑——对话里"呼叫角色"用这个。id 一个都不在
+    personas_path 对应人格包里时（拼错/串包），静默回落到自动选人，不让评审
+    因为一次无效的显式指定就直接跑空面板。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -259,11 +265,21 @@ def run_panel(
     ]
     artifact_summary = artifact_bundle.get("title", "")
 
-    panel = select_panel(task_type, personas, presets)
+    panel_selected = None
+    panel_skipped = []
+    if selected_personas:
+        panel_selected = [p for p in personas if p["id"] in selected_personas]
+        if not panel_selected:
+            panel_selected = None  # 一个都没匹配上——回落自动选人，别跑空面板
 
-    precheck = precheck_panel(panel["selected"], artifact_bundle)
+    if panel_selected is None:
+        panel = select_panel(task_type, personas, presets)
+        panel_selected = panel["selected"]
+        panel_skipped = panel["skipped"]
+
+    precheck = precheck_panel(panel_selected, artifact_bundle)
     valid_personas = precheck["valid_personas"]
-    skipped_count = len(panel["skipped"]) + len(precheck["skipped_personas"])
+    skipped_count = len(panel_skipped) + len(precheck["skipped_personas"])
 
     config = {
         "budget": budget_config,

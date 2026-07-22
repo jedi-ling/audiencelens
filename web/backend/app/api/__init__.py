@@ -68,6 +68,8 @@ def create_review(
         selected_personas=data.selected_personas,
         mode=data.mode.value if hasattr(data.mode, 'value') else data.mode,
         user_id=identity.user_id,
+        skill_type=data.skill_type,
+        project_key=data.project_key,
     )
 
     def _run():

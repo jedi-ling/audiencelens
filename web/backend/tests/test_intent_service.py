@@ -98,3 +98,75 @@ class TestParseIntentLlmRoutesThroughUnifiedClient:
     def test_parse_intent_falls_back_to_heuristic_without_key(self):
         result = intent_service.parse_intent("帮我看看 Steam 商店页", api_key=None)
         assert result.method == "heuristic"
+
+
+class TestChatFeaturesHeuristic:
+    """对话内插入技能/呼叫角色/长期评审项目——启发式档（零成本兜底）的字段提取。"""
+
+    def test_skill_keyword_detected(self):
+        r = intent_service.parse_intent_heuristic("帮我评审一下 Steam 商店页，红队来一下，专门挑毛病")
+        assert r.skill_type == "red_team_audience"
+
+    def test_no_skill_keyword_leaves_none(self):
+        r = intent_service.parse_intent_heuristic("帮我评审一下 Steam 商店页")
+        assert r.skill_type is None
+
+    def test_persona_call_trigger_matches_archetype(self):
+        r = intent_service.parse_intent_heuristic("叫上核心独立探索者这个角色，帮我看看这个游戏概念")
+        assert "P01-indie-core-operator" in r.matched_personas
+
+    def test_no_persona_trigger_means_no_match_even_if_archetype_mentioned(self):
+        """光是提到某个 archetype 词不算"点名要角色"——没有触发词就不该误伤。"""
+        r = intent_service.parse_intent_heuristic("这个游戏面向核心独立探索者这类人群，看看概念行不行")
+        assert r.matched_personas == []
+
+    def test_project_key_extracted_from_quoted_name(self):
+        r = intent_service.parse_intent_heuristic(
+            "创建「新手引导优化」长期评审项目，帮我看看新手引导流程"
+        )
+        assert r.project_key == "新手引导优化"
+
+    def test_no_project_trigger_means_none(self):
+        r = intent_service.parse_intent_heuristic("帮我看看新手引导流程")
+        assert r.project_key is None
+
+
+class TestChatFeaturesLlmDispatch:
+    """LLM 档：这几个字段由模型直接判断，本地只做校验 + 复用同一套角色匹配逻辑。"""
+
+    def test_skill_type_from_llm_passed_through_when_valid(self):
+        fake_response = (
+            '{"task_type": "steam_page_review", "mode": "standard", "confidence": 0.9, '
+            '"skill_type": "red_team_audience", "persona_hint": null, "project_key": null}'
+        )
+        with patch("runner.llm_client.chat_completion", return_value=(fake_response, 10, 5)):
+            result = intent_service.parse_intent_llm("红队来一下", api_key="sk-test")
+        assert result.skill_type == "red_team_audience"
+
+    def test_invalid_skill_type_from_llm_is_dropped(self):
+        """persona_generate 不是能通过评审创建触发的技能——模型瞎猜也要被本地过滤掉。"""
+        fake_response = (
+            '{"task_type": "steam_page_review", "mode": "standard", "confidence": 0.9, '
+            '"skill_type": "persona_generate", "persona_hint": null, "project_key": null}'
+        )
+        with patch("runner.llm_client.chat_completion", return_value=(fake_response, 10, 5)):
+            result = intent_service.parse_intent_llm("随便看看", api_key="sk-test")
+        assert result.skill_type is None
+
+    def test_persona_hint_from_llm_resolved_against_pack_roster(self):
+        fake_response = (
+            '{"task_type": "concept_review", "mode": "standard", "persona_pack": "game-core", '
+            '"confidence": 0.9, "persona_hint": "核心独立探索者", "skill_type": null, "project_key": null}'
+        )
+        with patch("runner.llm_client.chat_completion", return_value=(fake_response, 10, 5)):
+            result = intent_service.parse_intent_llm("帮我看看这个概念", api_key="sk-test")
+        assert "P01-indie-core-operator" in result.matched_personas
+
+    def test_project_key_from_llm_passed_through_and_trimmed(self):
+        fake_response = (
+            '{"task_type": "onboarding_review", "mode": "standard", "confidence": 0.9, '
+            '"skill_type": null, "persona_hint": null, "project_key": "  新手引导优化  "}'
+        )
+        with patch("runner.llm_client.chat_completion", return_value=(fake_response, 10, 5)):
+            result = intent_service.parse_intent_llm("看看新手引导", api_key="sk-test")
+        assert result.project_key == "新手引导优化"

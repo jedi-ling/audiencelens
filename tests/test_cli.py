@@ -306,6 +306,46 @@ class TestRunPanel:
         assert "模拟模式" in result["report"]["simulation_notice"]
         assert "模拟模式" in result["markdown"]
 
+    def test_selected_personas_overrides_preset_selection(self, sample_artifact_bundle):
+        """对话里"呼叫角色"就是靠这个参数生效——显式指定的 id 必须真的进面板，
+        而不是像 v2 链路曾经那样，selected_personas 落库了但从没传给引擎。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=sample_artifact_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            selected_personas=["P01-indie-core-operator"],
+        )
+        persona_ids = {n["persona_id"] for n in result["report"]["persona_notes"]}
+        assert persona_ids == {"P01-indie-core-operator"}
+
+    def test_selected_personas_with_no_match_falls_back_to_auto_select(self, sample_artifact_bundle):
+        """id 全部拼错/串包时不能跑出一个空面板——静默回落到自动选人。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=sample_artifact_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            selected_personas=["not-a-real-persona-id"],
+        )
+        assert result["cost_summary"]["persona_count"] > 0
+
     def test_report_has_required_sections(self, sample_artifact_bundle):
         os.environ.pop("ANTHROPIC_API_KEY", None)
         result = run_panel(

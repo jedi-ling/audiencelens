@@ -163,6 +163,8 @@ export interface Review {
   calibration: unknown
   persona_outputs: PersonaOutput[]
   skill_type?: SkillType
+  /** 长期评审项目分组键——同名评审在历史侧栏聚合成一组 */
+  project_key?: string
   evaluation_scorecard?: EvaluationScorecard
   ethics_reports?: EthicsReport[]
 }

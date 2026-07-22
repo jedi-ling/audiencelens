@@ -48,6 +48,11 @@ class Review(Base):
     artifact_bundle = Column(JSON, nullable=False)
     persona_pack = Column(String, nullable=True)
     selected_personas = Column(JSON, nullable=True)
+    # 附加技能标签（见 SkillType）——影响评审 prompt 的取向，不影响流程本身
+    skill_type = Column(String, nullable=True)
+    # 长期评审项目的分组键：同 project_key 的历次评审在前端聚合成一条时间线。
+    # 不建独立 Project 表——纯字符串分组，用户改名即视为新项目，足够轻量。
+    project_key = Column(String, index=True, nullable=True)
     mode = Column(String, default="standard", nullable=False)
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)

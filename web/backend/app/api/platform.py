@@ -414,6 +414,14 @@ class CreateReviewRequest(BaseModel):
     artifact: dict = Field(description="材料包：{title, materials:[{type,text}]}")
     mode: str = "standard"
     persona_pack: str = "game-core"
+    # 呼叫具体角色：id 必须落在 persona_pack 对应的人格包内，不属于该包的会被
+    # select_panel_by_mode 静默过滤掉（见 services/__init__.py），不算错误。
+    selected_personas: Optional[List[str]] = None
+    # 插入技能：只有 red_team_audience / audience_panel 真正影响 prompt 取向
+    # （见 PersonaService.get_skill_prompt_hint）；其余值原样落库当标签，不报错。
+    skill_type: Optional[str] = None
+    # 长期评审项目分组键：同名即同一个项目，前端按它把历次评审聚合成时间线。
+    project_key: Optional[str] = None
 
 
 @router.post(
@@ -440,12 +448,17 @@ async def create_review_v2(
         db, identity.user_id, key_source=resolved.source, plan=identity.plan
     )
 
+    from app.services import apply_skill_hint
+
     review = Review(
         user_id=identity.user_id,
         task_type=body.task_type,
         target_title=(body.artifact or {}).get("title"),
-        artifact_bundle=body.artifact or {},
+        artifact_bundle=apply_skill_hint(body.artifact or {}, body.skill_type),
         persona_pack=body.persona_pack,
+        selected_personas=body.selected_personas,
+        skill_type=body.skill_type,
+        project_key=body.project_key,
         mode=body.mode,
         status="pending",
     )

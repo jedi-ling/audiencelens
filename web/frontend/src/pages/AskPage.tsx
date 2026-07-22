@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, deleteReview } from '@/lib/api'
@@ -51,6 +51,11 @@ const TASK_LABELS: Record<string, string> = {
   pricing_page_review: '定价页评审',
   onboarding_review: '新手引导评审',
   pitch_review: '创业项目评审',
+}
+
+const SKILL_LABELS: Record<string, string> = {
+  red_team_audience: '红队受众',
+  audience_panel: '受众面板',
 }
 
 type ChatMessageBase =
@@ -309,6 +314,9 @@ export default function AskPage() {
         artifact: { title: artifactText.slice(0, 60), materials },
         mode: intent.mode,
         persona_pack: intent.persona_pack,
+        selected_personas: intent.matched_personas.length > 0 ? intent.matched_personas : undefined,
+        skill_type: intent.skill_type,
+        project_key: intent.project_key,
       })
       appendMessage({ id: nextId(), role: 'assistant', kind: 'text', text: '评审团已经开庭，带你去看实时进度…' })
       setAttachments([])
@@ -532,6 +540,26 @@ export default function AskPage() {
   )
 }
 
+/** 同 project_key 的评审聚合成一个长期项目组，其余保持原来的扁平列表——
+ * history 本身已按 created_at 倒序，分组内 / 分组间顺序天然保留。 */
+function groupHistoryByProject(history: Review[]): { projects: { key: string; items: Review[] }[]; ungrouped: Review[] } {
+  const projectOrder: string[] = []
+  const projectMap = new Map<string, Review[]>()
+  const ungrouped: Review[] = []
+  for (const r of history) {
+    if (r.project_key) {
+      if (!projectMap.has(r.project_key)) {
+        projectMap.set(r.project_key, [])
+        projectOrder.push(r.project_key)
+      }
+      projectMap.get(r.project_key)!.push(r)
+    } else {
+      ungrouped.push(r)
+    }
+  }
+  return { projects: projectOrder.map((key) => ({ key, items: projectMap.get(key)! })), ungrouped }
+}
+
 function HistorySidebar({
   open,
   history,
@@ -583,8 +611,9 @@ function HistorySidebar({
               还没有评审记录
             </div>
           ) : (
-            <div className="space-y-1">
-              {history.map((r) => {
+            (() => {
+              const { projects, ungrouped } = groupHistoryByProject(history)
+              const renderItem = (r: Review) => {
                 const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
                 const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
                 return (
@@ -608,8 +637,25 @@ function HistorySidebar({
                     </button>
                   </div>
                 )
-              })}
-            </div>
+              }
+              return (
+                <div className="space-y-3">
+                  {projects.map((group) => (
+                    <div key={group.key}>
+                      <div className="mb-1 flex items-center gap-1.5 px-1 text-[11px] font-medium text-warm-orange">
+                        <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                        <span className="min-w-0 flex-1 truncate">{group.key}</span>
+                        <span className="shrink-0 text-text-muted">{group.items.length}</span>
+                      </div>
+                      <div className="space-y-1 border-l border-border pl-2">
+                        {group.items.map(renderItem)}
+                      </div>
+                    </div>
+                  ))}
+                  {ungrouped.length > 0 && <div className="space-y-1">{ungrouped.map(renderItem)}</div>}
+                </div>
+              )
+            })()
           )}
         </div>
       </div>
@@ -733,6 +779,21 @@ function ChatBubble({
             <span className="rounded-md border border-border bg-bg-card px-2.5 py-1 text-xs text-text-secondary">
               评审团 · {intent.persona_pack}
             </span>
+            {intent.skill_type && (
+              <span className="rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
+                技能 · {SKILL_LABELS[intent.skill_type] ?? intent.skill_type}
+              </span>
+            )}
+            {intent.matched_personas.length > 0 && (
+              <span className="rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
+                角色 · 已指定 {intent.matched_personas.length} 位
+              </span>
+            )}
+            {intent.project_key && (
+              <span className="rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
+                项目 · {intent.project_key}
+              </span>
+            )}
           </div>
 
           <div className="mt-3.5">

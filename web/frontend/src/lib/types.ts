@@ -143,6 +143,12 @@ export interface IntentResult {
   /** 'llm' 或 'heuristic' —— 如实声明用了哪档解析 */
   method: 'llm' | 'heuristic'
   candidates: string[]
+  /** 插入技能：只有 red_team_audience / audience_panel 真正影响评审 prompt 取向 */
+  skill_type: 'red_team_audience' | 'audience_panel' | null
+  /** 呼叫角色：用户点名想要的具体人格 id（落在 persona_pack 对应的包内） */
+  matched_personas: string[]
+  /** 长期评审项目：用户给的项目名，同名评审会在历史侧栏聚合成一组 */
+  project_key: string | null
 }
 
 export interface CreateReviewResponse {

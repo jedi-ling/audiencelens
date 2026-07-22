@@ -143,6 +143,7 @@ def _execute_review(
             provider=provider,
             model_override=model,
             api_base=api_base,
+            selected_personas=review.selected_personas,
         )
 
         job_service.update_progress(job_id, 80)
