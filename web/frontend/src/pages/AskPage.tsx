@@ -1077,7 +1077,7 @@ const SEVERITY_DOT: Record<string, string> = {
   critical: 'bg-severity-critical',
 }
 
-function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewState: ReviewState }) {
+function ReviewStatusBody({ reviewState }: { reviewState: ReviewState }) {
   const [reportOpen, setReportOpen] = useState(false)
   const risk = RISK_BADGE[reviewState.detail?.report?.executive_summary?.release_risk ?? '']
 
@@ -1157,7 +1157,7 @@ function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewS
       )}
 
       {reportOpen && reviewState.detail && (
-        <ReportModal reviewId={reviewId} detail={reviewState.detail} onClose={() => setReportOpen(false)} />
+        <ReportModal detail={reviewState.detail} onClose={() => setReportOpen(false)} />
       )}
     </>
   )
@@ -1166,11 +1166,21 @@ function ReviewStatusBody({ reviewId, reviewState }: { reviewId: string; reviewS
 /** 评审卡片"查看完整报告"打开的弹窗——摘要+优先修复项+角色简报，
  * 数据直接复用已经拉到手的 detail，不用再发一次请求。图表/persona 详细对比
  * 那些更重的可视化留在独立报告页，弹窗底部给一个入口跳过去。 */
-function ReportModal({ reviewId, detail, onClose }: { reviewId: string; detail: ReviewDetail; onClose: () => void }) {
+function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () => void }) {
   const summary = detail.report?.executive_summary
   const risk = RISK_BADGE[summary?.release_risk ?? '']
   const priorityFixes = detail.report?.priority_fixes ?? []
   const personaNotes = detail.report?.persona_notes ?? []
+  const disagreements = detail.report?.major_disagreements ?? []
+  const informationGaps = detail.report?.information_gaps ?? []
+
+  // 立场分布——引擎不单独出这一项，现场从 persona_notes 统计成文字摘要
+  // （不引图表库，弹窗里一行字就够看清"谁站哪边"）
+  const stanceCounts = new Map<string, number>()
+  for (const note of personaNotes) {
+    const s = note.primary_stance || '未表态'
+    stanceCounts.set(s, (stanceCounts.get(s) ?? 0) + 1)
+  }
 
   return (
     <div
@@ -1241,9 +1251,20 @@ function ReportModal({ reviewId, detail, onClose }: { reviewId: string; detail: 
 
           {personaNotes.length > 0 && (
             <div className="mt-5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                角色简报 · {personaNotes.length}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                  角色简报 · {personaNotes.length}
+                </p>
+                {stanceCounts.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {Array.from(stanceCounts.entries()).map(([stance, count]) => (
+                      <span key={stance} className="rounded-full border border-border bg-bg-card px-2 py-0.5 text-[11px] text-text-secondary">
+                        {stance} · {count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="mt-2 space-y-1.5">
                 {personaNotes.map((note, i) => (
                   <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-bg-card/40 px-2.5 py-2">
@@ -1257,19 +1278,51 @@ function ReportModal({ reviewId, detail, onClose }: { reviewId: string; detail: 
               </div>
             </div>
           )}
+
+          {disagreements.length > 0 && (
+            <div className="mt-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                主要分歧 · {disagreements.length}
+              </p>
+              <div className="mt-2 space-y-2">
+                {disagreements.map((d, i) => (
+                  <div key={i} className="rounded-lg border border-warm-orange/20 bg-warm-orange/5 p-2.5">
+                    <p className="font-medium text-text-primary">{d.topic}</p>
+                    {d.persona_stances && d.persona_stances.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
+                        {d.persona_stances.map((ps, j) => (
+                          <li key={j}>
+                            {ps.persona_id}：{ps.stance}
+                            {ps.evidence ? `（${ps.evidence}）` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {d.resolution_suggestion && (
+                      <p className="mt-1.5 text-xs text-neon-green">调解建议：{d.resolution_suggestion}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {informationGaps.length > 0 && (
+            <div className="mt-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                信息缺口 · {informationGaps.length}
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-text-secondary">
+                {informationGaps.map((gap, i) => (
+                  <li key={i}>{gap}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3 text-xs text-text-muted">
+        <div className="flex shrink-0 items-center border-t border-border px-5 py-3 text-xs text-text-muted">
           <span>花费 ${detail.total_cost_usd.toFixed(3)}</span>
-          <a
-            href={`/review/${reviewId}/report`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-neon-green hover:text-neon-green-dim transition-colors"
-          >
-            在独立页面打开（含图表）
-            <ArrowRight className="h-3 w-3" strokeWidth={2} />
-          </a>
         </div>
       </div>
     </div>
@@ -1361,7 +1414,7 @@ function ChatBubble({
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
           <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
-            <ReviewStatusBody reviewId={message.reviewId} reviewState={reviewState} />
+            <ReviewStatusBody reviewState={reviewState} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>

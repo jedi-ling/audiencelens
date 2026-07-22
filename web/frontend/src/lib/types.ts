@@ -185,12 +185,19 @@ export interface ExecutiveSummary {
   evidence_quality: string
 }
 
+export interface Disagreement {
+  topic?: string
+  persona_stances?: Array<{ persona_id?: string; stance?: string; evidence?: string }>
+  resolution_suggestion?: string
+}
+
 export interface ReviewReport {
   executive_summary?: ExecutiveSummary
   consensus?: unknown
-  major_disagreements?: unknown[]
+  major_disagreements?: Disagreement[]
   priority_fixes?: PriorityFix[]
   persona_notes?: PersonaNote[]
+  information_gaps?: string[]
   cross_examination?: unknown
   simulation_notice?: string
   [key: string]: unknown
