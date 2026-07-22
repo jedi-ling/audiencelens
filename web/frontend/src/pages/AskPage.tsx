@@ -606,7 +606,7 @@ export default function AskPage() {
           )}
         </button>
 
-        <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+        <div className="h-9 w-px shrink-0 bg-border" aria-hidden="true" />
 
         {/* 三个"钉住选择"按钮共享一个浅色胶囊容器，和上传按钮的独立感区分开——
             视觉上明确"这一组都是覆盖 AI 猜测结果的手动指定"。 */}
@@ -772,7 +772,7 @@ export default function AskPage() {
         </div>
         </div>
 
-        <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+        <div className="h-9 w-px shrink-0 bg-border" aria-hidden="true" />
 
         <textarea
           className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
