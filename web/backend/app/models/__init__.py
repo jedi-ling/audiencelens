@@ -67,6 +67,7 @@ class Review(Base):
     calibration = Column(JSON, nullable=True)
 
     persona_outputs = relationship("PersonaOutput", back_populates="review", cascade="all, delete-orphan")
+    chat_messages = relationship("ReviewChatMessage", back_populates="review", cascade="all, delete-orphan")
     evaluation_results = relationship("EvaluationResult", back_populates="review", cascade="all, delete-orphan")
     judgments = relationship("Judgment", back_populates="review", cascade="all, delete-orphan")
     feedback = relationship("ReviewFeedback", back_populates="review", uselist=False, cascade="all, delete-orphan")
@@ -87,6 +88,27 @@ class PersonaOutput(Base):
     completed_at = Column(DateTime, nullable=True)
 
     review = relationship("Review", back_populates="persona_outputs")
+
+
+class ReviewChatMessage(Base):
+    """报告出来后的真对话：追问报告结论、或点名某个人格继续聊。
+
+    persona_id=None 是"跟评审团整体聊"（针对报告结论追问）；
+    非空则是"跟某个具体人格聊"，回复要用该人格的 identity_summary/
+    behavior_profile/communication_style 保持人设一致，而不是通用助手腔。
+    同一条 review 下，两种 thread 各自独立维护上下文（按 persona_id 分组）。
+    """
+
+    __tablename__ = "review_chat_messages"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    review_id = Column(String, ForeignKey("reviews.id"), nullable=False)
+    persona_id = Column(String, nullable=True)
+    role = Column(String, nullable=False)  # 'user' | 'assistant'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    review = relationship("Review", back_populates="chat_messages")
 
 
 class EvaluationResult(Base):

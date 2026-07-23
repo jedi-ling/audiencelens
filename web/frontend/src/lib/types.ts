@@ -151,6 +151,17 @@ export interface IntentResult {
   project_key: string | null
 }
 
+/** 报告出来后的真对话——persona_id 为 null 是"跟评审团整体聊"，
+ * 给定则是"跟某个具体人格保持人设聊"，两条 thread 各自独立维护上下文。 */
+export interface ChatMessage {
+  id: string
+  review_id: string
+  persona_id: string | null
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string | null
+}
+
 export interface CreateReviewResponse {
   review_id: string
   job_id: string

@@ -533,6 +533,58 @@ async def get_review_v2(
     }
 
 
+class ChatMessageRequest(BaseModel):
+    message: str
+    # None = 跟评审团整体聊（追问报告结论）；给定人格 id = 跟该人格保持人设聊
+    persona_id: Optional[str] = None
+
+
+def _serialize_chat_message(m) -> dict:
+    return {
+        "id": m.id,
+        "review_id": m.review_id,
+        "persona_id": m.persona_id,
+        "role": m.role,
+        "content": m.content,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+@router.get("/v2/reviews/{review_id}/chat")
+async def list_review_chat(
+    review_id: str,
+    persona_id: Optional[str] = None,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    review = db.get(Review, review_id)
+    if not review or (review.user_id or "anonymous") != identity.user_id:
+        raise NotFound("评审不存在")
+    from app.services import chat_service
+
+    messages = chat_service.list_messages(db, review_id, persona_id)
+    return {"messages": [_serialize_chat_message(m) for m in messages]}
+
+
+@router.post(
+    "/v2/reviews/{review_id}/chat",
+    dependencies=[Depends(rate_limit("review_chat", 30, 3600))],
+)
+async def post_review_chat(
+    review_id: str,
+    body: ChatMessageRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    review = db.get(Review, review_id)
+    if not review or (review.user_id or "anonymous") != identity.user_id:
+        raise NotFound("评审不存在")
+    from app.services import chat_service
+
+    reply = chat_service.send_message(db, review, body.message, body.persona_id)
+    return {"reply": _serialize_chat_message(reply)}
+
+
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str):
     job = job_service.get_job(job_id)

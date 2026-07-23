@@ -1319,6 +1319,8 @@ function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () =>
               </ul>
             </div>
           )}
+
+          <ReportChatPanel reviewId={detail.id} personaNotes={personaNotes} />
         </div>
 
         <div className="flex shrink-0 items-center border-t border-border px-5 py-3 text-xs text-text-muted">
@@ -1327,6 +1329,162 @@ function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () =>
       </div>
     </div>
   )
+}
+
+/** 报告出来后的真追问——不是终点。默认跟"评审团整体"聊报告结论，
+ * 也能切到某个具体人格保持人设聊（比如问 P15 毒舌差评者"为什么这么刻薄"）。
+ * 每个 thread 独立维护上下文，切换人格不会清掉之前问过的内容。 */
+function ReportChatPanel({
+  reviewId,
+  personaNotes,
+}: {
+  reviewId: string
+  personaNotes: Array<{ persona_id: string; persona_name?: string }>
+}) {
+  const [activePersona, setActivePersona] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessageDTO[]>([])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [loaded, setLoaded] = useState<Set<string>>(new Set())
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const threadKey = activePersona ?? '__general__'
+
+  useEffect(() => {
+    if (loaded.has(threadKey)) return
+    let cancelled = false
+    api
+      .getReviewChat(reviewId, activePersona)
+      .then((res) => {
+        if (!cancelled) {
+          setMessages(res.messages as unknown as ChatMessageDTO[])
+          setLoaded((prev) => new Set(prev).add(threadKey))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadKey, reviewId])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [messages])
+
+  const send = async () => {
+    const text = input.trim()
+    if (!text || sending) return
+    setSending(true)
+    setInput('')
+    setMessages((prev) => [
+      ...prev,
+      { id: `tmp-${Date.now()}`, role: 'user', content: text, persona_id: activePersona, created_at: null },
+    ])
+    try {
+      const res = await api.sendReviewChat(reviewId, text, activePersona)
+      setMessages((prev) => [...prev, res.reply as unknown as ChatMessageDTO])
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: 'assistant',
+          content: e instanceof ApiError ? e.message : '追问失败，请再试一次',
+          persona_id: activePersona,
+          created_at: null,
+        },
+      ])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="mt-5 border-t border-border pt-4">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">追问</p>
+      {personaNotes.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setActivePersona(null)}
+            className={cn(
+              'rounded-full border px-2.5 py-1 text-xs transition-colors',
+              activePersona === null
+                ? 'border-neon-green/50 bg-neon-green/10 text-neon-green'
+                : 'border-border bg-bg-card text-text-muted hover:text-text-primary',
+            )}
+          >
+            评审团
+          </button>
+          {personaNotes.map((note) => (
+            <button
+              key={note.persona_id}
+              onClick={() => setActivePersona(note.persona_id)}
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                activePersona === note.persona_id
+                  ? 'border-neon-green/50 bg-neon-green/10 text-neon-green'
+                  : 'border-border bg-bg-card text-text-muted hover:text-text-primary',
+              )}
+            >
+              {note.persona_name ?? note.persona_id}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div ref={scrollRef} className="mt-3 max-h-56 space-y-2 overflow-y-auto">
+        {messages.length === 0 && (
+          <p className="text-xs text-text-muted">
+            {activePersona ? '跟TA聊聊——问问这个角色为什么这么想' : '对报告结论有疑问？直接问'}
+          </p>
+        )}
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={cn(
+              'max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed',
+              m.role === 'user' ? 'ml-auto bg-neon-green/10 text-text-primary' : 'bg-bg-card text-text-secondary',
+            )}
+          >
+            {m.content}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void send()
+            }
+          }}
+          placeholder={activePersona ? '问问TA为什么这么想…' : '追问报告结论…'}
+          disabled={sending}
+          className="min-h-[36px] flex-1 rounded-lg border border-border bg-bg-primary px-3 py-1.5 text-xs text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
+        />
+        <button
+          onClick={() => void send()}
+          disabled={sending || !input.trim()}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary disabled:opacity-50"
+          aria-label="发送追问"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" strokeWidth={2} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+interface ChatMessageDTO {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  persona_id: string | null
+  created_at: string | null
 }
 
 function ChatBubble({

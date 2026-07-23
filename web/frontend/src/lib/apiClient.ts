@@ -14,6 +14,7 @@
 import {
   ApiError,
   type ApiErrorCode,
+  type ChatMessage,
   type CreateReviewResponse,
   type HealthConfig,
   type HitRate,
@@ -176,6 +177,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ mode: 'standard', persona_pack: 'game-core', ...params }),
     }),
+
+  /** 报告出来后追问——不传 personaId 是跟评审团整体聊，传了是跟该人格保持人设聊 */
+  sendReviewChat: (reviewId: string, message: string, personaId?: string | null) =>
+    request<{ reply: ChatMessage }>(`/api/v2/reviews/${reviewId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ message, persona_id: personaId ?? null }),
+    }),
+
+  getReviewChat: (reviewId: string, personaId?: string | null) =>
+    request<{ messages: ChatMessage[] }>(
+      `/api/v2/reviews/${reviewId}/chat${personaId ? `?persona_id=${encodeURIComponent(personaId)}` : ''}`,
+    ),
 
   /** 手动对已完成评审运行 8 维质量评估（创建时没开 enable_evaluation 的补跑入口） */
   runEvaluation: (reviewId: string) =>
