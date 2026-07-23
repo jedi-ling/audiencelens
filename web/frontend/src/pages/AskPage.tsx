@@ -145,6 +145,13 @@ export default function AskPage() {
   const [pinnedSkill, setPinnedSkill] = useState<{ type: string; name: string } | null>(null)
   const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
   const [pinnedProject, setPinnedProject] = useState<string | null>(null)
+  // 报告出来后的追问——钉在同一个对话里，不弹独立窗口：钉住后普通发送
+  // 就路由去跟这条评审（或某个具体人格）聊，而不是走意图解析开新评审。
+  const [activeChatContext, setActiveChatContext] = useState<{
+    reviewId: string
+    personaId: string | null
+    label: string
+  } | null>(null)
   const [skillPickerOpen, setSkillPickerOpen] = useState(false)
   const [typePickerOpen, setTypePickerOpen] = useState(false)
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
@@ -273,9 +280,35 @@ export default function AskPage() {
 
   const appendMessage = (m: ChatMessageBase) => setMessages((prev) => [...prev, { ...m, ts: Date.now() }])
 
+  /** 追问模式下发送：同一个对话框、同一条消息列表，只是路由目标从
+   * "意图解析→开新评审"换成"这条评审的 chat 接口"。用户说"就是要在同一个
+   * 对话里聊"，所以这里绝不弹窗、绝不跳转，回复直接追加成普通聊天气泡。 */
+  const sendFollowUp = async (text: string) => {
+    if (!activeChatContext) return
+    setInput('')
+    appendMessage({ id: nextId(), role: 'user', text })
+    setBusy(true)
+    try {
+      const res = await api.sendReviewChat(activeChatContext.reviewId, text, activeChatContext.personaId)
+      appendMessage({ id: nextId(), role: 'assistant', kind: 'text', text: res.reply.content })
+    } catch (e) {
+      appendMessage({
+        id: nextId(),
+        role: 'assistant',
+        kind: 'error',
+        text: e instanceof Error ? e.message : '追问失败，请再试一次',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const send = async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
+    if (activeChatContext) {
+      return sendFollowUp(text)
+    }
     setInput('')
     setShowExamples(false) // 开聊后收起示例，给对话让出空间
     appendMessage({ id: nextId(), role: 'user', text })
@@ -503,6 +536,7 @@ export default function AskPage() {
             personaNames={personaNames}
             onConfirm={(intent, personas) => void confirmAndCreate(m.id, intent, personas)}
             onGoSettings={() => navigate('/settings')}
+            onStartFollowUp={(reviewId, personaId, label) => setActiveChatContext({ reviewId, personaId, label })}
           />
         ))}
         {busy && <ThinkingIndicator />}
@@ -573,6 +607,22 @@ export default function AskPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {activeChatContext && (
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 rounded-md border border-neon-green/30 bg-neon-green/10 px-2.5 py-1.5 text-xs text-neon-green">
+          <span className="flex items-center gap-1.5 truncate">
+            <Sparkles className="h-3 w-3 shrink-0" strokeWidth={2} />
+            正在追问 · {activeChatContext.label}
+          </span>
+          <button
+            onClick={() => setActiveChatContext(null)}
+            className="shrink-0 hover:text-text-primary transition-colors"
+            aria-label="退出追问模式"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
         </div>
       )}
 
@@ -801,7 +851,9 @@ export default function AskPage() {
 
         <textarea
           className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
-          placeholder="说说你想评审什么…（Enter 发送，Shift+Enter 换行）"
+          placeholder={
+            activeChatContext ? `问问${activeChatContext.label}…（Enter 发送）` : '说说你想评审什么…（Enter 发送，Shift+Enter 换行）'
+          }
           value={input}
           disabled={busy}
           onChange={(e) => setInput(e.target.value)}
@@ -1077,7 +1129,13 @@ const SEVERITY_DOT: Record<string, string> = {
   critical: 'bg-severity-critical',
 }
 
-function ReviewStatusBody({ reviewState }: { reviewState: ReviewState }) {
+function ReviewStatusBody({
+  reviewState,
+  onStartFollowUp,
+}: {
+  reviewState: ReviewState
+  onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
+}) {
   const [reportOpen, setReportOpen] = useState(false)
   const risk = RISK_BADGE[reviewState.detail?.report?.executive_summary?.release_risk ?? '']
 
@@ -1146,18 +1204,29 @@ function ReviewStatusBody({ reviewState }: { reviewState: ReviewState }) {
             )}
           </div>
 
-          <button
-            onClick={() => setReportOpen(true)}
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
-          >
-            查看完整报告
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
-          </button>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={() => setReportOpen(true)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+            >
+              查看完整报告
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+            {reviewState.detail && (
+              <button
+                onClick={() => onStartFollowUp(reviewState.detail!.id, null, '这份报告')}
+                className="shrink-0 rounded-md border border-border bg-bg-card px-3 py-1.5 text-[13px] text-text-secondary transition-colors hover:text-text-primary"
+                title="就在这条对话里继续追问，不用打开报告"
+              >
+                追问
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {reportOpen && reviewState.detail && (
-        <ReportModal detail={reviewState.detail} onClose={() => setReportOpen(false)} />
+        <ReportModal detail={reviewState.detail} onClose={() => setReportOpen(false)} onStartFollowUp={onStartFollowUp} />
       )}
     </>
   )
@@ -1166,7 +1235,15 @@ function ReviewStatusBody({ reviewState }: { reviewState: ReviewState }) {
 /** 评审卡片"查看完整报告"打开的弹窗——摘要+优先修复项+角色简报，
  * 数据直接复用已经拉到手的 detail，不用再发一次请求。图表/persona 详细对比
  * 那些更重的可视化留在独立报告页，弹窗底部给一个入口跳过去。 */
-function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () => void }) {
+function ReportModal({
+  detail,
+  onClose,
+  onStartFollowUp,
+}: {
+  detail: ReviewDetail
+  onClose: () => void
+  onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
+}) {
   const summary = detail.report?.executive_summary
   const risk = RISK_BADGE[summary?.release_risk ?? '']
   const priorityFixes = detail.report?.priority_fixes ?? []
@@ -1269,10 +1346,21 @@ function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () =>
                 {personaNotes.map((note, i) => (
                   <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-bg-card/40 px-2.5 py-2">
                     <span className="min-w-0 truncate text-text-primary">{note.persona_name ?? note.persona_id}</span>
-                    <span className="shrink-0 text-xs text-text-muted">
-                      {note.primary_stance ?? '—'}
-                      {note.key_issues && note.key_issues.length > 0 ? ` · ${note.key_issues.length} 条意见` : ''}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-text-muted">
+                        {note.primary_stance ?? '—'}
+                        {note.key_issues && note.key_issues.length > 0 ? ` · ${note.key_issues.length} 条意见` : ''}
+                      </span>
+                      <button
+                        onClick={() => {
+                          onStartFollowUp(detail.id, note.persona_id, note.persona_name ?? note.persona_id)
+                          onClose()
+                        }}
+                        className="rounded-full border border-neon-green/30 bg-neon-green/10 px-2 py-0.5 text-[11px] text-neon-green transition-colors hover:bg-neon-green/20"
+                      >
+                        跟TA聊聊
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1320,171 +1408,24 @@ function ReportModal({ detail, onClose }: { detail: ReviewDetail; onClose: () =>
             </div>
           )}
 
-          <ReportChatPanel reviewId={detail.id} personaNotes={personaNotes} />
         </div>
 
-        <div className="flex shrink-0 items-center border-t border-border px-5 py-3 text-xs text-text-muted">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-3 text-xs text-text-muted">
           <span>花费 ${detail.total_cost_usd.toFixed(3)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** 报告出来后的真追问——不是终点。默认跟"评审团整体"聊报告结论，
- * 也能切到某个具体人格保持人设聊（比如问 P15 毒舌差评者"为什么这么刻薄"）。
- * 每个 thread 独立维护上下文，切换人格不会清掉之前问过的内容。 */
-function ReportChatPanel({
-  reviewId,
-  personaNotes,
-}: {
-  reviewId: string
-  personaNotes: Array<{ persona_id: string; persona_name?: string }>
-}) {
-  const [activePersona, setActivePersona] = useState<string | null>(null)
-  const [messages, setMessages] = useState<ChatMessageDTO[]>([])
-  const [input, setInput] = useState('')
-  const [sending, setSending] = useState(false)
-  const [loaded, setLoaded] = useState<Set<string>>(new Set())
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  const threadKey = activePersona ?? '__general__'
-
-  useEffect(() => {
-    if (loaded.has(threadKey)) return
-    let cancelled = false
-    api
-      .getReviewChat(reviewId, activePersona)
-      .then((res) => {
-        if (!cancelled) {
-          setMessages(res.messages as unknown as ChatMessageDTO[])
-          setLoaded((prev) => new Set(prev).add(threadKey))
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadKey, reviewId])
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [messages])
-
-  const send = async () => {
-    const text = input.trim()
-    if (!text || sending) return
-    setSending(true)
-    setInput('')
-    setMessages((prev) => [
-      ...prev,
-      { id: `tmp-${Date.now()}`, role: 'user', content: text, persona_id: activePersona, created_at: null },
-    ])
-    try {
-      const res = await api.sendReviewChat(reviewId, text, activePersona)
-      setMessages((prev) => [...prev, res.reply as unknown as ChatMessageDTO])
-    } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          role: 'assistant',
-          content: e instanceof ApiError ? e.message : '追问失败，请再试一次',
-          persona_id: activePersona,
-          created_at: null,
-        },
-      ])
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <div className="mt-5 border-t border-border pt-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">追问</p>
-      {personaNotes.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
           <button
-            onClick={() => setActivePersona(null)}
-            className={cn(
-              'rounded-full border px-2.5 py-1 text-xs transition-colors',
-              activePersona === null
-                ? 'border-neon-green/50 bg-neon-green/10 text-neon-green'
-                : 'border-border bg-bg-card text-text-muted hover:text-text-primary',
-            )}
+            onClick={() => {
+              onStartFollowUp(detail.id, null, '这份报告')
+              onClose()
+            }}
+            className="flex items-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 px-2.5 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
           >
-            评审团
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+            追问这份报告
           </button>
-          {personaNotes.map((note) => (
-            <button
-              key={note.persona_id}
-              onClick={() => setActivePersona(note.persona_id)}
-              className={cn(
-                'rounded-full border px-2.5 py-1 text-xs transition-colors',
-                activePersona === note.persona_id
-                  ? 'border-neon-green/50 bg-neon-green/10 text-neon-green'
-                  : 'border-border bg-bg-card text-text-muted hover:text-text-primary',
-              )}
-            >
-              {note.persona_name ?? note.persona_id}
-            </button>
-          ))}
         </div>
-      )}
-
-      <div ref={scrollRef} className="mt-3 max-h-56 space-y-2 overflow-y-auto">
-        {messages.length === 0 && (
-          <p className="text-xs text-text-muted">
-            {activePersona ? '跟TA聊聊——问问这个角色为什么这么想' : '对报告结论有疑问？直接问'}
-          </p>
-        )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={cn(
-              'max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed',
-              m.role === 'user' ? 'ml-auto bg-neon-green/10 text-text-primary' : 'bg-bg-card text-text-secondary',
-            )}
-          >
-            {m.content}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              void send()
-            }
-          }}
-          placeholder={activePersona ? '问问TA为什么这么想…' : '追问报告结论…'}
-          disabled={sending}
-          className="min-h-[36px] flex-1 rounded-lg border border-border bg-bg-primary px-3 py-1.5 text-xs text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
-        />
-        <button
-          onClick={() => void send()}
-          disabled={sending || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary disabled:opacity-50"
-          aria-label="发送追问"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" strokeWidth={2} />}
-        </button>
       </div>
     </div>
   )
-}
-
-interface ChatMessageDTO {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  persona_id: string | null
-  created_at: string | null
 }
 
 function ChatBubble({
@@ -1494,6 +1435,7 @@ function ChatBubble({
   onPickCandidate,
   onConfirm,
   onGoSettings,
+  onStartFollowUp,
 }: {
   message: ChatMessage
   busy: boolean
@@ -1501,6 +1443,7 @@ function ChatBubble({
   onPickCandidate: (candidate: string) => void
   onConfirm: (intent: IntentResult, personas?: string[]) => void
   onGoSettings: () => void
+  onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
 }) {
   const timeLabel = formatTime(message.ts)
   // 确认卡片上被用户手动移除的角色（呼叫角色可开庭前调整）。
@@ -1572,7 +1515,7 @@ function ChatBubble({
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
           <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
-            <ReviewStatusBody reviewState={reviewState} />
+            <ReviewStatusBody reviewState={reviewState} onStartFollowUp={onStartFollowUp} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
