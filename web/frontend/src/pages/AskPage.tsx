@@ -1187,18 +1187,26 @@ function ReviewStatusBody({
           )}
 
           <div className="mt-3 flex items-center gap-3 text-[11px] text-text-muted">
-            {reviewState.detail?.report?.priority_fixes && (
-              <span className="flex items-center gap-1">
-                <FileWarning className="h-3 w-3" strokeWidth={1.75} />
-                {reviewState.detail.report.priority_fixes.length} 条修复项
-              </span>
-            )}
-            {reviewState.detail?.report?.persona_notes && (
-              <span className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3" strokeWidth={1.75} />
-                {reviewState.detail.report.persona_notes.length} 位角色
-              </span>
-            )}
+            {(() => {
+              // 匿名"体验版"里 persona_notes/priority_fixes 被裁空，真实条数在 gated_counts。
+              // 卡片必须显示真实总数，否则看起来像"0 角色 0 修复项"的空壳（其实评审团真跑了）。
+              const rep = reviewState.detail?.report
+              const gated = rep?.gated_counts
+              const fixCount = (rep?.priority_fixes?.length ?? 0) + (gated?.priority_fixes_hidden ?? 0)
+              const personaCount = (rep?.persona_notes?.length ?? 0) + (gated?.persona_notes_hidden ?? 0)
+              return (
+                <>
+                  <span className="flex items-center gap-1">
+                    <FileWarning className="h-3 w-3" strokeWidth={1.75} />
+                    {fixCount} 条修复项
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" strokeWidth={1.75} />
+                    {personaCount} 位角色
+                  </span>
+                </>
+              )
+            })()}
             {reviewState.detail?.total_cost_usd !== undefined && (
               <span>${reviewState.detail.total_cost_usd.toFixed(3)}</span>
             )}

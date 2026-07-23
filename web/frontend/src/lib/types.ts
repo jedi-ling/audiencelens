@@ -213,6 +213,12 @@ export interface ReviewReport {
   information_gaps?: string[]
   cross_examination?: unknown
   simulation_notice?: string
+  /** 匿名用户看到的是"体验版"：persona_notes 被裁成空，真实条数在 gated_counts 里。 */
+  is_gated?: boolean
+  gated_counts?: {
+    priority_fixes_hidden: number
+    persona_notes_hidden: number
+  }
   [key: string]: unknown
 }
 
