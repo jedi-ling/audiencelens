@@ -159,7 +159,9 @@ export const api = {
 
   createReview: (params: {
     task_type: TaskType
-    artifact: { title?: string; materials: Material[] }
+    /** materials 两种形态引擎都原生支持：对话页的 {type:'text'|'image', ...}，
+     *  以及 Wizard 的 {type: 字段名, description: 内容}（与 CLI 示例包同构） */
+    artifact: { title?: string; materials: Array<Material | { type: string; description: string }> }
     mode?: ReviewMode
     persona_pack?: PersonaPack
     selected_personas?: string[]

@@ -10,6 +10,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import Base, PersonaOutput, Review, SkillType
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -736,13 +737,46 @@ class ReviewService:
         self.session.commit()
         return True
 
+    @staticmethod
+    def _ws_emit(ws_manager: Any, review_id: str, event: str, data: dict) -> None:
+        """v1 引擎的 WS 广播出口——信封统一成与 v2 相同的 {event, data} 结构。
+        此前 v1 发 {type: ...} 老格式，前端 ws.ts 的终态判断（payload.event）
+        识别不了，导致 v1 评审结束后 socket 不会自动关闭。"""
+        if ws_manager:
+            ws_manager.broadcast_sync(review_id, {"event": event, "data": data})
+
     def run_review(self, review_id: str, ws_manager: Any = None):
         review = self.session.get(Review, review_id)
         if review is None:
             return
 
+        # BYOK：与 v2 同一套 key 解析。此前这里直接读 os.environ 的
+        # ANTHROPIC_API_KEY——用户在设置页保存的 key 在 v1（Wizard/直接调 API）
+        # 评审里完全无效；没有环境变量时更是静默把模拟占位数据当真实报告入库。
+        from app.services import key_service
+
+        try:
+            resolved = key_service.resolve_key(self.session, review.user_id or "anonymous")
+        except Exception:
+            resolved = None
+
+        if resolved is None:
+            review.status = "failed"
+            review.error_message = (
+                "未配置 API Key——评审必须使用真实模型，模拟数据没有评审价值，已拒绝执行。"
+                "请在设置页填写 API Key 后重新发起。"
+            )
+            self.session.commit()
+            self._ws_emit(ws_manager, review.id, "review.failed", {
+                "review_id": review.id, "error": review.error_message,
+            })
+            return
+
+        from runner.llm_client import chat_completion
+
         review.status = "running"
         self.session.commit()
+        self._ws_emit(ws_manager, review.id, "review.started", {"review_id": review.id})
 
         try:
             with open(BUDGET_PATH, "r", encoding="utf-8") as f:
@@ -791,35 +825,30 @@ class ReviewService:
                 po.started_at = datetime.now(timezone.utc)
                 self.session.commit()
 
-                if ws_manager:
-                    ws_manager.broadcast_sync(review.id, {
-                        "type": "persona_started",
-                        "persona_id": persona["id"],
-                        "persona_name": persona.get("name", persona["id"]),
-                    })
+                self._ws_emit(ws_manager, review.id, "review.persona_started", {
+                    "persona_id": persona["id"],
+                    "persona_name": persona.get("name", persona["id"]),
+                })
 
                 try:
-                    model = select_model(persona, budget_config)
+                    # 用户显式指定了模型（openai_compatible 档必填）就用它，
+                    # 否则按人格分级选型——与 v2 引擎同一规则
+                    model = resolved.model or select_model(persona, budget_config)
                     prompt = render_prompt(persona, review.task_type, artifact_summary, PERSONA_PROMPT_PATH, review.artifact_bundle)
 
-                    api_key = os.environ.get("ANTHROPIC_API_KEY")
-                    if api_key:
-                        import anthropic
-                        client = anthropic.Anthropic(api_key=api_key)
-                        response = client.messages.create(
-                            model=model,
-                            max_tokens=4096,
-                            messages=[{"role": "user", "content": prompt}],
-                        )
-                        raw_output = response.content[0].text
-                        input_tokens = response.usage.input_tokens
-                        output_tokens = response.usage.output_tokens
+                    # 统一走 runner.llm_client：BYOK key + provider + 自定义端点全部生效
+                    raw_output, input_tokens, output_tokens = chat_completion(
+                        model=model,
+                        prompt=prompt,
+                        api_key=resolved.key,
+                        provider=resolved.provider,
+                        api_base=resolved.api_base,
+                    )
+                    try:
                         cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
-                        output = parse_persona_output(raw_output)
-                    else:
-                        from runner.cli import _build_simulated_output
-                        output = _build_simulated_output(persona, review.task_type)
-                        cost = 0.0
+                    except Exception:
+                        cost = 0.0  # 第三方模型不在预算价目表里——记 0 不阻断
+                    output = parse_persona_output(raw_output)
 
                     validation = validate_output(output, persona, output_schema, artifact_texts)
 
@@ -832,34 +861,29 @@ class ReviewService:
 
                     persona_outputs_data.append(output)
 
-                    if ws_manager:
-                        ws_manager.broadcast_sync(review.id, {
-                            "type": "persona_completed",
-                            "persona_id": persona["id"],
-                            "persona_name": persona.get("name", persona["id"]),
-                            "validation_passed": validation.get("passed", False),
-                            "cost_usd": cost,
-                        })
+                    self._ws_emit(ws_manager, review.id, "review.persona_completed", {
+                        "persona_id": persona["id"],
+                        "persona_name": persona.get("name", persona["id"]),
+                        "validation_passed": validation.get("passed", False),
+                        "cost_usd": cost,
+                    })
 
                 except Exception as e:
                     po.status = "failed"
                     po.output_json = {"error": str(e)}
                     po.completed_at = datetime.now(timezone.utc)
 
-                    if ws_manager:
-                        ws_manager.broadcast_sync(review.id, {
-                            "type": "persona_failed",
-                            "persona_id": persona["id"],
-                            "persona_name": persona.get("name", persona["id"]),
-                            "error": str(e),
-                        })
+                    self._ws_emit(ws_manager, review.id, "review.persona_failed", {
+                        "persona_id": persona["id"],
+                        "persona_name": persona.get("name", persona["id"]),
+                        "error": str(e),
+                    })
 
                 self.session.commit()
 
             cross_exam_results = []
             if persona_outputs_data and mode_config["cross_examination"]:
-                if ws_manager:
-                    ws_manager.broadcast_sync(review.id, {"type": "cross_exam_started"})
+                self._ws_emit(ws_manager, review.id, "review.cross_exam_started", {})
 
                 try:
                     controversy_points = extract_controversy_points(persona_outputs_data)
@@ -867,29 +891,20 @@ class ReviewService:
                         cross_exam_prompt = render_cross_exam_prompt(
                             controversy_points, persona_outputs_data, CROSS_EXAM_PROMPT_PATH
                         )
-                        api_key = os.environ.get("ANTHROPIC_API_KEY")
-                        if api_key:
-                            import anthropic
-                            client = anthropic.Anthropic(api_key=api_key)
-                            ce_response = client.messages.create(
-                                model=budget_config.get("default_model", "claude-sonnet"),
-                                max_tokens=4096,
-                                messages=[{"role": "user", "content": cross_exam_prompt}],
-                            )
-                            cross_exam_results = parse_cross_exam_output(ce_response.content[0].text)
-                        else:
-                            cross_exam_results = [
-                                {"controversy_point": cp["title"], "simulated": True}
-                                for cp in controversy_points
-                            ]
+                        ce_raw, _ce_in, _ce_out = chat_completion(
+                            model=resolved.model or budget_config.get("default_model", "claude-sonnet"),
+                            prompt=cross_exam_prompt,
+                            api_key=resolved.key,
+                            provider=resolved.provider,
+                            api_base=resolved.api_base,
+                        )
+                        cross_exam_results = parse_cross_exam_output(ce_raw)
                 except Exception:
                     pass
 
-                if ws_manager:
-                    ws_manager.broadcast_sync(review.id, {"type": "cross_exam_completed"})
+                self._ws_emit(ws_manager, review.id, "review.cross_exam_completed", {})
 
-            if ws_manager:
-                ws_manager.broadcast_sync(review.id, {"type": "aggregation_started"})
+            self._ws_emit(ws_manager, review.id, "review.aggregation_started", {})
 
             report = aggregate_report(
                 persona_outputs_data,
@@ -899,8 +914,7 @@ class ReviewService:
                 cross_exam_results if cross_exam_results else None,
             )
 
-            if ws_manager:
-                ws_manager.broadcast_sync(review.id, {"type": "aggregation_completed"})
+            self._ws_emit(ws_manager, review.id, "review.aggregation_completed", {})
 
             calibration = None
             if mode_config["calibration"]:
@@ -925,19 +939,21 @@ class ReviewService:
             review.calibration = calibration
             self.session.commit()
 
-            if ws_manager:
-                ws_manager.broadcast_sync(review.id, {
-                    "type": "review_completed",
-                    "report_html_available": report_html is not None,
-                })
+            self._ws_emit(ws_manager, review.id, "review.completed", {
+                "review_id": review.id,
+                "cost_usd": total_cost,
+                "report_html_available": report_html is not None,
+            })
 
         except Exception as e:
             review.status = "failed"
+            review.error_message = str(e)[:2000]
             review.report_json = {"error": str(e)}
             self.session.commit()
 
-            if ws_manager:
-                ws_manager.broadcast_sync(review.id, {"type": "review_failed", "error": str(e)})
+            self._ws_emit(ws_manager, review.id, "review.failed", {
+                "review_id": review.id, "error": str(e),
+            })
 
 
 class MaterialExtractor:
@@ -959,11 +975,11 @@ class MaterialExtractor:
     }
 
     @classmethod
-    def extract(cls, task_type: str, text: str, filename: str) -> Dict[str, Any]:
+    def extract(cls, task_type: str, text: str, filename: str, resolved: Any = None) -> Dict[str, Any]:
         fields = cls.TASK_FIELDS.get(task_type, [])
 
         try:
-            result = cls._extract_with_ai(task_type, text, fields)
+            result = cls._extract_with_ai(task_type, text, fields, resolved=resolved)
             if result:
                 return result
         except Exception:
@@ -972,17 +988,20 @@ class MaterialExtractor:
         return cls._extract_fallback(task_type, text, fields, filename)
 
     @classmethod
-    def _extract_with_ai(cls, task_type: str, text: str, fields: List[str]) -> Optional[Dict[str, Any]]:
+    def _extract_with_ai(
+        cls, task_type: str, text: str, fields: List[str], resolved: Any = None
+    ) -> Optional[Dict[str, Any]]:
+        """AI 抽取档。resolved 是 key_service.ResolvedKey——此前这里硬编码
+        Anthropic 客户端 + os.environ 读 key，完全绕过 BYOK 体系：配了第三方
+        中转/自定义模型的用户，抽取要么静默失败要么花的是环境变量里那把
+        不属于他的 key。没有 resolved 时直接走 fallback，不再碰环境变量。"""
+        if resolved is None:
+            return None
         try:
-            import os as _os
-            api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
-            if not api_key:
-                return None
-
-            from anthropic import Anthropic
             import json as _json
 
-            client = Anthropic(timeout=15.0)
+            from runner.llm_client import chat_completion
+
             fields_desc = "、".join(fields)
 
             prompt = f"""你是一个游戏评审材料提取助手。请从以下文档内容中，提取出结构化的评审材料。
@@ -996,13 +1015,15 @@ class MaterialExtractor:
 文档内容：
 {text[:8000]}"""
 
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+            content, _in_tok, _out_tok = chat_completion(
+                model=resolved.model or settings.intent_model,
+                prompt=prompt,
+                api_key=resolved.key,
+                provider=resolved.provider,
+                api_base=resolved.api_base,
                 max_tokens=2000,
-                messages=[{"role": "user", "content": prompt}],
             )
-
-            content = response.content[0].text.strip()
+            content = content.strip()
 
             json_str = content
             if "```json" in json_str:

@@ -392,6 +392,8 @@ def _extract_text_from_file(content: bytes, ext: str) -> str:
 async def extract_materials(
     task_type: str = Form(...),
     file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
 ):
     filename = file.filename or "unknown"
     _, ext = os.path.splitext(filename)
@@ -419,7 +421,16 @@ async def extract_materials(
     safe_filename = str(uuid.uuid4()) + ext
     text = _extract_text_from_file(content, ext)
 
-    result = MaterialExtractor.extract(task_type, text, safe_filename)
+    # AI 抽取档走 BYOK（此前硬编码读环境变量，绕过用户配置的 key/中转/模型）；
+    # 没配 key 就退回规则抽取，不阻断上传
+    from app.services import key_service
+
+    try:
+        resolved = key_service.resolve_key(session, identity.user_id)
+    except Exception:
+        resolved = None
+
+    result = MaterialExtractor.extract(task_type, text, safe_filename, resolved=resolved)
     return result
 
 

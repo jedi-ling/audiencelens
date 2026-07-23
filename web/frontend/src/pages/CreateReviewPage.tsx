@@ -40,6 +40,7 @@ export default function CreateReviewPage() {
   const [selectedPack, setSelectedPack] = useState<string | null>(null)
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(new Set())
   const [launching, setLaunching] = useState(false)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const [materialsExpanded, setMaterialsExpanded] = useState(false)
   const [examplesExpanded, setExamplesExpanded] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -121,6 +122,7 @@ export default function CreateReviewPage() {
   const handleLaunch = async () => {
     if (!selectedTaskType) return
     setLaunching(true)
+    setLaunchError(null)
     try {
       const materials = Object.entries(materialFields)
         .filter(([, value]) => value.trim() !== '')
@@ -137,19 +139,19 @@ export default function CreateReviewPage() {
         artifactBundle.directory_path = directoryPath.trim()
       }
 
-      const review = await createNewReview({
+      // 走 v2 异步链路（Job 队列 + WS 进度）。此前走 v1 同步接口：阻塞线程池、
+      // 无视 BYOK key、无 key 时把模拟数据当真实报告入库——三个坑一次躲掉。
+      const reviewId = await createNewReview({
         task_type: selectedTaskType,
         artifact_bundle: artifactBundle,
         persona_pack: selectedPack ?? undefined,
         selected_personas: Array.from(selectedPersonaIds),
         mode: selectedMode,
         skill_type: selectedSkillType ?? undefined,
-        enable_evaluation: enableEvaluation,
-        enable_red_team: enableRedTeam,
       })
-      if (review) {
-        navigate(`/review/${review.id}`)
-      }
+      navigate(`/review/${reviewId}`)
+    } catch (e) {
+      setLaunchError(e instanceof Error ? e.message : '发起评审失败')
     } finally {
       setLaunching(false)
     }
@@ -1028,16 +1030,21 @@ export default function CreateReviewPage() {
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />
           </button>
         ) : (
-          <button
-            onClick={handleLaunch}
-            disabled={launching}
-            className={cn(
-              'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold hover:bg-neon-green-dim glow-green transition-all text-sm',
-              launching && 'opacity-70 cursor-not-allowed'
+          <div className="flex items-center gap-3">
+            {launchError && (
+              <p className="max-w-md text-sm text-severity-critical">{launchError}</p>
             )}
-          >
-            {launching ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : '🚀 启动评审'}
-          </button>
+            <button
+              onClick={handleLaunch}
+              disabled={launching}
+              className={cn(
+                'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold hover:bg-neon-green-dim glow-green transition-all text-sm',
+                launching && 'opacity-70 cursor-not-allowed'
+              )}
+            >
+              {launching ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : '🚀 启动评审'}
+            </button>
+          </div>
         )}
       </div>
     </div>
