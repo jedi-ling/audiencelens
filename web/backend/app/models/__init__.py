@@ -53,6 +53,9 @@ class Review(Base):
     # 长期评审项目的分组键：同 project_key 的历次评审在前端聚合成一条时间线。
     # 不建独立 Project 表——纯字符串分组，用户改名即视为新项目，足够轻量。
     project_key = Column(String, index=True, nullable=True)
+    # 评审完成后自动运行质量评估（8 维评分）——Wizard"启用评估"开关的落点。
+    # 此前该开关从 UI 传到后端被 schema 静默丢弃，从来没有生效过。
+    enable_evaluation = Column(Boolean, default=False, nullable=False)
     mode = Column(String, default="standard", nullable=False)
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)

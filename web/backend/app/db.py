@@ -93,6 +93,8 @@ def _legacy_migrations() -> None:
         patches.append("ALTER TABLE reviews ADD COLUMN skill_type VARCHAR")
     if "project_key" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN project_key VARCHAR")
+    if "enable_evaluation" not in columns:
+        patches.append("ALTER TABLE reviews ADD COLUMN enable_evaluation BOOLEAN DEFAULT 0 NOT NULL")
 
     if "user_api_keys" in inspector.get_table_names():
         key_columns = {c["name"] for c in inspector.get_columns("user_api_keys")}

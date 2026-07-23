@@ -191,6 +191,20 @@ def _execute_review(
             key_source=key_source,
         )
 
+        # 自动质量评估（Wizard"启用评估"开关）：失败不拖垮已完成的评审
+        if review.enable_evaluation:
+            try:
+                from app.services.evaluation_service import EvaluationService
+
+                EvaluationService.run_full_evaluation(db, review.id)
+                _broadcast(
+                    review_id,
+                    "review.evaluation_completed",
+                    {"review_id": review_id},
+                )
+            except Exception as exc:
+                logger.warning("review %s 自动评估失败（评审本身不受影响）: %s", review_id, exc)
+
         job_service.update_progress(job_id, 100)
         _broadcast(
             review_id,

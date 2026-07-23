@@ -430,6 +430,10 @@ class CreateReviewRequest(BaseModel):
     skill_type: Optional[str] = None
     # 长期评审项目分组键：同名即同一个项目，前端按它把历次评审聚合成时间线。
     project_key: Optional[str] = None
+    # 评审完成后自动运行 8 维质量评估（Wizard"启用评估"开关）
+    enable_evaluation: bool = False
+    # 追加红队对抗视角提示（与 skill_type 独立——选了别的技能也能叠加红队）
+    enable_red_team: bool = False
 
 
 @router.post(
@@ -458,15 +462,21 @@ async def create_review_v2(
 
     from app.services import apply_skill_hint
 
+    bundle = apply_skill_hint(body.artifact or {}, body.skill_type)
+    if body.enable_red_team and body.skill_type != "red_team_audience":
+        # 红队开关与技能选择独立：选了受众面板也能叠加对抗视角提示
+        bundle = apply_skill_hint(bundle, "red_team_audience")
+
     review = Review(
         user_id=identity.user_id,
         task_type=body.task_type,
         target_title=(body.artifact or {}).get("title"),
-        artifact_bundle=apply_skill_hint(body.artifact or {}, body.skill_type),
+        artifact_bundle=bundle,
         persona_pack=body.persona_pack,
         selected_personas=body.selected_personas,
         skill_type=body.skill_type,
         project_key=body.project_key,
+        enable_evaluation=body.enable_evaluation,
         mode=body.mode,
         status="pending",
     )

@@ -25,6 +25,8 @@ interface ReviewState {
     selected_personas?: string[]
     mode?: string
     skill_type?: SkillType
+    enable_evaluation?: boolean
+    enable_red_team?: boolean
   }) => Promise<string>
   deleteReviewById: (id: string) => Promise<void>
   fetchExamplesList: () => Promise<void>
@@ -73,6 +75,8 @@ export const useReviewStore = create<ReviewState>((set) => ({
       persona_pack: (data.persona_pack ?? 'game-core') as PersonaPack,
       selected_personas: data.selected_personas?.length ? data.selected_personas : undefined,
       skill_type: data.skill_type ?? null,
+      enable_evaluation: data.enable_evaluation ?? false,
+      enable_red_team: data.enable_red_team ?? false,
     })
     return res.review_id
   },

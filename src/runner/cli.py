@@ -49,24 +49,11 @@ REVIEW_MODE_CONFIG = {
     "full": {"max_personas": 8, "cross_examination": True, "calibration": True},
 }
 
-VALID_TASK_TYPES = [
-    "steam_page_review",
-    "demo_first_play",
-    "concept_review",
-    "monetization_review",
-    "looking_for_party_post",
-    "update_announcement_review",
-    "devlog_review",
-    "kickstarter_review",
-    "localization_review",
-    "discord_community_review",
-    # 通用产品向任务类型（不限游戏）——见 src/personas/general-consumer.yaml
-    "product_feedback_review",
-    "pricing_page_review",
-    "onboarding_review",
-    # 创业项目评审（BP/路演/申报表）——见 src/personas/startup-panel.yaml
-    "pitch_review",
-]
+# 单一注册表：见 runner/task_types.py（这里 re-export 保持既有导入路径不破）
+try:
+    from .task_types import VALID_TASK_TYPES
+except ImportError:
+    from runner.task_types import VALID_TASK_TYPES
 
 
 def load_artifact_bundle(path: str) -> dict:

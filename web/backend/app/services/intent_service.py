@@ -13,30 +13,19 @@
 """
 
 import json
+import os as _os
 import re
+import sys as _sys
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional
 
 from app.config import settings
 
-VALID_TASK_TYPES = [
-    "steam_page_review",
-    "demo_first_play",
-    "concept_review",
-    "monetization_review",
-    "looking_for_party_post",
-    "update_announcement_review",
-    "devlog_review",
-    "kickstarter_review",
-    "localization_review",
-    "discord_community_review",
-    # 通用产品向任务类型（不限游戏）——见 src/personas/general-consumer.yaml
-    "product_feedback_review",
-    "pricing_page_review",
-    "onboarding_review",
-    # 创业项目评审（BP/路演/申报表）——见 src/personas/startup-panel.yaml
-    "pitch_review",
-]
+# 任务类型从单一注册表读（src/runner/task_types.py），不再本地复制一份
+_SRC = _os.path.join(settings.repo_root, "src")
+if _SRC not in _sys.path:
+    _sys.path.insert(0, _SRC)
+from runner.task_types import VALID_TASK_TYPES  # noqa: E402
 
 # 通用任务类型没有命中任何 PACK_KEYWORDS 时的默认人格包——
 # 不能落回 game-core，否则"评一下定价页"这种非游戏请求会被硬塞游戏向人格。

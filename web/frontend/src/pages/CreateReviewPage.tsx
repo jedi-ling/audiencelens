@@ -148,6 +148,10 @@ export default function CreateReviewPage() {
         selected_personas: Array.from(selectedPersonaIds),
         mode: selectedMode,
         skill_type: selectedSkillType ?? undefined,
+        // 这两个开关此前从 UI 传到后端被 schema 静默丢弃、从未生效——现在真接上了：
+        // enable_evaluation 评审完成后自动跑 8 维评估，enable_red_team 叠加对抗视角提示
+        enable_evaluation: enableEvaluation,
+        enable_red_team: enableRedTeam,
       })
       navigate(`/review/${reviewId}`)
     } catch (e) {

@@ -170,6 +170,105 @@ class TestV2DetailExposesChatFields:
         assert detail["project_key"] == "详情字段验证"
 
 
+class TestEvaluationAutoRun:
+    def test_enable_evaluation_triggers_full_evaluation_after_completion(self, client, db, monkeypatch):
+        """Wizard"启用评估"开关的落点：此前该参数被 schema 静默丢弃从未生效。
+        现在 v2 评审完成后自动调 EvaluationService.run_full_evaluation。"""
+        from app.services import key_service
+        from app.services.evaluation_service import EvaluationService
+
+        import runner.cli
+
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: _fake_result())
+        eval_calls = []
+        monkeypatch.setattr(
+            EvaluationService, "run_full_evaluation",
+            classmethod(lambda cls, session, rid: eval_calls.append(rid)),
+        )
+        key_service.save_user_key(db, "anonymous", "sk-ant-eval-test")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "e", "materials": [{"type": "text", "text": "x"}]},
+                "enable_evaluation": True,
+            },
+        )
+        assert r.status_code == 202
+        review_id = r.json()["review_id"]
+        _poll_job_until_terminal(client, r.json()["job_id"])
+        assert eval_calls == [review_id], "enable_evaluation=True 却没有触发自动评估"
+
+    def test_evaluation_not_run_when_disabled(self, client, db, monkeypatch):
+        from app.services import key_service
+        from app.services.evaluation_service import EvaluationService
+
+        import runner.cli
+
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: _fake_result())
+        eval_calls = []
+        monkeypatch.setattr(
+            EvaluationService, "run_full_evaluation",
+            classmethod(lambda cls, session, rid: eval_calls.append(rid)),
+        )
+        key_service.save_user_key(db, "anonymous", "sk-ant-eval-test2")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "e2", "materials": [{"type": "text", "text": "x"}]},
+            },
+        )
+        assert r.status_code == 202
+        _poll_job_until_terminal(client, r.json()["job_id"])
+        assert eval_calls == []
+
+
+class TestRedTeamStacking:
+    def test_red_team_hint_stacks_on_top_of_other_skill(self, client, db, monkeypatch):
+        """红队开关与技能选择独立：选了受众面板也能叠加对抗视角提示。"""
+        from app.services import key_service
+
+        import runner.cli
+
+        calls = []
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: (calls.append(kw), _fake_result())[1])
+        key_service.save_user_key(db, "anonymous", "sk-ant-rt-test")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "rt", "materials": [{"type": "text", "text": "y"}]},
+                "skill_type": "audience_panel",
+                "enable_red_team": True,
+            },
+        )
+        assert r.status_code == 202
+        _poll_job_until_terminal(client, r.json()["job_id"])
+        texts = [m.get("text", "") for m in calls[0]["artifact_bundle"]["materials"]]
+        assert any("红队" in t for t in texts), "红队提示没叠加进材料"
+        assert any("消费" in t for t in texts), "受众面板提示丢了"
+
+
+class TestTaskTypeRegistry:
+    def test_meta_and_engine_registry_aligned(self):
+        """展示元数据与引擎单一注册表必须一致（此前多 4 个引擎不认的、
+        少 4 个引擎支持的——模块导入时的 assert 是硬闸，这里是显式回归）。"""
+        import sys
+
+        sys.path.insert(0, "src")
+        from runner.task_types import VALID_TASK_TYPES
+
+        from app.services import TASK_TYPES
+        from app.services.intent_service import VALID_TASK_TYPES as INTENT_TYPES
+
+        assert set(TASK_TYPES) == set(VALID_TASK_TYPES)
+        assert INTENT_TYPES is VALID_TASK_TYPES  # 同一个对象，不是又一份拷贝
+
+
 class TestProjectKeyGrouping:
     def test_project_key_stored_and_returned(self, client, db, monkeypatch):
         from app.services import key_service

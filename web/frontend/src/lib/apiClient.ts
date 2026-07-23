@@ -167,11 +167,27 @@ export const api = {
     selected_personas?: string[]
     skill_type?: string | null
     project_key?: string | null
+    /** 评审完成后自动运行 8 维质量评估 */
+    enable_evaluation?: boolean
+    /** 追加红队对抗视角提示（与 skill_type 独立可叠加） */
+    enable_red_team?: boolean
   }) =>
     request<CreateReviewResponse>('/api/v2/reviews', {
       method: 'POST',
       body: JSON.stringify({ mode: 'standard', persona_pack: 'game-core', ...params }),
     }),
+
+  /** 手动对已完成评审运行 8 维质量评估（创建时没开 enable_evaluation 的补跑入口） */
+  runEvaluation: (reviewId: string) =>
+    request<{ review_id: string; overall_score: number; passed: boolean }>(
+      `/api/evaluations/${reviewId}`,
+      { method: 'POST' },
+    ),
+
+  getEvaluation: (reviewId: string) =>
+    request<{ review_id: string; overall_score: number; passed: boolean }>(
+      `/api/evaluations/${reviewId}`,
+    ),
 
   getReview: (id: string) => request<ReviewDetail>(`/api/v2/reviews/${id}`),
 

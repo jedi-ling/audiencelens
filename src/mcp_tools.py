@@ -15,6 +15,7 @@ for _p in (_SRC_DIR, _REPO_ROOT):
         sys.path.insert(0, _p)
 
 from runner import cli as runner_cli  # noqa: E402
+from runner.task_types import VALID_TASK_TYPES  # noqa: E402
 
 TASK_TYPE_DESCRIPTIONS = {
     "steam_page_review": "Steam 商店页：信息架构、视觉传达、信任信号",
@@ -32,6 +33,14 @@ TASK_TYPE_DESCRIPTIONS = {
     "onboarding_review": "新手引导评审：首次使用体验、上手摩擦，不限游戏",
     "pitch_review": "创业项目评审：BP/路演/申报表，投资人与尽调视角，不限行业",
 }
+
+# 描述表必须与单一注册表（runner/task_types.py）完全对齐——漂移就在导入时炸，
+# 而不是等到用户调用工具才发现"注册表认的类型这里没有描述"或反之。
+assert set(TASK_TYPE_DESCRIPTIONS) == set(VALID_TASK_TYPES), (
+    "TASK_TYPE_DESCRIPTIONS 与 runner/task_types.py 的 VALID_TASK_TYPES 不一致："
+    f"仅描述表有 {set(TASK_TYPE_DESCRIPTIONS) - set(VALID_TASK_TYPES)}；"
+    f"仅注册表有 {set(VALID_TASK_TYPES) - set(TASK_TYPE_DESCRIPTIONS)}"
+)
 
 PERSONA_PACKS = [
     "game-core",

@@ -76,30 +76,6 @@ TASK_TYPES: Dict[str, Dict[str, Any]] = {
         "stance_enum": ["增强信心", "降低信心", "无影响"],
         "score_dimensions": ["communication_clarity", "trust_reinforcement", "retention_signal"],
     },
-    "app_store_review": {
-        "name_zh": "应用商店评审",
-        "description": "应用商店页、ASO、转化率",
-        "stance_enum": ["会下载", "不会", "观望"],
-        "score_dimensions": ["aso_effectiveness", "conversion_potential", "trust_signals"],
-    },
-    "social_media_post": {
-        "name_zh": "社媒帖评审",
-        "description": "传播性、互动潜力、品牌调性",
-        "stance_enum": ["会互动", "划走", "观望"],
-        "score_dimensions": ["shareability", "engagement_potential", "brand_alignment"],
-    },
-    "video_ad_review": {
-        "name_zh": "视频广告评审",
-        "description": "前3秒钩子、信息密度、CTA",
-        "stance_enum": ["会看完", "跳过", "观望"],
-        "score_dimensions": ["hook_strength", "message_clarity", "cta_effectiveness"],
-    },
-    "landing_page_review": {
-        "name_zh": "落地页评审",
-        "description": "转化路径、信任建立、首屏钩子",
-        "stance_enum": ["会注册", "离开", "观望"],
-        "score_dimensions": ["conversion_clarity", "trust_building", "first_impression"],
-    },
     "kickstarter_review": {
         "name_zh": "众筹页评审",
         "description": "众筹页叙事、回报设计、信任建立",
@@ -124,7 +100,42 @@ TASK_TYPES: Dict[str, Dict[str, Any]] = {
         "stance_enum": ["文化适配良好", "存在问题", "观望"],
         "score_dimensions": ["cultural_adaptation", "language_quality", "ui_adaptation"],
     },
+    "product_feedback_review": {
+        "name_zh": "产品反馈评审",
+        "description": "通用产品反馈收集与解读，不限游戏",
+        "stance_enum": ["会继续用", "会流失", "观望"],
+        "score_dimensions": ["usability", "value_perception", "trust_signals"],
+    },
+    "pricing_page_review": {
+        "name_zh": "定价页评审",
+        "description": "定价分层、价值传达、信任信号，不限游戏",
+        "stance_enum": ["会付费", "不会", "观望"],
+        "score_dimensions": ["value_for_money", "pricing_clarity", "trust_signals"],
+    },
+    "onboarding_review": {
+        "name_zh": "新手引导评审",
+        "description": "首次使用体验、上手摩擦，不限游戏",
+        "stance_enum": ["会留下", "会放弃", "观望"],
+        "score_dimensions": ["onboarding_friendliness", "time_to_value", "clarity"],
+    },
+    "pitch_review": {
+        "name_zh": "创业项目评审",
+        "description": "BP/路演/申报表，投资人与尽调视角",
+        "stance_enum": ["值得跟进", "不投", "观望"],
+        "score_dimensions": ["market_potential", "team_credibility", "evidence_quality"],
+    },
 }
+
+# 展示元数据必须与引擎单一注册表（src/runner/task_types.py）完全对齐——
+# 此前这里多出 4 个引擎不认的类型（前端展示了、用户选了创建必 400），
+# 同时少了 4 个引擎支持的通用类型（做了功能没露出）。漂移就在导入时炸。
+from runner.task_types import VALID_TASK_TYPES as _ENGINE_TASK_TYPES  # noqa: E402
+
+assert set(TASK_TYPES) == set(_ENGINE_TASK_TYPES), (
+    "services.TASK_TYPES 与 runner/task_types.py 不一致："
+    f"仅元数据有 {set(TASK_TYPES) - set(_ENGINE_TASK_TYPES)}；"
+    f"仅注册表有 {set(_ENGINE_TASK_TYPES) - set(TASK_TYPES)}"
+)
 
 REVIEW_MODES: Dict[str, Dict[str, Any]] = {
     "quick": {
