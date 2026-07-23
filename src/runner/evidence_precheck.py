@@ -26,12 +26,22 @@ def _fuzzy_match(needed_type: str, available_types: List[str]) -> bool:
     return False
 
 
+# 对话链路（/ask）的材料统一是自由文本，type 就叫 "text"。它是"万能证据"：
+# 用户用大白话把想法讲清楚，任何人格都能据此表态——不该因为缺"截图/定价页"
+# 这类结构化证据类型就把人全跳过（那道门槛是给 Wizard 结构化多材料评审用的）。
+# 没有这一条，每一次对话评审都会因为 type="text" 匹配不上人格需要的证据类型而
+# 被整团跳过，报告空壳（0 角色/0 修复项）。
+FREEFORM_EVIDENCE_TYPES = {"text", "用户输入", "补充信息", "自由描述", ""}
+
+
 def check_evidence_coverage(
     persona: dict, available_evidence_types: List[str]
 ) -> dict:
     needed = persona.get("evidence_types_needed", [])
 
-    if len(needed) == 0:
+    has_freeform = any(t in FREEFORM_EVIDENCE_TYPES for t in available_evidence_types)
+
+    if len(needed) == 0 or has_freeform:
         coverage_ratio = 1.0
         missing = []
     else:

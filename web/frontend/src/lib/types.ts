@@ -184,6 +184,8 @@ export interface ReviewDetail {
   created_at: string | null
   completed_at: string | null
   total_cost_usd: number
+  input_tokens?: number
+  output_tokens?: number
   report: ReviewReport | null
   calibration: unknown
 }

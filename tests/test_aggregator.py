@@ -485,3 +485,30 @@ class TestRenderMarkdownReport:
         md = render_markdown_report(report, TEMPLATE_PATH)
         assert "Consensus" in md
         assert "Priority Fixes" in md
+
+
+class TestAggregatorToleratesOffSchemaOutput:
+    """第三方模型（MiniMax 等）产出的 persona 输出未必严格贴合 output-schema：
+    可能缺 persona_id / key_issues，或 evidence 项少 content 字段。聚合器过去
+    对这些字段是硬取值，一份不合规输出就 KeyError 让整份报告作废、报告空壳。
+    加固后应降级容忍：缺字段用默认值，绝不崩，仍产出可用报告。"""
+
+    def test_missing_persona_id_and_key_issues_does_not_crash(self):
+        rules = load_aggregation_rules(RULES_PATH)
+        off_schema = [
+            {"primary_stance": "观望", "scores": {}},  # 无 persona_id / key_issues / evidence
+            {"persona_id": "P02", "primary_stance": "会买",
+             "evidence": [{"label": "只有label没有content"}]},  # evidence 项缺 content
+        ]
+        report = aggregate_report(off_schema, "concept_review", "X", rules)
+        assert "executive_summary" in report
+        assert len(report["persona_notes"]) == 2  # 两个都保留，没被崩掉
+
+    def test_non_dict_issue_items_skipped(self):
+        rules = load_aggregation_rules(RULES_PATH)
+        weird = [
+            {"persona_id": "P1", "primary_stance": "会买",
+             "key_issues": ["裸字符串不是dict", {"title": "真issue", "severity": "high"}]},
+        ]
+        report = aggregate_report(weird, "concept_review", "X", rules)
+        assert "executive_summary" in report

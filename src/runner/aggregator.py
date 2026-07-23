@@ -25,7 +25,7 @@ def compute_consensus(persona_outputs: List[dict], threshold: float = 0.7) -> di
     if not persona_outputs:
         return {"agreed_points": [], "questioned_points": [], "stance_distribution": {}}
 
-    stances = [p["primary_stance"] for p in persona_outputs]
+    stances = [p.get("primary_stance", "观望") for p in persona_outputs]
     counter = Counter(stances)
     total = len(stances)
     distribution = dict(counter)
@@ -52,7 +52,7 @@ def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[
 
     stance_groups = {}
     for p in persona_outputs:
-        stance = p["primary_stance"]
+        stance = p.get("primary_stance", "观望")
         if stance not in stance_groups:
             stance_groups[stance] = []
         stance_groups[stance].append(p)
@@ -65,17 +65,21 @@ def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[
     issue_clusters = []  # [{"title": str, "entries": [(pid, stance, issue)]}]
     for p in persona_outputs:
         for issue in p.get("key_issues", []):
-            title = issue["title"]
+            if not isinstance(issue, dict):
+                continue
+            title = issue.get("title", "")
+            if not title:
+                continue
             merged = False
             for cluster in issue_clusters:
                 if similarity.is_same_issue(title, cluster["title"]):
-                    cluster["entries"].append((p["persona_id"], p["primary_stance"], issue))
+                    cluster["entries"].append((p.get("persona_id",""), p.get("primary_stance","观望"), issue))
                     merged = True
                     break
             if not merged:
                 issue_clusters.append({
                     "title": title,
-                    "entries": [(p["persona_id"], p["primary_stance"], issue)],
+                    "entries": [(p.get("persona_id",""), p.get("primary_stance","观望"), issue)],
                 })
 
     issue_map = {c["title"]: c["entries"] for c in issue_clusters}
@@ -93,7 +97,7 @@ def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[
             entries = issue_map[title]
             persona_stances = []
             for pid, stance, issue in entries:
-                evidence_text = f"{issue['title']}: {issue['why_it_matters']}"
+                evidence_text = f"{issue.get('title', '')}: {issue.get('why_it_matters', '')}"
                 persona_stances.append({
                     "persona_id": pid,
                     "stance": stance,
@@ -114,14 +118,14 @@ def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[
                 for p in stance_groups[stance_a]:
                     evidence_text = p.get("voice_sample", "")
                     persona_stances.append({
-                        "persona_id": p["persona_id"],
+                        "persona_id": p.get("persona_id",""),
                         "stance": stance_a,
                         "evidence": evidence_text,
                     })
                 for p in stance_groups[stance_b]:
                     evidence_text = p.get("voice_sample", "")
                     persona_stances.append({
-                        "persona_id": p["persona_id"],
+                        "persona_id": p.get("persona_id",""),
                         "stance": stance_b,
                         "evidence": evidence_text,
                     })
@@ -141,15 +145,19 @@ def compute_priority_fixes(persona_outputs: List[dict], rules: dict) -> List[dic
 
     for p in persona_outputs:
         for issue in p.get("key_issues", []):
-            title = issue["title"]
+            if not isinstance(issue, dict):
+                continue
+            title = issue.get("title", "")
+            if not title:
+                continue
             if title not in issue_map:
                 issue_map[title] = {
-                    "severity": issue["severity"],
-                    "why_it_matters": issue["why_it_matters"],
-                    "suggested_fix": issue["suggested_fix"],
+                    "severity": issue.get("severity", "medium"),
+                    "why_it_matters": issue.get("why_it_matters", ""),
+                    "suggested_fix": issue.get("suggested_fix", ""),
                     "affected_personas": [],
                 }
-            issue_map[title]["affected_personas"].append(p["persona_id"])
+            issue_map[title]["affected_personas"].append(p.get("persona_id", ""))
 
     results = []
     for title, info in issue_map.items():
@@ -185,19 +193,20 @@ def aggregate_report(
     disagreements = compute_disagreements(persona_outputs)
     priority_fixes = compute_priority_fixes(persona_outputs, rules)
 
-    stance_counter = Counter(p["primary_stance"] for p in persona_outputs)
+    stance_counter = Counter(p.get("primary_stance", "观望") for p in persona_outputs)
     primary_recommendation = stance_counter.most_common(1)[0][0] if stance_counter else ""
 
     all_issues = []
     for p in persona_outputs:
         for issue in p.get("key_issues", []):
-            all_issues.append(issue)
-    critical_high_count = sum(1 for i in all_issues if i["severity"] in ("critical", "high"))
+            if isinstance(issue, dict):
+                all_issues.append(issue)
+    critical_high_count = sum(1 for i in all_issues if i.get("severity") in ("critical", "high"))
     if critical_high_count >= 2:
         release_risk = "critical"
     elif critical_high_count == 1:
         release_risk = "high"
-    elif any(i["severity"] == "medium" for i in all_issues):
+    elif any(i.get("severity") == "medium" for i in all_issues):
         release_risk = "medium"
     else:
         release_risk = "low"
@@ -230,7 +239,7 @@ def aggregate_report(
     for d in disagreements:
         suggested_tasks.append(f"Test resolution of: {d['topic']}")
     for p in persona_outputs:
-        recruit_types.append(p.get("persona_name", p["persona_id"]))
+        recruit_types.append(p.get("persona_name", p.get("persona_id","")))
     for gap in information_gaps:
         next_materials.append(f"Provide: {gap}")
 
@@ -243,12 +252,16 @@ def aggregate_report(
 
     persona_notes = []
     for p in persona_outputs:
-        top_evidence = [e["content"] for e in p.get("evidence", [])][:3]
-        top_issues = [i["title"] for i in p.get("key_issues", [])]
+        top_evidence = [
+            e.get("content", "") for e in p.get("evidence", []) if isinstance(e, dict)
+        ][:3]
+        top_issues = [
+            i.get("title", "") for i in p.get("key_issues", []) if isinstance(i, dict)
+        ]
         persona_notes.append({
-            "persona_id": p["persona_id"],
-            "persona_name": p.get("persona_name", p["persona_id"]),
-            "stance": p["primary_stance"],
+            "persona_id": p.get("persona_id", ""),
+            "persona_name": p.get("persona_name", p.get("persona_id", "")),
+            "stance": p.get("primary_stance", "观望"),
             "evidence_top3": top_evidence,
             "top_issues": top_issues,
             "continue_triggers": p.get("continue_triggers", []),
@@ -398,7 +411,7 @@ def render_html_report(report: dict, template_path: str) -> str:
             stance_class = "neutral"
 
         persona_output = next(
-            (p for p in report.get("_persona_outputs", []) if p["persona_id"] == pid),
+            (p for p in report.get("_persona_outputs", []) if p.get("persona_id") == pid),
             None,
         )
 

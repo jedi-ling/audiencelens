@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, deleteReview, fetchPersonas } from '@/lib/api'
@@ -1202,6 +1202,15 @@ function ReviewStatusBody({
             {reviewState.detail?.total_cost_usd !== undefined && (
               <span>${reviewState.detail.total_cost_usd.toFixed(3)}</span>
             )}
+            {(reviewState.detail?.input_tokens || reviewState.detail?.output_tokens) ? (
+              <span
+                className="flex items-center gap-1"
+                title={`输入 ${(reviewState.detail?.input_tokens ?? 0).toLocaleString('en-US')} · 输出 ${(reviewState.detail?.output_tokens ?? 0).toLocaleString('en-US')} token`}
+              >
+                <Coins className="h-3 w-3" strokeWidth={1.75} />
+                {((reviewState.detail?.input_tokens ?? 0) + (reviewState.detail?.output_tokens ?? 0)).toLocaleString('en-US')} tok
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-3 flex items-center gap-2">

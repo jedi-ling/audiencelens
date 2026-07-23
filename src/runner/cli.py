@@ -153,6 +153,16 @@ def run_single_persona(
             )
             cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
             output = parse_persona_output(raw_output)
+            # 身份不靠模型回填：聚合器要 output 里带 persona_id/persona_name，但不同模型
+            # 未必按 schema 原样吐回来（MiniMax 就把身份塞进了 persona:{name,archetype}，
+            # 顶层没有 persona_id，聚合时 KeyError 整份报告作废）。用我们已知的 persona
+            # 强制注入，engine 从此不依赖模型是否老实 echo 身份字段。
+            if isinstance(output, dict):
+                output.setdefault("persona_id", persona["id"])
+                output.setdefault("persona_name", persona.get("name", persona["id"]))
+                # 聚合器对 primary_stance 是硬取值——模型偶尔漏这个字段就会让整份
+                # 报告 KeyError 作废。缺了就按"观望"兜底（各任务 stance_enum 的通用中立项）。
+                output.setdefault("primary_stance", "观望")
             return {
                 "persona_id": persona["id"],
                 "output": output,
@@ -269,8 +279,20 @@ def run_panel(
     rules = load_aggregation_rules(rules_path)
     output_schema = load_schema(output_schema_path)
 
+    # 材料形态统一：对话链路（/ask）发的是 {type:'text', text:内容}，Wizard 发的是
+    # {type:字段名, description:内容}。引擎的模板/证据抽取全按 description 读——不统一
+    # 的话对话评审的正文（在 text 键里）根本到不了人格手上，人格拿到空材料。
+    # 这里把 text 补进 description（已有 description 的 Wizard 材料原样不动），
+    # 图片材料（image_data）不碰，交给 render_prompt 走多模态。
+    _materials = artifact_bundle.get("materials", []) or []
+    for _m in _materials:
+        if _m.get("type") != "image" and not _m.get("description") and _m.get("text"):
+            _m["description"] = _m["text"]
+
     artifact_texts = [
-        m.get("description", "") for m in artifact_bundle.get("materials", [])
+        (m.get("description") or m.get("text") or "")
+        for m in _materials
+        if m.get("type") != "image"
     ]
     artifact_summary = artifact_bundle.get("title", "")
 

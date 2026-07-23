@@ -196,3 +196,25 @@ class TestPrecheckPanel:
         result = precheck_panel(SAMPLE_PERSONAS, SAMPLE_BUNDLE)
         total = sum(len(p.get("evidence_types_needed", [])) for p in SAMPLE_PERSONAS)
         assert result["evidence_summary"]["total_needed"] == total
+
+
+class TestFreeformTextPasses:
+    """对话链路（/ask）的材料 type 统一是 "text" 自由文本——它是万能证据，
+    任何人格都不该因为缺结构化证据类型而被跳过。此前 type="text" 匹配不上
+    任何 evidence_types_needed，导致每次对话评审整团被跳、报告空壳。"""
+
+    def test_freeform_text_material_passes_all_personas(self):
+        bundle = {
+            "materials": [
+                {"type": "text", "description": "一个把日程碎片自动拼成番茄钟的极简App"},
+            ]
+        }
+        result = precheck_panel(SAMPLE_PERSONAS, bundle)
+        assert len(result["valid_personas"]) == len(SAMPLE_PERSONAS)
+        assert len(result["skipped_personas"]) == 0
+
+    def test_structured_material_still_gated(self):
+        # Wizard 的结构化材料仍按证据类型正常门控，不受自由文本豁免影响
+        bundle = {"materials": [{"type": "完全不相关的类型", "description": "x"}]}
+        result = precheck_panel(SAMPLE_PERSONAS, bundle)
+        assert len(result["valid_personas"]) < len(SAMPLE_PERSONAS)

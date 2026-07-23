@@ -118,12 +118,16 @@ def check_identity_behavior_decoupling(output: dict) -> dict:
     violations = []
 
     for entry in output.get("evidence", []):
+        if not isinstance(entry, dict):
+            continue
         content = entry.get("content", "")
         matches = pattern.findall(content)
         for m in matches:
             violations.append(f"evidence: {m}")
 
     for issue in output.get("key_issues", []):
+        if not isinstance(issue, dict):
+            continue
         for field in ["title", "why_it_matters", "suggested_fix"]:
             text = issue.get(field, "")
             matches = pattern.findall(text)
