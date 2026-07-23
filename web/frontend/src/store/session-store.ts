@@ -79,7 +79,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     setToken(token)
     const identity = await api.me()
     set({ identity })
-    await get().refreshKeys()
+    // key/用量都换了归属，一起刷新（用量失败不阻断登录）
+    await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
   },
 
   register: async (email, password, displayName) => {
@@ -87,7 +88,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     setToken(token)
     const identity = await api.me()
     set({ identity })
-    await get().refreshKeys()
+    await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
   },
 
   logout: () => {

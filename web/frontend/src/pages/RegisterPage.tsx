@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { UserPlus } from 'lucide-react'
 import { ApiError } from '@/lib/apiClient'
@@ -7,6 +7,7 @@ import { useSessionStore } from '@/store/session-store'
 export default function RegisterPage() {
   const navigate = useNavigate()
   const register = useSessionStore((s) => s.register)
+  const identity = useSessionStore((s) => s.identity)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,13 +17,18 @@ export default function RegisterPage() {
 
   const passwordTooShort = password.length > 0 && password.length < 8
 
+  // 已登录还停在注册页没有意义——直接送进应用
+  useEffect(() => {
+    if (identity && !identity.is_anonymous) navigate('/ask', { replace: true })
+  }, [identity, navigate])
+
   const submit = async () => {
     if (!email.trim() || password.length < 8) return
     setBusy(true)
     setError(null)
     try {
       await register(email.trim(), password, displayName.trim() || undefined)
-      navigate('/')
+      navigate('/ask') // 落进应用而不是营销落地页
     } catch (e) {
       if (e instanceof ApiError) setError(e.message)
       else setError(e instanceof Error ? e.message : '注册失败')

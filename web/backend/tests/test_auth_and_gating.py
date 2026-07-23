@@ -50,6 +50,25 @@ class TestProgressiveAuth:
         assert r.status_code == 200
         assert r.json()["token"]
 
+    def test_register_rejects_malformed_email(self, client, monkeypatch):
+        """email 字段曾经裸收字符串——"abc" 也能注册成功，落库一个永远无法
+        通知/找回的账号标识。现在服务端做宽松格式校验兜底。"""
+        _enable_auth(monkeypatch)
+        for bad in ["abc", "a@b", "@b.com", "a b@c.com", "a@"]:
+            r = client.post("/api/auth/register", json={"email": bad, "password": "password123"})
+            assert r.status_code == 400, f"畸形邮箱 {bad!r} 不该注册成功"
+        # 正常邮箱不受影响
+        r = client.post(
+            "/api/auth/register", json={"email": "valid@example.com", "password": "password123"}
+        )
+        assert r.status_code == 200
+
+    def test_register_rejects_short_password(self, client, monkeypatch):
+        """服务端强制密码 >=8 位（不能只靠前端校验）。"""
+        _enable_auth(monkeypatch)
+        r = client.post("/api/auth/register", json={"email": "short@example.com", "password": "1234567"})
+        assert r.status_code == 422  # pydantic min_length 校验
+
     def test_anonymous_review_creation_still_works_when_auth_enabled(self, client, monkeypatch):
         """核心承诺：打开认证开关不等于关闭匿名体验——两者互不冲突。"""
         _enable_auth(monkeypatch)

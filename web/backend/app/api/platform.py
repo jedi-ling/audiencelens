@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 import uuid
 from typing import List, Optional
 
@@ -60,10 +61,17 @@ def _require_auth_enabled():
         )
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 @router.post("/auth/register", dependencies=[Depends(rate_limit("auth", 10, 3600))])
 async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     _require_auth_enabled()
     email = body.email.strip().lower()
+    # 之前 email 字段裸收字符串，"abc" 也能注册成功——落库一个永远收不到任何
+    # 通知、也无法找回的账号标识。宽松格式校验兜底（不追求 RFC 完备）。
+    if not _EMAIL_RE.match(email) or len(email) > 254:
+        raise BadRequest("邮箱格式不正确")
     if db.query(User).filter(User.email == email).first():
         # 不说"已注册"——那等于替枚举者确认这个邮箱存在账号
         raise BadRequest("该邮箱不可用，请更换邮箱；若已有账号请直接登录")

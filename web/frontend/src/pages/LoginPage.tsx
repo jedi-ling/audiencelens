@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogIn } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
@@ -6,11 +6,17 @@ import { useSessionStore } from '@/store/session-store'
 export default function LoginPage() {
   const navigate = useNavigate()
   const login = useSessionStore((s) => s.login)
+  const identity = useSessionStore((s) => s.identity)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 已登录还停在登录页没有意义——直接送进应用
+  useEffect(() => {
+    if (identity && !identity.is_anonymous) navigate('/ask', { replace: true })
+  }, [identity, navigate])
 
   const submit = async () => {
     if (!email.trim() || !password) return
@@ -18,7 +24,7 @@ export default function LoginPage() {
     setError(null)
     try {
       await login(email.trim(), password)
-      navigate('/')
+      navigate('/ask') // 落进应用而不是营销落地页
     } catch (e) {
       setError(e instanceof Error ? e.message : '登录失败')
     } finally {
