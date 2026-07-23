@@ -97,6 +97,7 @@ def render_prompt(
         persona_yaml_minified=persona_yaml_minified,
         mbti=mbti,
         persona_name=persona_name,
+        persona_id=persona.get("id", ""),
         must_comment_on_items=must_comment_on_items,
         primary_decision_rule=primary_decision_rule,
         task_type=task_type,
@@ -145,6 +146,81 @@ def parse_persona_output(raw_output: str) -> dict:
         return json.loads(raw_output)
     except json.JSONDecodeError:
         return {"parse_error": True, "raw_output": raw_output}
+
+
+# 第三方模型常见的"同义字段名"——它们能理解任务但不肯照抄 schema 的字段名
+# （实测 MiniMax-M3 会吐 evaluator_id / stance_rationale / dimension_analysis…）。
+# prompt 里已经给了逐字骨架，这里是第二道保险：把变体名归一回规范名，
+# 让报告不至于因为"名字没对上"就丢掉模型真正产出的内容。
+_FIELD_ALIASES = {
+    "persona_id": ("evaluator_id", "reviewer_id", "agent_id", "id"),
+    "persona_name": ("evaluator_name", "reviewer_name", "agent_name", "name"),
+    "primary_stance": ("stance", "overall_stance", "verdict"),
+    "key_issues": ("issues", "problems", "concerns", "key_problems", "dimension_analysis"),
+    "voice_sample": ("quote", "voice", "comment"),
+    "missing_information": ("missing_info", "information_gaps", "gaps"),
+    "evidence_sufficiency": ("evidence_score", "evidence_confidence"),
+}
+
+# key_issues 每项内部的字段变体
+_ISSUE_ALIASES = {
+    "title": ("issue", "problem", "name", "summary", "point"),
+    "severity": ("level", "priority", "impact"),
+    "why_it_matters": ("reason", "rationale", "why", "impact_description", "detail"),
+    "suggested_fix": ("fix", "suggestion", "recommendation", "how_to_fix", "advice"),
+}
+
+
+def normalize_persona_output(output: dict) -> dict:
+    """把模型吐回来的变体字段名归一成 output-schema 的规范名。
+
+    只在规范名缺失时才从别名回填（模型老实照抄骨架时此函数等于空操作），
+    所以对 Claude 这类守规矩的模型零影响。
+    """
+    if not isinstance(output, dict) or output.get("parse_error"):
+        return output
+
+    for canonical, aliases in _FIELD_ALIASES.items():
+        if output.get(canonical):
+            continue
+        for alias in aliases:
+            if output.get(alias):
+                output[canonical] = output[alias]
+                break
+
+    issues = output.get("key_issues")
+    if isinstance(issues, dict):
+        # 有的模型把 issues 写成 {维度: 描述} 的字典而非数组
+        issues = [
+            {"title": str(k), "why_it_matters": v if isinstance(v, str) else str(v)}
+            for k, v in issues.items()
+        ]
+        output["key_issues"] = issues
+
+    if isinstance(issues, list):
+        normalized = []
+        for item in issues:
+            if isinstance(item, str):
+                normalized.append({"title": item, "severity": "medium",
+                                   "why_it_matters": "", "suggested_fix": ""})
+                continue
+            if not isinstance(item, dict):
+                continue
+            for canonical, aliases in _ISSUE_ALIASES.items():
+                if item.get(canonical):
+                    continue
+                for alias in aliases:
+                    if item.get(alias):
+                        item[canonical] = item[alias]
+                        break
+            item.setdefault("severity", "medium")
+            item.setdefault("why_it_matters", "")
+            item.setdefault("suggested_fix", "")
+            if item.get("title"):
+                normalized.append(item)
+        output["key_issues"] = normalized
+
+    return output
 
 
 def estimate_cost(

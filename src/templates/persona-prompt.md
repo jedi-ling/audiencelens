@@ -37,8 +37,41 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
 - 当材料缺失触发角色决策规则中的退出条件时，应同时输出：(1) 角色决策结果，(2) 标注此判断基于信息缺失而非负面证据
 
 [OUTPUT RULES]
-- 仅输出有效 JSON，符合 output-schema.json
+- 仅输出有效 JSON，字段名必须与下方骨架**逐字一致**（不得改名、不得增删顶层字段）
 - 用简短、具体、可操作的句子
+
+[OUTPUT SKELETON - 严格照抄字段名，把值换成你的判断]
+```json
+{
+  "persona_id": "{{persona_id}}",
+  "persona_name": "{{persona_name}}",
+  "persona_version": "0.1.0",
+  "task_type": "{{task_type}}",
+  "primary_stance": "<见下方枚举，只能填其中之一>",
+  "confidence": 0.0,
+  "evidence_sufficiency": 0.0,
+  "evidence": [
+    {"content": "<你观察到的具体事实>", "inference_level": "direct|inferred|gap",
+     "source_location": "<材料中的位置，没有填 未指定>", "inference_basis": "<inferred 时写推断链，否则空字符串>"}
+  ],
+  "scores": {"base": {}, "task_specific": {}},
+  "key_issues": [
+    {"severity": "critical|high|medium|low", "title": "<一句话问题标题>",
+     "why_it_matters": "<为什么这对你这类用户是问题>", "suggested_fix": "<具体可执行的改法>"}
+  ],
+  "continue_triggers": ["<什么会让你继续>"],
+  "quit_triggers": ["<什么会让你退出>"],
+  "first_scan_observations": ["<你扫一眼最先注意到的>"],
+  "must_comment_on_check": {},
+  "missing_information": ["<你需要但材料没给的信息>"],
+  "voice_sample": "<用你的角色语气写 1-2 句原声评价>",
+  "meta": {"caveats": ["<至少一条限制声明>"], "is_synthetic": true}
+}
+```
+
+**key_issues 是本次评审最重要的产出**：即使你的立场是"观望/值得推进"，也必须至少列出
+1 条你真正在意的问题（没有致命问题就写你最希望改进的点）。不允许交回空的 key_issues 数组。
+
 - 不输出推理过程
 - voice_sample 字段用你的角色语气写 1-2 句原声评价
 - meta.caveats 必须包含至少一条限制声明

@@ -24,7 +24,7 @@ from runner.calibration import run_calibration_check
 from runner.cross_exam import extract_controversy_points, parse_cross_exam_output, render_cross_exam_prompt
 from runner.evidence_precheck import precheck_panel
 from runner.panel_selector import load_personas, load_presets, select_panel
-from runner.persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
+from runner.persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
 from runner.validator import load_schema, validate_output
 
 PERSONAS_DIR = os.path.join(PROJECT_ROOT, "src", "personas")
@@ -861,7 +861,7 @@ class ReviewService:
                         cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
                     except Exception:
                         cost = 0.0  # 第三方模型不在预算价目表里——记 0 不阻断
-                    output = parse_persona_output(raw_output)
+                    output = normalize_persona_output(parse_persona_output(raw_output))
 
                     validation = validate_output(output, persona, output_schema, artifact_texts)
 

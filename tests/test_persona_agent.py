@@ -225,3 +225,54 @@ class TestSelectModel:
         persona = {"model_hint": None}
         result = select_model(persona, budget_config)
         assert result == "claude-sonnet-4-20250514"
+
+
+class TestNormalizePersonaOutput:
+    """第三方模型（实测 MiniMax-M3）能理解任务但不肯照抄 schema 字段名：
+    吐 evaluator_id / issues / reason 之类的同义名，导致报告里"0 条修复项"。
+    normalize_persona_output 把变体名归一回规范名，把模型真产出的内容救回来。"""
+
+    def test_variant_top_level_names_normalized(self):
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({
+            "evaluator_id": "P01",
+            "evaluator_name": "林岚",
+            "stance": "观望",
+            "issues": [{"problem": "差异化不明", "level": "high", "reason": "看不出独特性"}],
+        })
+        assert out["persona_id"] == "P01"
+        assert out["persona_name"] == "林岚"
+        assert out["primary_stance"] == "观望"
+        assert out["key_issues"][0]["title"] == "差异化不明"
+        assert out["key_issues"][0]["severity"] == "high"
+        assert out["key_issues"][0]["why_it_matters"] == "看不出独特性"
+
+    def test_schema_conformant_output_untouched(self):
+        # 守规矩的模型（Claude）输出原样通过，规范名已存在时不被别名覆盖
+        from runner.persona_agent import normalize_persona_output
+
+        canonical = {
+            "persona_id": "P01", "persona_name": "林岚", "primary_stance": "值得推进",
+            "key_issues": [{"title": "T", "severity": "low",
+                            "why_it_matters": "W", "suggested_fix": "F"}],
+        }
+        out = normalize_persona_output(dict(canonical))
+        assert out["persona_id"] == "P01"
+        assert out["key_issues"][0] == canonical["key_issues"][0]
+
+    def test_issues_as_dict_or_strings_coerced_to_list(self):
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({"key_issues": {"上手成本": "第一步就卡住"}})
+        assert out["key_issues"][0]["title"] == "上手成本"
+
+        out2 = normalize_persona_output({"key_issues": ["纯字符串问题"]})
+        assert out2["key_issues"][0]["title"] == "纯字符串问题"
+        assert out2["key_issues"][0]["severity"] == "medium"
+
+    def test_parse_error_passthrough(self):
+        from runner.persona_agent import normalize_persona_output
+
+        bad = {"parse_error": True, "raw_output": "not json"}
+        assert normalize_persona_output(bad) is bad

@@ -18,7 +18,7 @@ try:
     from .evidence_precheck import precheck_panel
     from .llm_client import chat_completion
     from .panel_selector import load_personas, load_presets, select_panel
-    from .persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
+    from .persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
     from .validator import load_schema, validate_output
 except ImportError:
     from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
@@ -31,7 +31,7 @@ except ImportError:
     from runner.evidence_precheck import precheck_panel
     from runner.llm_client import chat_completion
     from runner.panel_selector import load_personas, load_presets, select_panel
-    from runner.persona_agent import estimate_cost, parse_persona_output, render_prompt, select_model
+    from runner.persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
     from runner.validator import load_schema, validate_output
 
 SIMULATION_WARNING = (
@@ -152,7 +152,7 @@ def run_single_persona(
                 api_base=api_base,
             )
             cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
-            output = parse_persona_output(raw_output)
+            output = normalize_persona_output(parse_persona_output(raw_output))
             # 身份不靠模型回填：聚合器要 output 里带 persona_id/persona_name，但不同模型
             # 未必按 schema 原样吐回来（MiniMax 就把身份塞进了 persona:{name,archetype}，
             # 顶层没有 persona_id，聚合时 KeyError 整份报告作废）。用我们已知的 persona
