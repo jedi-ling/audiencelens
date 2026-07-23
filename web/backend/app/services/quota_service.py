@@ -168,15 +168,19 @@ def record_usage(
     kind: str = "review",
     persona_count: int = 0,
     cost_usd: float = 0.0,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
     key_source: str = "byok",
 ) -> UsageRecord:
-    """评审结束后调用。无论配额是否开启都记录——这是日后计费的事实源。"""
+    """评审结束后调用。无论配额是否开启都记录——这是日后计费/token 报表的事实源。"""
     row = UsageRecord(
         user_id=user_id,
         review_id=review_id,
         kind=kind,
         persona_count=persona_count,
         cost_usd=float(cost_usd or 0.0),
+        input_tokens=int(input_tokens or 0),
+        output_tokens=int(output_tokens or 0),
         key_source=key_source,
     )
     db.add(row)

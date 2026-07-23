@@ -107,6 +107,14 @@ export function ReviewsPanel() {
               <span>{r.user_id}</span>
               <span>·</span>
               <span>{r.task_type}</span>
+              {r.tokens_total > 0 && (
+                <>
+                  <span>·</span>
+                  <span title={`输入 ${r.input_tokens.toLocaleString('en-US')} · 输出 ${r.output_tokens.toLocaleString('en-US')}`}>
+                    {r.tokens_total.toLocaleString('en-US')} tok
+                  </span>
+                </>
+              )}
             </div>
             {r.error_message && <div className="mt-1 truncate text-severity-critical">{r.error_message}</div>}
           </li>
@@ -151,6 +159,14 @@ export function ReviewsPanel() {
           <DetailField label="人格包" value={selected.persona_pack ?? '—'} />
           <DetailField label="用户" value={selected.user_id ?? '—'} />
           <DetailField label="成本" value={`$${selected.total_cost_usd.toFixed(4)}`} />
+          <DetailField
+            label="Token 用量"
+            value={
+              selected.tokens_total > 0
+                ? `${selected.tokens_total.toLocaleString('en-US')}（输入 ${selected.input_tokens.toLocaleString('en-US')} · 输出 ${selected.output_tokens.toLocaleString('en-US')}）`
+                : '—'
+            }
+          />
           <DetailField label="创建时间" value={selected.created_at ? new Date(selected.created_at).toLocaleString() : '—'} />
           <DetailField label="完成时间" value={selected.completed_at ? new Date(selected.completed_at).toLocaleString() : '—'} />
           {selected.error_message && <DetailField label="错误信息" value={<span className="text-severity-critical">{selected.error_message}</span>} />}

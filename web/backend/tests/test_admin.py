@@ -327,7 +327,8 @@ class TestTimeseries:
         assert body["days"] == 7
         assert len(body["series"]) == 8  # 含今天，共 days+1 个点
         assert set(body["series"][0].keys()) == {
-            "date", "reviews_total", "reviews_completed", "reviews_failed", "cost_usd"
+            "date", "reviews_total", "reviews_completed", "reviews_failed", "cost_usd",
+            "input_tokens", "output_tokens", "tokens_total",
         }
 
     def test_reflects_new_review(self, client, monkeypatch, db):

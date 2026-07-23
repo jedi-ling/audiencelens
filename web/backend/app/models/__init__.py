@@ -62,6 +62,9 @@ class Review(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     completed_at = Column(DateTime, nullable=True)
     total_cost_usd = Column(Float, default=0.0, nullable=False)
+    # 本次评审真实消耗的 token（各人格 + 交叉质证的 input/output 之和）
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
     report_json = Column(JSON, nullable=True)
     report_markdown = Column(Text, nullable=True)
     calibration = Column(JSON, nullable=True)
@@ -84,6 +87,9 @@ class PersonaOutput(Base):
     output_json = Column(JSON, nullable=True)
     validation_result = Column(JSON, nullable=True)
     cost_usd = Column(Float, default=0.0, nullable=False)
+    # 该人格本次评审的真实 token 消耗（v1 引擎逐人格记；v2 只汇总到 Review 级）
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
@@ -208,6 +214,9 @@ class UsageRecord(Base):
     kind = Column(String, default="review", nullable=False)  # review | intent | evaluation
     persona_count = Column(Integer, default=0, nullable=False)
     cost_usd = Column(Float, default=0.0, nullable=False)
+    # token 计量事实源：按 user_id + 时间窗聚合即得后台的 token 用量报表
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
     key_source = Column(String, default="byok", nullable=False)  # byok | server —— 谁付的钱
     created_at = Column(DateTime, index=True, default=lambda: datetime.now(timezone.utc), nullable=False)
 

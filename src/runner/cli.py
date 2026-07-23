@@ -159,6 +159,9 @@ def run_single_persona(
                 "prompt": prompt,
                 "model": model,
                 "cost": cost,
+                # 真实 token 计数（来自各 provider 的 usage 字段），供上层汇总/落库
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
                 "error": None,
             }
         except Exception as e:
@@ -168,6 +171,8 @@ def run_single_persona(
                 "prompt": prompt,
                 "model": model,
                 "cost": 0.0,
+                "input_tokens": 0,
+                "output_tokens": 0,
                 "error": str(e),
             }
     else:
@@ -178,6 +183,8 @@ def run_single_persona(
             "prompt": prompt,
             "model": model,
             "cost": 0.0,
+            "input_tokens": 0,
+            "output_tokens": 0,
             "error": None,
         }
 
@@ -389,6 +396,8 @@ def run_panel(
     del report["_persona_outputs"]
 
     total_cost = sum(r["cost"] for r in persona_results)
+    total_input_tokens = sum(r.get("input_tokens", 0) for r in persona_results)
+    total_output_tokens = sum(r.get("output_tokens", 0) for r in persona_results)
 
     return {
         "report": report,
@@ -400,6 +409,8 @@ def run_panel(
             "total_cost": total_cost,
             "persona_count": len(persona_results),
             "skipped_count": skipped_count,
+            "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens,
         },
     }
 

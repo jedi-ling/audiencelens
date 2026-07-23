@@ -95,6 +95,24 @@ def _legacy_migrations() -> None:
         patches.append("ALTER TABLE reviews ADD COLUMN project_key VARCHAR")
     if "enable_evaluation" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN enable_evaluation BOOLEAN DEFAULT 0 NOT NULL")
+    if "input_tokens" not in columns:
+        patches.append("ALTER TABLE reviews ADD COLUMN input_tokens INTEGER DEFAULT 0 NOT NULL")
+    if "output_tokens" not in columns:
+        patches.append("ALTER TABLE reviews ADD COLUMN output_tokens INTEGER DEFAULT 0 NOT NULL")
+
+    if "persona_outputs" in inspector.get_table_names():
+        po_columns = {c["name"] for c in inspector.get_columns("persona_outputs")}
+        if "input_tokens" not in po_columns:
+            patches.append("ALTER TABLE persona_outputs ADD COLUMN input_tokens INTEGER DEFAULT 0 NOT NULL")
+        if "output_tokens" not in po_columns:
+            patches.append("ALTER TABLE persona_outputs ADD COLUMN output_tokens INTEGER DEFAULT 0 NOT NULL")
+
+    if "usage_records" in inspector.get_table_names():
+        ur_columns = {c["name"] for c in inspector.get_columns("usage_records")}
+        if "input_tokens" not in ur_columns:
+            patches.append("ALTER TABLE usage_records ADD COLUMN input_tokens INTEGER DEFAULT 0 NOT NULL")
+        if "output_tokens" not in ur_columns:
+            patches.append("ALTER TABLE usage_records ADD COLUMN output_tokens INTEGER DEFAULT 0 NOT NULL")
 
     if "user_api_keys" in inspector.get_table_names():
         key_columns = {c["name"] for c in inspector.get_columns("user_api_keys")}

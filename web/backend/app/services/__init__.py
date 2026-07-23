@@ -830,6 +830,8 @@ class ReviewService:
 
             persona_outputs_data = []
             total_cost = 0.0
+            total_input_tokens = 0
+            total_output_tokens = 0
 
             for persona, po in persona_output_records:
                 po.status = "running"
@@ -867,8 +869,12 @@ class ReviewService:
                     po.output_json = output
                     po.validation_result = validation
                     po.cost_usd = cost
+                    po.input_tokens = input_tokens
+                    po.output_tokens = output_tokens
                     po.completed_at = datetime.now(timezone.utc)
                     total_cost += cost
+                    total_input_tokens += input_tokens
+                    total_output_tokens += output_tokens
 
                     persona_outputs_data.append(output)
 
@@ -902,13 +908,15 @@ class ReviewService:
                         cross_exam_prompt = render_cross_exam_prompt(
                             controversy_points, persona_outputs_data, CROSS_EXAM_PROMPT_PATH
                         )
-                        ce_raw, _ce_in, _ce_out = chat_completion(
+                        ce_raw, ce_in, ce_out = chat_completion(
                             model=resolved.model or budget_config.get("default_model", "claude-sonnet"),
                             prompt=cross_exam_prompt,
                             api_key=resolved.key,
                             provider=resolved.provider,
                             api_base=resolved.api_base,
                         )
+                        total_input_tokens += ce_in
+                        total_output_tokens += ce_out
                         cross_exam_results = parse_cross_exam_output(ce_raw)
                 except Exception:
                     pass
@@ -945,14 +953,40 @@ class ReviewService:
             review.status = "completed"
             review.completed_at = datetime.now(timezone.utc)
             review.total_cost_usd = total_cost
+            review.input_tokens = total_input_tokens
+            review.output_tokens = total_output_tokens
             review.report_json = report
             review.report_markdown = markdown
             review.calibration = calibration
             self.session.commit()
 
+            # 计量事实源：v1 此前完全没记 usage_records，token 报表看不到 v1 评审。
+            # 补上，让后台 token 聚合覆盖两条链路。失败不拖垮已完成的评审。
+            try:
+                from app.services import quota_service
+
+                quota_service.record_usage(
+                    self.session,
+                    review.user_id or "anonymous",
+                    review_id=review.id,
+                    persona_count=len(persona_output_records),
+                    cost_usd=total_cost,
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    key_source=resolved.source,
+                )
+            except Exception:
+                import logging
+
+                logging.getLogger("audiencelens").warning(
+                    "v1 review %s 记 usage 失败（评审不受影响）", review.id
+                )
+
             self._ws_emit(ws_manager, review.id, "review.completed", {
                 "review_id": review.id,
                 "cost_usd": total_cost,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
                 "report_html_available": report_html is not None,
             })
 

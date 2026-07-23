@@ -159,9 +159,14 @@ def _execute_review(
         review.report_json = report
         review.report_markdown = result.get("markdown") or ""
         review.calibration = result.get("calibration")
-        cost = float((result.get("cost_summary") or {}).get("total_cost", 0.0))
-        persona_count = int((result.get("cost_summary") or {}).get("persona_count", 0))
+        cost_summary = result.get("cost_summary") or {}
+        cost = float(cost_summary.get("total_cost", 0.0))
+        persona_count = int(cost_summary.get("persona_count", 0))
+        input_tokens = int(cost_summary.get("total_input_tokens", 0))
+        output_tokens = int(cost_summary.get("total_output_tokens", 0))
         review.total_cost_usd = cost
+        review.input_tokens = input_tokens
+        review.output_tokens = output_tokens
         review.status = "completed"
         review.completed_at = datetime.now(timezone.utc)
 
@@ -188,6 +193,8 @@ def _execute_review(
             review_id=review.id,
             persona_count=persona_count,
             cost_usd=cost,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             key_source=key_source,
         )
 

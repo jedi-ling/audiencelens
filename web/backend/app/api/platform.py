@@ -528,6 +528,8 @@ async def get_review_v2(
         "created_at": review.created_at.isoformat() if review.created_at else None,
         "completed_at": review.completed_at.isoformat() if review.completed_at else None,
         "total_cost_usd": review.total_cost_usd,
+        "input_tokens": review.input_tokens,
+        "output_tokens": review.output_tokens,
         "report": report,
         "calibration": review.calibration,
     }

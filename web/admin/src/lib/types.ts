@@ -32,6 +32,9 @@ export interface AdminOverview {
   usage_24h: {
     count: number
     cost_usd_total: number
+    input_tokens_total: number
+    output_tokens_total: number
+    tokens_total: number
     cost_usd_by_source: Record<string, number>
   }
   judgments: { total: number; verified: number }
@@ -45,6 +48,9 @@ export interface AdminTimeseriesPoint {
   reviews_completed: number
   reviews_failed: number
   cost_usd: number
+  input_tokens: number
+  output_tokens: number
+  tokens_total: number
 }
 
 export interface AdminTimeseries {
@@ -195,6 +201,9 @@ export interface AdminReviewRow {
   mode: string
   status: string
   total_cost_usd: number
+  input_tokens: number
+  output_tokens: number
+  tokens_total: number
   error_message: string | null
   created_at: string | null
   completed_at: string | null
@@ -248,6 +257,9 @@ export interface AdminUser {
   created_at: string | null
   reviews_total: number
   cost_usd_total: number
+  input_tokens_total: number
+  output_tokens_total: number
+  tokens_total: number
 }
 
 export interface AdminUserList {

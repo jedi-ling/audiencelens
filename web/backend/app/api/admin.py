@@ -47,6 +47,8 @@ async def overview(db: Session = Depends(get_db)):
         db.query(
             func.count(UsageRecord.id),
             func.coalesce(func.sum(UsageRecord.cost_usd), 0.0),
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.output_tokens), 0),
         )
         .filter(UsageRecord.created_at >= since_24h)
         .one()
@@ -74,6 +76,9 @@ async def overview(db: Session = Depends(get_db)):
         "usage_24h": {
             "count": int(usage_24h[0] or 0),
             "cost_usd_total": round(float(usage_24h[1] or 0.0), 4),
+            "input_tokens_total": int(usage_24h[2] or 0),
+            "output_tokens_total": int(usage_24h[3] or 0),
+            "tokens_total": int((usage_24h[2] or 0) + (usage_24h[3] or 0)),
             "cost_usd_by_source": {k: round(float(v), 4) for k, v in usage_by_source.items()},
         },
         "judgments": {"total": total_judgments, "verified": verified_judgments},
@@ -110,18 +115,26 @@ async def timeseries(days: int = 14, db: Session = Depends(get_db)):
         bucket[status] = bucket.get(status, 0) + 1
 
     cost_by_day: dict = {}
-    for created_at, cost in db.query(UsageRecord.created_at, UsageRecord.cost_usd).filter(
-        UsageRecord.created_at >= since
-    ).all():
+    tokens_by_day: dict = {}
+    for created_at, cost, in_tok, out_tok in db.query(
+        UsageRecord.created_at,
+        UsageRecord.cost_usd,
+        UsageRecord.input_tokens,
+        UsageRecord.output_tokens,
+    ).filter(UsageRecord.created_at >= since).all():
         k = bucket_key(created_at)
         if not k:
             continue
         cost_by_day[k] = cost_by_day.get(k, 0.0) + float(cost or 0.0)
+        b = tokens_by_day.setdefault(k, {"in": 0, "out": 0})
+        b["in"] += int(in_tok or 0)
+        b["out"] += int(out_tok or 0)
 
     series = []
     for i in range(days + 1):
         day = (since + timedelta(days=i)).date().isoformat()
         bucket = review_by_day.get(day, {"total": 0})
+        tok = tokens_by_day.get(day, {"in": 0, "out": 0})
         series.append(
             {
                 "date": day,
@@ -129,6 +142,9 @@ async def timeseries(days: int = 14, db: Session = Depends(get_db)):
                 "reviews_completed": bucket.get("completed", 0),
                 "reviews_failed": bucket.get("failed", 0),
                 "cost_usd": round(cost_by_day.get(day, 0.0), 4),
+                "input_tokens": tok["in"],
+                "output_tokens": tok["out"],
+                "tokens_total": tok["in"] + tok["out"],
             }
         )
     return {"days": days, "series": series}
@@ -367,6 +383,17 @@ async def list_users(
             .group_by(UsageRecord.user_id)
             .all()
         )
+        token_totals = {
+            uid: (int(in_tok or 0), int(out_tok or 0))
+            for uid, in_tok, out_tok in db.query(
+                UsageRecord.user_id,
+                func.coalesce(func.sum(UsageRecord.input_tokens), 0),
+                func.coalesce(func.sum(UsageRecord.output_tokens), 0),
+            )
+            .filter(UsageRecord.user_id.in_(user_ids))
+            .group_by(UsageRecord.user_id)
+            .all()
+        }
 
     return {
         "total": total,
@@ -381,6 +408,9 @@ async def list_users(
                 "created_at": u.created_at.isoformat() if u.created_at else None,
                 "reviews_total": int(review_counts.get(u.id, 0)),
                 "cost_usd_total": round(float(cost_totals.get(u.id, 0.0)), 4),
+                "input_tokens_total": token_totals.get(u.id, (0, 0))[0],
+                "output_tokens_total": token_totals.get(u.id, (0, 0))[1],
+                "tokens_total": sum(token_totals.get(u.id, (0, 0))),
             }
             for u in rows
         ],
@@ -574,6 +604,9 @@ def _review_row(r: Review) -> dict:
         "mode": r.mode,
         "status": r.status,
         "total_cost_usd": r.total_cost_usd,
+        "input_tokens": r.input_tokens,
+        "output_tokens": r.output_tokens,
+        "tokens_total": (r.input_tokens or 0) + (r.output_tokens or 0),
         "error_message": r.error_message,
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "completed_at": r.completed_at.isoformat() if r.completed_at else None,

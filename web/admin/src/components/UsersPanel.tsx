@@ -69,6 +69,7 @@ export function UsersPanel() {
               <th className="py-2 pr-3 font-normal">套餐</th>
               <th className="py-2 pr-3 font-normal">评审数</th>
               <th className="py-2 pr-3 font-normal">累计成本</th>
+              <th className="py-2 pr-3 font-normal">累计 Token</th>
               <th className="py-2 pr-3 font-normal">注册时间</th>
               <th className="py-2 font-normal">状态</th>
             </tr>
@@ -76,7 +77,7 @@ export function UsersPanel() {
           <tbody className="divide-y divide-border">
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-text-muted">暂无注册用户</td>
+                <td colSpan={7} className="py-6 text-center text-text-muted">暂无注册用户</td>
               </tr>
             )}
             {users.map((u) => (
@@ -98,6 +99,12 @@ export function UsersPanel() {
                 </td>
                 <td className="py-2 pr-3 tabular-nums text-text-secondary">{u.reviews_total}</td>
                 <td className="py-2 pr-3 tabular-nums text-text-secondary">${u.cost_usd_total.toFixed(4)}</td>
+                <td
+                  className="py-2 pr-3 tabular-nums text-text-secondary"
+                  title={`输入 ${u.input_tokens_total.toLocaleString('en-US')} · 输出 ${u.output_tokens_total.toLocaleString('en-US')}`}
+                >
+                  {u.tokens_total.toLocaleString('en-US')}
+                </td>
                 <td className="py-2 pr-3 text-text-muted">
                   {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                 </td>

@@ -1,5 +1,10 @@
-import { Activity, CircleDollarSign, ClipboardCheck, ListChecks } from 'lucide-react'
+import { Activity, CircleDollarSign, ClipboardCheck, Coins, ListChecks } from 'lucide-react'
 import type { AdminOverview } from '@/lib/types'
+
+/** 大数字千分位化：token 动辄几十万，不加分隔看不清量级。 */
+function fmtInt(n: number): string {
+  return n.toLocaleString('en-US')
+}
 
 /** 概览统计卡：数字 + 图形化的构成展示（分段条/环形进度），不再是纯文字罗列。 */
 export function OverviewCards({ data }: { data: AdminOverview }) {
@@ -9,7 +14,7 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
   const byokCost = bySource['byok'] ?? 0
 
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <StatCard
         icon={<ClipboardCheck className="h-4 w-4" strokeWidth={1.5} />}
         accent="text-neon-green"
@@ -34,6 +39,15 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
         value={`$${data.usage_24h.cost_usd_total.toFixed(4)}`}
       >
         <CostSplit server={serverCost} byok={byokCost} />
+      </StatCard>
+
+      <StatCard
+        icon={<Coins className="h-4 w-4" strokeWidth={1.5} />}
+        accent="text-gold-cream"
+        label="24h Token 用量"
+        value={fmtInt(data.usage_24h.tokens_total)}
+      >
+        <TokenSplit input={data.usage_24h.input_tokens_total} output={data.usage_24h.output_tokens_total} />
       </StatCard>
 
       <StatCard
@@ -153,6 +167,30 @@ function CostSplit({ server, byok }: { server: number; byok: number }) {
         <span className="flex items-center gap-1">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan/70" />
           BYOK ${byok.toFixed(4)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** 输入 vs 输出 token 占比条——输出通常比输入便宜不了，运营看这个判断"钱花在哪头"。 */
+function TokenSplit({ input, output }: { input: number; output: number }) {
+  const total = input + output
+  if (total <= 0) return <p className="font-mono text-[10px] text-text-muted">窗口期内暂无 token</p>
+  return (
+    <div>
+      <div className="flex h-2 overflow-hidden rounded-full bg-bg-secondary">
+        {input > 0 && <div className="bg-gold-cream/70" style={{ flex: input }} title={`输入 ${input.toLocaleString('en-US')}`} />}
+        {output > 0 && <div className="bg-neon-green/70" style={{ flex: output }} title={`输出 ${output.toLocaleString('en-US')}`} />}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 font-mono text-[10px] text-text-muted">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold-cream/70" />
+          输入 {input.toLocaleString('en-US')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-neon-green/70" />
+          输出 {output.toLocaleString('en-US')}
         </span>
       </div>
     </div>
