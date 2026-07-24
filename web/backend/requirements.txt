@@ -9,3 +9,4 @@ websockets
 python-multipart
 pypdf
 python-docx
+cryptography

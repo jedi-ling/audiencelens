@@ -78,11 +78,29 @@ def decode_token(token: str, secret: str) -> dict:
 
 
 # ---------------- 用户 API Key 的可逆封装 ----------------
-# 说明：BYOK 模式下需把用户 key 还原后去调模型，故必须可逆（不能只哈希）。
-# 这里用 HMAC 派生密钥流做 XOR，足以避免"数据库被看一眼就泄露明文"；
-# 生产环境请换 cryptography.fernet —— 只需替换这两个函数，调用方无感。
+# BYOK 模式下需把用户 key 还原后去调模型，故必须可逆（不能只哈希）。
+#
+# v2（当前写入格式）：cryptography.fernet —— AES-128-CBC + HMAC-SHA256 认证加密，
+#   业界标准实现，不再自己搓密码学。密钥用 PBKDF2 从 AL_ENCRYPTION_KEY 派生。
+# v1（只读，兼容存量）：HMAC 派生密钥流 XOR 的自实现封装。它的问题不是"能被直接
+#   解开"，而是自研密码学本身不该出现在生产路径上（分组模式/填充/侧信道都没人审过）。
+#   存量密文继续能读，用户无感；下次保存 key 时自动升级成 v2（见 key_service）。
+#
+# 迁移原则：绝不因为换算法让用户已存的 key 变成解不开的乱码——那等于静默清空所有
+# 人的 BYOK 配置，比不换更糟。
+
+_FERNET_SALT = b"audiencelens-key-encryption-v2"
+
+
+def _fernet(secret: str):
+    from cryptography.fernet import Fernet
+
+    dk = hashlib.pbkdf2_hmac("sha256", secret.encode(), _FERNET_SALT, 100_000)
+    return Fernet(base64.urlsafe_b64encode(dk))
+
 
 def _keystream(secret: str, nonce: bytes, length: int) -> bytes:
+    """仅供解开 v1 存量密文使用，不再用于加密。"""
     out = b""
     counter = 0
     while len(out) < length:
@@ -94,14 +112,11 @@ def _keystream(secret: str, nonce: bytes, length: int) -> bytes:
 
 
 def encrypt_secret(plaintext: str, secret: str) -> str:
-    nonce = os.urandom(12)
-    data = plaintext.encode()
-    ct = bytes(a ^ b for a, b in zip(data, _keystream(secret, nonce, len(data))))
-    tag = hmac.new(secret.encode(), nonce + ct, hashlib.sha256).digest()[:16]
-    return f"v1${_b64u(nonce)}${_b64u(ct)}${_b64u(tag)}"
+    token = _fernet(secret).encrypt(plaintext.encode()).decode()
+    return f"v2${token}"
 
 
-def decrypt_secret(blob: str, secret: str) -> str:
+def _decrypt_v1(blob: str, secret: str) -> str:
     try:
         ver, n_b64, c_b64, t_b64 = blob.split("$")
         if ver != "v1":
@@ -113,6 +128,23 @@ def decrypt_secret(blob: str, secret: str) -> str:
     if not hmac.compare_digest(expected, tag):
         raise ValueError("密文校验失败")
     return bytes(a ^ b for a, b in zip(ct, _keystream(secret, nonce, len(ct)))).decode()
+
+
+def decrypt_secret(blob: str, secret: str) -> str:
+    """按密文自带的版本前缀分派——v1 存量照常能解，不会因为升级算法而失效。"""
+    if blob.startswith("v2$"):
+        from cryptography.fernet import InvalidToken
+
+        try:
+            return _fernet(secret).decrypt(blob[3:].encode()).decode()
+        except InvalidToken:
+            raise ValueError("密文校验失败")
+    return _decrypt_v1(blob, secret)
+
+
+def is_legacy_ciphertext(blob: str) -> bool:
+    """v1 存量密文——调用方可据此在下次写入时顺手升级成 v2。"""
+    return bool(blob) and not blob.startswith("v2$")
 
 
 def mask_key(key: str) -> str:

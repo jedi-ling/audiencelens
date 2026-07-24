@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.errors import LLMKeyMissing
-from app.core.security import decrypt_secret, encrypt_secret, mask_key
+from app.core.security import decrypt_secret, encrypt_secret, is_legacy_ciphertext, mask_key
 from app.models import UserApiKey
 from app.services import admin_settings_service
 
@@ -162,11 +162,18 @@ def resolve_key(db: Session, user_id: str, provider: str = "anthropic") -> Resol
             except ValueError:
                 continue
             if user_key:
+                update_fields = {"last_used_at": datetime.now(timezone.utc)}
+                # 顺手把 v1 存量密文升级成 v2（Fernet）——用户无需重填 key，
+                # 用一次就自动迁移一条，不需要停机批处理。
+                if is_legacy_ciphertext(user_row.key_ciphertext):
+                    update_fields["key_ciphertext"] = encrypt_secret(
+                        user_key, settings.encryption_key
+                    )
                 db.query(UserApiKey).filter(
                     UserApiKey.user_id == user_id,
                     UserApiKey.provider == p,
                     UserApiKey.is_active.is_(True),
-                ).update({"last_used_at": datetime.now(timezone.utc)})
+                ).update(update_fields)
                 db.commit()
                 return ResolvedKey(
                     key=user_key, source="byok", provider=p,
