@@ -109,6 +109,54 @@ async def me(identity: Identity = Depends(optional_identity)):
     return identity.to_dict()
 
 
+# ---------- 数据自主权：导出我的数据 / 删除我的账号 ----------
+# 让"你的东西归你"不只是一句承诺，而是用户能亲手验证的两个按钮。
+
+
+@router.get("/auth/me/export", dependencies=[Depends(rate_limit("data_export", 5, 3600))])
+async def export_my_data(
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """导出我的全部数据（JSON）。密钥只给掩码，不导出明文。"""
+    from app.services import user_data_service
+
+    return user_data_service.export_user_data(db, identity.user_id)
+
+
+class DeleteAccountRequest(BaseModel):
+    # 二次确认：必须原样输入这个词，避免误点就把账号删了
+    confirm: str
+    # 已注册用户还要验密码——光有 token 不够，token 可能是被人捡到的
+    password: Optional[str] = None
+
+
+DELETE_CONFIRM_PHRASE = "删除我的账号"
+
+
+@router.post("/auth/me/delete", dependencies=[Depends(rate_limit("account_delete", 5, 3600))])
+async def delete_my_account(
+    body: DeleteAccountRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """彻底删除我的内容与账号。财务流水改为切断关联的墓碑 id（见 user_data_service）。"""
+    from app.services import user_data_service
+
+    if body.confirm != DELETE_CONFIRM_PHRASE:
+        raise BadRequest(f"请输入「{DELETE_CONFIRM_PHRASE}」以确认此操作")
+
+    if not identity.is_anonymous:
+        user = db.get(User, identity.user_id)
+        if not user:
+            raise NotFound("账号不存在")
+        if not body.password or not verify_password(body.password, user.password_hash):
+            raise Unauthorized("密码不正确")
+
+    stats = user_data_service.delete_user_data(db, identity.user_id)
+    return {"deleted": True, "detail": stats}
+
+
 # ============================== BYOK Key（埋线）==============================
 
 class SaveKeyRequest(BaseModel):

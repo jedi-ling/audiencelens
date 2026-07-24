@@ -105,6 +105,18 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ email, password }) },
     ),
 
+  // ---------------- 数据自主权（导出 / 删号）----------------
+
+  /** 导出我的全部数据（密钥只给掩码，不含明文） */
+  exportMyData: () => request<Record<string, unknown>>('/api/auth/me/export'),
+
+  /** 彻底删除我的内容与账号。confirm 必须是「删除我的账号」；已登录用户还要验密码。 */
+  deleteMyAccount: (confirm: string, password?: string) =>
+    request<{ deleted: boolean; detail: Record<string, number> }>('/api/auth/me/delete', {
+      method: 'POST',
+      body: JSON.stringify({ confirm, password: password || null }),
+    }),
+
   // ---------------- BYOK Key ----------------
 
   getKeys: () => request<KeyStatus>('/api/keys'),

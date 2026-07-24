@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { api, setToken } from '@/lib/apiClient'
+import { useSessionStore } from '@/store/session-store'
 import type { KeyStatus, UsageSummary, TestConnectionResult } from '@/lib/types'
 import { OPENAI_COMPATIBLE_PRESETS } from '@/lib/types'
 import {
@@ -22,6 +23,8 @@ import {
   BarChart3,
   ImagePlus,
   Ticket,
+  Download,
+  AlertTriangle,
 } from 'lucide-react'
 
 type Provider = 'anthropic' | 'openai_compatible'
@@ -88,6 +91,55 @@ export default function SettingsPage() {
   const [cdkBusy, setCdkBusy] = useState(false)
   const [cdkError, setCdkError] = useState<string | null>(null)
   const [cdkSuccess, setCdkSuccess] = useState<{ granted: number; balance: number; guest: boolean } | null>(null)
+
+  // ---------------- 数据自主权：导出 / 删号 ----------------
+  const { identity, logout } = useSessionStore()
+  const [exporting, setExporting] = useState(false)
+  const [dataError, setDataError] = useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteDone, setDeleteDone] = useState<Record<string, number> | null>(null)
+
+
+  /** 导出：直接在浏览器里生成文件下载，不经过服务端存一份中间产物——
+   *  少一个副本就少一处泄露面，也免得又攒出一堆没人清理的死文件。 */
+  const handleExport = async () => {
+    setExporting(true)
+    setDataError(null)
+    try {
+      const data = await api.exportMyData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audiencelens-my-data-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : '导出失败')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    setDataError(null)
+    try {
+      const res = await api.deleteMyAccount(deleteConfirm, deletePassword || undefined)
+      setDeleteDone(res.detail)
+      setDeleteOpen(false)
+      // 账号已经没了，本地登录态留着只会让后续请求一直 401
+      if (!identity?.is_anonymous) logout()
+      await refreshByok()
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const refreshByok = useCallback(async () => {
     // key 状态和用量各自失败互不影响；平台服务没起时整块降级为提示
@@ -563,6 +615,112 @@ export default function SettingsPage() {
                   <p className="mt-1.5 text-xs text-text-muted">配额窗口：{usage.window}</p>
                 </div>
               )}
+            </div>
+          )}
+        </section>
+
+        {/* ---------------- 数据自主权 ----------------
+         * "你的东西归你"不能只写在隐私政策里——给两个用户能亲手按的按钮，
+         * 承诺才变成可验证的事实。 */}
+        <section className="pt-8">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <ShieldCheck className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+            我的数据
+          </h2>
+          <p className="mt-1 text-xs text-text-muted">
+            你上传的材料、评审报告、追问记录都属于你。随时可以带走，也可以彻底删掉。
+          </p>
+
+          {dataError && (
+            <p className="mt-3 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-3 py-2 font-mono text-xs text-severity-critical">
+              {dataError}
+            </p>
+          )}
+
+          {deleteDone && (
+            <div className="mt-3 rounded-md border border-neon-green/30 bg-neon-green/10 px-3 py-2 text-xs text-neon-green">
+              已删除：{deleteDone.reviews_deleted} 条评审、{deleteDone.api_keys_deleted} 个密钥。
+              计费流水已切断与你的关联（保留无主统计，见隐私政策）。
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleExport()}
+              disabled={exporting}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-neon-green/40 disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+              ) : (
+                <Download className="h-4 w-4" strokeWidth={1.5} />
+              )}
+              导出我的全部数据
+            </button>
+
+            <button
+              onClick={() => { setDeleteOpen(true); setDeleteDone(null) }}
+              className="flex items-center gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/5 px-3 py-2 text-sm text-severity-critical transition-colors hover:bg-severity-critical/10"
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+              删除我的账号与数据
+            </button>
+          </div>
+
+          {deleteOpen && (
+            <div className="mt-4 rounded-lg border border-severity-critical/30 bg-severity-critical/5 p-4">
+              <p className="flex items-start gap-2 text-sm text-text-primary">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
+                <span>
+                  这会<strong>立即物理删除</strong>你的全部评审、上传材料、报告、追问记录和已保存的
+                  API 密钥，<strong>不可撤销</strong>。
+                  <br />
+                  计费与兑换流水会保留但切断与你的关联（财务对账所需，此后无法回指到你本人）。
+                  <br />
+                  建议先「导出我的全部数据」留个备份。
+                </span>
+              </p>
+
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-xs text-text-muted">
+                    输入「删除我的账号」以确认
+                  </label>
+                  <input
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder="删除我的账号"
+                    className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-severity-critical/50"
+                  />
+                </div>
+                {!identity?.is_anonymous && (
+                  <div>
+                    <label className="text-xs text-text-muted">账号密码</label>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-severity-critical/50"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => void handleDeleteAccount()}
+                  disabled={deleting || deleteConfirm !== '删除我的账号'}
+                  className="rounded-md bg-severity-critical px-3 py-2 text-sm font-semibold text-bg-primary disabled:opacity-40"
+                >
+                  {deleting ? '删除中…' : '确认永久删除'}
+                </button>
+                <button
+                  onClick={() => { setDeleteOpen(false); setDeleteConfirm(''); setDeletePassword('') }}
+                  className="rounded-md border border-border px-3 py-2 text-sm text-text-secondary"
+                >
+                  取消
+                </button>
+              </div>
             </div>
           )}
         </section>
