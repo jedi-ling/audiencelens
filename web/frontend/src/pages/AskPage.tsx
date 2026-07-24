@@ -62,7 +62,7 @@ const SKILL_LABELS: Record<string, string> = {
 
 type ChatMessageBase =
   | { id: string; role: 'user'; text: string }
-  | { id: string; role: 'assistant'; kind: 'text'; text: string }
+  | { id: string; role: 'assistant'; kind: 'text'; text: string; isGated?: boolean; fullLength?: number }
   | { id: string; role: 'assistant'; kind: 'clarify'; question: string; candidates: string[] }
   | { id: string; role: 'assistant'; kind: 'confirm'; intent: IntentResult }
   | { id: string; role: 'assistant'; kind: 'error'; text: string; needsKey?: boolean }
@@ -290,7 +290,14 @@ export default function AskPage() {
     setBusy(true)
     try {
       const res = await api.sendReviewChat(activeChatContext.reviewId, text, activeChatContext.personaId)
-      appendMessage({ id: nextId(), role: 'assistant', kind: 'text', text: res.reply.content })
+      appendMessage({
+        id: nextId(),
+        role: 'assistant',
+        kind: 'text',
+        text: res.reply.content,
+        isGated: res.reply.is_gated,
+        fullLength: res.reply.full_length ?? undefined,
+      })
     } catch (e) {
       appendMessage({
         id: nextId(),
@@ -536,6 +543,7 @@ export default function AskPage() {
             personaNames={personaNames}
             onConfirm={(intent, personas) => void confirmAndCreate(m.id, intent, personas)}
             onGoSettings={() => navigate('/settings')}
+            onGoLogin={() => navigate('/login')}
             onStartFollowUp={(reviewId, personaId, label) => setActiveChatContext({ reviewId, personaId, label })}
           />
         ))}
@@ -1452,6 +1460,7 @@ function ChatBubble({
   onPickCandidate,
   onConfirm,
   onGoSettings,
+  onGoLogin,
   onStartFollowUp,
 }: {
   message: ChatMessage
@@ -1460,6 +1469,7 @@ function ChatBubble({
   onPickCandidate: (candidate: string) => void
   onConfirm: (intent: IntentResult, personas?: string[]) => void
   onGoSettings: () => void
+  onGoLogin: () => void
   onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
 }) {
   const timeLabel = formatTime(message.ts)
@@ -1490,8 +1500,28 @@ function ChatBubble({
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex max-w-[75%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-2.5 text-sm leading-relaxed text-text-primary">
+          <div
+            className={cn(
+              'rounded-xl rounded-tl-sm border border-l-[3px] px-4 py-2.5 text-sm leading-relaxed text-text-primary',
+              message.isGated
+                ? 'border-warm-orange/30 border-l-warm-orange/50 bg-warm-orange/5'
+                : 'border-border border-l-neon-green/40 bg-bg-secondary',
+            )}
+          >
             {message.text}
+            {message.isGated && (
+              <div className="mt-2 flex items-center gap-2 border-t border-warm-orange/20 pt-2 text-xs text-text-muted">
+                <span>
+                  还有 {Math.max(0, (message.fullLength ?? 0) - message.text.length)} 字被隐藏
+                </span>
+                <button
+                  onClick={onGoLogin}
+                  className="font-medium text-neon-green underline underline-offset-2 hover:text-gold-cream"
+                >
+                  登录看完整回答
+                </button>
+              </div>
+            )}
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>

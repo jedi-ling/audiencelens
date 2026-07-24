@@ -162,3 +162,76 @@ class TestPersonaChat:
             json={"message": "hi", "persona_id": "P99-not-real"},
         )
         assert r.status_code == 400
+
+
+class TestAnonymousChatGating:
+    """匿名用户能追问，但只给回复的体验版——完整内容已存进历史，
+    登录后同一条 thread 直接展示完整版，不需要重新问一遍。"""
+
+    def test_anonymous_reply_is_truncated_with_full_length(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-gate-test")
+
+        long_reply = "这是一段足够长的真实回复内容，" * 10
+        import runner.llm_client
+
+        monkeypatch.setattr(
+            runner.llm_client, "chat_completion", lambda **kw: (long_reply, 10, 5)
+        )
+
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "追问一下"})
+        assert r.status_code == 200
+        reply = r.json()["reply"]
+        assert reply["is_gated"] is True
+        assert len(reply["content"]) < len(long_reply)
+        assert reply["full_length"] == len(long_reply)
+
+    def test_stored_message_keeps_full_content_regardless_of_gating(self, client, db, monkeypatch):
+        """裁剪只发生在返回给这次请求的内容——数据库里存的必须是完整回复，
+        否则用户登录后"看完整"其实还是看不到。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-gate-test2")
+
+        long_reply = "完整未裁剪的真实回复内容，" * 10
+        import runner.llm_client
+
+        monkeypatch.setattr(
+            runner.llm_client, "chat_completion", lambda **kw: (long_reply, 10, 5)
+        )
+        client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "追问一下"})
+
+        from app.models import ReviewChatMessage
+
+        stored = (
+            db.query(ReviewChatMessage)
+            .filter(ReviewChatMessage.review_id == review_id, ReviewChatMessage.role == "assistant")
+            .one()
+        )
+        assert stored.content == long_reply  # 库里是完整内容，不是裁剪后的
+
+    def test_short_reply_not_gated(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-gate-test3")
+
+        import runner.llm_client
+
+        monkeypatch.setattr(runner.llm_client, "chat_completion", lambda **kw: ("短回复", 5, 2))
+
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "问"})
+        reply = r.json()["reply"]
+        assert reply["is_gated"] is False
+        assert reply["content"] == "短回复"
+
+    def test_user_own_question_never_gated(self, client, db, monkeypatch):
+        """裁的是 AI 答了什么，用户自己发的问题原样保留（否则连自己问过什么都看不全）。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-gate-test4")
+
+        long_reply = "很长的回复内容，" * 15
+        import runner.llm_client
+
+        monkeypatch.setattr(runner.llm_client, "chat_completion", lambda **kw: (long_reply, 10, 5))
+
+        long_question = "这是我提出的一个比较长的追问问题内容，" * 5
+        client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": long_question})
+
+        listed = client.get(f"/api/v2/reviews/{review_id}/chat").json()["messages"]
+        user_msg = next(m for m in listed if m["role"] == "user")
+        assert user_msg["content"] == long_question
+        assert user_msg["is_gated"] is False

@@ -541,13 +541,27 @@ class ChatMessageRequest(BaseModel):
     persona_id: Optional[str] = None
 
 
-def _serialize_chat_message(m) -> dict:
+def _serialize_chat_message(m, gate_assistant: bool = False) -> dict:
+    """gate_assistant=True（匿名用户）时裁剪 assistant 回复内容——用户自己发的
+    问题从不裁剪，裁的是"AI/角色答了什么"这半边，逼真实回复价值留在登录后。"""
+    content = m.content
+    is_gated = False
+    full_length: Optional[int] = None
+    if gate_assistant and m.role == "assistant":
+        from app.services import report_gating
+
+        gated = report_gating.gate_chat_reply_for_anonymous(m.content)
+        content = gated["content"]
+        is_gated = gated["is_gated"]
+        full_length = gated["full_length"]
     return {
         "id": m.id,
         "review_id": m.review_id,
         "persona_id": m.persona_id,
         "role": m.role,
-        "content": m.content,
+        "content": content,
+        "is_gated": is_gated,
+        "full_length": full_length,
         "created_at": m.created_at.isoformat() if m.created_at else None,
     }
 
@@ -565,7 +579,11 @@ async def list_review_chat(
     from app.services import chat_service
 
     messages = chat_service.list_messages(db, review_id, persona_id)
-    return {"messages": [_serialize_chat_message(m) for m in messages]}
+    return {
+        "messages": [
+            _serialize_chat_message(m, gate_assistant=identity.is_anonymous) for m in messages
+        ]
+    }
 
 
 @router.post(
@@ -583,8 +601,11 @@ async def post_review_chat(
         raise NotFound("评审不存在")
     from app.services import chat_service
 
+    # 匿名用户能追问，但只给回复的体验版——完整内容已存进历史，登录后
+    # 同一条 thread 直接展示完整版，不需要重问。真对话在同一个对话框里，
+    # 不弹窗不跳转，只是回复本身打了个"登录看完整"的马赛克。
     reply = chat_service.send_message(db, review, body.message, body.persona_id)
-    return {"reply": _serialize_chat_message(reply)}
+    return {"reply": _serialize_chat_message(reply, gate_assistant=identity.is_anonymous)}
 
 
 @router.get("/jobs/{job_id}")

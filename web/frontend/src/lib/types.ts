@@ -159,6 +159,10 @@ export interface ChatMessage {
   persona_id: string | null
   role: 'user' | 'assistant'
   content: string
+  /** 匿名用户追问：assistant 回复被裁成体验版，is_gated=true 时 content 已截断，
+   * full_length 是完整回复的字符数，用来提示"还有多少内容登录才能看"。 */
+  is_gated?: boolean
+  full_length?: number | null
   created_at: string | null
 }
 
