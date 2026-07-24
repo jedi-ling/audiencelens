@@ -125,6 +125,8 @@ def _legacy_migrations() -> None:
         user_columns = {c["name"] for c in inspector.get_columns("users")}
         if "is_guest" not in user_columns:
             patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT 0 NOT NULL")
+        if "email_verified_at" not in user_columns:
+            patches.append("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
 
     if not patches:
         return

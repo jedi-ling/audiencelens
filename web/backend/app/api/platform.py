@@ -12,6 +12,8 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from datetime import datetime, timezone
+
 from app.config import settings
 from app.core.errors import BadRequest, NotFound, Unauthorized
 from app.core.security import create_token, hash_password, verify_password
@@ -83,6 +85,7 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    _send_verify_email(db, user)  # 失败不抛，注册本身不受影响
     token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
     return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
@@ -107,6 +110,117 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/auth/me")
 async def me(identity: Identity = Depends(optional_identity)):
     return identity.to_dict()
+
+
+# ---------- 邮箱验证 / 忘记密码 ----------
+# 未验证邮箱不挡住上手（注册即可用），但要给用户机会确认邮箱是真的——
+# 否则填错邮箱自己不知道，等到要找回密码时才发现联系不上，为时已晚。
+
+
+def _send_verify_email(db: Session, user: User) -> None:
+    from app.services import auth_token_service, mail_service
+
+    raw = auth_token_service.issue(
+        db, user.id, auth_token_service.PURPOSE_VERIFY_EMAIL, settings.email_token_ttl_seconds
+    )
+    link = f"{settings.public_web_url}/verify-email?token={raw}"
+    mail_service.send_mail(
+        user.email,
+        "验证你的 AudienceLens 邮箱",
+        f"点击链接完成邮箱验证（{settings.email_token_ttl_seconds // 3600} 小时内有效）：\n{link}\n\n"
+        "如果不是你本人操作，忽略这封邮件即可。",
+    )
+
+
+@router.post("/auth/verify-email/send", dependencies=[Depends(rate_limit("auth_mail", 5, 3600))])
+async def send_verify_email(
+    identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
+):
+    _require_auth_enabled()
+    if identity.is_anonymous:
+        raise Unauthorized("请先登录")
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+    if user.email_verified_at:
+        return {"sent": False, "detail": "邮箱已验证"}
+    _send_verify_email(db, user)
+    return {"sent": True}
+
+
+class TokenBody(BaseModel):
+    token: str
+
+
+@router.post("/auth/verify-email/confirm")
+async def confirm_verify_email(body: TokenBody, db: Session = Depends(get_db)):
+    _require_auth_enabled()
+    from app.services import auth_token_service
+
+    user_id = auth_token_service.consume(
+        db, body.token, auth_token_service.PURPOSE_VERIFY_EMAIL
+    )
+    if not user_id:
+        raise BadRequest("验证链接无效或已过期，请重新发送")
+    user = db.get(User, user_id)
+    if not user:
+        raise BadRequest("验证链接无效或已过期，请重新发送")
+    user.email_verified_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"verified": True, "email": user.email}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@router.post("/auth/password/forgot", dependencies=[Depends(rate_limit("auth_mail", 5, 3600))])
+async def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """无论邮箱是否注册过都返回同样的成功响应——否则这个接口就成了
+    "这个邮箱有没有注册"的枚举器（与注册接口同一套防枚举口径）。"""
+    _require_auth_enabled()
+    from app.services import auth_token_service, mail_service
+
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user and user.is_active:
+        raw = auth_token_service.issue(
+            db, user.id, auth_token_service.PURPOSE_RESET_PASSWORD,
+            settings.reset_token_ttl_seconds,
+        )
+        link = f"{settings.public_web_url}/reset-password?token={raw}"
+        mail_service.send_mail(
+            user.email,
+            "重置你的 AudienceLens 密码",
+            f"点击链接重置密码（{settings.reset_token_ttl_seconds // 60} 分钟内有效，只能用一次）：\n{link}\n\n"
+            "如果不是你本人操作，忽略这封邮件即可，你的密码不会有任何变化。",
+        )
+    return {"sent": True, "detail": "如果该邮箱已注册，重置链接已发送"}
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
+@router.post("/auth/password/reset")
+async def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    _require_auth_enabled()
+    from app.services import auth_token_service
+
+    user_id = auth_token_service.consume(
+        db, body.token, auth_token_service.PURPOSE_RESET_PASSWORD
+    )
+    if not user_id:
+        raise BadRequest("重置链接无效或已过期，请重新申请")
+    user = db.get(User, user_id)
+    if not user:
+        raise BadRequest("重置链接无效或已过期，请重新申请")
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    # 不自动登录：重置成功后让用户用新密码走一次正常登录，
+    # 免得链接被中途截获的人直接拿到会话。
+    return {"reset": True}
 
 
 # ---------- 数据自主权：导出我的数据 / 删除我的账号 ----------

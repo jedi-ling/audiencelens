@@ -62,6 +62,15 @@ export default function LoginPage() {
           placeholder="········"
         />
 
+        <div className="mt-2 text-right">
+          <Link
+            to="/forgot-password"
+            className="text-xs text-text-muted underline underline-offset-2 hover:text-neon-green"
+          >
+            忘记密码？
+          </Link>
+        </div>
+
         {error && <p className="mt-3 text-sm text-severity-critical">{error}</p>}
 
         <button

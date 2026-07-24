@@ -174,9 +174,31 @@ class User(Base):
     # 游客身份：CDK 免登录兑换时自动签发（合成邮箱 + 不可登录的随机口令）。
     # 是真实 User 行——配额/key/评审归属全部复用既有逻辑，只是没有可登录的凭据。
     is_guest = Column(Boolean, default=False, nullable=False)
+    # 邮箱是否已验证。注册即可用（不挡住上手），但未验证的账号会被提示去验证——
+    # 否则用户填错邮箱自己不知道，等到要找回密码时才发现联系不上，为时已晚。
+    email_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     api_keys = relationship("UserApiKey", back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthToken(Base):
+    """邮箱验证 / 密码重置的一次性令牌。
+
+    只存令牌的 SHA-256 摘要，不存原文——库被看一眼也无法拿它去重置别人的
+    密码（与口令哈希同一个道理：能验证，但反推不出来）。
+    """
+
+    __tablename__ = "auth_tokens"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
+    # verify_email | reset_password
+    purpose = Column(String, index=True, nullable=False)
+    token_hash = Column(String, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)  # 用过就作废，防重放
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class UserApiKey(Base):

@@ -99,6 +99,19 @@ class Settings:
         # 单次评审内部的人格并发度（透传给 runner.run_panel）
         self.review_concurrency: int = _int("AUDIENCELENS_MAX_CONCURRENCY", 6)
 
+        # ---- 邮件（埋线：默认 console，不真发信也能跑通验证/找回链路）----
+        self.mail_backend: str = os.environ.get("AL_MAIL_BACKEND", "console").lower()
+        self.mail_from: str = os.environ.get("AL_MAIL_FROM", "AudienceLens <noreply@localhost>")
+        self.smtp_host: str = os.environ.get("AL_SMTP_HOST", "")
+        self.smtp_port: int = _int("AL_SMTP_PORT", 587)
+        self.smtp_user: str = os.environ.get("AL_SMTP_USER", "")
+        self.smtp_password: str = os.environ.get("AL_SMTP_PASSWORD", "")
+        self.smtp_use_ssl: bool = _bool("AL_SMTP_USE_SSL", False)
+        # 邮件里链接的落点（前端地址）——本地开发默认 vite 端口
+        self.public_web_url: str = os.environ.get("AL_PUBLIC_WEB_URL", "http://localhost:5199")
+        self.email_token_ttl_seconds: int = _int("AL_EMAIL_TOKEN_TTL_SECONDS", 24 * 3600)
+        self.reset_token_ttl_seconds: int = _int("AL_RESET_TOKEN_TTL_SECONDS", 3600)
+
         # ---- 上传 ----
         self.upload_dir: str = os.environ.get(
             "AL_UPLOAD_DIR", os.path.join(self.backend_dir, "data", "uploads")

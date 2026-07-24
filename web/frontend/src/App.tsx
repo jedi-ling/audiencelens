@@ -11,6 +11,9 @@ const TaskTypesPage = lazy(() => import('@/pages/TaskTypesPage'))
 const TutorialPage = lazy(() => import('@/pages/TutorialPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'))
+const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
+const VerifyEmailPage = lazy(() => import('@/pages/VerifyEmailPage'))
 const SkillSelectPage = lazy(() => import('@/pages/SkillSelectPage'))
 const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
@@ -69,6 +72,9 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/skills" element={<SkillSelectPage />} />
             <Route path="/evaluations/:id" element={<EvaluationPage />} />

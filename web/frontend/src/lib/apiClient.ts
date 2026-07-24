@@ -105,6 +105,31 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ email, password }) },
     ),
 
+  // ---------------- 邮箱验证 / 忘记密码 ----------------
+
+  /** 给当前登录用户重新发一封验证邮件 */
+  sendVerifyEmail: () =>
+    request<{ sent: boolean; detail?: string }>('/api/auth/verify-email/send', { method: 'POST' }),
+
+  confirmVerifyEmail: (token: string) =>
+    request<{ verified: boolean; email: string }>('/api/auth/verify-email/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
+  /** 申请密码重置链接。注册过与否都返回相同响应（后端防邮箱枚举）。 */
+  forgotPassword: (email: string) =>
+    request<{ sent: boolean; detail: string }>('/api/auth/password/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    request<{ reset: boolean }>('/api/auth/password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
+    }),
+
   // ---------------- 数据自主权（导出 / 删号）----------------
 
   /** 导出我的全部数据（密钥只给掩码，不含明文） */
