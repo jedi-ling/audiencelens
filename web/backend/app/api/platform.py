@@ -539,6 +539,8 @@ class ChatMessageRequest(BaseModel):
     message: str
     # None = 跟评审团整体聊（追问报告结论）；给定人格 id = 跟该人格保持人设聊
     persona_id: Optional[str] = None
+    # 随消息附带的截图（data URI 列表）——支持视觉的模型直接"看"，其余静默降级纯文字
+    images: Optional[List[str]] = None
 
 
 def _serialize_chat_message(m, gate_assistant: bool = False) -> dict:
@@ -604,7 +606,7 @@ async def post_review_chat(
     # 匿名用户能追问，但只给回复的体验版——完整内容已存进历史，登录后
     # 同一条 thread 直接展示完整版，不需要重问。真对话在同一个对话框里，
     # 不弹窗不跳转，只是回复本身打了个"登录看完整"的马赛克。
-    reply = chat_service.send_message(db, review, body.message, body.persona_id)
+    reply = chat_service.send_message(db, review, body.message, body.persona_id, images=body.images)
     return {"reply": _serialize_chat_message(reply, gate_assistant=identity.is_anonymous)}
 
 

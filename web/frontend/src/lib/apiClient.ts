@@ -178,11 +178,16 @@ export const api = {
       body: JSON.stringify({ mode: 'standard', persona_pack: 'game-core', ...params }),
     }),
 
-  /** 报告出来后追问——不传 personaId 是跟评审团整体聊，传了是跟该人格保持人设聊 */
-  sendReviewChat: (reviewId: string, message: string, personaId?: string | null) =>
+  /** 报告出来后追问——不传 personaId 是跟评审团整体聊，传了是跟该人格保持人设聊。
+   * images：随消息附带的截图 data URI（支持视觉的模型直接"看"，其余降级纯文字）。 */
+  sendReviewChat: (reviewId: string, message: string, personaId?: string | null, images?: string[]) =>
     request<{ reply: ChatMessage }>(`/api/v2/reviews/${reviewId}/chat`, {
       method: 'POST',
-      body: JSON.stringify({ message, persona_id: personaId ?? null }),
+      body: JSON.stringify({
+        message,
+        persona_id: personaId ?? null,
+        images: images && images.length ? images : null,
+      }),
     }),
 
   getReviewChat: (reviewId: string, personaId?: string | null) =>

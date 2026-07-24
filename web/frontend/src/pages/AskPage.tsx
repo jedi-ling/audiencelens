@@ -286,10 +286,25 @@ export default function AskPage() {
   const sendFollowUp = async (text: string) => {
     if (!activeChatContext) return
     setInput('')
-    appendMessage({ id: nextId(), role: 'user', text })
+    // 附件栏里的截图随追问一起发出去——此前这条链路只发文字，图片被静默
+    // 丢弃（附件还挂在栏里，用户以为发出去了）。发送成功与否都先清空附件栏，
+    // 跟"开新评审"链路的行为一致：一条消息带一批图，不粘到下一条。
+    const imagePayload = attachments.map((a) => a.image_data)
+    const imageCount = attachments.length
+    setAttachments([])
+    appendMessage({
+      id: nextId(),
+      role: 'user',
+      text: imageCount > 0 ? `${text}（附图×${imageCount}）` : text,
+    })
     setBusy(true)
     try {
-      const res = await api.sendReviewChat(activeChatContext.reviewId, text, activeChatContext.personaId)
+      const res = await api.sendReviewChat(
+        activeChatContext.reviewId,
+        text,
+        activeChatContext.personaId,
+        imagePayload,
+      )
       appendMessage({
         id: nextId(),
         role: 'assistant',
@@ -889,7 +904,7 @@ export default function AskPage() {
       {attachments.length > 0 && (
         <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted shrink-0">
           <ImageIcon className="h-3 w-3" strokeWidth={1.5} />
-          {attachments.length} 张图片将随评审一起发送给支持视觉的模型
+          {attachments.length} 张图片将随{activeChatContext ? '追问' : '评审'}一起发送给支持视觉的模型
         </p>
       )}
 

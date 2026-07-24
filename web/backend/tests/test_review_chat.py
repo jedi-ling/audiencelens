@@ -235,3 +235,84 @@ class TestAnonymousChatGating:
         user_msg = next(m for m in listed if m["role"] == "user")
         assert user_msg["content"] == long_question
         assert user_msg["is_gated"] is False
+
+
+class TestChatWithImages:
+    """追问带图链路：此前 chat 接口只收文字，前端附件栏里的截图被静默丢弃。
+    现在 images（data URI）拼成多模态内容块进 chat_completion，历史里存
+    [附图×N] 标记（不存原图，data URI 太大）。"""
+
+    _PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
+
+    def test_images_reach_chat_completion_as_content_blocks(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-img-test")
+
+        captured = []
+        import runner.llm_client
+
+        monkeypatch.setattr(
+            runner.llm_client, "chat_completion",
+            lambda **kw: (captured.append(kw["prompt"]), ("看到了", 10, 5))[1],
+        )
+
+        r = client.post(
+            f"/api/v2/reviews/{review_id}/chat",
+            json={"message": "怎么说这个", "images": [self._PNG]},
+        )
+        assert r.status_code == 200
+        prompt = captured[0]
+        # 带图时 prompt 是内容块列表：文字块 + 图片块
+        assert isinstance(prompt, list)
+        assert prompt[0]["type"] == "text"
+        assert prompt[1] == {"type": "image_url", "image_url": {"url": self._PNG}}
+
+    def test_stored_user_message_marks_image_count(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-img-test2")
+
+        import runner.llm_client
+
+        monkeypatch.setattr(runner.llm_client, "chat_completion", lambda **kw: ("好", 5, 2))
+        client.post(
+            f"/api/v2/reviews/{review_id}/chat",
+            json={"message": "看图", "images": [self._PNG, self._PNG]},
+        )
+
+        from app.models import ReviewChatMessage
+
+        stored = (
+            db.query(ReviewChatMessage)
+            .filter(ReviewChatMessage.review_id == review_id, ReviewChatMessage.role == "user")
+            .one()
+        )
+        assert stored.content == "[附图×2] 看图"
+
+    def test_no_images_keeps_plain_string_prompt(self, client, db, monkeypatch):
+        # 不带图时 prompt 保持纯字符串——不要为了统一把所有请求都变成内容块
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-img-test3")
+
+        captured = []
+        import runner.llm_client
+
+        monkeypatch.setattr(
+            runner.llm_client, "chat_completion",
+            lambda **kw: (captured.append(kw["prompt"]), ("好", 5, 2))[1],
+        )
+        client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "纯文字"})
+        assert isinstance(captured[0], str)
+
+    def test_non_image_uris_filtered_out(self, client, db, monkeypatch):
+        # 只认 data:image/*——javascript:/http:/文本一律丢弃（不给注入面）
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-img-test4")
+
+        captured = []
+        import runner.llm_client
+
+        monkeypatch.setattr(
+            runner.llm_client, "chat_completion",
+            lambda **kw: (captured.append(kw["prompt"]), ("好", 5, 2))[1],
+        )
+        client.post(
+            f"/api/v2/reviews/{review_id}/chat",
+            json={"message": "混入脏数据", "images": ["javascript:alert(1)", "http://evil/x.png"]},
+        )
+        assert isinstance(captured[0], str)  # 全被过滤 → 退回纯文字

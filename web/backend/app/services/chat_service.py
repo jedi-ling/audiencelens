@@ -100,7 +100,20 @@ def _build_prompt(
     return system + "\n\n对话记录：\n" + "\n".join(turns)
 
 
-def send_message(db: Session, review: Review, message: str, persona_id: Optional[str] = None) -> ReviewChatMessage:
+MAX_CHAT_IMAGES = 4  # 追问单条消息最多带几张图（data URI 全量进 prompt，防打爆）
+
+
+def send_message(
+    db: Session,
+    review: Review,
+    message: str,
+    persona_id: Optional[str] = None,
+    images: Optional[List[str]] = None,
+) -> ReviewChatMessage:
+    """images：data URI 列表（data:image/png;base64,...）。此前追问链路只收文字，
+    前端附件栏里的截图被静默丢弃——用户以为"随消息发出去了"其实根本没有。
+    现在拼成多模态内容块交给 chat_completion（llm_client 会按 provider 转换格式；
+    模型不支持视觉时静默降级为纯文字，不报错阻断追问）。"""
     if review.status != "completed":
         raise BadRequest("评审尚未完成，还不能追问")
     if not message or not message.strip():
@@ -108,6 +121,8 @@ def send_message(db: Session, review: Review, message: str, persona_id: Optional
 
     from app.services import key_service
     from runner.llm_client import chat_completion
+
+    images = [u for u in (images or []) if u and u.startswith("data:image/")][:MAX_CHAT_IMAGES]
 
     persona = _find_persona(review, persona_id) if persona_id else None
     if persona_id and persona is None:
@@ -121,12 +136,23 @@ def send_message(db: Session, review: Review, message: str, persona_id: Optional
         .all()
     )
 
-    user_msg = ReviewChatMessage(review_id=review.id, persona_id=persona_id, role="user", content=message)
+    # 历史记录里图片不存原图（data URI 动辄几 MB），只留标记——模型第一轮
+    # 已经"看过"并把理解写进回复，后续轮次靠文字上下文接得上。
+    stored_content = (f"[附图×{len(images)}] " if images else "") + message
+    user_msg = ReviewChatMessage(
+        review_id=review.id, persona_id=persona_id, role="user", content=stored_content
+    )
     db.add(user_msg)
     db.commit()
 
     resolved = key_service.resolve_key(db, review.user_id or "anonymous")
     prompt = _build_prompt(review, history, message, persona, persona_note)
+    if images:
+        # OpenAI Vision 内容块格式——runner.llm_client.chat_completion 原生支持，
+        # 并对不支持视觉的模型自动降级为纯文字（丢图不丢消息）
+        prompt = [{"type": "text", "text": prompt}] + [
+            {"type": "image_url", "image_url": {"url": u}} for u in images
+        ]
     reply_text, _in_tok, _out_tok = chat_completion(
         model=resolved.model or settings.intent_model,
         prompt=prompt,
