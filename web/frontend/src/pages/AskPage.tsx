@@ -17,7 +17,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, ApiError } from '@/lib/apiClient'
-import { fetchReviews, deleteReview, fetchPersonas } from '@/lib/api'
+import { fetchReviews, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
 import { connectReviewSocket } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
@@ -215,6 +215,9 @@ export default function AskPage() {
     setPinnedSkill(null)
     setPinnedTaskType(null)
     setPinnedProject(null)
+    setActiveChatContext(null)
+    searchParams.delete('review')
+    setSearchParams(searchParams, { replace: true })
   }
 
   /** 点历史侧栏一条评审——不跳走、不弹窗，而是把这条评审"当年"对应的对话
@@ -240,6 +243,48 @@ export default function AskPage() {
       { id: nextId(), role: 'user', text: userText, ts: Date.now() },
       { id: nextId(), role: 'assistant', kind: 'review', reviewId: r.id, ts: Date.now() },
     ])
+    setSearchParams({ review: r.id }, { replace: true })
+
+    // 追问的问答此前只存了数据库、从没在重新打开对话时重放——用户刷新页面
+    // 或换个对话再回来，明明数据库里还在的追问记录在界面上却像是"从没问过"。
+    // 这里把"跟评审团整体聊"的 thread（persona_id=null）拉回来接在评审卡片后面；
+    // 具体人格的 thread 只有匿名用户看不到 persona_id（体验版报告裁掉了），
+    // 登录用户能拿到真实 persona_id 就一并拉。
+    if (r.status !== 'completed') return
+    const restoreThread = async (personaId: string | null) => {
+      try {
+        const { messages: history } = await api.getReviewChat(r.id, personaId)
+        return history.map((m): ChatMessage => {
+          const ts = m.created_at ? new Date(m.created_at).getTime() : Date.now()
+          if (m.role === 'user') {
+            return { id: nextId(), role: 'user', text: m.content, ts }
+          }
+          return {
+            id: nextId(),
+            role: 'assistant',
+            kind: 'text',
+            text: m.content,
+            isGated: m.is_gated,
+            fullLength: m.full_length ?? undefined,
+            ts,
+          }
+        })
+      } catch {
+        return []
+      }
+    }
+    const report = r.report_json as { persona_notes?: Array<{ persona_id?: string }> } | null
+    const personaIds = (report?.persona_notes ?? [])
+      .map((n) => n.persona_id)
+      .filter((id): id is string => !!id)
+
+    void Promise.all([restoreThread(null), ...personaIds.map((pid) => restoreThread(pid))]).then(
+      (threads) => {
+        const restored = threads.flat().sort((a, b) => a.ts - b.ts)
+        if (restored.length === 0) return
+        setMessages((prev) => [...prev, ...restored])
+      },
+    )
   }
 
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
@@ -267,6 +312,27 @@ export default function AskPage() {
       // 用掉后清掉 query，避免刷新/后退时重复预填
       searchParams.delete('q')
       setSearchParams(searchParams, { replace: true })
+    }
+    // 只在挂载时消费一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 刷新页面（F5）不该把正在聊的对话打回开场白——confirmAndCreate/
+  // openReviewConversation 都会把当前评审 id 写进 URL（?review=xxx），
+  // 挂载时如果 URL 上带着它，就直接照着这个 id 把对话还原回来。
+  useEffect(() => {
+    const reviewId = searchParams.get('review')
+    if (!reviewId) return
+    let cancelled = false
+    void fetchReview(reviewId)
+      .then((r) => {
+        if (!cancelled) openReviewConversation(r)
+      })
+      .catch(() => {
+        // 评审已被删除或不存在——静默回到开场白，不用报错打断使用
+      })
+    return () => {
+      cancelled = true
     }
     // 只在挂载时消费一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -474,6 +540,9 @@ export default function AskPage() {
       appendMessage({ id: nextId(), role: 'assistant', kind: 'review', reviewId: res.review_id })
       setAttachments([])
       void loadHistory() // 新评审马上出现在左侧历史里
+      // URL 带上 review id：纯 React state 的对话在原地刷新页面（F5）会被清空回开场白，
+      // 跟"点历史侧栏能找回来"是两回事——这里让"当前正在聊的这条"也扛得住刷新。
+      setSearchParams({ review: res.review_id }, { replace: true })
     } catch (e) {
       if (e instanceof ApiError && e.needsApiKey) {
         appendMessage({ id: nextId(), role: 'assistant', kind: 'error', text: e.message, needsKey: true })
