@@ -325,15 +325,15 @@ async def upload_file(
     except UnicodeDecodeError:
         raise BadRequest("文件必须是 UTF-8 文本")
 
-    os.makedirs(settings.upload_dir, exist_ok=True)
-    stored_name = f"{uuid.uuid4().hex}{ext}"
-    with open(os.path.join(settings.upload_dir, stored_name), "w", encoding="utf-8") as f:
-        f.write(text)
-
+    # 不再往磁盘写副本：抽取出的 text 直接随响应回给前端，前端把它并进材料
+    # 文本一起提交评审，评审内容最终落在 Review.artifact_bundle 里。此前额外
+    # 存的那份 data/uploads/{uuid}.txt 从写下去那一刻起就没有任何代码读过它
+    # （stored_as 只在类型定义里出现，没有下载/引用入口），纯粹在攒垃圾文件、
+    # 且没有任何清理逻辑——磁盘只增不减。备份脚本也只备份 reviews.db，
+    # 不含这个目录，所以它连"数据资产"都算不上。
     return {
         "filename": file.filename,
         "kind": "text",
-        "stored_as": stored_name,
         "size": len(raw),
         "text": text,
     }

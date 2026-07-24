@@ -1,17 +1,17 @@
 import { create } from 'zustand'
-import type { Review, Example, ReviewModeConfig, TaskTypeDetail, SkillType } from '@/lib/mock-data'
+import type { Review, ReviewListItem, Example, ReviewModeConfig, TaskTypeDetail, SkillType } from '@/lib/mock-data'
 import { fetchReviews, fetchReview, deleteReview, fetchExamples, fetchReviewModes, fetchTaskTypes } from '@/lib/api'
 import { api } from '@/lib/apiClient'
 import type { PersonaPack, ReviewMode, TaskType } from '@/lib/types'
 
 interface ReviewState {
-  reviews: Review[]
+  reviews: ReviewListItem[]
   currentReview: Review | null
   examples: Example[]
   reviewModes: ReviewModeConfig[]
   taskTypes: TaskTypeDetail[]
   loading: boolean
-  setReviews: (reviews: Review[]) => void
+  setReviews: (reviews: ReviewListItem[]) => void
   setCurrentReview: (review: Review | null) => void
   setLoading: (loading: boolean) => void
   initReviews: () => Promise<void>

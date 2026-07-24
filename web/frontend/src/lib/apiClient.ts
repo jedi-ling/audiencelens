@@ -151,7 +151,7 @@ export const api = {
     const fd = new FormData()
     fd.append('file', file)
     return request<
-      | { filename: string; kind: 'text'; stored_as: string; size: number; text: string }
+      | { filename: string; kind: 'text'; size: number; text: string }
       | { filename: string; kind: 'image'; size: number; image_data: string }
     >('/api/uploads', { method: 'POST', body: fd })
   },

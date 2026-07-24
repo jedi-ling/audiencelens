@@ -21,6 +21,7 @@ from app.schemas import (
     ReportResponse,
     ReviewCreate,
     ReviewModeConfig,
+    ReviewListItemResponse,
     ReviewResponse,
     ReviewResult,
     ReviewSession,
@@ -95,13 +96,16 @@ def _check_review_owner(review: Review, identity: Identity) -> None:
         raise HTTPException(status_code=404, detail="Review not found")
 
 
-@router.get("/reviews", response_model=List[ReviewResponse])
+@router.get("/reviews", response_model=List[ReviewListItemResponse])
 def list_reviews(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
     identity: Identity = Depends(optional_identity),
 ):
+    """列表只返回瘦身字段（见 ReviewListItemResponse）——不带 artifact_bundle /
+    report_json / persona_outputs。侧栏只画一行标题，不该为此把每条评审的
+    base64 截图和完整报告全量拖下来。要完整内容请求 GET /api/reviews/{id}。"""
     svc = ReviewService(session)
     return svc.list_reviews(offset=offset, limit=limit, user_id=identity.user_id)
 

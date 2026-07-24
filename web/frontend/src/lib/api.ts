@@ -1,4 +1,4 @@
-import type { Review, Report, Persona, PersonaPack, Preset, WSMessage, Example, ReviewModeConfig, TaskTypeDetail, ReviewResultData, SkillType, SkillDetail, EvaluationScorecard, EthicsReport } from './mock-data'
+import type { Review, ReviewListItem, Report, Persona, PersonaPack, Preset, WSMessage, Example, ReviewModeConfig, TaskTypeDetail, ReviewResultData, SkillType, SkillDetail, EvaluationScorecard, EthicsReport } from './mock-data'
 import { getToken } from './apiClient'
 
 /** v1 链路统一出口：所有请求都带上登录态——
@@ -10,7 +10,7 @@ function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   return fetch(input, { ...init, headers })
 }
 
-export async function fetchReviews(): Promise<Review[]> {
+export async function fetchReviews(): Promise<ReviewListItem[]> {
   const res = await authedFetch('/api/reviews')
   if (!res.ok) throw new Error(`Failed to fetch reviews: ${res.statusText}`)
   return res.json()

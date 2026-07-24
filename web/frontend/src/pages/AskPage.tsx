@@ -22,7 +22,7 @@ import { connectReviewSocket } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
 import type { IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
-import type { Review } from '@/lib/mock-data'
+import type { Review, ReviewListItem } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
 
@@ -165,7 +165,7 @@ export default function AskPage() {
 
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [reviewHistory, setReviewHistory] = useState<Review[] | null>(null)
+  const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -603,7 +603,9 @@ export default function AskPage() {
         error={historyError}
         deletingId={deletingId}
         onNewConversation={startNewConversation}
-        onOpenReview={openReviewConversation}
+        // 列表现在是瘦身数据（没有 artifact_bundle/report_json），还原对话需要
+        // 完整内容——点开时按 id 单独拉一次，跟刷新页面走的是同一条路径。
+        onOpenReview={(r) => void fetchReview(r.id).then(openReviewConversation).catch(() => {})}
         onDelete={handleDeleteHistory}
       />
 
@@ -1041,10 +1043,10 @@ export default function AskPage() {
 
 /** 同 project_key 的评审聚合成一个长期项目组，其余保持原来的扁平列表——
  * history 本身已按 created_at 倒序，分组内 / 分组间顺序天然保留。 */
-function groupHistoryByProject(history: Review[]): { projects: { key: string; items: Review[] }[]; ungrouped: Review[] } {
+function groupHistoryByProject(history: ReviewListItem[]): { projects: { key: string; items: ReviewListItem[] }[]; ungrouped: ReviewListItem[] } {
   const projectOrder: string[] = []
-  const projectMap = new Map<string, Review[]>()
-  const ungrouped: Review[] = []
+  const projectMap = new Map<string, ReviewListItem[]>()
+  const ungrouped: ReviewListItem[] = []
   for (const r of history) {
     if (r.project_key) {
       if (!projectMap.has(r.project_key)) {
@@ -1069,11 +1071,11 @@ function HistorySidebar({
   onDelete,
 }: {
   open: boolean
-  history: Review[] | null
+  history: ReviewListItem[] | null
   error: string | null
   deletingId: string | null
   onNewConversation: () => void
-  onOpenReview: (review: Review) => void
+  onOpenReview: (review: ReviewListItem) => void
   onDelete: (e: React.MouseEvent, id: string) => void
 }) {
   return (
@@ -1112,7 +1114,7 @@ function HistorySidebar({
           ) : (
             (() => {
               const { projects, ungrouped } = groupHistoryByProject(history)
-              const renderItem = (r: Review) => {
+              const renderItem = (r: ReviewListItem) => {
                 const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
                 return (
                   <div

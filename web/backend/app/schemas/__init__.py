@@ -58,6 +58,32 @@ class ReviewResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ReviewListItemResponse(BaseModel):
+    """列表专用的瘦身响应——只有侧栏/历史页真正要显示的字段。
+
+    此前 /api/reviews 直接返回完整 ReviewResponse：每条都带着完整
+    artifact_bundle（内含 base64 图片，一张截图就能有几 MB）、report_json、
+    report_markdown、以及每个人格的完整 output_json。侧栏其实只画一行标题，
+    却要为此下载几十 MB——评审越多、带图越多，历史页只会越来越慢。
+
+    需要完整内容的地方走 GET /api/reviews/{id}（仍返回 ReviewResponse）。
+    """
+
+    id: str
+    task_type: str
+    target_title: Optional[str] = None
+    project_key: Optional[str] = None
+    mode: str = "standard"
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    total_cost_usd: float
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    model_config = {"from_attributes": True}
+
+
 class PersonaSummary(BaseModel):
     id: str
     name: str

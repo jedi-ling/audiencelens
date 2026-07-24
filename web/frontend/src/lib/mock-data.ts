@@ -169,6 +169,24 @@ export interface Review {
   ethics_reports?: EthicsReport[]
 }
 
+/** GET /api/reviews 的列表项——后端返回的是瘦身字段（见后端
+ * ReviewListItemResponse）：不含 artifact_bundle / report_json /
+ * persona_outputs，因为侧栏只画一行标题，不该为此把每条评审的 base64
+ * 截图和完整报告全量拖下来。需要完整内容时按 id 走 fetchReview()。 */
+export interface ReviewListItem {
+  id: string
+  task_type: string
+  target_title: string
+  project_key?: string
+  mode: ReviewMode
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  created_at: string
+  completed_at: string | null
+  total_cost_usd: number
+  input_tokens?: number
+  output_tokens?: number
+}
+
 export interface Example {
   id: string
   title: string

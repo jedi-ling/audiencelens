@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { fetchReviews, deleteReview } from '@/lib/api'
 import { TASK_TYPES } from '@/lib/mock-data'
-import type { Review, ReviewMode } from '@/lib/mock-data'
+import type { Review, ReviewListItem, ReviewMode } from '@/lib/mock-data'
 import {
   History,
   Loader2,
@@ -45,10 +45,10 @@ function taskTypeName(taskType: string): string {
 
 /** 同 project_key 的评审聚合成"长期评审项目"分组（与 /ask 侧栏同一逻辑）；
  * 列表已按 created_at 倒序，分组内/分组间顺序天然保留。 */
-function groupByProject(reviews: Review[]): { projects: { key: string; items: Review[] }[]; ungrouped: Review[] } {
+function groupByProject(reviews: ReviewListItem[]): { projects: { key: string; items: ReviewListItem[] }[]; ungrouped: ReviewListItem[] } {
   const order: string[] = []
-  const map = new Map<string, Review[]>()
-  const ungrouped: Review[] = []
+  const map = new Map<string, ReviewListItem[]>()
+  const ungrouped: ReviewListItem[] = []
   for (const r of reviews) {
     if (r.project_key) {
       if (!map.has(r.project_key)) {
@@ -73,7 +73,7 @@ function formatTime(iso: string): string {
 
 export default function ReviewHistoryPage() {
   const navigate = useNavigate()
-  const [reviews, setReviews] = useState<Review[] | null>(null)
+  const [reviews, setReviews] = useState<ReviewListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -142,7 +142,7 @@ export default function ReviewHistoryPage() {
       ) : (
         (() => {
           const { projects, ungrouped } = groupByProject(reviews)
-          const renderRow = (r: Review) => {
+          const renderRow = (r: ReviewListItem) => {
             const sc = statusConfig[r.status] ?? statusConfig.pending
             const mb = modeBadgeConfig[r.mode] ?? modeBadgeConfig.standard
             const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`

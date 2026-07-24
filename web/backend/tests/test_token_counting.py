@@ -133,3 +133,70 @@ class TestAdminAggregatesTokens:
         row = next(x for x in listing["reviews"] if x["id"] == review_id)
         assert row["tokens_total"] == 6000
         assert row["input_tokens"] == 4200
+
+
+class TestReviewListIsSlim:
+    """列表接口必须是瘦身的——侧栏只画一行标题，不该把每条评审的 base64
+    截图（artifact_bundle）和完整报告全量拖下来。评审越多、带图越多，
+    这个接口的响应体只会越来越大，历史页越来越慢。"""
+
+    def test_list_omits_heavy_fields(self, client, db, monkeypatch):
+        from app.services import key_service
+
+        import runner.cli
+
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: _fake_result_with_tokens())
+        key_service.save_user_key(db, "anonymous", "sk-ant-slim-test")
+
+        big_image = "data:image/png;base64," + ("A" * 5000)
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {
+                    "title": "带图评审",
+                    "materials": [
+                        {"type": "text", "text": "正文"},
+                        {"type": "image", "image_data": big_image},
+                    ],
+                },
+            },
+        )
+        assert r.status_code == 202
+        _poll_job_until_terminal(client, r.json()["job_id"])
+
+        listing = client.get("/api/reviews").json()
+        assert len(listing) >= 1
+        row = listing[0]
+        # 侧栏要用的字段还在
+        assert "id" in row and "task_type" in row and "status" in row
+        # 重字段一个都不该出现
+        for heavy in ("artifact_bundle", "report_json", "report_markdown", "persona_outputs", "calibration"):
+            assert heavy not in row, f"列表不该返回 {heavy}"
+        # 整个列表响应里不该夹带 base64 图片
+        import json as _json
+
+        assert big_image not in _json.dumps(listing)
+
+    def test_detail_still_returns_full_payload(self, client, db, monkeypatch):
+        """瘦身只针对列表——按 id 取详情仍要给完整内容，否则还原对话就断了。"""
+        from app.services import key_service
+
+        import runner.cli
+
+        monkeypatch.setattr(runner.cli, "run_panel", lambda **kw: _fake_result_with_tokens())
+        key_service.save_user_key(db, "anonymous", "sk-ant-slim-test2")
+
+        r = client.post(
+            "/api/v2/reviews",
+            json={
+                "task_type": "concept_review",
+                "artifact": {"title": "t", "materials": [{"type": "text", "text": "正文内容"}]},
+            },
+        )
+        review_id = r.json()["review_id"]
+        _poll_job_until_terminal(client, r.json()["job_id"])
+
+        detail = client.get(f"/api/reviews/{review_id}").json()
+        assert "artifact_bundle" in detail
+        assert "report_json" in detail
