@@ -30,8 +30,12 @@ OPENAI_COMPATIBLE_PRESETS = {
 
 # 已知具备视觉能力的模型——多模态材料只在这些模型上才有意义，其余模型静默丢弃图片块
 # （不报错阻断评审：没有视觉能力的模型至少还能读文字材料）。
+# 核实日期见各前缀后的注释；漏了新模型就是本列表滞后，不是模型真没有视觉能力——
+# 之前漏收 MiniMax-M3（原生多模态，训练第一步就融合文本/图像/视频，2026-07
+# 官方发布确认）就是这类维护滞后，误伤了一个真正支持视觉的模型。
 VISION_CAPABLE_PREFIXES = (
     "claude-", "gpt-4o", "gpt-4-turbo", "gpt-4-vision", "gpt-5", "qwen-vl", "glm-4v", "glm-5",
+    "minimax",  # MiniMax-M3 起原生多模态（大小写不敏感匹配，见 supports_vision）
 )
 
 
@@ -40,7 +44,11 @@ class LLMCallError(Exception):
 
 
 def supports_vision(model: str) -> bool:
-    return any(model.startswith(p) for p in VISION_CAPABLE_PREFIXES)
+    # 各家模型名大小写不统一（"MiniMax-M3" vs 假设的 "minimax-m3"）——
+    # 前缀表统一写小写，比对时把 model 也转小写，别让大小写差异导致
+    # 明明在白名单里的模型被误判成不支持视觉。
+    model_lower = model.lower()
+    return any(model_lower.startswith(p) for p in VISION_CAPABLE_PREFIXES)
 
 
 def _parse_data_uri(url: str) -> Tuple[str, str]:

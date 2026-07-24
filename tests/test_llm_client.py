@@ -34,6 +34,17 @@ class TestSupportsVision:
     def test_deepseek_chat_does_not(self):
         assert supports_vision("deepseek-chat") is False
 
+    def test_minimax_m3_supports_vision(self):
+        # MiniMax-M3 起原生多模态（2026-07 官方发布确认）——此前漏收进
+        # VISION_CAPABLE_PREFIXES，导致带图追问被误判成"模型不支持视觉"
+        # 静默丢图，是本清单维护滞后，不是模型真没有该能力。
+        assert supports_vision("MiniMax-M3") is True
+
+    def test_matching_is_case_insensitive(self):
+        # 各家模型名大小写不统一，前缀匹配不该因为大小写差异漏判
+        assert supports_vision("Claude-Sonnet-4-20250514") is True
+        assert supports_vision("MINIMAX-M3") is True
+
 
 class TestParseDataUri:
     def test_parses_png(self):
