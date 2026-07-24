@@ -61,7 +61,7 @@ const SKILL_LABELS: Record<string, string> = {
 }
 
 type ChatMessageBase =
-  | { id: string; role: 'user'; text: string }
+  | { id: string; role: 'user'; text: string; images?: string[] }
   | { id: string; role: 'assistant'; kind: 'text'; text: string; isGated?: boolean; fullLength?: number }
   | { id: string; role: 'assistant'; kind: 'clarify'; question: string; candidates: string[] }
   | { id: string; role: 'assistant'; kind: 'confirm'; intent: IntentResult }
@@ -137,6 +137,10 @@ export default function AskPage() {
   const [showExamples, setShowExamples] = useState(true) // 首轮后自动收起，随时可再展开
   const [preview, setPreview] = useState<ImageAttachment | null>(null) // 附件放大预览
   const historyRef = useRef<string[]>([]) // 累积的用户发言，作为下一次解析的完整上下文
+  // 累积"这轮对话里发过的所有图"，跨消息保留——用户可能先发一张图被追问，
+  // answer 几句之后才凑齐 confirm 卡片，不能因为中途某条消息"发送"了
+  // 就把图丢了：真正消费图片、清空这个累积区的时机是评审真的建出来那一刻。
+  const sessionImagesRef = useRef<ImageAttachment[]>([])
   const listRef = useRef<HTMLDivElement>(null) // 消息列表容器：滚动只发生在它内部，不能带动 window
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -200,6 +204,7 @@ export default function AskPage() {
 
   const startNewConversation = () => {
     historyRef.current = []
+    sessionImagesRef.current = []
     setAttachments([])
     setInput('')
     setShowExamples(true)
@@ -233,6 +238,7 @@ export default function AskPage() {
       TASK_TYPES.find((t) => t.id === r.task_type)?.name ||
       '（历史评审）'
     historyRef.current = [userText]
+    sessionImagesRef.current = []
     setAttachments([])
     setInput('')
     setShowExamples(false)
@@ -367,7 +373,8 @@ export default function AskPage() {
     appendMessage({
       id: nextId(),
       role: 'user',
-      text: imageCount > 0 && rawText.trim() ? `${text}（附图×${imageCount}）` : text,
+      text,
+      images: imagePayload.length > 0 ? imagePayload : undefined,
     })
     setBusy(true)
     try {
@@ -410,7 +417,18 @@ export default function AskPage() {
     if (!text) return
     setInput('')
     setShowExamples(false) // 开聊后收起示例，给对话让出空间
-    appendMessage({ id: nextId(), role: 'user', text })
+    // 图片跟着这条气泡一起露出来（不再是"发完文字、图还杵在附件栏里"），
+    // 同时并入跨轮次的累积区——用户可能先发图被追问，几句之后才凑出
+    // confirm 卡片，图不能因为这条消息"发送"了就在评审真正建出来之前被丢掉。
+    const imagesForBubble = attachments.map((a) => a.image_data)
+    sessionImagesRef.current = [...sessionImagesRef.current, ...attachments]
+    setAttachments([])
+    appendMessage({
+      id: nextId(),
+      role: 'user',
+      text,
+      images: imagesForBubble.length > 0 ? imagesForBubble : undefined,
+    })
     historyRef.current = [...historyRef.current, text]
     setBusy(true)
     try {
@@ -531,9 +549,13 @@ export default function AskPage() {
     setSubmittingId(msgId)
     try {
       const artifactText = historyRef.current.join('\n')
+      // 图片来源两处：sessionImagesRef 是"之前几轮发送时已经落进气泡"的累积图，
+      // attachments 是"confirm 卡片出来后还没点发送、仍挂在附件栏"的图——
+      // 两处都要带上，否则要么丢掉早前几轮的图，要么丢掉临门一脚才加的图。
+      const allImages = [...sessionImagesRef.current, ...attachments]
       const materials: Material[] = [
         { type: 'text', text: intent.artifact_text || artifactText },
-        ...attachments.map((a) => ({ type: 'image' as const, image_data: a.image_data, filename: a.filename })),
+        ...allImages.map((a) => ({ type: 'image' as const, image_data: a.image_data, filename: a.filename })),
       ]
       const res = await api.createReview({
         task_type: intent.task_type,
@@ -550,6 +572,7 @@ export default function AskPage() {
       // 评审卡片直接嵌进这条对话——不跳走，用户可以边等边继续聊
       appendMessage({ id: nextId(), role: 'assistant', kind: 'review', reviewId: res.review_id })
       setAttachments([])
+      sessionImagesRef.current = []
       void loadHistory() // 新评审马上出现在左侧历史里
       // URL 带上 review id：纯 React state 的对话在原地刷新页面（F5）会被清空回开场白，
       // 跟"点历史侧栏能找回来"是两回事——这里让"当前正在聊的这条"也扛得住刷新。
@@ -1581,9 +1604,26 @@ function ChatBubble({
     return (
       <div className="flex justify-end animate-message-in">
         <div className="flex max-w-[75%] flex-col items-end">
-          <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(212,169,78,0.25)]">
-            {message.text}
-          </div>
+          {/* 图片本身要在气泡里露出来，跟正常聊天记录一样——之前只在文字里
+           * 写一句"（附图×N）"，图片实际内容从没被渲染进对话，用户看不到
+           * 自己发过什么图。 */}
+          {message.images && message.images.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+              {message.images.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt={`附图 ${i + 1}`}
+                  className="h-20 w-20 rounded-lg border border-neon-green/30 object-cover shadow-[0_2px_16px_rgba(212,169,78,0.2)]"
+                />
+              ))}
+            </div>
+          )}
+          {message.text && (
+            <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(212,169,78,0.25)]">
+              {message.text}
+            </div>
+          )}
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
         </div>
       </div>
