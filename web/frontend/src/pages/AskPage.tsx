@@ -349,19 +349,25 @@ export default function AskPage() {
   /** 追问模式下发送：同一个对话框、同一条消息列表，只是路由目标从
    * "意图解析→开新评审"换成"这条评审的 chat 接口"。用户说"就是要在同一个
    * 对话里聊"，所以这里绝不弹窗、绝不跳转，回复直接追加成普通聊天气泡。 */
-  const sendFollowUp = async (text: string) => {
+  const sendFollowUp = async (rawText: string) => {
     if (!activeChatContext) return
+    const imageCount = attachments.length
+    // 只拖了图、一个字没打——发送按钮此前对这种情况是禁用的（判断只看
+    // input.trim()，完全没考虑附件），点了跟没点一样，图片就一直卡在附件栏，
+    // 零提示零反馈。现在只要有图或有字任一项就放行；纯图时补一句占位文字，
+    // 后端 message 不能为空，且这句话也让追问历史看得懂"这轮问的是什么"。
+    const text = rawText.trim() || (imageCount > 0 ? '（仅附图，无文字说明）' : '')
+    if (!text) return
     setInput('')
     // 附件栏里的截图随追问一起发出去——此前这条链路只发文字，图片被静默
     // 丢弃（附件还挂在栏里，用户以为发出去了）。发送成功与否都先清空附件栏，
     // 跟"开新评审"链路的行为一致：一条消息带一批图，不粘到下一条。
     const imagePayload = attachments.map((a) => a.image_data)
-    const imageCount = attachments.length
     setAttachments([])
     appendMessage({
       id: nextId(),
       role: 'user',
-      text: imageCount > 0 ? `${text}（附图×${imageCount}）` : text,
+      text: imageCount > 0 && rawText.trim() ? `${text}（附图×${imageCount}）` : text,
     })
     setBusy(true)
     try {
@@ -392,11 +398,16 @@ export default function AskPage() {
   }
 
   const send = async (raw: string) => {
-    const text = raw.trim()
-    if (!text || busy) return
+    if (busy) return
     if (activeChatContext) {
-      return sendFollowUp(text)
+      return sendFollowUp(raw)
     }
+    // 只拖了截图、一个字没打也要能发——发送按钮此前只看 input.trim()，
+    // 纯图时按钮是禁用的，点了没反应，图片就一直卡在附件栏。这里放开：
+    // 有图没字时用占位文字撑住"这条消息说了什么"，intent 解析拿不到有效
+    // 文字信号大概率会追问，那也是诚实的行为，好过按钮直接摁不动。
+    const text = raw.trim() || (attachments.length > 0 ? '（仅附图，无文字说明）' : '')
+    if (!text) return
     setInput('')
     setShowExamples(false) // 开聊后收起示例，给对话让出空间
     appendMessage({ id: nextId(), role: 'user', text })
@@ -960,7 +971,7 @@ export default function AskPage() {
         <button
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary shadow-[0_0_16px_rgba(212,169,78,0.35)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_0_24px_rgba(212,169,78,0.5)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
-          disabled={busy || !input.trim()}
+          disabled={busy || (!input.trim() && attachments.length === 0)}
           aria-label="发送"
         >
           {busy ? (
