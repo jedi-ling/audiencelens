@@ -29,7 +29,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   // 账户下拉菜单——之前点邮箱按钮就直接退出登录，误触一下就被登出了
   const [accountOpen, setAccountOpen] = useState(false)
-  const { config, identity, bootstrap, logout } = useSessionStore()
+  const { config, identity, bootstrap, logout, sessionExpired, dismissSessionExpired } = useSessionStore()
 
   useEffect(() => {
     void bootstrap()
@@ -286,6 +286,20 @@ export default function Layout() {
               <span>隐私政策</span>
             </Link>
           </nav>
+        </div>
+      )}
+
+      {sessionExpired && (
+        // 过期 token 之前会静默退回匿名——用户只会莫名其妙发现自己"没登录了"，
+        // 不知道发生了什么。这里显式说明，且不挡内容（可关闭）。
+        <div className="flex items-center justify-center gap-3 border-b border-warm-orange/30 bg-warm-orange/10 px-4 py-2 text-sm text-warm-orange">
+          <span>登录已过期，请重新登录</span>
+          <Link to="/login" className="font-medium underline underline-offset-2 hover:text-gold-cream" onClick={dismissSessionExpired}>
+            去登录
+          </Link>
+          <button onClick={dismissSessionExpired} className="ml-1 text-warm-orange/70 hover:text-warm-orange" aria-label="关闭提示">
+            <X className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
         </div>
       )}
 

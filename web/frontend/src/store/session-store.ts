@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand'
-import { api, setToken } from '@/lib/apiClient'
+import { api, getToken, setToken } from '@/lib/apiClient'
 import type { HealthConfig, Identity, KeyStatus, UsageSummary } from '@/lib/types'
 
 interface SessionState {
@@ -18,6 +18,12 @@ interface SessionState {
   usage: UsageSummary | null
   loading: boolean
   error: string | null
+  /** localStorage 里存着 token、但后端把它当无效/过期处理（判定依据：
+   * /auth/me 静默退回匿名身份而不是报错——见 app/deps.py optional_identity）。
+   * 区别于"本来就没登录"，这种情况要提示用户，而不是既不报错也不解释地
+   * 让人以为自己账户突然消失了。 */
+  sessionExpired: boolean
+  dismissSessionExpired: () => void
 
   bootstrap: () => Promise<void>
   refreshKeys: () => Promise<void>
@@ -39,12 +45,21 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   usage: null,
   loading: false,
   error: null,
+  sessionExpired: false,
+  dismissSessionExpired: () => set({ sessionExpired: false }),
 
   bootstrap: async () => {
     set({ loading: true, error: null })
+    // 进来时先记下"本地是否存着一把 token"——如果有，但下面拿到的身份是匿名，
+    // 说明这把 token 被后端拒绝了（过期/失效），而不是用户压根没登录过。
+    const hadToken = !!getToken()
     try {
       const [health, identity] = await Promise.all([api.health(), api.me()])
       set({ config: health.config, identity })
+      if (hadToken && identity.is_anonymous) {
+        setToken(null) // 过期 token 留着没用，还会在后续请求里继续带上
+        set({ sessionExpired: true })
+      }
       // key/用量非关键路径，失败不该阻断启动
       await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
     } catch (e) {
@@ -78,7 +93,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { token } = await api.login(email, password)
     setToken(token)
     const identity = await api.me()
-    set({ identity })
+    set({ identity, sessionExpired: false })
     // key/用量都换了归属，一起刷新（用量失败不阻断登录）
     await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
   },
@@ -87,7 +102,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { token } = await api.register(email, password, displayName)
     setToken(token)
     const identity = await api.me()
-    set({ identity })
+    set({ identity, sessionExpired: false })
     await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
   },
 

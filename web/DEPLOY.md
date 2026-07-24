@@ -21,6 +21,11 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # 3. 冒烟
 curl -s https://你的域名/api/health   # 应返回 JSON 且 env=production
+
+# 4. 装自动备份（这一步之前只是文档里提一句"建议挂 cron"，没人真的装——
+#    数据库单点无备份。跑一次即可，幂等，改 schedule 重跑会覆盖旧的）
+chmod +x deploy/install-backup-cron.sh
+./deploy/install-backup-cron.sh   # 默认每天 04:00；改时间：BACKUP_CRON_SCHEDULE="0 */6 * * *" ./deploy/install-backup-cron.sh
 ```
 
 ## 后台管理面板
@@ -43,8 +48,11 @@ git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -
 # 看日志
 docker compose logs -f backend
 
-# 手动备份（自动备份挂 cron，见 deploy/backup.sh 顶部注释）
+# 手动备份（自动备份由 install-backup-cron.sh 装的 crontab 定时跑）
 ./deploy/backup.sh
+
+# 查看/确认自动备份已装
+crontab -l | grep audiencelens-backup
 ```
 
 ## 关键事实（排障先看这里）
