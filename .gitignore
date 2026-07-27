@@ -80,3 +80,13 @@ htmlcov/
 # Temporary files
 *.tmp
 *.bak
+
+# 数据库备份产物。
+# 上面的 *.db / *.sqlite3 匹配不到 backup.sh 生成的 .db.gz——而 install-backup-cron.sh
+# 装的 cron 每天 04:00 往仓库工作树内的 web/backups/ 写一份新的。服务器上任何一次
+# git add -A 都会把整库（用户邮箱、密码哈希、加密的 BYOK 密钥密文、全部评审原文）
+# 提交进 git 历史，且历史里删不干净。
+backups/
+*.db.gz
+*.sql.gz
+*.dump

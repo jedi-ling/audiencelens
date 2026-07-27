@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import re
 import sys
 import uuid
@@ -494,7 +495,12 @@ class PersonaService:
             selected = panel["selected"]
         except ValueError:
             if personas:
-                import random
+                # random 已在模块顶部 import。此处原本是函数内 import，而下方"人数不足
+                # 补人"分支同样用 random.sample —— Python 的函数级名字绑定会让 random
+                # 在整个函数里都算局部名，于是走不到 except 的正常路径上它从未被赋值，
+                # 补人时直接 UnboundLocalError。触发条件正是"预设选出的人数少于下限"，
+                # 也就是 pitch_review / product_feedback_review / pricing_page_review
+                # 这三个预设人选不在默认 game-core 包里的任务类型——它们此前 100% 失败。
                 selected = random.sample(personas, min(max_count, len(personas)))
             else:
                 selected = []
@@ -912,12 +918,31 @@ class ReviewService:
             # 实际是一个人格都没跑成（key 过期/欠费/模型名写错都会这样）。
             # 这类失败比崩溃危险得多——它伪装成正常结果，用户会据此做决定。
             if not persona_outputs_data:
-                detail = "；".join(f"{name}: {err}" for _pid, name, err in persona_failures[:3])
-                more = f"（另有 {len(persona_failures) - 3} 位同样失败）" if len(persona_failures) > 3 else ""
+                # 两种成因要分清楚，否则报错会把排查引到错误方向：
+                #   A. 有人格入场但全挂了 → key/模型/网络问题
+                #   B. 压根没人入场（面板为空，或证据预检把人全跳过）→ 材料或选人问题
+                if persona_failures:
+                    detail = "；".join(f"{name}: {err}" for _pid, name, err in persona_failures[:3])
+                    more = (
+                        f"（另有 {len(persona_failures) - 3} 位同样失败）"
+                        if len(persona_failures) > 3
+                        else ""
+                    )
+                    raise RuntimeError(
+                        f"全部 {len(persona_failures)} 位人格都没能完成评审，未生成任何报告。"
+                        f"常见原因：API Key 失效/欠费、模型名不被服务商识别、中转地址不可达。"
+                        f"错误详情——{detail}{more}"
+                    )
+                skipped = len(selected) - len(valid_personas)
                 raise RuntimeError(
-                    f"全部 {len(persona_failures)} 位人格都没能完成评审，未生成任何报告。"
-                    f"常见原因：API Key 失效/欠费、模型名不被服务商识别、中转地址不可达。"
-                    f"错误详情——{detail}{more}"
+                    "没有任何人格进入本次评审，未生成报告。"
+                    + (
+                        f"评审团选出了 {len(selected)} 位，但全部 {skipped} 位都因"
+                        f"材料里缺少他们需要的证据而被跳过——请补充更完整的材料"
+                        f"（如截图、核心玩法说明、定价信息等）后重试。"
+                        if selected
+                        else "当前任务类型与人格包的组合没有匹配到任何人格，请换一个人格包或指定角色。"
+                    )
                 )
 
             cross_exam_results = []

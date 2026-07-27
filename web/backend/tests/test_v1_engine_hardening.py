@@ -333,3 +333,66 @@ class TestMaterialExtractorByok:
         assert calls[0]["api_key"] == "sk-extract-test"
         assert calls[0]["provider"] == "openai_compatible"
         assert calls[0]["model"] == "deepseek-v4-pro"
+
+
+class TestNonGameTaskTypesActuallyWork:
+    """pitch_review / product_feedback_review / pricing_page_review 三个非游戏任务类型
+    此前 100% 失败——用户提交一份创业 BP，拿到的是
+    `local variable 'random' referenced before assignment`。
+
+    根因：PersonaService.select_panel_by_mode 里 `import random` 写在 except 块内，
+    而下方"人数不足补人"分支也用 random.sample。Python 的函数级名字绑定让 random
+    在整个函数里都是局部名，正常路径上它从未被赋值。
+    触发条件正是"预设人选不在当前包里 → 选出人数少于下限 → 需要补人"，
+    而这三个任务类型的预设人选恰好都不在默认 game-core 包中。
+
+    这三个正是 BP 里当作产品扩张主打的"3 种产品向 + 1 种创业项目评审"。
+    """
+
+    def test_panel_selection_does_not_crash(self):
+        from app.services import PersonaService
+
+        for task_type in ("pitch_review", "product_feedback_review", "pricing_page_review"):
+            panel = PersonaService.select_panel_by_mode(
+                task_type=task_type, mode="standard",
+                persona_pack="game-core", selected_personas=None,
+            )
+            assert panel, f"{task_type} 选不出任何人格"
+
+    def test_pitch_review_runs_end_to_end(self, client, db, monkeypatch):
+        """跑通到底。绕开证据预检的理由同 test_partial_failure_marks_report_degraded：
+        测试用的极简材料会让人格因"缺所需证据"被全部跳过，那测的是预检不是本 bug。"""
+        import app.services as services_mod
+        from app.services import key_service
+
+        key_service.save_user_key(db, "anonymous", "sk-pitch-regression")
+
+        real_precheck = services_mod.precheck_panel
+        monkeypatch.setattr(
+            services_mod,
+            "precheck_panel",
+            lambda sel, ab: {**real_precheck(sel, ab), "valid_personas": list(sel)},
+        )
+
+        import runner.llm_client
+
+        good = (
+            '{"persona_id":"P01","primary_stance":"观望","key_issues":'
+            '[{"title":"缺少单位经济","severity":"high","why_it_matters":"投资人会问"}],'
+            '"evidence":[],"missing_information":[],"voice_sample":"再想想"}'
+        )
+        monkeypatch.setattr(runner.llm_client, "chat_completion", lambda **kw: (good, 10, 5))
+
+        r = client.post(
+            "/api/reviews",
+            json={
+                "task_type": "pitch_review",
+                "artifact_bundle": {
+                    "title": "我的创业 BP",
+                    "materials": [{"type": "一句话pitch", "description": "AI 评审工具"}],
+                },
+            },
+        )
+        assert r.status_code == 200, r.text
+        detail = _wait_terminal(client, r.json()["id"])
+        assert detail["status"] == "completed", detail.get("report_json")
