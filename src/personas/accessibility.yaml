@@ -131,7 +131,10 @@ personas:
     gaming_profile:
       experience: 核心
       platforms: [PC, Switch, PS5]
-      genres: [turn-based-RPG, strategy, narrative-adventure, puzzle, sim]
+      # 加入 action / fighting-game：运动障碍玩家打动作与格斗游戏是有大量公开记录的现实
+      # （单手手柄、键位重映射、可调判定窗口），原先只列慢节奏品类等于用 yaml 写下
+      # "残障玩家只玩慢节奏游戏"这条刻板印象。
+      genres: [turn-based-RPG, strategy, narrative-adventure, puzzle, sim, action, fighting-game]
       session_length: 30-90分钟
     behavior_profile:
       patience: 高
@@ -189,7 +192,10 @@ personas:
     gaming_profile:
       experience: 中核
       platforms: [PC, PS5, Switch]
-      genres: [narrative-adventure, puzzle, strategy, sim, indie-narrative]
+      # 加入 competitive-FPS / rhythm：聋人与重听玩家打 FPS、玩音游同样有大量公开记录
+      # （视觉化脚步指示、可视化节奏提示），原先的品类列表把"听力障碍"直接等同于
+      # "只玩安静的慢节奏游戏"。
+      genres: [narrative-adventure, puzzle, strategy, sim, indie-narrative, competitive-FPS, rhythm]
       session_length: 30-90分钟
     behavior_profile:
       patience: 中

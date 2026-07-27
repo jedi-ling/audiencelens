@@ -45,17 +45,21 @@
         "monetization_review",
         "looking_for_party_post",
         "update_announcement_review",
-        "kickstarter_review",
-        "discord_community_review",
         "devlog_review",
-        "localization_review"
+        "kickstarter_review",
+        "localization_review",
+        "discord_community_review",
+        "product_feedback_review",
+        "pricing_page_review",
+        "onboarding_review",
+        "pitch_review"
       ],
-      "description": "评审任务类型"
+      "description": "评审任务类型。此枚举必须与 src/runner/task_types.py 的 VALID_TASK_TYPES 完全一致——src/runner/persona_agent.py 在导入时断言两者相等，漂移会当场失败（此前少了 4 个，pitch_review 等合法输出被判枚举不符，报告拿不到评分）"
     },
     "primary_stance": {
       "type": "string",
       "minLength": 1,
-      "description": "主要立场（自由文本，prompt 中按 task_type 约束枚举）"
+      "description": "主要立场。schema 层不写死枚举（词表按 task_type 不同），由提示词按 task_type 注入约束；词表的唯一定义在 src/runner/persona_agent.py 的 TASK_STANCE_ENUM，与后端 services.TASK_TYPES[*].stance_enum 逐字对齐（聚合器拿它当立场聚类的 dict 键，自造说法会让共识/分歧统计失效）"
     },
     "confidence": {
       "type": "number",
@@ -111,13 +115,13 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 5,
-              "description": "清晰度 1-5"
+              "description": "清晰度 1-5：看完材料能否一眼说清「这是什么、给谁、凭什么值得花时间或钱」。1=看完仍不知道它是什么，3=大意能懂但关键处要猜，5=信息组织清楚不必追问。全任务通用，报告靠它做跨人格横向对比，故为必填"
             },
             "trust": {
               "type": "integer",
               "minimum": 1,
               "maximum": 5,
-              "description": "信任度 1-5"
+              "description": "信任度 1-5：有多相信材料里的说法能兑现（团队/进度/数据/承诺）。1=通篇自说自话无可核验内容，3=部分有支撑部分是空头承诺，5=关键说法都能找到依据。全任务通用，必填"
             }
           },
           "additionalProperties": false
@@ -129,7 +133,7 @@
             "minimum": 1,
             "maximum": 5
           },
-          "description": "动态任务维度评分，键为维度名，值为 1-5 整数。按 task_type 必须包含对应维度：kickstarter_review=[trust_building, value_perception, urgency_communication, community_mobilization]; discord_community_review=[community_atmosphere, developer_engagement, information_value, organization_governance]; devlog_review=[transparency, information_density, expectation_management, narrative_appeal]; localization_review=[text_accuracy, cultural_adaptation, ui_adaptation, terminology_consistency, contextual_fidelity]"
+          "description": "任务专属维度评分，键为维度名，值为 1-5 整数。维度名由 task_type 决定，唯一定义在 src/runner/persona_agent.py 的 TASK_SCORE_DIMENSIONS（与后端 services.TASK_TYPES[*].score_dimensions 逐字对齐，由测试锁死）；提示词按 task_type 把该次要填的维度名注入骨架。此处不逐一枚举，避免再抄一份会漂移的清单——schema 只约束形状与取值范围，不强制维度齐全"
         }
       },
       "additionalProperties": false

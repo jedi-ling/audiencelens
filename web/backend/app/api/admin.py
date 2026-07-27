@@ -6,6 +6,7 @@
 """
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -17,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.errors import BadRequest, NotFound
 from app.db import get_db
-from app.deps import require_admin
+from app.deps import rate_limit, require_admin
 from app.models import Job, Judgment, Review, UsageRecord, User
 from app.services import (
     admin_settings_service,
@@ -25,6 +26,7 @@ from app.services import (
     cdk_service,
     key_service,
     ledger_service,
+    mail_service,
     plan_service,
 )
 
@@ -253,6 +255,104 @@ async def delete_server_key(provider: str = "anthropic", db: Session = Depends(g
     if n:
         audit_log_service.record(db, "server_key.delete", provider)
     return {"deleted": n}
+
+
+# ============================== 邮件发送 ==============================
+# 邮件链路配错的代价是"用户注册后激活不了、密码忘了找不回"，而且默认 console 档
+# 不会报任何错——不主动打一封真信就发现不了。所以这里给运营一个当场验证的入口。
+
+# 只做"长得像邮箱"的最低限度校验：真正的判据是那封信到底发不发得出去，
+# 不该在这里用正则去争论 RFC 5322 的边角。
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$")
+
+
+@router.get("/mail/status")
+async def mail_status():
+    """当前邮件配置快照（不含密码）。
+
+    configured_backend 与 effective_backend 可能不一致——配了 smtp 却缺
+    AL_SMTP_HOST 就会回落 console，那正是最该被看见的一种配错。
+    """
+    return mail_service.describe_config()
+
+
+class TestMailRequest(BaseModel):
+    to: str
+
+
+@router.post(
+    "/mail/test",
+    # 这个端点能让持令牌者向任意地址发信。主题和正文都是写死的（见下），
+    # 所以它不是通用转发器；再加一道限流把"拿它当发信机刷"的成本压住。
+    dependencies=[Depends(rate_limit("admin_mail_test", 10, 3600))],
+)
+async def send_test_mail(body: TestMailRequest, db: Session = Depends(get_db)):
+    """真的发一封测试邮件。失败时回可读原因，不吞异常。
+
+    与 send_mail 的区别正在于此：注册链路不能因为邮件服务商抽风就整体失败，
+    所以那条路吞异常；而这条路存在的唯一目的就是把异常给运营看。
+    """
+    to = (body.to or "").strip()
+    if not _EMAIL_RE.match(to):
+        raise BadRequest("收件地址格式不对，请填一个你能打开的真实邮箱。")
+
+    config = mail_service.describe_config()
+    subject = "AudienceLens 测试邮件"
+    # 正文写死：不接受调用方内容，避免这个端点被当成匿名转发器。
+    text = (
+        "这是一封来自 AudienceLens 后台的测试邮件。\n\n"
+        "你能读到它，说明 SMTP 配置正确，用户的邮箱验证与密码重置邮件也能正常送达。\n"
+        f"发件人: {config['mail_from']}\n"
+        f"SMTP: {config['smtp_host']}:{config['smtp_port']}"
+        f"（{'SSL' if config['smtp_use_ssl'] else 'STARTTLS'}）\n"
+        f"站点地址(邮件里链接的落点): {config['public_web_url']}\n"
+    )
+
+    from starlette.concurrency import run_in_threadpool
+
+    # SMTP 是同步阻塞网络调用；直接 await 会堵死事件循环，
+    # 一台卡住的邮件服务器足以拖垮整个后端的响应能力（同 /server-key/test）。
+    try:
+        backend = await run_in_threadpool(mail_service.send_mail_strict, to, subject, text)
+    except mail_service.MailError as exc:
+        audit_log_service.record(db, "mail.test", to, {"ok": False, "error": str(exc)})
+        return {
+            "ok": False,
+            "delivered": False,
+            "backend": config["effective_backend"],
+            "to": to,
+            "error": str(exc),
+            **config,
+        }
+
+    audit_log_service.record(db, "mail.test", to, {"ok": True, "backend": backend})
+    if backend != "smtp":
+        # console 档："调用成功"但根本没发出去。必须说清楚，不能让运营
+        # 看见一个绿勾就以为配好了——那正是这个按钮要防的事。
+        return {
+            "ok": True,
+            "delivered": False,
+            "backend": backend,
+            "to": to,
+            "warning": (
+                f"当前是 {backend} 档，邮件**没有真的发出**，只写到了服务器本地的 "
+                f"{config['outbox_dir']}。用户仍然收不到任何邮件。"
+                "要真发信请配 AL_MAIL_BACKEND=smtp 与 AL_SMTP_HOST 后重启。"
+            ),
+            **config,
+        }
+    return {
+        "ok": True,
+        "delivered": True,
+        "backend": backend,
+        "to": to,
+        "message": (
+            f"已通过 SMTP 投递给 {to}。请到该邮箱收件箱确认；"
+            "几分钟内没收到就翻垃圾箱，仍然没有则去服务商后台看发信日志"
+            "（SMTP 返回成功只代表服务商收下了，不代表对方收件服务器接受了）。"
+        ),
+        **config,
+    }
 
 
 # ============================== CDK 兑换码 ==============================

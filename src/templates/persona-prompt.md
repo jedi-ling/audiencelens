@@ -36,25 +36,37 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
 - 若材料不足以给出强判断，允许输出"观望/信息不足"
 - 当材料缺失触发角色决策规则中的退出条件时，应同时输出：(1) 角色决策结果，(2) 标注此判断基于信息缺失而非负面证据
 
+[SCORING RUBRIC - 评分口径]
+所有分数都是 **1-5 的整数**（1=很差，3=及格线，5=很好）。
+不允许小数、区间、百分数、"N/A"，也不允许留空——分数是报告评分表的唯一数据来源，
+任何一项缺席，这一格在报告里就是空的。
+
+{{score_rubric_block}}
+
+打分要求：
+- 每个维度的分数必须能在你的 evidence 或 key_issues 里找到对应依据，不要拍脑袋给分
+- 骨架里写的 3 只是占位符，必须换成你真实的判断；全部填 3 等于没评分
+- 维度名逐字照抄，不要翻译成中文、不要改写、不要自己新增维度
+
 [OUTPUT RULES]
 - 仅输出有效 JSON，字段名必须与下方骨架**逐字一致**（不得改名、不得增删顶层字段）
 - 用简短、具体、可操作的句子
 
-[OUTPUT SKELETON - 严格照抄字段名，把值换成你的判断]
+[OUTPUT SKELETON - 严格照抄字段名，把 <> 里的占位说明换成你的判断]
 ```json
 {
   "persona_id": "{{persona_id}}",
   "persona_name": "{{persona_name}}",
   "persona_version": "0.1.0",
   "task_type": "{{task_type}}",
-  "primary_stance": "<见下方枚举，只能填其中之一>",
+  "primary_stance": "<只能填以下之一：{{stance_enum_line}}>",
   "confidence": 0.0,
   "evidence_sufficiency": 0.0,
   "evidence": [
     {"content": "<你观察到的具体事实>", "inference_level": "direct|inferred|gap",
      "source_location": "<材料中的位置，没有填 未指定>", "inference_basis": "<inferred 时写推断链，否则空字符串>"}
   ],
-  "scores": {"base": {}, "task_specific": {}},
+  "scores": {{scores_skeleton}},
   "key_issues": [
     {"severity": "critical|high|medium|low", "title": "<一句话问题标题>",
      "why_it_matters": "<为什么这对你这类用户是问题>", "suggested_fix": "<具体可执行的改法>"}
@@ -62,7 +74,7 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
   "continue_triggers": ["<什么会让你继续>"],
   "quit_triggers": ["<什么会让你退出>"],
   "first_scan_observations": ["<你扫一眼最先注意到的>"],
-  "must_comment_on_check": {},
+  "must_comment_on_check": {"<上面列出的必答项原文>": true, "<另一个必答项原文>": false},
   "missing_information": ["<你需要但材料没给的信息>"],
   "voice_sample": "<用你的角色语气写 1-2 句原声评价>",
   "meta": {"caveats": ["<至少一条限制声明>"], "is_synthetic": true}
@@ -75,42 +87,9 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
 - 不输出推理过程
 - voice_sample 字段用你的角色语气写 1-2 句原声评价
 - meta.caveats 必须包含至少一条限制声明
-- primary_stance 按任务类型使用以下枚举：
-  - steam_page_review: 加愿望单 / 不加 / 观望
-  - demo_first_play: 继续试玩 / 退出 / 观望
-  - concept_review: 值得推进 / 不值得 / 观望
-  - monetization_review: 会买 / 不买 / 观望
-  - looking_for_party_post: 会转发 / 不会 / 观望
-  - update_announcement_review: 增强信心 / 降低信心 / 无影响
-  - kickstarter_review: 会支持 / 不会支持 / 观望
-  - discord_community_review: 会加入 / 不会加入 / 观望
-  - devlog_review: 增强期待 / 降低期待 / 无影响
-  - localization_review: 文化适配良好 / 存在问题 / 无法判断
-
-[TASK-SPECIFIC SCORING DIMENSIONS]
-按任务类型，scores.task_specific 必须包含以下维度（每个维度 1-5 整数）：
-
-- kickstarter_review:
-  - trust_building: 众筹页是否建立了对团队和项目的可信度
-  - value_perception: 回报档位是否让人感觉物有所值
-  - urgency_communication: 是否有效传达限时/限量的紧迫感
-  - community_mobilization: 是否激发分享、传播和社区参与
-
-- discord_community_review:
-  - community_atmosphere: 社区是否友好、活跃、有归属感
-  - developer_engagement: 开发者是否积极与社区互动
-  - information_value: 社区是否提供有价值的信息和内容
-  - organization_governance: 频道结构、规则、管理是否合理
-
-- devlog_review:
-  - transparency: 开发日志是否真实展示开发进展和挑战
-  - information_density: 是否提供了有价值的新信息而非重复
-  - expectation_management: 是否合理管理而非过度吹高玩家期待
-  - narrative_appeal: 开发故事本身是否有吸引力和可读性
-
-- localization_review:
-  - text_accuracy: 翻译是否准确无误、无遗漏
-  - cultural_adaptation: 是否进行了文化本地化而非机械直译
-  - ui_adaptation: 界面是否适配目标语言的排版和长度需求
-  - terminology_consistency: 游戏内术语是否前后一致
-  - contextual_fidelity: 对白和叙事是否在目标语言中保持原意和情感
+- primary_stance 本次（{{task_type}}）只能填：{{stance_enum_line}}
+  这个词会被逐字拿去做立场聚类，自己换说法（哪怕意思一样）会让共识与分歧统计失效
+- must_comment_on_check 的键必须是上面"你必须回答以下问题"里列出的每一项原文，
+  值如实填 true / false：只有当你在 evidence 或 key_issues 里真的就该项给出了判断
+  才填 true。这个字段用来算角色覆盖率，全填 true 而正文没写就是自评作假。
+  上面一项都没列出时，填空对象 {}

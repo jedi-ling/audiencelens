@@ -44,6 +44,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
   setReviews: (reviews) => set({ reviews }),
   setCurrentReview: (currentReview) => set({ currentReview }),
   setLoading: (loading) => set({ loading }),
+  /** 拉全部评审。fetchReviews() 现在内部翻页翻到底（此前它不传 offset/limit，
+   *  只拿得到后端默认的最近 20 条，第 21 条以后的评审在界面上等于消失）。
+   *  需要"分页 + 加载更多"的界面请直接用 fetchReviewsPage()，别用这个。 */
   initReviews: async () => {
     set({ loading: true })
     try {
@@ -80,11 +83,11 @@ export const useReviewStore = create<ReviewState>((set) => ({
     })
     return res.review_id
   },
+  /** 删除失败要往上抛：以前这里 catch {} 吞掉异常，界面上表现为"点了删除，
+   *  没报错也没消失"——用户只能反复点。调用方负责把 message 显示出来。 */
   deleteReviewById: async (id: string) => {
-    try {
-      await deleteReview(id)
-      set((state) => ({ reviews: state.reviews.filter((r) => r.id !== id) }))
-    } catch {}
+    await deleteReview(id)
+    set((state) => ({ reviews: state.reviews.filter((r) => r.id !== id) }))
   },
   fetchExamplesList: async () => {
     try {

@@ -1,4 +1,19 @@
-version: 0.1.0
+version: 0.2.0
+# 面板预设：每个 task_type 一条，可按人格包（by_pack）覆盖。
+#
+# 解析顺序见 src/runner/panel_selector.select_panel：
+#   1. by_pack[<包名>]     —— 该 (task_type, 人格包) 组合的专用面板
+#   2. default_personas    —— 全局默认（历史行为，按 game-core 的裸号写）
+#   3. 人格自带 task_affinity 排序兜底 —— 前两层在当前包里一个都对不上时
+#
+# by_pack **不需要穷举** 10 个包 × 14 个任务：第 3 层兜底本身就是合理面板
+# （每个人格的 task_affinity 都是逐条标注过的）。by_pack 只写"亲和度表达不了的
+# 策展意图"，比如 localization_review 面板里必须有真正懂本地化的人——按亲和度排
+# 未必能把他排进前几名，但少了他这个面板就是假的。
+#
+# min_panel_size / max_panel_size / optional_personas 现在都真的生效：
+#   人数不足 min_panel_size 时先补 optional_personas，再按亲和度补；
+#   超过 max_panel_size 时截断（唱反调的人格恒在队首，不会被截掉）。
 presets:
   steam_page_review:
     description: Steam商店页评审
@@ -6,24 +21,39 @@ presets:
     optional_personas: [P01, P04]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      # 商店页最先撞的墙不是"好不好看"而是"过不过审"——素材分级、成就/内购描述、
+      # 年龄分级问卷答错都能让页面直接被拒。
+      launch-compliance: [P62, P65, P63, P66]
   demo_first_play:
     description: Demo首玩评审
     default_personas: [P03, P05, P07, P08, P04]
     optional_personas: [P02, P09]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      # Demo 首玩最常见的"玩不下去"不是设计问题而是机型问题：低端机掉帧、发热、
+      # 闪退、首包太大下不动。P64 就是专门盯这一类的。
+      launch-compliance: [P64, P66, P62, P65]
   concept_review:
     description: 概念/GDD评审
     default_personas: [P01, P02, P04, P06, P13, P16]
     optional_personas: [P12]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      # 立项阶段最贵的错误是题材/玩法本身拿不到版号或过不了分级——
+      # 这些改起来等于重做，所以 P63 必须在概念阶段就在场。
+      launch-compliance: [P63, P62, P65, P64]
   monetization_review:
     description: 商业化/付费方案评审
     default_personas: [P11, P13, P14, P15]
     optional_personas: [P07, P10]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      # 付费设计的合规红线（未成年人充值、概率公示、诱导付费）和退款潮是一体两面。
+      launch-compliance: [P63, P66, P65, P62]
   looking_for_party_post:
     description: 找搭子帖/社区文案评审
     default_personas: [P07, P09, P11, P12]
@@ -55,11 +85,20 @@ presets:
     min_panel_size: 4
     max_panel_size: 8
   localization_review:
+    # 这条预设原先选出的五个人 must_comment_on 全是"独特性/核心循环/视觉辨识度/
+    # 20秒转化/信任风险"，没有一条涉及翻译或文化适配——本地化评审里没有一个人
+    # 懂本地化。现在每个包的第一位都是该包里真正做本地化判断的人。
     description: 本地化评审
-    default_personas: [P01, P04, P06, P10, P43]
-    optional_personas: [P02, P29]
+    default_personas: [P67, P01, P04, P06, P10]
+    optional_personas: [P02, P13]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      game-core: [P67, P06, P10, P04, P01]
+      family-casual: [P43, P39, P40, P41]        # P43 跨代际桥梁，localization 亲和度 0.8
+      indie-creative: [P03, P06, P01, P02]       # P03 文化消费主义者，专判文化挪用
+      educational-serious: [P35, P38, P37, P36]  # 教材/术语本地化由教师评估者领衔
+      launch-compliance: [P63, P62, P66, P65]    # 分级与合规文案随语区变化
   product_feedback_review:
     description: 通用产品反馈评审（不限游戏）
     default_personas: [P47, P49, P50, P51, P52]
@@ -84,3 +123,9 @@ presets:
     optional_personas: [P56, P60]
     min_panel_size: 4
     max_panel_size: 8
+    by_pack:
+      # 用默认人格包（game-core）跑 pitch_review 时，P54-P61 一个都不在包里，
+      # 原先整个面板退化成"只有 P15 一个人"。P13 发行商星探本职就是评估待签项目，
+      # 是 game-core 里唯一真的会看 BP 的人。
+      game-core: [P13, P01, P14, P16, P10]
+      launch-compliance: [P63, P62, P64, P66]

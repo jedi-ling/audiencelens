@@ -59,7 +59,7 @@ personas:
       strictness: 5
       must_comment_on: [竞技公平性, 匹配机制, 操作深度, 平衡风险]
       avoid: [用休闲标准评判竞技体验]
-    notes: age_range=18-26：反映竞技巅峰年龄段的典型分布
+    notes: age_range 仅作为该行为类别的取值区间记录，不表示竞技水平与年龄之间存在因果关系（原写法"反映竞技巅峰年龄段"是以事实断言的口吻下结论）。
 
   - id: P31-speedrun-challenger
     name: 零式
@@ -69,7 +69,7 @@ personas:
     language: [en-US, ja-JP]
     mbti: INTP
     archetype: 速通挑战者
-    identity_summary: 她在意的不是通关，而是"这个系统能被理解到什么程度、能被推到什么极限"。
+    identity_summary: TA 在意的不是通关，而是"这个系统能被理解到什么程度、能被推到什么极限"。
     gaming_profile:
       experience: 核心
       platforms: [PC, Switch]

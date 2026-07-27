@@ -25,7 +25,7 @@
 AudienceLens is a **full-stack synthetic audience review system** that simulates diverse player personas to evaluate games, products, and creative projects — before committing resources to real user testing.
 
 Unlike simply asking ChatGPT for feedback, AudienceLens:
-1. Runs **multiple behavior-driven personas in isolation** (66 across 10 packs)
+1. Runs **multiple behavior-driven personas in isolation** (72 across 11 packs)
 2. Extracts the **top-3 controversies** across persona outputs and runs **one live rebuttal round** on them — arbitrated in `standard` mode, per-persona in `full` mode, skipped in `quick` (see §3 for exactly what each tier does)
 3. Enforces **ethical constraints** — stereotype detection, evidence tiering (`inferred` hard-capped at 40%), mandatory disclaimers
 4. Ships an optional **8-dimension quality scorecard** — post-hoc scoring, off by default; it grades a finished review, it does not gate or re-run one
@@ -69,11 +69,11 @@ Personas are defined by **behavioral vectors**, not demographic labels. SCOPE re
 | `platform_loyalty` | Platform attachment strength |
 | `criticism_style` | Constructive vs. harsh feedback tendency |
 
-**10 Persona Packs (66 personas total):**
+**11 Persona Packs (72 personas total):**
 
 | Pack | File | # | Personas |
 |---|---|---|---|
-| Game Core | `game-core.yaml` | 16 | Indie core operator, systems theorycrafter, challenge hunter, story immersion seeker, completionist collector, visual atmosphere lover, casual mobile drop-in, first-time novice, cozy social sharer, Steam wishlist browser, TapTap comment scout, streamer creator, publisher scout, price-sensitive buyer, toxic skeptic, competitor-loyal veteran |
+| Game Core | `game-core.yaml` | 17 | Indie core operator, systems theorycrafter, challenge hunter, story immersion seeker, completionist collector, visual atmosphere lover, casual mobile drop-in, first-time novice, cozy social sharer, Steam wishlist browser, TapTap comment scout, streamer creator, publisher scout, price-sensitive buyer, toxic skeptic, competitor-loyal veteran, localization-dependent player |
 | Competitive Esport | `competitive-esport.yaml` | 5 | Rank climber, speedrun challenger, team coordinator, esport spectator, mod competitor |
 | Family Casual | `family-casual.yaml` | 5 | Parent-child creator, party socialite, cozy relaxer, nostalgia retro, generational bridge |
 | Indie Creative | `indie-creative.yaml` | 5 | Indie connoisseur, creativity seeker, culture consumer, indie narrative designer, indie rhythm fanatic |
@@ -83,8 +83,9 @@ Personas are defined by **behavioral vectors**, not demographic labels. SCOPE re
 | Educational Serious | `educational-serious.yaml` | 4 | Teacher evaluator, parent gatekeeper, lifelong learner, special needs learner |
 | General Consumer | `general-consumer.yaml` | 8 | Value-conscious buyer, skeptical reviewer, B2B decision maker, first-time user, power user, word-of-mouth sharer, accessibility user, competitor-loyal switcher |
 | Startup Panel | `startup-panel.yaml` | 8 | Angel investor, VC associate, industry analyst, tech-DD engineer, early-adopter customer, incubator screener, unit-economics skeptic, devil's advocate |
+| Launch & Compliance | `launch-compliance.yaml` | 5 | Store submission reviewer, China license gatekeeper, device-compat tester, privacy compliance counsel, refunded/churned player |
 
-> Non-game personas live in the last two packs (16 of 66). There is **no red-team persona pack** — "red team" is a skill hint applied to an existing panel, not a set of personas.
+> Non-game personas live in the general-consumer and startup-panel packs (16 of 72). There is **no red-team persona pack** — "red team" is a skill hint applied to an existing panel, not a set of personas.
 
 ### 3. Cross-Examination — Controversy Extraction + One Live Rebuttal Round
 
@@ -320,7 +321,7 @@ audiencelens/
 │   │   ├── cross_exam.py              #   Controversy extraction + rebuttal round
 │   │   ├── aggregator.py              #   Rule-driven report aggregation
 │   │   └── calibration.py             #   Quality calibration check
-│   ├── personas/                      # 10 persona packs (66 personas)
+│   ├── personas/                      # 11 persona packs (72 personas)
 │   ├── presets/                       # Panel presets per task type
 │   ├── schemas/                       # JSON Schema (persona, output, report)
 │   ├── templates/                     # Prompt + report templates
@@ -371,7 +372,7 @@ not passing — it is counted separately on purpose.
 |---|---|---|
 | v0.1 | MVP — 16 personas, 6 task types, CLI runner, controversy extraction, 3-layer validation | Done |
 | v0.2 | Harness Edition — 8-dim scorecard, ethics service, expanded persona set, Web UI | Done |
-| **v0.3** | **66 personas / 10 packs, 14 task types, SaaS platform (auth / quota / admin / CDK), multimodal input, plus one live cross-examination rebuttal round with code-adjudicated vote changes** | **Current** |
+| **v0.3** | **72 personas / 11 packs, 14 task types, SaaS platform (auth / quota / admin / CDK), multimodal input, plus one live cross-examination rebuttal round with code-adjudicated vote changes** | **Current** |
 | v0.4 | **Evaluate the rebuttal round, then extend it** — A/B the three tiers (§3) to find out whether rebuttal improves a review at all, calibrate θ_change against data, then add rounds 2–3 with cross-round state so consensus evolution and tipping points become computable | Planned — see the §3 caveat for what does not exist today |
 | v0.5 | Human-parity benchmark with real cohort data (tooling exists, cohort data pending) | Planned |
 | v1.0 | Big-Five replacement for MBTI, dynamic panel generation, cost-aware model routing | Planned |
@@ -406,7 +407,7 @@ MIT License — see [LICENSE](LICENSE)
 AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人格对游戏、产品和创意项目进行评审——在投入真人测试资源之前。
 
 与直接问 ChatGPT 不同，AudienceLens：
-1. **隔离运行**多个行为驱动人格（10 个 Pack 共 66 个人格）
+1. **隔离运行**多个行为驱动人格（11 个 Pack 共 72 个人格）
 2. 从人格输出中提取 **top-3 争议点**，并对它们跑**一轮真实的反驳**——`standard` 档是仲裁式、`full` 档逐人格、`quick` 档不跑（每档到底做了什么见 §3）
 3. 强制**伦理约束**——刻板印象检测、证据三级标注（`inferred` 硬上限 40%）、强制免责声明
 4. 提供可选的 **8 维质量打分卡**——事后打分、默认关闭；它给已完成的报告打分，不拦截、不重跑
@@ -450,11 +451,11 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | `platform_loyalty` | 平台忠诚度 |
 | `criticism_style` | 批评风格 |
 
-**10 个人格 Pack（共 66 个人格）：**
+**11 个人格 Pack（共 72 个人格）：**
 
 | Pack | 文件 | 数量 | 人格 |
 |---|---|---|---|
-| 游戏核心 | `game-core.yaml` | 16 | 独立核心操作者、系统推演党、挑战猎人、剧情沉浸党、收集完成党、视觉氛围党、碎片手游党、首次新手、治愈社交分享者、Steam 心愿单浏览者、TapTap 口碑侦察、主播创作者、发行侦察、价格敏感买家、毒舌怀疑者、竞品忠诚老兵 |
+| 游戏核心 | `game-core.yaml` | 17 | 独立核心操作者、系统推演党、挑战猎人、剧情沉浸党、收集完成党、视觉氛围党、碎片手游党、首次新手、治愈社交分享者、Steam 心愿单浏览者、TapTap 口碑侦察、主播创作者、发行侦察、价格敏感买家、毒舌怀疑者、竞品忠诚老兵、本地化依赖玩家 |
 | 竞技电竞 | `competitive-esport.yaml` | 5 | 冲分玩家、速通挑战者、团队协调者、电竞观众、Mod 竞技者 |
 | 家庭休闲 | `family-casual.yaml` | 5 | 亲子共创者、派对社交、治愈放松、怀旧复古、代际桥梁 |
 | 独立创意 | `indie-creative.yaml` | 5 | 独立品鉴者、创意探索者、文化消费者、独立叙事设计者、独立节奏狂 |
@@ -464,8 +465,9 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | 教育严肃 | `educational-serious.yaml` | 4 | 教师评估者、家长守门人、终身学习者、特殊需求学习者 |
 | 通用消费 | `general-consumer.yaml` | 8 | 价值敏感买家、怀疑型评测者、B2B 决策者、首次使用者、资深用户、口碑传播者、无障碍用户、竞品转换者 |
 | 创业评审 | `startup-panel.yaml` | 8 | 天使投资人、VC 投资经理、行业分析师、技术尽调工程师、早期尝鲜客户、孵化器筛选人、单位经济怀疑者、专职唱反调 |
+| 上线合规 | `launch-compliance.yaml` | 5 | 平台送审审核员、版号与分级把关人、机型适配与性能测试员、隐私合规法务、退款与流失玩家 |
 
-> 非游戏人格集中在最后两个 Pack（66 个中的 16 个）。**不存在红队人格包**——"红队"是套在既有面板上的技能提示，不是一组人格。
+> 非游戏人格集中在通用消费与创业评审两个 Pack（72 个中的 16 个）。**不存在红队人格包**——"红队"是套在既有面板上的技能提示，不是一组人格。
 
 ### 3. 交叉质询 — 争议点提取 + 一轮真实反驳
 
@@ -685,7 +687,7 @@ audiencelens/
 │   │   ├── cross_exam.py              #   争议点提取 + 反驳轮次
 │   │   ├── aggregator.py              #   规则驱动报告聚合
 │   │   └── calibration.py             #   质量校准检查
-│   ├── personas/                      # 10个人格Pack（66个人格）
+│   ├── personas/                      # 11个人格Pack（72个人格）
 │   ├── presets/                       # 各任务类型面板预设
 │   ├── schemas/                       # JSON Schema（人格、输出、报告）
 │   ├── templates/                     # Prompt + 报告模板
@@ -733,7 +735,7 @@ cd web/backend && python -m pytest tests/ -q
 |---|---|---|
 | v0.1 | MVP — 16个人格、6种任务类型、CLI引擎、争议点提取、三层校验 | 已完成 |
 | v0.2 | Harness版 — 8维打分卡、伦理服务、人格集扩充、Web UI | 已完成 |
-| **v0.3** | **66人格 / 10个Pack、14种任务类型、SaaS 平台（认证 / 配额 / 后台 / CDK）、多模态输入，外加一轮真实的交叉质询反驳、改票由代码判定** | **当前** |
+| **v0.3** | **72人格 / 11个Pack、14种任务类型、SaaS 平台（认证 / 配额 / 后台 / CDK）、多模态输入，外加一轮真实的交叉质询反驳、改票由代码判定** | **当前** |
 | v0.4 | **先评估这轮反驳，再扩展它**——A/B 三档（见 §3）看反驳到底有没有让评审变好、用数据校准 θ_change，然后补上第 2–3 轮与跨轮状态，使共识演化与临界点变得可计算 | 计划中——今天不存在什么，见 §3 的说明 |
 | v0.5 | 真人对照 benchmark（工具链已就绪，真人数据待积累） | 计划中 |
 | v1.0 | Big-Five替代MBTI、动态面板生成、成本感知模型路由 | 计划中 |

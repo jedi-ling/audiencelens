@@ -1,15 +1,22 @@
 /**
  * 评审历史列表——之前产品里完全没有这个页面，用户发起评审后除了当次的进度页
- * 链接，没有任何地方能回看"我都评审过什么"。数据走 fetchReviews()（/api/reviews），
- * 后端已按登录身份过滤（见 app/api/__init__.py 的 _check_review_owner），
- * 匿名单机形态下所有匿名请求共享同一个历史列表，这是既有设计，不是本页的 bug。
+ * 链接，没有任何地方能回看"我都评审过什么"。数据走 fetchReviewsPage()
+ * （/api/reviews），后端已按登录身份过滤（见 app/api/__init__.py 的
+ * _check_review_owner），匿名单机形态下所有匿名请求共享同一个历史列表，
+ * 这是既有设计，不是本页的 bug。
+ *
+ * 分页：后端一直是 offset/limit 分页、默认一页 20 条，而这个页面过去
+ * 一个参数都不传、也没有翻页 UI——用户跑到第 21 次评审之后，旧评审在界面上
+ * 就等于凭空消失，且没有任何提示。现在页面顶部常驻"共 N 条 / 已显示 M 条"，
+ * 底部是"加载更多"，加载到底会明确说"已加载全部"——用户任何时候都能看出
+ * 数据是没加载完、还是真的只有这么多。
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
-import { fetchReviews, deleteReview } from '@/lib/api'
+import { fetchReviewsPage, deleteReview, REVIEWS_PAGE_SIZE } from '@/lib/api'
 import { TASK_TYPES } from '@/lib/mock-data'
-import type { Review, ReviewListItem, ReviewMode } from '@/lib/mock-data'
+import type { ReviewListItem, ReviewMode } from '@/lib/mock-data'
 import {
   History,
   Loader2,
@@ -23,6 +30,8 @@ import {
   AlertCircle,
   Inbox,
   FolderOpen,
+  ChevronDown,
+  CheckCircle2,
 } from 'lucide-react'
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -44,7 +53,8 @@ function taskTypeName(taskType: string): string {
 }
 
 /** 同 project_key 的评审聚合成"长期评审项目"分组（与 /ask 侧栏同一逻辑）；
- * 列表已按 created_at 倒序，分组内/分组间顺序天然保留。 */
+ * 列表已按 created_at 倒序，分组内/分组间顺序天然保留。
+ * 分页是在这之前把已加载的条目累加好再分组的，所以跨页的同一项目会正确合并。 */
 function groupByProject(reviews: ReviewListItem[]): { projects: { key: string; items: ReviewListItem[] }[]; ungrouped: ReviewListItem[] } {
   const order: string[] = []
   const map = new Map<string, ReviewListItem[]>()
@@ -74,22 +84,59 @@ function formatTime(iso: string): string {
 export default function ReviewHistoryPage() {
   const navigate = useNavigate()
   const [reviews, setReviews] = useState<ReviewListItem[] | null>(null)
+  /** 后端 X-Total-Count；读不到（跨域没 expose 等）就是 null，此时不显示"共 N 条" */
+  const [total, setTotal] = useState<number | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  /**
+   * 下一页要用的 offset。**不能**直接用 reviews.length：删掉一条已加载的评审后，
+   * 服务端列表整体左移一位，继续按 reviews.length 取下一页会正好跳过一条，
+   * 那条评审就变成了翻不到的"幽灵"。所以删除成功时这里跟着减一。
+   */
+  const [nextOffset, setNextOffset] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const loadFirstPage = useCallback(async () => {
     try {
-      const data = await fetchReviews()
-      setReviews(data)
+      const page = await fetchReviewsPage(0, REVIEWS_PAGE_SIZE)
+      setReviews(page.items)
+      setTotal(page.total)
+      setHasMore(page.hasMore)
+      setNextOffset(page.items.length)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
+      setReviews((prev) => prev ?? [])
     }
   }, [])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadFirstPage()
+  }, [loadFirstPage])
+
+  const loadMore = async () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    try {
+      const page = await fetchReviewsPage(nextOffset, REVIEWS_PAGE_SIZE)
+      setReviews((prev) => {
+        const base = prev ?? []
+        // 去重兜底：删除导致的偏移已在 nextOffset 里修正，这里只是防御性保险，
+        // 万一重复也不该炸出 React 重复 key
+        const seen = new Set(base.map((r) => r.id))
+        return [...base, ...page.items.filter((r) => !seen.has(r.id))]
+      })
+      setTotal(page.total)
+      setHasMore(page.hasMore)
+      setNextOffset((prev) => prev + page.items.length)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载更多失败')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
@@ -99,12 +146,26 @@ export default function ReviewHistoryPage() {
     try {
       await deleteReview(id)
       setReviews((prev) => (prev ? prev.filter((r) => r.id !== id) : prev))
+      setTotal((prev) => (prev === null ? null : Math.max(0, prev - 1)))
+      setNextOffset((prev) => Math.max(0, prev - 1)) // 见 nextOffset 的说明
+      setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '删除失败')
     } finally {
       setDeletingId(null)
     }
   }
+
+  const loaded = reviews?.length ?? 0
+  /** 顶部计数：总数拿得到就说"共 N 条"，拿不到就只说已显示多少——不猜 */
+  const countLabel =
+    total === null
+      ? loaded > 0
+        ? `已显示 ${loaded} 条`
+        : ''
+      : hasMore || loaded < total
+        ? `共 ${total} 条 · 已显示 ${loaded} 条`
+        : `共 ${total} 条`
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
@@ -114,6 +175,9 @@ export default function ReviewHistoryPage() {
           <h1 className="text-xl font-semibold text-text-primary">评审历史</h1>
           <p className="text-sm text-text-secondary mt-0.5">你发起过的所有评审，点进去看报告或继续跟进</p>
         </div>
+        {countLabel && (
+          <span className="ml-auto shrink-0 text-xs text-text-muted tabular-nums">{countLabel}</span>
+        )}
       </div>
 
       {error && (
@@ -129,16 +193,32 @@ export default function ReviewHistoryPage() {
           <p className="text-text-secondary text-sm">加载中...</p>
         </div>
       ) : reviews.length === 0 ? (
-        <div className="py-16 text-center rounded-xl border border-border bg-bg-card">
-          <Inbox className="w-10 h-10 text-text-muted mx-auto mb-3" strokeWidth={1.25} />
-          <p className="text-text-secondary text-sm mb-4">还没有评审记录</p>
-          <Link
-            to="/ask"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-green text-bg-primary text-sm font-bold hover:bg-neon-green-dim transition-colors"
-          >
-            发起第一次评审 →
-          </Link>
-        </div>
+        /* 空列表要分清两种情况：真的没有记录，和"没加载出来"。
+           以前加载失败时这里会照样显示"还没有评审记录"——用户会以为数据没了。 */
+        error ? (
+          <div className="py-16 text-center rounded-xl border border-border bg-bg-card">
+            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-3" strokeWidth={1.25} />
+            <p className="text-text-secondary text-sm mb-1">没能加载评审历史</p>
+            <p className="text-text-muted text-xs mb-4">这不代表记录被删除了，请重试或稍后再来</p>
+            <button
+              onClick={() => void loadFirstPage()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:border-neon-green/30 hover:text-text-primary transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        ) : (
+          <div className="py-16 text-center rounded-xl border border-border bg-bg-card">
+            <Inbox className="w-10 h-10 text-text-muted mx-auto mb-3" strokeWidth={1.25} />
+            <p className="text-text-secondary text-sm mb-4">还没有评审记录</p>
+            <Link
+              to="/ask"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-green text-bg-primary text-sm font-bold hover:bg-neon-green-dim transition-colors"
+            >
+              发起第一次评审 →
+            </Link>
+          </div>
+        )
       ) : (
         (() => {
           const { projects, ungrouped } = groupByProject(reviews)
@@ -219,6 +299,38 @@ export default function ReviewHistoryPage() {
               {ungrouped.length > 0 && (
                 <div className="space-y-2.5">{ungrouped.map(renderRow)}</div>
               )}
+
+              {/* 翻页出口：有更多就给按钮，没有了就明说"已加载全部"，
+                  不让用户对着一个截断的列表猜数据是不是丢了 */}
+              <div className="pt-2 text-center">
+                {hasMore ? (
+                  <button
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-bg-card text-sm text-text-secondary hover:border-neon-green/30 hover:text-text-primary transition-colors disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} />
+                        加载中...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" strokeWidth={1.25} />
+                        加载更多
+                        {total !== null && ` · 还有 ${Math.max(0, total - loaded)} 条`}
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  loaded > REVIEWS_PAGE_SIZE && (
+                    <p className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+                      <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.25} />
+                      已加载全部 {loaded} 条评审
+                    </p>
+                  )
+                )}
+              </div>
             </div>
           )
         })()

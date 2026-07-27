@@ -143,8 +143,9 @@ class Settings:
         self.review_concurrency: int = _int("AUDIENCELENS_MAX_CONCURRENCY", 6)
 
         # ---- 邮件（埋线：默认 console，不真发信也能跑通验证/找回链路）----
-        # console 档只把邮件写进日志（令牌脱敏，见 mail_service._redact），
-        # 用户拿不到可用链接 —— 类生产 + 开了账号体系时启动自检会拦下。
+        # console 档日志里只留脱敏正文，完整邮件写到 mail_outbox_dir 下的 0600 文件
+        # （见 mail_service._write_outbox）—— 用户仍然拿不到可用链接，
+        # 所以类生产 + 开了账号体系时启动自检会拦下。
         self.mail_backend: str = (os.environ.get("AL_MAIL_BACKEND", "").strip() or "console").lower()
         self.mail_from: str = (
             os.environ.get("AL_MAIL_FROM", "").strip() or "AudienceLens <noreply@localhost>"
@@ -154,6 +155,15 @@ class Settings:
         self.smtp_user: str = os.environ.get("AL_SMTP_USER", "")
         self.smtp_password: str = os.environ.get("AL_SMTP_PASSWORD", "")
         self.smtp_use_ssl: bool = _bool("AL_SMTP_USE_SSL", False)
+        # 不设超时 = 用 socket 的全局默认值（通常等于永不超时），
+        # 一台连不上的 SMTP 主机就能把发起注册的那个工作线程永久挂住。
+        self.smtp_timeout_seconds: float = _float("AL_SMTP_TIMEOUT_SECONDS", 15.0)
+        # console 档的本地投递目录。默认在 backend/data 下——该目录已被
+        # web/backend/.gitignore 覆盖，不会有令牌被 git add 进历史。
+        self.mail_outbox_dir: str = (
+            os.environ.get("AL_MAIL_OUTBOX_DIR", "").strip()
+            or os.path.join(self.backend_dir, "data", "outbox")
+        )
         # 邮件里链接的落点（前端地址）——本地开发默认 vite 端口
         self.public_web_url: str = (
             os.environ.get("AL_PUBLIC_WEB_URL", "").strip() or "http://localhost:5199"
@@ -263,8 +273,9 @@ class Settings:
         if self.mail_backend == "smtp" and not self.smtp_host:
             raise RuntimeError(
                 "AL_MAIL_BACKEND=smtp 但未配置 AL_SMTP_HOST。"
-                "此时 mail_service 会静默回落到 console 发送器——"
-                "用户收不到验证/重置邮件，而令牌会被写进日志。请补齐 SMTP 配置。"
+                "此时 mail_service 会回落到 console 发送器——"
+                "用户收不到验证/重置邮件，令牌只会落到服务器本地的 outbox 文件。"
+                "请补齐 SMTP 配置（填法见 web/DEPLOY.md 的「邮件发送」一节）。"
             )
 
         if self.mail_backend != "smtp" and self.auth_enabled and not self.allow_console_mail:
@@ -272,12 +283,40 @@ class Settings:
                 "检测到类生产环境且已开启账号体系（AL_AUTH_ENABLED=true），"
                 f"但邮件后端是 {self.mail_backend!r}（非 smtp）。"
                 "此时邮箱验证和密码重置邮件不会真的发出，用户无法完成注册与找回；"
-                "且邮件正文会进日志，能看日志的人即可接管任意账号。"
-                "请配置 AL_MAIL_BACKEND=smtp 与 AL_SMTP_HOST；"
-                "若确认暂不需要邮件链路，显式设 AL_ALLOW_CONSOLE_MAIL=true。"
+                "含令牌的完整邮件会落到服务器磁盘上的 outbox 文件，能读该文件的人"
+                "即可接管任意账号。"
+                "请配置 AL_MAIL_BACKEND=smtp 与 AL_SMTP_HOST（填法见 web/DEPLOY.md 的"
+                "「邮件发送」一节）；若确认暂不需要邮件链路，显式设 AL_ALLOW_CONSOLE_MAIL=true。"
             )
 
         # ---- 以下只告警，不拦启动 ----
+
+        # 邮件配置的三类"配了但发不出去"。都只告警：真假要靠后台
+        # 「发送测试邮件」当场打一次才算数，启动期猜不出服务商的脾气。
+        if self.mail_backend == "smtp" and self.smtp_host:
+            if self.mail_from.endswith("localhost>") or "@localhost" in self.mail_from:
+                self._warn(
+                    f"AL_MAIL_FROM 仍是默认值 {self.mail_from!r}。"
+                    "几乎所有服务商都会拒收 @localhost 的发件人（SMTPSenderRefused）。"
+                    "请改成 AL_SMTP_USER 对应的那个邮箱地址。"
+                )
+            if self.smtp_port == 465 and not self.smtp_use_ssl:
+                self._warn(
+                    "AL_SMTP_PORT=465 但 AL_SMTP_USE_SSL=false。465 是隐式 SSL 端口，"
+                    "用 STARTTLS 连它通常会超时或被中断。请设 AL_SMTP_USE_SSL=true。"
+                )
+            if self.smtp_port in (25, 587) and self.smtp_use_ssl:
+                self._warn(
+                    f"AL_SMTP_PORT={self.smtp_port} 但 AL_SMTP_USE_SSL=true。"
+                    f"{self.smtp_port} 是 STARTTLS 端口，用隐式 SSL 连它会 TLS 握手失败。"
+                    "请设 AL_SMTP_USE_SSL=false，或改用 465 端口。"
+                )
+            if not _is_public_host(self.public_web_url):
+                self._warn(
+                    f"邮件能发出，但链接指向 AL_PUBLIC_WEB_URL={self.public_web_url!r}——"
+                    "这不是一个公网地址，用户点开验证/重置链接会打不开。"
+                    "请设成用户实际访问的站点地址，例如 https://你的域名。"
+                )
         if not os.environ.get("AL_ENCRYPTION_KEY"):
             self._warn(
                 "未设置 AL_ENCRYPTION_KEY，落库加密密钥回落到 AL_JWT_SECRET。"
@@ -305,8 +344,9 @@ class Settings:
 
         if self.allow_console_mail and self.mail_backend != "smtp":
             self._warn(
-                "AL_ALLOW_CONSOLE_MAIL=true：验证/重置邮件不会真的发出，"
-                "且邮件正文（含令牌）会写进日志。请确保日志的访问权限等同于账号权限。"
+                "AL_ALLOW_CONSOLE_MAIL=true：验证/重置邮件不会真的发出——用户注册后"
+                "激活不了、忘记密码找不回。含令牌的完整邮件会写到 "
+                f"{self.mail_outbox_dir}（0600 文件），请确保该目录的访问权限等同于账号权限。"
             )
 
     def _validate_admin_token(self) -> None:

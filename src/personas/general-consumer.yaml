@@ -212,7 +212,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: INTP
     archetype: 效率导向专业用户
-    identity_summary: 他评判产品的标准只有一个：能不能让我更快做完该做的事，别用花哨包装浪费我的时间。
+    identity_summary: TA 评判产品的标准只有一个：能不能让我更快做完该做的事，别用花哨包装浪费我的时间。
     gaming_profile:
       experience: 核心
       platforms: [桌面客户端, Web]

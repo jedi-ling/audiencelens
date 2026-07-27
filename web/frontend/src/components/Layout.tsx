@@ -13,6 +13,7 @@ const navItems = [
   { path: '/skills', label: '技能中心' },
   { path: '/task-types', label: '任务类型' },
   { path: '/personas', label: '角色' },
+  { path: '/plans', label: '定价' },
   { path: '/settings', label: '设置' },
 ]
 

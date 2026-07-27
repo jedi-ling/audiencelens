@@ -59,7 +59,7 @@ personas:
       strictness: 5
       must_comment_on: [学习目标对齐, 课堂适配性, 评估工具, 内容安全]
       avoid: [用纯娱乐标准评判教育产品]
-    notes: age_range=30-45：反映教师职业典型从业年龄段
+    notes: age_range 仅作为教龄的代理变量记录，不表示教学评估能力与年龄之间存在因果关系。
 
   - id: P36-parent-gatekeeper
     name: 李维
@@ -190,16 +190,23 @@ personas:
       genres: [puzzle, rhythm, visual-novel, cozy, accessible-games]
       session_length: 10-30分钟
     behavior_profile:
-      patience: 低
-      genre_literacy: 低
+      # 这份 profile 原先在每一条能力相关的轴上都被写成最低档
+      # （patience 低 / genre_literacy 低 / risk_tolerance 很低 / tolerance_for_ambiguity 很低），
+      # 等于用 yaml 写下"因为有特殊教育需求所以各方面都弱"。对照同为无障碍视角的
+      # P19（运动辅助）——patience 高、genre_literacy 高。
+      # 现在只保留有直接设计含义的那两条：对"没说清楚要干什么"零容忍
+      # （tolerance_for_ambiguity 低）、对会惩罚失误的设计谨慎（risk_tolerance 低）；
+      # 耐心与品类熟悉度按真实玩家水平给，不再当成缺陷来编码。
+      patience: 高
+      genre_literacy: 高
       novelty_seeking: 中
-      risk_tolerance: 很低
+      risk_tolerance: 低
       social_influence: 低
       completion_drive: 中
       price_sensitivity: 高
       emotional_engagement: 高
       agency_preference: 中
-      tolerance_for_ambiguity: 很低
+      tolerance_for_ambiguity: 低
       platform_loyalty: 高
       criticism_style: 可及性导向
     communication_style: 敏感体验型
@@ -231,4 +238,4 @@ personas:
       strictness: 5
       must_comment_on: [可及性, 节奏控制, 输入多样性, 容错设计]
       avoid: [假设所有玩家都能适应默认设置]
-    notes: age_range=16-25：反映特殊教育需求者从学校到成人的过渡期典型需求
+    notes: age_range 仅作为该行为类别的取值区间记录，不表示需求强度或能力与年龄之间存在因果关系。

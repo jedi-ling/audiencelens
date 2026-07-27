@@ -10,6 +10,7 @@ const PersonasPage = lazy(() => import('@/pages/PersonasPage'))
 const TaskTypesPage = lazy(() => import('@/pages/TaskTypesPage'))
 const TutorialPage = lazy(() => import('@/pages/TutorialPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const PlansPage = lazy(() => import('@/pages/PlansPage'))
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
@@ -70,6 +71,11 @@ export default function App() {
             <Route path="/task-types" element={<TaskTypesPage />} />
             <Route path="/tutorial" element={<TutorialPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            {/* 配额提示里的"升级套餐"此前无处可去（全站没有任何定价路由）。
+                /pricing 是外部最常被手输/被链接的写法，一并指到同一页，
+                否则它会被 * 兜底静默送回首页——用户以为自己点错了。 */}
+            <Route path="/plans" element={<PlansPage />} />
+            <Route path="/pricing" element={<PlansPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

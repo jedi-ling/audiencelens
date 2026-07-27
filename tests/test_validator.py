@@ -1,5 +1,16 @@
+import json
 import os
+import re
+
 import pytest
+
+from runner.persona_agent import (
+    TASK_SCORE_DIMENSIONS,
+    TASK_STANCE_ENUM,
+    render_prompt,
+    stance_enum_for,
+)
+from runner.task_types import VALID_TASK_TYPES
 from runner.validator import (
     load_schema,
     validate_schema,
@@ -9,8 +20,10 @@ from runner.validator import (
     check_identity_behavior_decoupling,
 )
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCHEMA_DIR = os.path.join(os.path.dirname(__file__), "..", "src", "schemas")
 OUTPUT_SCHEMA_PATH = os.path.join(SCHEMA_DIR, "output-schema.json")
+PERSONA_PROMPT_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "persona-prompt.md")
 
 
 def _make_valid_output():
@@ -100,6 +113,160 @@ def _make_persona():
             "avoid": [],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# "照抄提示词骨架的输出必须能过 schema"——本文件最核心的一条回归
+#
+# 修复前实跑复现：提示词骨架写 "scores": {"base": {}, "task_specific": {}}，
+# 而 schema 要求 scores.base 必须含 clarity 和 trust（且 additionalProperties:false），
+# 提示词全文没出现过这两个词。于是一份**字段一字不差照抄骨架**的输出仍然报
+#   scores.base: 'clarity' is a required property
+#   scores.base: 'trust' is a required property
+# 结果：报告评分表恒为空、validation 恒为 fail、任何基于"schema 合格率"的
+# 质量门形同虚设。
+#
+# 下面这组测试不手抄一份"理想输出"（那样只测到测试作者的记忆），而是**从真正
+# 渲染出来的提示词里把骨架抠出来**，只把 <...> 占位说明换成合法取值，再送进
+# schema。提示词与 schema 任何一方再次跑偏，这里立刻红。
+# ---------------------------------------------------------------------------
+
+_JSON_BLOCK_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
+# 骨架里的占位说明一律写成 <...>
+_PLACEHOLDER_RE = re.compile(r"^<.*>$", re.DOTALL)
+# 骨架里用 "a|b|c" 表示"从中选一个"的字段
+_CHOICE_DEFAULTS = {"inference_level": "direct", "severity": "medium"}
+
+_SKELETON_PERSONA = {
+    "id": "P-skeleton",
+    "name": "骨架测试角色",
+    "mbti": "INTJ",
+    "decision_rules": ["没有可核验证据就不下结论"],
+    "review_output": {"must_comment_on": ["必答项甲", "必答项乙"]},
+}
+
+
+def _fill_value(key, value, task_type):
+    """单个字符串值的占位替换：字段名不动，只把 <...> 换成该字段的合法取值。"""
+    if key in _CHOICE_DEFAULTS and "|" in value:
+        return _CHOICE_DEFAULTS[key]
+    if key == "primary_stance":
+        stances = stance_enum_for(task_type)
+        return stances[0] if stances else "观望"
+    if _PLACEHOLDER_RE.match(value):
+        return f"占位替换：{key} 的具体内容"
+    return value
+
+
+def _output_from_prompt_skeleton(task_type: str) -> dict:
+    """渲染提示词 → 抠出 ```json 骨架 → 填占位 → 得到"最听话的模型"会交回的输出。"""
+    prompt = render_prompt(
+        _SKELETON_PERSONA, task_type, "某评审对象", PERSONA_PROMPT_PATH
+    )
+    block = _JSON_BLOCK_RE.search(prompt)
+    assert block, "提示词里找不到 ```json 骨架块"
+
+    # 骨架本身必须是合法 JSON——它是给模型逐字照抄的样板，自己都解析不了就没救了
+    skeleton = json.loads(block.group(1))
+
+    must_items = iter(_SKELETON_PERSONA["review_output"]["must_comment_on"])
+
+    def walk(node, parent_key=None):
+        if isinstance(node, dict):
+            out = {}
+            for key, value in node.items():
+                real_key = next(must_items) if _PLACEHOLDER_RE.match(key) else key
+                out[real_key] = walk(value, key)
+            return out
+        if isinstance(node, list):
+            return [walk(item, parent_key) for item in node]
+        if isinstance(node, str):
+            return _fill_value(parent_key, node, task_type)
+        return node
+
+    return walk(skeleton)
+
+
+class TestPromptSkeletonMatchesSchema:
+    """提示词骨架 ↔ schema 的一致性。这是"报告评分表永远是空的"的根因所在。"""
+
+    def test_skeleton_block_is_parseable_json(self):
+        prompt = render_prompt(
+            _SKELETON_PERSONA, "steam_page_review", "某评审对象", PERSONA_PROMPT_PATH
+        )
+        block = _JSON_BLOCK_RE.search(prompt)
+        assert block is not None
+        json.loads(block.group(1))
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_verbatim_skeleton_passes_schema(self, task_type):
+        schema = load_schema(OUTPUT_SCHEMA_PATH)
+        output = _output_from_prompt_skeleton(task_type)
+        result = validate_schema(output, schema)
+        assert result["valid"] is True, (
+            f"{task_type}: 照抄提示词骨架的输出被 schema 拒绝 → {result['errors']}"
+        )
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_skeleton_carries_required_base_scores(self, task_type):
+        # 骨架必须把 clarity / trust 明写出来。此前这两个词在提示词全文都不存在，
+        # 模型无从知道要输出它们 —— 评分表因此恒为空。
+        output = _output_from_prompt_skeleton(task_type)
+        assert set(output["scores"]["base"]) == {"clarity", "trust"}
+        for value in output["scores"]["base"].values():
+            assert isinstance(value, int) and 1 <= value <= 5
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_skeleton_carries_task_specific_dimensions(self, task_type):
+        output = _output_from_prompt_skeleton(task_type)
+        assert list(output["scores"]["task_specific"]) == list(
+            TASK_SCORE_DIMENSIONS[task_type]
+        )
+
+    def test_pitch_review_stance_is_in_enum(self):
+        # 创业评审面板此前没有任何立场词表，8 个人格自造 8 种说法，
+        # 聚合器拿 primary_stance 当 dict 键做立场聚类 → 共识/分歧统计直接失效
+        output = _output_from_prompt_skeleton("pitch_review")
+        assert output["primary_stance"] in TASK_STANCE_ENUM["pitch_review"]
+        assert TASK_STANCE_ENUM["pitch_review"] == ["值得跟进", "不投", "观望"]
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_every_task_type_has_stance_words_in_prompt(self, task_type):
+        prompt = render_prompt(
+            _SKELETON_PERSONA, task_type, "某评审对象", PERSONA_PROMPT_PATH
+        )
+        for stance in TASK_STANCE_ENUM[task_type]:
+            assert stance in prompt, f"{task_type} 的立场词「{stance}」没进提示词"
+
+
+class TestSchemaTaskTypeEnum:
+    """schema 的 task_type 枚举与引擎注册表漂移 → 合法输出被判枚举不符 → 报告没评分。
+    persona_agent 导入时已有同样的断言，这里再钉一遍，避免有人把断言删了。"""
+
+    def test_enum_matches_engine_registry(self):
+        schema = load_schema(OUTPUT_SCHEMA_PATH)
+        assert set(schema["properties"]["task_type"]["enum"]) == set(VALID_TASK_TYPES)
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_every_registered_task_type_accepted(self, task_type):
+        schema = load_schema(OUTPUT_SCHEMA_PATH)
+        output = _make_valid_output()
+        output["task_type"] = task_type
+        result = validate_schema(output, schema)
+        assert result["valid"] is True, result["errors"]
+
+    def test_previously_missing_four_are_now_accepted(self):
+        # 实测挂过的四个：引擎认、schema 不认
+        schema = load_schema(OUTPUT_SCHEMA_PATH)
+        for task_type in (
+            "pitch_review",
+            "product_feedback_review",
+            "pricing_page_review",
+            "onboarding_review",
+        ):
+            output = _make_valid_output()
+            output["task_type"] = task_type
+            assert validate_schema(output, schema)["valid"] is True
 
 
 class TestLoadSchema:

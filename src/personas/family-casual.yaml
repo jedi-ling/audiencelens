@@ -287,4 +287,4 @@ personas:
       strictness: 4
       must_comment_on: [难度自适应, 操作简化, 字体/UI可及性, 跨代共玩可能]
       avoid: [只从单一人群角度评判]
-    notes: age_range=40-55：反映跨代桥梁角色通常处于家庭中间代的典型年龄段
+    notes: age_range 仅作为"同时与更年长和更年幼家人一起玩"这一处境的代理变量记录，不表示该处境与年龄之间存在因果关系。

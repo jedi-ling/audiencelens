@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 
@@ -5,15 +6,24 @@ import pytest
 import yaml
 
 from runner.persona_agent import (
+    BASE_SCORE_DIMENSIONS,
+    TASK_SCORE_DIMENSIONS,
+    TASK_STANCE_ENUM,
     estimate_cost,
     parse_persona_output,
     render_prompt,
+    score_dimensions_for,
     select_model,
+    stance_enum_for,
 )
+from runner.task_types import VALID_TASK_TYPES
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "persona-prompt.md")
 BUDGET_PATH = os.path.join(PROJECT_ROOT, "src", "config", "budget.yaml")
+BACKEND_SERVICES_PATH = os.path.join(
+    PROJECT_ROOT, "web", "backend", "app", "services", "__init__.py"
+)
 
 
 @pytest.fixture
@@ -134,6 +144,167 @@ class TestRenderPrompt:
         if isinstance(parsed, dict):
             assert "behavior_profile" not in parsed or "id" in parsed
         assert "P01-indie-core-operator" in result
+
+
+def _backend_task_types() -> dict:
+    """读后端 services 的 TASK_TYPES 字面量，但**不 import 它**。
+
+    import 会把 fastapi / sqlalchemy / pydantic-settings 全家桶拖进引擎测试环境
+    （后端有自己的一套依赖和一条独立的测试门），而这里只需要一个字典字面量。
+    用 ast 直接取，既没有依赖也没有导入副作用。
+    """
+    with open(BACKEND_SERVICES_PATH, "r", encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    for node in ast.walk(tree):
+        target = None
+        if isinstance(node, ast.AnnAssign):
+            target = node.target
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+        if isinstance(target, ast.Name) and target.id == "TASK_TYPES":
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"{BACKEND_SERVICES_PATH} 里找不到 TASK_TYPES 字面量")
+
+
+class TestTaskTableSingleSource:
+    """立场词表 / 评分维度必须只有一套口径。
+
+    此前是两套半：后端 services.TASK_TYPES 一套（前端 /api/task-types 展示的就是它），
+    提示词里手写一套（只覆盖 10 个立场 + 4 个任务的维度，且与前者不一致），
+    剩下 4 个任务类型两套都没有。后果是模型按 A 打分、报告页按 B 展示，
+    创业面板的 8 个人格干脆自造 8 种立场说法，共识与分歧统计直接失效。
+
+    现在提示词的词表来自 runner.persona_agent，值从 services 逐字复制。
+    任何一边改了而另一边没跟上，下面这两条立刻红。
+    """
+
+    def test_stance_enum_matches_backend(self):
+        backend = _backend_task_types()
+        for task_type in VALID_TASK_TYPES:
+            assert TASK_STANCE_ENUM[task_type] == backend[task_type]["stance_enum"], (
+                f"{task_type} 的立场词表与后端 services.TASK_TYPES 不一致——"
+                "两边必须逐字相同，否则模型输出的立场词在报告页上对不上号"
+            )
+
+    def test_score_dimensions_match_backend(self):
+        backend = _backend_task_types()
+        for task_type in VALID_TASK_TYPES:
+            assert list(TASK_SCORE_DIMENSIONS[task_type]) == backend[task_type][
+                "score_dimensions"
+            ], (
+                f"{task_type} 的评分维度与后端 services.TASK_TYPES 不一致——"
+                "维度名对不上，跨人格分数就不可比"
+            )
+
+    def test_tables_cover_every_registered_task_type(self):
+        assert set(TASK_STANCE_ENUM) == set(VALID_TASK_TYPES)
+        assert set(TASK_SCORE_DIMENSIONS) == set(VALID_TASK_TYPES)
+        assert len(VALID_TASK_TYPES) == 14
+
+    def test_base_dimensions_are_the_two_schema_requires(self):
+        assert list(BASE_SCORE_DIMENSIONS) == ["clarity", "trust"]
+        # 释义不能是空壳：模型要靠它知道 1 分和 5 分分别是什么样
+        assert all(len(desc) > 20 for desc in BASE_SCORE_DIMENSIONS.values())
+
+
+class TestTaskTableDriftGuard:
+    """导入期断言必须真的会炸——否则它只是一行看起来很负责的注释。"""
+
+    def test_missing_task_type_in_stance_table_fails(self, monkeypatch):
+        from runner import persona_agent
+
+        broken = dict(persona_agent.TASK_STANCE_ENUM)
+        broken.pop("pitch_review")
+        monkeypatch.setattr(persona_agent, "TASK_STANCE_ENUM", broken)
+        with pytest.raises(AssertionError, match="TASK_STANCE_ENUM"):
+            persona_agent._assert_task_tables_aligned()
+
+    def test_missing_task_type_in_dimension_table_fails(self, monkeypatch):
+        from runner import persona_agent
+
+        broken = dict(persona_agent.TASK_SCORE_DIMENSIONS)
+        broken.pop("onboarding_review")
+        monkeypatch.setattr(persona_agent, "TASK_SCORE_DIMENSIONS", broken)
+        with pytest.raises(AssertionError, match="TASK_SCORE_DIMENSIONS"):
+            persona_agent._assert_task_tables_aligned()
+
+    def test_schema_enum_drift_fails(self, monkeypatch, tmp_path):
+        from runner import persona_agent
+
+        stale = tmp_path / "output-schema.json"
+        stale.write_text(
+            json.dumps(
+                {"properties": {"task_type": {"enum": VALID_TASK_TYPES[:10]}}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(persona_agent, "_SCHEMA_PATH", str(stale))
+        with pytest.raises(AssertionError, match="output-schema.json"):
+            persona_agent._assert_task_tables_aligned()
+
+
+class TestRenderScoringGuidance:
+    """提示词必须**明确写出**模型要交回什么分——此前 clarity / trust 两个词
+    在提示词全文一次都没出现过，而 schema 要求它们必填。"""
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_base_dimensions_named_and_explained(self, sample_persona, task_type):
+        result = render_prompt(sample_persona, task_type, "某评审对象", TEMPLATE_PATH)
+        for dim, desc in BASE_SCORE_DIMENSIONS.items():
+            assert dim in result
+            assert desc in result
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_task_dimensions_named_and_explained(self, sample_persona, task_type):
+        result = render_prompt(sample_persona, task_type, "某评审对象", TEMPLATE_PATH)
+        for dim, desc in TASK_SCORE_DIMENSIONS[task_type].items():
+            assert dim in result, f"{task_type} 缺维度 {dim}"
+            assert desc in result, f"{task_type} 的维度 {dim} 没给释义"
+
+    def test_other_task_dimensions_not_leaked(self, sample_persona):
+        # 只注入本次要填的维度：铺 14 份清单会让模型在表里找错行（旧提示词就这样，
+        # 它只列了 4 个任务的维度，其余 10 个任务的人格全靠自造）
+        result = render_prompt(
+            sample_persona, "pitch_review", "某BP", TEMPLATE_PATH
+        )
+        assert "market_potential" in result
+        assert "wishlist_appeal" not in result
+        assert "moment_to_moment_feel" not in result
+
+    def test_unknown_task_type_says_so_instead_of_inventing(self, sample_persona):
+        # 没预置词表就明说没有，不给模型一套编出来的维度/立场
+        result = render_prompt(
+            sample_persona, "not_a_registered_task", "某材料", TEMPLATE_PATH
+        )
+        assert "未预置专属评分维度" in result
+        assert "未预置立场词表" in result
+        # 基础维度任何任务都得填
+        assert "clarity" in result and "trust" in result
+
+    @pytest.mark.parametrize("task_type", VALID_TASK_TYPES)
+    def test_skeleton_scores_are_prefilled_with_real_dimension_names(
+        self, sample_persona, task_type
+    ):
+        result = render_prompt(sample_persona, task_type, "某评审对象", TEMPLATE_PATH)
+        # 旧骨架就是这一行导致评分表恒为空
+        assert '"scores": {"base": {}, "task_specific": {}}' not in result
+        assert '"base": {"clarity": 3, "trust": 3}' in result
+        for dim in score_dimensions_for(task_type):
+            assert f'"{dim}": 3' in result
+
+    def test_stance_line_is_the_task_specific_one(self, sample_persona):
+        result = render_prompt(
+            sample_persona, "pitch_review", "某BP", TEMPLATE_PATH
+        )
+        assert "值得跟进 / 不投 / 观望" in result
+        # 别的任务类型的立场词表不该出现在这份提示词里（旧提示词把 10 份词表全铺出来）
+        assert "继续试玩 / 退出 / 观望" not in result
+        assert "增强信心 / 降低信心 / 无影响" not in result
+
+    def test_stance_helpers_do_not_invent_for_unknown_task(self):
+        assert stance_enum_for("not_a_registered_task") == []
+        assert score_dimensions_for("not_a_registered_task") == []
 
 
 class TestParsePersonaOutput:
@@ -414,6 +585,93 @@ class TestNormalizeShapes:
         out = normalize_persona_output({"scores": {"clarity": 4, "trust": 3, "fun": 5}})
         assert out["scores"]["base"] == {"clarity": 4, "trust": 3}
         assert out["scores"]["task_specific"] == {"fun": 5}
+
+
+class TestNormalizeScores:
+    """评分是报告评分表的唯一数据来源，所以"模型确实给了分"这件事不能死在形状上。
+    但缺的分绝不补——编一个分数出来，报告里会显示成"这个人格给了 3 分"。"""
+
+    def test_non_integer_values_coerced_to_1_5_int(self):
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({
+            "scores": {
+                "base": {"clarity": 4.4, "trust": "3"},
+                "task_specific": {"a": "4/5", "b": "8/10", "c": "评分：5 分", "d": 7},
+            }
+        })
+        assert out["scores"]["base"] == {"clarity": 4, "trust": 3}
+        # 4/5 → 4；8/10 折算回五分制 → 4；带字的取数字 → 5；超上限夹到 5
+        assert out["scores"]["task_specific"] == {"a": 4, "b": 4, "c": 5, "d": 5}
+
+    def test_unreadable_score_is_dropped_not_invented(self):
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({
+            "scores": {"base": {"clarity": 4, "trust": "N/A"},
+                       "task_specific": {"a": "无法判断", "b": None, "c": True}}
+        })
+        # trust 读不出数字就让它缺席，schema 会如实报缺；不能塞个 3 冒充评分
+        assert out["scores"]["base"] == {"clarity": 4}
+        assert out["scores"]["task_specific"] == {}
+
+    def test_extra_base_key_moved_to_task_specific(self):
+        from runner.persona_agent import normalize_persona_output
+
+        # schema 的 scores.base 是 additionalProperties:false，多一个键整份输出不合格；
+        # 但那个键往往承载真实评分，直接丢掉等于丢内容
+        out = normalize_persona_output({
+            "scores": {"base": {"clarity": 4, "trust": 3, "appeal": 5},
+                       "task_specific": {"fun": 2}}
+        })
+        assert out["scores"]["base"] == {"clarity": 4, "trust": 3}
+        assert out["scores"]["task_specific"] == {"fun": 2, "appeal": 5}
+
+    def test_base_dimensions_misplaced_in_task_specific_are_lifted(self):
+        from runner.persona_agent import normalize_persona_output
+
+        # 放错层会被报成"缺 clarity"，报告的横向对比列因此整列空掉
+        out = normalize_persona_output({
+            "scores": {"base": {}, "task_specific": {"clarity": 5, "trust": 2, "fun": 3}}
+        })
+        assert out["scores"]["base"] == {"clarity": 5, "trust": 2}
+        assert out["scores"]["task_specific"] == {"fun": 3}
+
+    def test_correct_scores_untouched(self):
+        from runner.persona_agent import normalize_persona_output
+
+        scores = {"base": {"clarity": 4, "trust": 5},
+                  "task_specific": {"market_potential": 2}}
+        out = normalize_persona_output({"scores": json.loads(json.dumps(scores))})
+        assert out["scores"] == scores
+
+    def test_normalized_scores_pass_schema(self):
+        """归一化之后必须真的能过 schema——否则救回来的分照样进不了报告。"""
+        from runner.persona_agent import normalize_persona_output
+        from runner.validator import load_schema, validate_schema
+
+        schema = load_schema(
+            os.path.join(PROJECT_ROOT, "src", "schemas", "output-schema.json")
+        )
+        base_output = {
+            "persona_id": "P01", "persona_name": "林岚", "persona_version": "0.1.0",
+            "task_type": "pitch_review", "primary_stance": "观望",
+            "confidence": 0.5, "evidence_sufficiency": 0.5,
+            "evidence": [{"content": "有营收数字", "inference_level": "direct"}],
+            "scores": {"base": {"clarity": "4", "trust": 3.4, "appeal": 5},
+                       "task_specific": {"market_potential": "4/5"}},
+            "key_issues": [{"severity": "medium", "title": "T",
+                            "why_it_matters": "W", "suggested_fix": "F"}],
+            "continue_triggers": [], "quit_triggers": [],
+            "first_scan_observations": [], "must_comment_on_check": {},
+            "missing_information": [], "voice_sample": "先看数据",
+            "meta": {"caveats": ["仅基于 BP"], "is_synthetic": True},
+        }
+        out = normalize_persona_output(base_output)
+        result = validate_schema(out, schema)
+        assert result["valid"] is True, result["errors"]
+        assert out["scores"]["base"] == {"clarity": 4, "trust": 3}
+        assert out["scores"]["task_specific"] == {"market_potential": 4, "appeal": 5}
 
     def test_absent_fields_not_invented(self):
         # 归一化只规整"模型给了但形状错"的字段，不给没给的字段凭空造空值——

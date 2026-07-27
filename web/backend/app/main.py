@@ -89,7 +89,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-Id"],
+    # X-Total-Count：GET /api/reviews 的总条数放在头里（见 api/__init__.py 的说明）。
+    # 不在这里 expose，跨域部署下浏览器根本读不到这个头，历史页的"共 N 条"会静默
+    # 退化成"这一页装满了就说明还有更多"——功能不报错，但数字永远显示不出来。
+    expose_headers=["X-Request-Id", "X-Total-Count"],
 )
 
 register_error_handlers(app)

@@ -4,7 +4,17 @@ import os
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
 
 from app.models import Review
 from app.schemas import (
@@ -37,6 +47,7 @@ from app.services.evaluation_service import EvaluationService
 from app.services.ethics_service import EthicsService
 from app.websocket import manager
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Base
@@ -143,8 +154,22 @@ def _review_response_for(review: Review, identity: Identity) -> ReviewResponse:
     )
 
 
+def _count_reviews_for(session: Session, user_id: Optional[str]) -> int:
+    """该身份名下的评审总条数。
+
+    where 子句必须和 ReviewService.list_reviews **逐字一致**（同样按
+    Review.user_id 精确匹配），否则前端拿总数算出的"还有 N 条"会指向一批
+    永远翻不到的记录——那又是一个"数字对不上"的静默谎话。
+    """
+    stmt = select(func.count()).select_from(Review)
+    if user_id is not None:
+        stmt = stmt.where(Review.user_id == user_id)
+    return int(session.scalar(stmt) or 0)
+
+
 @router.get("/reviews", response_model=List[ReviewListItemResponse])
 def list_reviews(
+    response: Response,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_session),
@@ -152,9 +177,20 @@ def list_reviews(
 ):
     """列表只返回瘦身字段（见 ReviewListItemResponse）——不带 artifact_bundle /
     report_json / persona_outputs。侧栏只画一行标题，不该为此把每条评审的
-    base64 截图和完整报告全量拖下来。要完整内容请求 GET /api/reviews/{id}。"""
+    base64 截图和完整报告全量拖下来。要完整内容请求 GET /api/reviews/{id}。
+
+    分页总数放在 `X-Total-Count` 响应头里。
+    为什么是响应头而不是把 body 换成 {items, total} 信封：历史页要显示
+    "共 N 条 / 已显示 M 条"，用户才能确信第 21 条以后的旧评审只是没加载、
+    不是被删了；但把 body 改成信封会一次性打断所有既有调用方。加一个头是纯
+    增量，老调用方原样拿到数组。
+    跨域部署时需要在 CORS expose_headers 里带上它才读得到；前端读不到时会
+    退化成"这一页装满了就说明还有更多"的判断，只是显示不出总数，不会漏数据。
+    """
     svc = ReviewService(session)
-    return svc.list_reviews(offset=offset, limit=limit, user_id=identity.user_id)
+    items = svc.list_reviews(offset=offset, limit=limit, user_id=identity.user_id)
+    response.headers["X-Total-Count"] = str(_count_reviews_for(session, identity.user_id))
+    return items
 
 
 @router.get("/reviews/{review_id}", response_model=ReviewResponse)

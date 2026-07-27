@@ -8,6 +8,7 @@ import { TimeseriesChart } from '@/components/TimeseriesChart'
 import { LedgerPanel } from '@/components/LedgerPanel'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { ServerKeyPanel } from '@/components/ServerKeyPanel'
+import { MailPanel } from '@/components/MailPanel'
 import { PlansPanel } from '@/components/PlansPanel'
 import { AuditLogPanel } from '@/components/AuditLogPanel'
 import { JobsPanel } from '@/components/JobsPanel'
@@ -268,6 +269,7 @@ function Dashboard() {
             <div className="grid gap-6 xl:grid-cols-2">
               <SettingsPanel />
               <ServerKeyPanel />
+              <MailPanel />
             </div>
           )}
 
