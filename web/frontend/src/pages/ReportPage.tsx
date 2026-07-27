@@ -9,13 +9,20 @@
  *
  * 登录态分级：匿名用户拿到的 report_json 带 is_gated=true（后端
  * report_gating.py 裁剪过），走 GatedReportTeaser 分支。
+ *
+ * 两条硬性要求写在 ETHICS.md 里（"每份 AudienceLens 报告必须"）：
+ *   1. Synthetic Banner，不得删除或弱化
+ *   2. Limitations & Caveats 章节
+ * 此前只有下载的 .md 带 banner（src/templates/report-template.md），网页端——
+ * 也就是绝大多数人实际阅读报告的地方——一个字都没有。见 SyntheticBanner /
+ * LimitationsSection，两个分支（完整报告 + 体验版）都必须渲染。
  */
 
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { api } from '@/lib/apiClient'
+import { api, claimPendingReviews, getToken, rememberPendingReview } from '@/lib/apiClient'
 import type { Review, ReviewMode, EvaluationScorecard, EthicsReportView, Severity } from '@/lib/mock-data'
 import {
   EVALUATION_DIMENSIONS,
@@ -28,7 +35,7 @@ import {
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -60,8 +67,26 @@ interface RealDisagreement {
   resolution_suggestion?: string
 }
 
+/** 部分人格没跑成时引擎/后端写进报告的降级标记。
+ *  两条链路（src/runner/cli.py 与 web 后端 services/__init__.py）字段同构，前端只需一套读法。 */
+interface RealDegradation {
+  degraded?: boolean
+  attempted_count?: number
+  succeeded_count?: number
+  failed_count?: number
+  failed_personas?: Array<{ persona_id?: string; persona_name?: string; error?: string }>
+  notice?: string
+}
+
 interface RealReport {
-  meta?: { task_type?: string; target?: string; generated_at?: string; is_synthetic?: boolean } | null
+  meta?: {
+    task_type?: string
+    target?: string
+    generated_at?: string
+    is_synthetic?: boolean
+    /** 引擎侧写入的逐条注意事项（目前只有模拟占位输出会带），有就照原样展示 */
+    caveats?: string[]
+  } | null
   executive_summary?: { primary_recommendation?: string; release_risk?: string; evidence_quality?: string } | null
   consensus?: { agreed_points?: string[]; questioned_points?: string[] } | null
   major_disagreements?: RealDisagreement[]
@@ -72,6 +97,7 @@ interface RealReport {
   cross_examination?: unknown
   compliance?: { status?: string; ethics_score?: number; recommended_steps?: string[] } | null
   simulation_notice?: string | null
+  degradation?: RealDegradation | null
   is_gated?: boolean
   gated_counts?: { priority_fixes_hidden?: number; persona_notes_hidden?: number }
 }
@@ -115,6 +141,92 @@ function noteStance(note: RealPersonaNote): string {
   return note.stance ?? note.primary_stance ?? '未表态'
 }
 
+// ---------- ETHICS.md 强制项：Synthetic Banner + Limitations & Caveats ----------
+
+/**
+ * 合成面板横幅。ETHICS.md：「每份 AudienceLens 报告必须包含 Synthetic Banner
+ * （不得删除或弱化）」。措辞对齐 src/templates/report-template.md 顶部那段，
+ * 不另起一套说法——两处口径不一致比没有更糟。
+ *
+ * 位置固定在页面最顶部（标题之上），用高对比警示色而非灰色小字：伦理指南里
+ * "弱化"和"删除"是同一档问题，摆在需要滚动才看得到的地方就是弱化。
+ */
+function SyntheticBanner() {
+  return (
+    <div className="mb-4 rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-4">
+      <div className="flex items-start gap-3">
+        <Bot className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+        <div>
+          <p className="text-sm font-bold text-warm-orange md:text-base">
+            合成评审面板：以下全部意见由 AI 人格生成，不是真实玩家/用户的反馈。
+          </p>
+          <p className="mt-1.5 text-sm text-text-primary">
+            本报告不得作为「玩家调研结果」「用户调查数据」「真实玩家意见分布」对外展示或引用。
+            它是投入真人测试之前的预筛工具，不能替代真人 playtest 或用户访谈，也不应作为发布决策的唯一依据。
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 降级横幅：本次有人格没跑成，结论只据剩下的几位得出。
+ * 不显式渲染的话，一份"8 位挂 6 位"的报告在页面上和满编报告长得一模一样。
+ */
+function DegradationNotice({ degradation }: { degradation?: RealDegradation | null }) {
+  if (!degradation?.degraded) return null
+  const failed = degradation.failed_personas ?? []
+  const notice =
+    degradation.notice?.trim() ||
+    `本次有 ${degradation.failed_count ?? failed.length} 位人格未能完成评审，以下结论仅基于 ${degradation.succeeded_count ?? '部分'} 位人格的输出。`
+  const failedLabels = failed.map((p) => p.persona_name || p.persona_id).filter(Boolean)
+  return (
+    <div className="mb-4 rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-4">
+      <div className="flex items-start gap-3">
+        <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-severity-critical" strokeWidth={1.75} />
+        <div>
+          <p className="text-sm font-bold text-severity-critical md:text-base">{notice}</p>
+          {failedLabels.length > 0 && (
+            <p className="mt-1.5 text-sm text-text-primary">未完成的人格：{failedLabels.join('、')}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 逐条来自 ETHICS.md（「偏见与局限性」「预筛工具，不是决策依据」「材料决定质量」），
+ *  不新增任何该文档里没有的说法——两份材料必须能对得上。 */
+const LIMITATIONS: string[] = [
+  '合成人格不是真人：立场分布反映的是 AI 人格的输出，不是任何真实用户群体的意见分布。',
+  '过度一致性：LLM 模拟特定群体时输出方差通常低于真实人群，真实世界里的分歧可能被低估。',
+  '材料决定质量：材料里缺少某类证据时人格会输出「未指定」，报告会标注信息缺口——「未指定」不等于「没有问题」。',
+  'Demographic 不是因果解释：性别、年龄、地域本身不能解释偏好，不要据此把结论推广到某个真实人群。',
+  '反馈循环风险：长期用同一套人格评审迭代版本，可能让产品过度迎合模拟出来的「平均偏好」，建议定期更换人格组合。',
+]
+
+/** ETHICS.md 强制项之二：Limitations & Caveats 章节（下载的 .md 一直有，网页端此前没有）。 */
+function LimitationsSection({ caveats }: { caveats?: string[] }) {
+  const extra = (caveats ?? []).filter((c) => typeof c === 'string' && c.trim())
+  return (
+    <section className="mb-6 rounded-xl border border-warm-orange/40 bg-bg-card p-4 md:p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Info className="h-5 w-5 text-warm-orange" strokeWidth={1.5} />
+        <h3 className="text-base font-semibold text-text-primary">局限与注意事项（Limitations &amp; Caveats）</h3>
+      </div>
+      <ul className="space-y-2">
+        {[...extra, ...LIMITATIONS].map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-text-primary">
+            <span className="mt-0.5 shrink-0 text-warm-orange">•</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function ReportPage() {
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
@@ -150,26 +262,48 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (!id) return
+    let alive = true
+
     const loadData = async () => {
+      const [reviewData, reportData] = await Promise.all([fetchReview(id), fetchReport(id)])
+      if (!alive) return
+      setReview(reviewData)
+      if (reportData.report_json) {
+        setReport(reportData.report_json as unknown as RealReport)
+      }
+      if (reportData.calibration) {
+        setCalibration(reportData.calibration as RealCalibration)
+      }
+      if (reportData.report_markdown) {
+        setReportMarkdown(reportData.report_markdown)
+      }
+      // 匿名看的这份报告，归属还挂在共享的 anonymous 桶里。记下 id，用户登录/
+      // 注册时才认领得回来（见 apiClient 的待认领清单）——否则登录那一刻它就 404。
+      if (!getToken()) rememberPendingReview(id)
+    }
+
+    const run = async () => {
       try {
-        const [reviewData, reportData] = await Promise.all([fetchReview(id), fetchReport(id)])
-        setReview(reviewData)
-        if (reportData.report_json) {
-          setReport(reportData.report_json as unknown as RealReport)
-        }
-        if (reportData.calibration) {
-          setCalibration(reportData.calibration as RealCalibration)
-        }
-        if (reportData.report_markdown) {
-          setReportMarkdown(reportData.report_markdown)
-        }
+        await loadData()
       } catch {
-        // 报告尚未生成时走下面的空态分支
+        // 已登录却打不开：很可能就是"这条评审是登录前匿名跑的，还挂在 anonymous
+        // 名下"。认领一次再重试；这里是兜底路径（正常路径在登录时就认领了），
+        // 覆盖"在别的标签页登录""事后再打开这个链接"这类情况。
+        try {
+          const claimed = await claimPendingReviews()
+          if (claimed.includes(id)) await loadData()
+        } catch {
+          // 认领失败（未登录/限流/后端不支持）：保持空态，不额外打断用户
+        }
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     }
-    loadData()
+
+    void run()
+    return () => {
+      alive = false
+    }
   }, [id])
 
   useEffect(() => {
@@ -272,6 +406,16 @@ export default function ReportPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
+      {/* 三条诚实信号一律置顶，不滚动就能看到：合成声明（ETHICS.md 强制）、
+          模拟占位输出、人格降级。它们比报告结论本身更需要被先看到。 */}
+      <SyntheticBanner />
+      {report.simulation_notice && (
+        <div className="mb-4 rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-4 text-sm font-bold text-severity-critical md:text-base">
+          {report.simulation_notice}
+        </div>
+      )}
+      <DegradationNotice degradation={report.degradation} />
+
       <div className="flex items-center gap-3 mb-6">
         <Link to={`/review/${id}`} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
@@ -312,12 +456,6 @@ export default function ReportPage() {
           </button>
         </div>
       </div>
-
-      {report.simulation_notice && (
-        <div className="mb-6 rounded-xl border-2 border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
-          {report.simulation_notice}
-        </div>
-      )}
 
       {reportHtml && (
         <div className="mb-6">
@@ -954,6 +1092,9 @@ export default function ReportPage() {
         )}
       </div>
 
+      {/* ---------- ETHICS.md 强制项：Limitations & Caveats ---------- */}
+      <LimitationsSection caveats={report.meta?.caveats} />
+
       {/* ---------- 价值回填 ---------- */}
       {id && !feedbackSent && (
         <section className="mb-6 rounded-xl border border-neon-green/30 bg-bg-card p-5">
@@ -1028,6 +1169,15 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
+      {/* 体验版也是一份报告——ETHICS.md 的"每份报告必须"没有"匿名版除外"这一条 */}
+      <SyntheticBanner />
+      {gated.simulation_notice && (
+        <div className="mb-4 rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-4 text-sm font-bold text-severity-critical md:text-base">
+          {gated.simulation_notice}
+        </div>
+      )}
+      <DegradationNotice degradation={gated.degradation} />
+
       <div className="flex items-center gap-3 mb-6">
         <Link to={review ? `/review/${review.id}` : '/'} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
@@ -1077,13 +1227,24 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
         <p className="text-text-primary font-medium">
           还有 {fixesHidden} 条优先修复项、{notesHidden} 条角色视角未展示
         </p>
-        <p className="mt-1 text-sm text-text-secondary">登录后可查看完整报告，且报告会保存在你的历史记录里</p>
+        {/* 这句话必须和代码对得上。匿名评审落库时 user_id="anonymous"，登录后
+            身份变了就再也打不开——所以"报告会保存在你的历史记录里"只有在认领
+            链路真的存在时才成立（apiClient 的待认领清单 + POST
+            /api/auth/me/claim-reviews）。认领靠的是这台浏览器本地记下的 id，
+            所以"在这台设备上"不是废话，是这句承诺真实的边界。 */}
+        <p className="mt-1 text-sm text-text-secondary">
+          在这台设备上登录或注册后，这份报告会自动归到你的账号名下，完整内容和历史记录都能在「评审历史」里打开。
+        </p>
         <Link
           to="/login"
           className="mt-4 inline-block rounded-lg bg-neon-green px-5 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
         >
-          登录查看完整报告
+          登录 / 注册看完整报告
         </Link>
+      </div>
+
+      <div className="mt-6">
+        <LimitationsSection caveats={gated.meta?.caveats} />
       </div>
     </div>
   )
@@ -1096,6 +1257,15 @@ function generateMarkdown(report: RealReport): string {
   const summary = report.executive_summary
   lines.push('# 评审报告')
   lines.push('')
+  // 服务端的 markdown 走 src/templates/report-template.md，顶部自带 Synthetic Banner。
+  // 这条兜底路径此前直接从"# 评审报告"开始，导出的文件里一句合成声明都没有。
+  lines.push('> **合成评审面板：以下全部意见由 AI 人格生成，不是真实玩家/用户的反馈。**')
+  lines.push('> 本报告不得作为「玩家调研结果」「用户调查数据」「真实玩家意见分布」对外展示或引用。')
+  lines.push('')
+  if (report.degradation?.degraded && report.degradation.notice) {
+    lines.push(`> **⚠️ ${report.degradation.notice}**`)
+    lines.push('')
+  }
   if (summary) {
     lines.push(`## 发布风险：${RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '未知'}`)
     lines.push('')
@@ -1122,5 +1292,12 @@ function generateMarkdown(report: RealReport): string {
     gaps.forEach((g, i) => lines.push(`${i + 1}. ${g}`))
     lines.push('')
   }
+  // ETHICS.md 要求每份报告都带 Limitations & Caveats——导出件同样算"一份报告"
+  lines.push('## 局限与注意事项（Limitations & Caveats）')
+  lines.push('')
+  for (const item of [...(report.meta?.caveats ?? []), ...LIMITATIONS]) {
+    lines.push(`- ${item}`)
+  }
+  lines.push('')
   return lines.join('\n')
 }

@@ -247,6 +247,103 @@ def _require_own_identity(identity: Identity) -> None:
         )
 
 
+# ---------- 认领：把登录前跑的匿名评审挂到自己账号下 ----------
+
+
+class ClaimReviewsRequest(BaseModel):
+    review_ids: List[str] = Field(default_factory=list)
+
+
+# 一次最多认领多少条。上限的意义不是"够不够用"，而是别让这个接口变成
+# 一次请求就能扫一大批 uuid 的探测器（配合限流一起看）。
+CLAIM_MAX_IDS = 50
+
+
+@router.post(
+    "/auth/me/claim-reviews",
+    dependencies=[Depends(rate_limit("claim_reviews", 20, 3600))],
+)
+async def claim_reviews(
+    body: ClaimReviewsRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """把「登录前以匿名身份跑的评审」改挂到当前账号名下。
+
+    为什么必须有这个接口：匿名评审落库时 user_id = settings.anonymous_user_id，
+    而所有归属校验都是精确字符串比对（v1 的 _check_review_owner、v2 的
+    `review.user_id != identity.user_id → 404`）。用户一登录，identity.user_id
+    变成真实 id，这条评审的每一个路由都开始返回 404——前端承诺的"登录后可查看
+    完整报告"实际表现是**报告凭空消失**。没有认领，那句文案就是假的。
+
+    ── 安全边界（写清楚，不假装它不存在）──────────────────────────
+    1. 只认领**当前仍归属匿名桶**（anonymous_user_id）或 user_id 为空的评审。
+       已经属于某个真实账号的一律跳过，绝不转移——所以这个接口无法把别人
+       账号里的评审偷过来。
+    2. 匿名桶是**共享**的：AL_AUTH_ENABLED=false 时全实例共用一个 anonymous
+       身份。因此"任何知道某条评审 uuid 的人都能把它认领走"是事实，唯一的
+       防线是 review.id 为 uuid4（122 位随机，不可枚举）+ 本接口的限流。
+       这是取舍，不是疏漏：换成"必须先证明你是创建者"就得引入匿名会话密钥，
+       而匿名本来就没有可信的身份可绑。
+    3. 认领是**一次性、不可逆**的（先到先得）：评审一旦离开匿名桶，其他匿名
+       访客就再也看不到它。单机/开源形态（认证关闭）下所有人都是匿名，
+       `_require_own_identity` 会直接挡住调用，不受影响。
+    4. 返回值不区分"这条 id 不存在"和"这条已属于别人"——两者都进 rejected。
+       理由与归属校验用 404 而不是 403 一致：不向调用方确认某个 id 是否存在。
+
+    ── 关联记录怎么处理 ─────────────────────────────────────────
+    跟着评审走（它们随 Review 级联删除，归属必须一致，否则新主人在
+    「判断复利」「价值指标」里看不到自己评审的数据，旧数据还留在匿名桶里）：
+        · Judgment（该评审产出的预测，/ledger/* 全部按 user_id 过滤）
+        · ReviewFeedback（价值回填，/validation/metrics 按 user_id 聚合）
+    **不跟着走**（计量/财务事实源，与 user_data_service 的删除口径同一条线）：
+        · UsageRecord / CreditLedger —— 这次消耗当时就记在匿名桶头上了，
+          事后改挂到新账号等于让用户为"注册前已经用掉的额度"再被扣一次配额。
+        · Job —— 队列簿记，评审跑完就没用了，不值得为它多写一次库。
+    """
+    from sqlalchemy import or_
+
+    from app.models import Judgment, ReviewFeedback
+
+    _require_own_identity(identity)
+
+    seen = set()
+    wanted: List[str] = []
+    for raw in body.review_ids or []:
+        rid = str(raw).strip()
+        if rid and rid not in seen:
+            seen.add(rid)
+            wanted.append(rid)
+    if len(wanted) > CLAIM_MAX_IDS:
+        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 条评审")
+    if not wanted:
+        return {"claimed": [], "rejected": [], "claimed_count": 0}
+
+    anon = settings.anonymous_user_id
+    rows = db.query(Review).filter(Review.id.in_(wanted)).all()
+    claimed: List[str] = []
+    for review in rows:
+        if review.user_id and review.user_id != anon:
+            continue  # 已属于某个真实账号 —— 拒绝，不做转移
+        review.user_id = identity.user_id
+        claimed.append(review.id)
+
+    if claimed:
+        for model in (Judgment, ReviewFeedback):
+            db.query(model).filter(
+                model.review_id.in_(claimed),
+                or_(model.user_id == anon, model.user_id.is_(None)),
+            ).update({"user_id": identity.user_id}, synchronize_session=False)
+        db.commit()
+
+    claimed_set = set(claimed)
+    return {
+        "claimed": claimed,
+        "rejected": [rid for rid in wanted if rid not in claimed_set],
+        "claimed_count": len(claimed),
+    }
+
+
 @router.get("/auth/me/export", dependencies=[Depends(rate_limit("data_export", 5, 3600))])
 async def export_my_data(
     identity: Identity = Depends(optional_identity),

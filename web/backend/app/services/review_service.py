@@ -24,9 +24,10 @@ from app.config import settings
 from app.core.logging import logger
 from app.db import session_scope
 from app.models import PersonaOutput, Review
-from app.services import job_service, ledger_service, quota_service
+from app.services import admin_settings_service, job_service, ledger_service, quota_service
 
-# 把仓库的 src/ 挂到 path，复用 CLI 那套已经过 232 项测试的引擎
+# 把仓库的 src/ 挂到 path，复用 CLI 那套引擎（引擎侧 tests/ 有独立测试套件；
+# 不在这里写死项数——数字会随开发漂移，写死了下一个读到的人就被骗一次）
 _SRC = os.path.join(settings.repo_root, "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
@@ -137,7 +138,11 @@ def _execute_review(
             task_type=review.task_type,
             artifact_bundle=review.artifact_bundle,
             personas_path=personas_path,
-            max_concurrency=settings.review_concurrency,
+            # 后台面板可实时覆盖（回落 env）——并发度直接决定单次评审的
+            # 峰值成本与上游 429 风险，运营必须能在不重启的情况下调。
+            max_concurrency=admin_settings_service.get(
+                db, "review_concurrency", settings.review_concurrency
+            ),
             progress_callback=_on_persona_done,
             api_key=api_key,
             provider=provider,

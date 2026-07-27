@@ -4,9 +4,13 @@
 于是你随时可以打开开关开始计费，而历史用量数据早已存在——
 不必等"想收费了"才开始埋点，那时就晚了。
 
+额度来源：一律走 plan_service.get_plan(plan, db)，**必须传 db** ——
+free 档的日限额/日成本上限由后台面板的 quota_free_* 设置项驱动，
+不传 db 就只读得到 env 默认值，运营在面板上的止血操作会静默失效。
+
 接入真实计费（Stripe 等）时：
-  1. 在 check_quota 里按 user.plan 查套餐额度（替换下面的 free 常量）
-  2. 在 record_usage 后推送计量事件到计费服务
+  1. 在 record_usage 后推送计量事件到计费服务
+  2. webhook 回来后改 User.plan 即可，评审链路无需改动
   调用方（api/reviews.py）无需改动。
 """
 

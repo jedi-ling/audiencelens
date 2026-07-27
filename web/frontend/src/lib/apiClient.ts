@@ -38,6 +38,9 @@ import {
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
 const TOKEN_KEY = 'al.token'
+const PENDING_REVIEWS_KEY = 'al.pending_reviews'
+/** 本地待认领清单的条数上限——localStorage 不是数据库，超出丢最旧的 */
+const PENDING_REVIEWS_MAX = 20
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -46,6 +49,66 @@ export function getToken(): string | null {
 export function setToken(token: string | null): void {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+}
+
+/* ------------------------------------------------------------------ *
+ * 匿名评审的「待认领」清单
+ *
+ * 未登录时发起的评审落库 user_id="anonymous"，而后端归属校验是精确字符串
+ * 比对。用户一登录 identity.user_id 变成真实 id，这条评审的所有路由立刻
+ * 404 —— 页面上表现为"登录后报告凭空消失"。所以这里记下"这台浏览器匿名
+ * 跑过哪些评审"，登录/注册成功后调 POST /api/auth/me/claim-reviews 认领。
+ *
+ * 边界（不粉饰）：只存 id 不存内容；清空浏览器数据 = 这些 id 永久失联，
+ * 后端没有别的线索能把它们找回给谁——匿名本来就没有可信身份可绑。
+ * ------------------------------------------------------------------ */
+
+export function listPendingReviews(): string[] {
+  try {
+    const raw = localStorage.getItem(PENDING_REVIEWS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  } catch {
+    return [] // 手工改坏 / 旧格式：当作空清单，不让它把页面搞崩
+  }
+}
+
+function writePendingReviews(ids: string[]): void {
+  try {
+    localStorage.setItem(PENDING_REVIEWS_KEY, JSON.stringify(ids.slice(0, PENDING_REVIEWS_MAX)))
+  } catch {
+    // 隐私模式 / 配额满：认领只是尽力而为的补救，存不下不该阻断评审本身
+  }
+}
+
+/** 记下一条"匿名跑的评审"。已登录时什么都不做——那条评审本来就归属明确。 */
+export function rememberPendingReview(id: string): void {
+  if (!id || getToken()) return
+  const current = listPendingReviews()
+  if (current.includes(id)) return
+  writePendingReviews([id, ...current])
+}
+
+export function forgetPendingReviews(ids: string[]): void {
+  if (!ids.length) return
+  const drop = new Set(ids)
+  writePendingReviews(listPendingReviews().filter((id) => !drop.has(id)))
+}
+
+/**
+ * 把本地清单里的匿名评审认领到当前账号名下。返回真正认领成功的 id。
+ *
+ * 未登录 / 清单为空时直接返回空数组（不发请求）。被拒绝的 id（不存在、或
+ * 已属于别的账号）也从清单移除——留着只会每次登录都重试一遍必失败的请求。
+ */
+export async function claimPendingReviews(): Promise<string[]> {
+  if (!getToken()) return []
+  const pending = listPendingReviews()
+  if (!pending.length) return []
+  const res = await api.claimReviews(pending)
+  forgetPendingReviews([...res.claimed, ...res.rejected])
+  return res.claimed
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -135,6 +198,14 @@ export const api = {
   /** 导出我的全部数据（密钥只给掩码，不含明文） */
   exportMyData: () => request<Record<string, unknown>>('/api/auth/me/export'),
 
+  /** 把登录前匿名跑的评审挂到当前账号下——不认领的话登录即 404（见文件顶部说明）。
+   *  后端只放行"当前仍归属匿名桶"的评审，已属于别的账号的一律进 rejected。 */
+  claimReviews: (reviewIds: string[]) =>
+    request<{ claimed: string[]; rejected: string[]; claimed_count: number }>(
+      '/api/auth/me/claim-reviews',
+      { method: 'POST', body: JSON.stringify({ review_ids: reviewIds }) },
+    ),
+
   /** 彻底删除我的内容与账号。confirm 必须是「删除我的账号」；已登录用户还要验密码。 */
   deleteMyAccount: (confirm: string, password?: string) =>
     request<{ deleted: boolean; detail: Record<string, number> }>('/api/auth/me/delete', {
@@ -213,6 +284,11 @@ export const api = {
     request<CreateReviewResponse>('/api/v2/reviews', {
       method: 'POST',
       body: JSON.stringify({ mode: 'standard', persona_pack: 'game-core', ...params }),
+    }).then((res) => {
+      // 匿名跑的评审在这里记下 id，登录后才认领得回来。写在唯一的创建出口上，
+      // 两个入口（AskPage / review-store）就不会有哪个漏记。
+      rememberPendingReview(res.review_id)
+      return res
     }),
 
   /** 报告出来后追问——不传 personaId 是跟评审团整体聊，传了是跟该人格保持人设聊。

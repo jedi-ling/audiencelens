@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand'
-import { api, getToken, setToken } from '@/lib/apiClient'
+import { api, claimPendingReviews, getToken, setToken } from '@/lib/apiClient'
 import type { HealthConfig, Identity, KeyStatus, UsageSummary } from '@/lib/types'
 
 interface SessionState {
@@ -92,6 +92,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   login: async (email, password) => {
     const { token } = await api.login(email, password)
     setToken(token)
+    // 登录前匿名跑的评审归属还是 "anonymous"，不认领的话登录后所有路由一律
+    // 404 ——"登录看完整报告"会变成"报告凭空消失"。失败不阻断登录：报告页
+    // 打开时还会再试一次（见 ReportPage）。
+    await claimPendingReviews().catch(() => {})
     const identity = await api.me()
     set({ identity, sessionExpired: false })
     // key/用量都换了归属，一起刷新（用量失败不阻断登录）
@@ -101,6 +105,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   register: async (email, password, displayName) => {
     const { token } = await api.register(email, password, displayName)
     setToken(token)
+    await claimPendingReviews().catch(() => {})
     const identity = await api.me()
     set({ identity, sessionExpired: false })
     await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])

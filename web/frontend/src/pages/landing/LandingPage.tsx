@@ -108,14 +108,17 @@ export default function LandingPage() {
     root.querySelectorAll('.reveal').forEach((el) => io.observe(el))
     cleanups.push(() => io.disconnect())
 
-    // P0-3：辩论卡片 stagger 入场（反对→翻票→赞同），尊重 prefers-reduced-motion
-    // 仅在 hero 首次进入视口时触发一次，避免反复播放
+    // P0-3：争议点摘要卡片 stagger 入场（反方→配对分隔→正方），尊重 prefers-reduced-motion
+    // 仅在 hero 首次进入视口时触发一次，避免反复播放。
+    // 类名沿用历史的 .debate-* / .debate-flip（CSS 里同名，不改），但它展示的是
+    // "同一争议点的正反论据并排"，不是实时辩论、更不是改票——engine 侧 cross_exam.py
+    // 明确返回 is_live_debate:False、vote_changes 恒空。改文案时别把"辩论/改票"写回去。
     const debateCard = root.querySelector<HTMLElement>('.debate-card')
     if (debateCard) {
       const opposeEl = debateCard.querySelector<HTMLElement>('.debate-msg.oppose')
-      const flipEl = debateCard.querySelector<HTMLElement>('.debate-flip')
+      const pairEl = debateCard.querySelector<HTMLElement>('.debate-flip')
       const agreeEl = debateCard.querySelector<HTMLElement>('.debate-msg.agree')
-      const debateTargets = [opposeEl, flipEl, agreeEl].filter(Boolean) as HTMLElement[]
+      const debateTargets = [opposeEl, pairEl, agreeEl].filter(Boolean) as HTMLElement[]
       const debateTimers: number[] = []
       const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches
       if (!reduceMotion) {
@@ -126,7 +129,7 @@ export default function LandingPage() {
             const en = entries[0]
             if (!en.isIntersecting) return
             debateIo.disconnect()
-            // 反对 200ms / 翻票 600ms / 赞同 1000ms 的 stagger 节奏
+            // 反方 200ms / 配对分隔 600ms / 正方 1000ms 的 stagger 节奏
             const delays = [200, 600, 1000]
             debateTargets.forEach((el, idx) => {
               const t = window.setTimeout(() => el.classList.add('debate-stagger-in'), delays[idx] || 0)

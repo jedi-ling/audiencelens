@@ -6,6 +6,21 @@
 用法：
     admin_settings_service.get(db, "quota_enabled", settings.quota_enabled)
     admin_settings_service.set_override(db, "quota_enabled", True)
+
+**进入 ADJUSTABLE 的唯一门槛：运行时真的有代码读它。**
+一个显示「已覆盖 · 1」、审计日志也留了痕、但运行时照旧按 env 放行的旋钮，
+比没有这个旋钮更糟——运营会以为已经止血。每个键下面的 `read_by` 就是读取点，
+新增键时必须一起填，并配一个「改了设置后行为真的变了」的测试，
+断言写入返回 200 不算数。
+
+已有这类行为断言的键（tests/test_admin.py）：
+    quota_enabled  → TestSettingsOverride::test_live_override_reaches_quota_service_without_restart
+    key_mode       → TestPlatformServerKey::test_key_mode_override_takes_effect_live
+**尚缺行为断言**（本轮新接线，只验证了写入校验，没验证运行时行为改变）：
+    quota_free_reviews_per_day / quota_free_cost_usd_per_day / ratelimit_per_minute /
+    ratelimit_review_per_hour / review_concurrency
+读取点见各键的 `read_by`，接线是真的（可 grep 确认），但"改了就生效"这句话
+目前靠代码审阅而不是靠测试保证——补测试之前别把它当成已验证的承诺。
 """
 
 from datetime import datetime, timezone
@@ -17,21 +32,61 @@ from app.config import settings
 from app.core.errors import BadRequest
 from app.models import PlatformSetting
 
-# 键 -> (类型转换函数, 描述, 取值范围校验)
+# 键 -> (类型转换函数, 面板标签, 取值范围校验, 运行时读取点)
 ADJUSTABLE: Dict[str, dict] = {
-    "quota_enabled": {"cast": bool, "label": "配额开关"},
+    "quota_enabled": {
+        "cast": bool,
+        "label": "配额开关",
+        "read_by": "quota_service._quota_enabled",
+    },
     "quota_mode": {
         "cast": str,
         "label": "配额模式（plan=套餐日限 / credits=纯CDK次数制，用完即止）",
         "choices": ("plan", "credits"),
+        "read_by": "quota_service.check_quota / usage_summary",
     },
-    "quota_free_reviews_per_day": {"cast": int, "label": "免费档每日评审次数上限", "min": 0},
-    "quota_free_cost_usd_per_day": {"cast": float, "label": "免费档每日成本上限（美元）", "min": 0},
-    "ratelimit_enabled": {"cast": bool, "label": "限流开关"},
-    "ratelimit_per_minute": {"cast": int, "label": "通用接口限流（次/分钟）", "min": 1},
-    "ratelimit_review_per_hour": {"cast": int, "label": "评审接口限流（次/小时）", "min": 1},
-    "key_mode": {"cast": str, "label": "Key 解析模式", "choices": ("byok", "managed", "hybrid")},
-    "review_concurrency": {"cast": int, "label": "单次评审人格并发度", "min": 1, "max": 32},
+    "quota_free_reviews_per_day": {
+        "cast": int,
+        "label": "免费档每日评审次数上限",
+        "min": 0,
+        "read_by": "plan_service._free_plan → quota_service.check_quota",
+    },
+    "quota_free_cost_usd_per_day": {
+        "cast": float,
+        "label": "免费档每日成本上限（美元）",
+        "min": 0,
+        "read_by": "plan_service._free_plan → quota_service.check_quota",
+    },
+    "ratelimit_enabled": {
+        "cast": bool,
+        "label": "限流开关",
+        "read_by": "deps.rate_limit",
+    },
+    "ratelimit_per_minute": {
+        "cast": int,
+        "label": "通用接口限流（次/分钟，不含发起评审）",
+        "min": 1,
+        "read_by": "deps.resolve_rate_limit（默认档）",
+    },
+    "ratelimit_review_per_hour": {
+        "cast": int,
+        "label": "发起评审限流（次/小时/用户）",
+        "min": 1,
+        "read_by": "deps.resolve_rate_limit（scope=review）",
+    },
+    "key_mode": {
+        "cast": str,
+        "label": "Key 解析模式",
+        "choices": ("byok", "managed", "hybrid"),
+        "read_by": "key_service.resolve_key",
+    },
+    "review_concurrency": {
+        "cast": int,
+        "label": "单次评审人格并发度",
+        "min": 1,
+        "max": 32,
+        "read_by": "review_service._execute_review",
+    },
 }
 
 
@@ -133,5 +188,7 @@ def get_all_effective(db: Session) -> list:
             "env_default": env_defaults[key],
             "effective_value": effective,
             "overridden": overridden,
+            # 运行时读取点：面板可以显示，也方便排障时直接 grep 确认这不是假旋钮
+            "read_by": spec.get("read_by"),
         })
     return out

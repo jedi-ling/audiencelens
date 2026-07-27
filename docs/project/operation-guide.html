@@ -534,6 +534,30 @@ td strong { color: var(--fg); }
 </style>
 </head>
 <body>
+<!-- ============================================================================
+     作废声明（2026-07-27 诚实性对齐加入）
+     本文件是 index.html 之前的旧版材料，未随代码更新，含已核实为不实的声称。
+     请勿分发、引用或复制其中任何数字与机制描述。
+     ========================================================================= -->
+<div style="background:#7f1d1d;color:#fff;padding:20px 24px;font:15px/1.7 -apple-system,'Segoe UI',sans-serif;border-bottom:4px solid #dc2626">
+  <div style="max-width:900px;margin:0 auto">
+    <div style="font-size:19px;font-weight:800;margin-bottom:10px">⚠ 本文件已作废，请勿引用</div>
+    <p style="margin:0 0 10px">
+      架构现状见 <code>docs/ARCHITECTURE.md</code>，能力边界见 <code>README.md</code>。
+      本文件停留在 2026-07 之前的版本，其中下列声称经代码核验<b>不成立</b>：
+    </p>
+    <ul style="margin:0 0 10px;padding-left:22px">
+      <li><b>测试数 440 / 267 / 173</b> —— 实际为 688 passed + 1 skipped（引擎 394 + 平台 294，2026-07 实测）。原文"0 skipped / 全绿"抹掉了那 1 项 skipped。</li>
+      <li><b>75 个人格 / 8 个 Pack / 5 个红队人格</b> —— 实际为 <b>66 个人格 / 10 个 Pack</b>，且<b>红队人格包不存在</b>。</li>
+      <li><b>三段式交叉质询、投票改票、Δc &gt; 0.15 改票、共识演化、临界点检测</b> —— <b>均未实现</b>。<code>cross_exam.py</code> 返回 <code>is_live_debate: false</code>、<code>vote_changes: []</code>、<code>delta</code> 硬编码为 0，渲染出的提示词从未发给模型；θ=0.15 在 Python 代码里零读取点。</li>
+      <li><b>"8 维质量门控 / 任一维不达标强制标注"</b> —— Harness 是<b>事后打分卡</b>，<code>enable_evaluation</code> 默认 false，在评审完成之后才跑，不拦截、不过滤、不重跑任何人格输出。</li>
+      <li><b>报告示例里的 "伦理评分 72/100"、"Harness 31/40"</b> —— 伦理分为 <code>100 − 10·|违规数|</code>，<b>只能取 10 的倍数</b>，72 不在取值范围内；评估器输出的是 [1,5] 区间的加权均值，不存在 /40 量纲。</li>
+      <li><b>"越用越准 / 数据网络效应"</b> —— 留档、回填、命中率均已实现，但 <code>hit_rate</code> <b>没有</b>接回选人或聚合加权，系统不会自动变准。</li>
+    </ul>
+    <p style="margin:0;color:#fecaca">保留本文件仅为版本留痕。</p>
+  </div>
+</div>
+
 
 <!-- 顶部导航 -->
 <nav class="top-bar">

@@ -4,7 +4,7 @@ authors:
   - name: 熵呓工作室
     affiliation: 熵呓工作室
 abstract: |
-  Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation offer a promising alternative by generating synthetic user interviews at scale. However, existing approaches rely on single-turn interactions without cross-examination, lack mechanisms for stance revision, and provide no systematic framework for tracking consensus evolution. We propose and implement a prototype of AudienceLens, a multi-agent cross-examination system for synthetic audience review that addresses these limitations through three core innovations: (1) a three-round debate protocol (position statement, rebuttal, final stance) with fork-isolated persona agents; (2) a vote change mechanism with a confidence threshold of 0.15 and full change provenance; (3) consensus evolution tracking with tipping point detection. The system comprises 75 behavior-driven personas across four specialized skills, accompanied by a preliminary 8-dimension Harness evaluation framework. We propose the identity-behavior decoupling principle and detail an ethics compliance framework aligned with EU AI Act requirements. We discuss limitations including the absence of real-world parity studies and outline a roadmap for empirical validation. We note that this paper presents a system design and prototype implementation; empirical validation with real users remains future work.
+  Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation offer a promising alternative by generating synthetic user interviews at scale, but they also make it cheap to produce plausible-sounding "user feedback" that is grounded in nothing. We present AudienceLens, an open-source prototype for synthetic audience review whose implemented contributions are constraint mechanisms rather than simulation fidelity: (1) three-level evidence provenance — every claim is labelled `direct`, `inferred`, or `gap`, and a validator rejects any persona output whose inferred share exceeds 40%; (2) structural identity-behavior decoupling — demographic fields (gender, age, region) are removed from the persona payload before it reaches the model, so demographic-causal reasoning is unavailable rather than merely discouraged; (3) an 8-dimension Harness rubric whose thresholds live in a single configuration file read at runtime and ship with an explicit "prototype threshold, not empirically validated" annotation. We additionally specify, but have not implemented, a three-round cross-examination protocol with a confidence-gated vote-change mechanism and consensus-evolution tracking; in the current release (v0.3.0) the cross-examination section of a report is a summary derived from single-round persona outputs, and the runtime marks it as such (`mode: "derived_summary"`, `is_live_debate: false`, empty `vote_changes`). The release ships 66 behavior-driven personas across 10 packs and 14 task types. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation.
 keywords: [multi-agent systems, synthetic audience, cross-examination, persona simulation, LLM evaluation, AI ethics]
 ---
 
@@ -12,7 +12,17 @@ keywords: [multi-agent systems, synthetic audience, cross-examination, persona s
 
 ## Abstract
 
-Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation—exemplified by SyntheticUsers and similar platforms—offer a promising alternative by generating synthetic user interviews at scale. However, existing approaches rely on single-turn interactions without cross-examination, lack mechanisms for stance revision, and provide no systematic framework for tracking consensus evolution. We propose and implement a prototype of AudienceLens, a multi-agent cross-examination system for synthetic audience review that addresses these limitations through three core innovations: (1) a three-round debate protocol (position statement, rebuttal, final stance) with fork-isolated persona agents; (2) a vote change mechanism with a confidence threshold of 0.15 and full change provenance; (3) consensus evolution tracking with tipping point detection. The system comprises 75 behavior-driven personas across four specialized skills, accompanied by a preliminary 8-dimension Harness evaluation framework. We propose the identity-behavior decoupling principle and detail an ethics compliance framework aligned with EU AI Act requirements. We discuss limitations including the absence of real-world parity studies and outline a roadmap for empirical validation. We note that this paper presents a system design and prototype implementation; empirical validation with real users remains future work.
+Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation—exemplified by SyntheticUsers and similar platforms—offer a promising alternative by generating synthetic user interviews at scale. They also make it cheap to produce plausible-sounding "user feedback" that is grounded in nothing, which is the failure mode this work targets.
+
+We present **AudienceLens**, an open-source prototype for synthetic audience review. Its implemented contributions are constraint mechanisms rather than simulation fidelity:
+
+1. **Three-level evidence provenance with a hard cap.** Every claim in a persona output is labelled `direct`, `inferred`, or `gap`, and a validator rejects any output whose `inferred` share exceeds 40%.
+2. **Structural identity-behavior decoupling.** Demographic fields (gender, age, region) are removed from the persona payload before it is serialised into the prompt, so demographic-causal reasoning is *unavailable to the model*, not merely discouraged by instruction.
+3. **An 8-dimension Harness evaluation rubric** whose thresholds live in a single configuration file that the code reads at runtime and that ships with an explicit "prototype threshold, not empirically validated" annotation.
+
+We additionally **specify, but have not implemented**, a three-round cross-examination protocol (position statement, rebuttal, final stance) with a confidence-gated vote-change mechanism ($\theta_{\text{change}} = 0.15$), change provenance, consensus-evolution classification, and tipping-point detection. In the current release (v0.3.0) no live multi-agent rebuttal is executed: the cross-examination section of a generated report is a summary derived from the single-round persona outputs, and the runtime labels it `mode: "derived_summary"`, `is_live_debate: false`, with an empty `vote_changes` list. Section 4.6 states the implementation status of each specified mechanism.
+
+The release ships 66 behavior-driven personas across 10 YAML packs and 14 task types. We propose the identity-behavior decoupling principle and describe AI Act–informed design considerations. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation. Empirical validation with real users remains future work for *all* components, implemented and specified alike.
 
 ## 1. Introduction
 
@@ -22,21 +32,27 @@ The emergence of large language models (LLMs) has opened a new frontier: *synthe
 
 However, these approaches share a critical limitation: they treat synthetic user simulation as a *monologue* rather than a *dialogue*. Each persona responds independently, without exposure to opposing viewpoints, without the opportunity to revise their position, and without any mechanism for detecting when consensus is genuine versus superficial. This is fundamentally different from how real focus groups operate—where participants challenge each other's assumptions, shift their views in response to compelling arguments, and sometimes converge on unexpected positions.
 
-We propose and implement a prototype of **AudienceLens**, a multi-agent cross-examination system for synthetic audience review that addresses these limitations. Our key contributions are:
+We present **AudienceLens**, an open-source prototype for synthetic audience review. We separate what the current release (v0.3.0) actually executes from what it only specifies, because that distinction determines what a reader can rely on.
 
-1. **A three-round cross-examination protocol** that structures persona interaction through position statements, rebuttals, and final stances, with fork-isolated agents that prevent cross-contamination while enabling indirect influence through shared position pools.
+**Implemented contributions.**
 
-2. **A vote change mechanism** with a confidence threshold ($\Delta c > 0.15$) that allows personas to update their positions when exposed to compelling counterarguments, while recording full change provenance (triggering argument, confidence delta, before/after stance).
+1. **Three-level evidence provenance with a hard inferred-evidence cap.** Every claim in a persona output carries a `direct` / `inferred` / `gap` label, and a validator rejects outputs whose `inferred` share exceeds 40% (`src/runner/validator.py`). This is enforced in code, not requested in a prompt.
 
-3. **Consensus evolution tracking** that classifies group dynamics into four patterns (converging, diverging, stable, oscillating) and detects tipping points—moments when $\geq 2$ personas change stance or confidence delta $\geq 0.3$ within a single round.
+2. **Structural identity-behavior decoupling.** Demographic attributes are stripped from the persona record before serialisation: only a fixed `CORE_FIELDS` allowlist (behavior profile, motivations, decision rules, quit/continue triggers, first-scan focus) is injected into the prompt. The model never sees gender, age, or region, so demographic-causal reasoning is structurally unavailable rather than merely prohibited. A two-layer stereotype detector (regex first pass, plus an optional LLM judge when an API key is configured) inspects the output as a second line of defence.
 
-4. **An 8-dimension Harness evaluation framework** with quantitative thresholds for each dimension, providing the first systematic quality gate for synthetic audience review outputs.
+3. **An 8-dimension Harness evaluation rubric** with thresholds declared in a single runtime-read configuration file (`src/harness/thresholds.yaml`) that ships with a machine-readable "prototype threshold, not empirically validated" annotation. We describe it as a *post-hoc scorecard, not a gate*: it is disabled by default, runs after a review completes, and does not filter, block, or re-run any persona output.
 
-5. **The identity-behavior decoupling principle**, an ethical framework that prohibits using demographic attributes (gender, age, region, MBTI) as causal explanations for behavioral judgments, with a compliance scoring mechanism and stereotype avoidance checklist.
+4. **An open-source implementation** (MIT) with CLI, Python API, MCP server, web, and Docker entry points, shipping 66 behavior-driven personas across 10 YAML packs and 14 task types, with presets for six model providers.
 
-6. **An open-source, skill-based implementation** compatible with Claude Code and Trae AI coding assistants, comprising 75 behavior-driven personas across four specialized skills.
+**Design contribution, specified but not implemented.**
 
-The remainder of this paper is organized as follows: Section 2 reviews related work; Section 3 presents our method; Section 4 details the implementation; Section 5 describes the evaluation framework; Section 6 discusses ethical considerations; Section 7 addresses limitations and future work; and Section 8 concludes.
+5. **A three-round cross-examination protocol** (position statement, rebuttal, final stance) with a confidence-gated vote-change mechanism ($\Delta c > \theta_{\text{change}}$, $\theta_{\text{change}} = 0.15$), full change provenance, consensus-evolution classification into four patterns, and tipping-point detection. Sections 3.3–3.6 give the specification; **Section 4.6 documents that none of it executes in v0.3.0.** In brief: the cross-examination block in a generated report is a summary derived from the single-round persona outputs, labelled `mode: "derived_summary"` and `is_live_debate: false` by the runtime itself; `vote_changes` is always empty and the reported confidence delta is hard-coded to zero; $\theta_{\text{change}} = 0.15$ exists only in a configuration file and in prompt text, with no Python module reading it; and consensus-evolution and tipping-point detection have no implementation at all.
+
+**Normative contribution.**
+
+6. **The identity-behavior decoupling principle**: the position that persona judgments must be causally traceable to behavioral profiles and motivations, never to demographic attributes (gender, age, region, MBTI). Contribution 2 is its implemented enforcement.
+
+The remainder of this paper is organized as follows: Section 2 reviews related work; Section 3 presents our method, including both implemented and specified-only mechanisms; Section 4 details the implementation and, in Section 4.6, its status against the specification; Section 5 describes the evaluation framework; Section 6 discusses ethical considerations; Section 7 addresses limitations and future work; and Section 8 concludes.
 
 ## 2. Related Work
 
@@ -56,7 +72,7 @@ Commercial synthetic user research platforms have emerged to address the cost an
 
 **Outset** takes a hybrid approach, using AI to moderate real human interviews at scale. While this preserves the authenticity of human responses, it does not address the cost and speed limitations that motivate synthetic approaches. **Yabble** offers AI-powered survey analysis but relies on single-turn interactions with demographic-tagged personas, which risks reinforcing stereotypes rather than capturing genuine behavioral diversity.
 
-These platforms share three limitations that AudienceLens addresses: (1) no cross-examination between personas; (2) no mechanism for stance revision; and (3) no systematic quality evaluation framework for synthetic review outputs.
+These platforms share three limitations: (1) no cross-examination between personas; (2) no mechanism for stance revision; and (3) no systematic quality evaluation framework for synthetic review outputs. AudienceLens addresses (3) with an implemented evaluation rubric (Section 3.7) and offers a specification — but not yet an implementation — for (1) and (2) (Sections 3.3–3.6, status in Section 4.6).
 
 ### 2.3 Multi-Agent Debate
 
@@ -66,7 +82,7 @@ Liang et al. (2023) extended this work to encourage diversity in multi-agent deb
 
 Wang et al. (2024) introduced a framework for multi-agent consensus through iterative debate, showing that convergence properties depend on the topology of agent interactions and the strength of evidence. Their work highlighted the risk of premature consensus—agents converging too quickly without fully exploring the argument space.
 
-AudienceLens builds on these insights by introducing a structured three-round debate protocol with explicit mechanisms for stance revision and consensus tracking. Unlike general multi-agent debate, our protocol is specifically designed for the audience review domain, where the goal is not to find a single correct answer but to map the landscape of perspectives and identify areas of genuine disagreement.
+AudienceLens builds on these insights by *specifying* a structured three-round debate protocol with explicit mechanisms for stance revision and consensus tracking. Unlike general multi-agent debate, the protocol is designed for the audience review domain, where the goal is not to find a single correct answer but to map the landscape of perspectives and identify areas of genuine disagreement. We stress that this protocol is a design contribution of this paper: the current implementation does not execute it (Section 4.6). Consequently we make no empirical claim about its behaviour, and readers should not treat the debate literature cited above as evidence for AudienceLens's outputs.
 
 ### 2.4 AI Ethics in Persona Generation
 
@@ -80,63 +96,67 @@ The Nielsen Norman Group's persona methodology has long advocated for behavior-f
 
 ### 3.1 System Architecture
 
-AudienceLens is organized as a skill-based architecture comprising four specialized skills, each serving a distinct review domain:
+The persona pool comprises **66 personas across 10 YAML packages**, serving **14 task types**. All counts below can be verified against `src/personas/` and the single authoritative registry `VALID_TASK_TYPES` in `src/runner/task_types.py`:
 
-| Skill | Domain | Persona Count | Task Types |
-|-------|--------|---------------|------------|
-| synthetic-playtest | Games | 50 | 14 (Steam page, demo, concept, monetization, etc.) |
-| audience-panel | Products | 20 | 6 (product, app, website, feature, pricing, UX) |
-| red-team-audience | Adversarial | 5 | 5 attack modes (user, buyer, investor, reviewer, competitor) |
-| persona-generate | Meta | Dynamic | 8 market types |
+| Persona domain | Packages | Personas | Task types served |
+|---|---|---|---|
+| Game | 8 (`game-core` 16, `mobile-f2p` 7, `competitive-esport` 5, `family-casual` 5, `indie-creative` 5, `accessibility` 4, `educational-serious` 4, `vr-immersive` 4) | 50 | 10 (`steam_page_review`, `demo_first_play`, `concept_review`, `monetization_review`, `looking_for_party_post`, `update_announcement_review`, `devlog_review`, `kickstarter_review`, `localization_review`, `discord_community_review`) |
+| General product | 1 (`general-consumer` 8) | 8 | 3 (`product_feedback_review`, `pricing_page_review`, `onboarding_review`) |
+| Startup / pitch | 1 (`startup-panel` 8) | 8 | 1 (`pitch_review`) |
+| **Total** | **10** | **66** | **14** |
 
-The total persona pool comprises **75 personas**: 50 game-focused personas distributed across 8 YAML packages (game-core: 16, competitive-esport: 5, family-casual: 5, indie-creative: 5, mobile-f2p: 5, vr-immersive: 5, accessibility: 5, educational-serious: 4), 20 product-focused personas across 6 packages, and 5 adversarial red-team personas.
+Three review skills (`synthetic-playtest`, `audience-panel`, `red-team-audience`) and one meta-skill (`persona-generate`) are defined as skill-pack front-ends over this pool. Two clarifications are needed here, because earlier descriptions of this system were inaccurate on both points. First, **`red-team-audience` has no persona pack of its own**: no red-team personas ship in `src/personas/`, and "red team" exists only as a skill-level framing over the existing pool, not as a distinct set of persona definitions. Second, `persona-generate` is an LLM-driven authoring workflow specified in a skill Markdown file, not a code path; the personas it produces are new YAML packs, not runtime entities.
 
-A critical architectural decision is **fork isolation**: each persona agent runs in an independent subprocess with its own context window. Persona agents cannot directly communicate with each other; influence propagates exclusively through the shared position pool in the cross-examination phase. This design prevents cross-contamination (where one persona's reasoning leaks into another's) while enabling indirect influence through structured argument exchange.
+A key architectural property is **context isolation** between personas. Each persona review is an independent, stateless model call dispatched from a thread pool (`concurrent.futures.ThreadPoolExecutor` in `src/runner/cli.py`); a call receives only its own persona payload, the target material, and the task rubric. No conversation state, reasoning trace, or intermediate result is shared between persona calls. This prevents cross-contamination, where one persona's reasoning leaks into another's. Note that we describe threads with per-call prompt construction, not OS subprocesses; the isolation guarantee comes from the calls being stateless and independently prompted, not from process boundaries. The "influence propagates through a shared position pool" property described in Section 3.3 belongs to the cross-examination specification and is not exercised in v0.3.0 (Section 4.6).
 
-### Fork Isolation Implementation
+### Context Isolation Implementation
 
-In the Claude Code Skill architecture, fork isolation is achieved through the Task subagent mechanism:
+Items 1, 2, and 4 below describe the implemented pipeline. **Items 3 and 5 describe the cross-examination specification and are not executed in v0.3.0** (Section 4.6); they are stated here for completeness of the design.
 
-1. **Input Phase**: Each persona agent receives:
+1. **Input Phase** *(implemented)*: Each persona agent receives:
    - Target material summary (truncated to fit context window)
    - Persona YAML definition (behavior_profile, motivations, decision_rules)
    - Task rubric and output schema
    - Review mode parameters (quick/standard/full)
 
-2. **Isolation Guarantee**: Each persona agent does NOT receive:
+   Demographic fields are excluded at this step: only the `CORE_FIELDS` allowlist is serialised (Section 6.1).
+
+2. **Isolation Guarantee** *(implemented)*: Each persona agent does NOT receive:
    - Other persona agents' full outputs
    - Other persona agents' private reasoning chains
    - Aggregation notes or intermediate results
    - Information about which other personas are in the panel
 
-3. **Rebuttal Phase**: In the cross-examination rounds, persona agents receive:
-   - Anonymized controversy claims (without persona attribution)
-   - Selected opposing arguments (filtered by relevance, not by persona identity)
-   - Their own previous output for reference
+3. **Rebuttal Phase** *(specified; not implemented)*: In the specified cross-examination rounds, persona agents would receive anonymized controversy claims, selected opposing arguments filtered by relevance, and their own previous output for reference. No such round is executed in v0.3.0.
 
-4. **Position Pool**: The intermediate position data is stored as structured JSON objects containing stance, confidence, key_issues, and evidence arrays. This pool is managed by the aggregation layer, not by individual persona agents.
+4. **Position Pool** *(implemented as an aggregation input)*: Persona outputs are stored as structured JSON objects containing stance, confidence, key_issues, and evidence arrays, and are consumed by the aggregation layer rather than by individual persona agents. In v0.3.0 this pool is read only once, after the single review round.
 
-5. **Anti-Collusion Design**: Persona names are not included in rebuttal prompts. Arguments are attributed only by argument ID (e.g., "Argument A3"), preventing persona agents from forming coalitions based on identity.
+5. **Anonymised attribution** *(specified; the shipped prompt template does the opposite)*: The design intent is that persona names be excluded from rebuttal prompts and arguments attributed only by argument ID (e.g., "Argument A3"), so that agents cannot form coalitions based on identity. **We must report that the shipped template does not do this.** `src/templates/cross-exam-prompt.md` interpolates `{{pro_persona_name}}` and `{{con_persona_name}}` directly into the prompt body. Since no rebuttal round is executed, this template is never sent to a model in v0.3.0 and the discrepancy has no effect on current outputs — but the anonymisation property must not be claimed as a validity guarantee of this system, and we do not claim it.
 
-The system operates in eight phases: (0) argument parsing, (1) task type validation, (2) material loading, (3) panel selection, (4) parallel persona reviews, (5) cross-examination, (6) report aggregation, (7) calibration check, and (8) output generation. Phases 5 and 7 are skipped in `quick` mode; all phases execute in `full` mode.
+The system operates in nine phases, numbered 0–8: (0) argument parsing, (1) task type validation, (2) material loading, (3) panel selection, (4) parallel persona reviews, (5) cross-examination, (6) report aggregation, (7) calibration check, and (8) output generation. Phases 5 and 7 are skipped in `quick` mode; all phases execute in `full` mode. Phase 5 in `full` mode produces a derived summary rather than a live debate (Section 4.6).
 
 ### 3.2 Persona Design
 
 Each persona is defined by a YAML specification containing identity fields, behavioral profiles, motivations, decision rules, and review configuration. The core innovation is the **behavior_profile**—a 12-axis behavioral vector that replaces traditional personality models:
 
-| Axis | Range | Description |
-|------|-------|-------------|
-| `patience` | very_low – very_high | Tolerance for friction and delay |
-| `genre_literacy` / `domain_literacy` | very_low – very_high | Domain-specific knowledge depth |
-| `novelty_seeking` | very_low – very_high | Preference for novel over familiar |
-| `risk_tolerance` | low – high | Comfort with uncertainty |
-| `social_influence` | low – very_high | Susceptibility to social proof |
-| `completion_drive` | very_low – very_high | Motivation to finish what was started |
-| `price_sensitivity` | low – very_high | Sensitivity to cost relative to value |
-| `emotional_engagement` | low – high | Depth of emotional investment |
-| `agency_preference` | low – high | Desire for player/user agency |
-| `tolerance_for_ambiguity` | low – high | Comfort with unclear situations |
-| `criticism_style` | categorical | Approach to expressing dissatisfaction |
+All twelve axes are `required` in `src/schemas/persona-schema.json`, which also sets `additionalProperties: false`; the table below is the complete and exact axis list:
+
+| # | Axis | Range | Description |
+|---|------|-------|-------------|
+| 1 | `patience` | very_low – very_high | Tolerance for friction and delay |
+| 2 | `genre_literacy` | very_low – very_high | Domain-specific knowledge depth |
+| 3 | `novelty_seeking` | very_low – very_high | Preference for novel over familiar |
+| 4 | `risk_tolerance` | low – high | Comfort with uncertainty |
+| 5 | `social_influence` | low – very_high | Susceptibility to social proof |
+| 6 | `completion_drive` | very_low – very_high | Motivation to finish what was started |
+| 7 | `price_sensitivity` | low – very_high | Sensitivity to cost relative to value |
+| 8 | `criticism_style` | categorical | Approach to expressing dissatisfaction |
+| 9 | `emotional_engagement` | low – high | Depth of emotional investment |
+| 10 | `agency_preference` | low – high | Desire for player/user agency |
+| 11 | `tolerance_for_ambiguity` | very_low – very_high | Comfort with unclear situations |
+| 12 | `platform_loyalty` | very_low – high | Attachment to a specific platform or storefront |
+
+The axis is named `genre_literacy` for every pack, including the non-game ones; there is no separate `domain_literacy` field.
 
 This design departs from the OCEAN (Big Five) personality model used by SyntheticUsers. We argue that `behavior_profile` is better suited for review tasks for four reasons:
 
@@ -160,23 +180,21 @@ Each persona also includes `decision_rules`—explicit conditional statements th
 | mobile-f2p | 7 | Game | Monetization sensitivity, session design |
 | indie-creative | 5 | Game | Innovation focus, aesthetic judgment |
 | competitive-esport | 5 | Game | Skill ceiling, balance, fairness |
-| vr-immersive | 4 | Game | Immersion, comfort, presence |
 | family-casual | 5 | Game | Accessibility, onboarding, safety |
+| vr-immersive | 4 | Game | Immersion, comfort, presence |
 | educational-serious | 4 | Game | Learning outcomes, engagement |
 | accessibility | 4 | Game | Keyboard/screen/cognitive access |
-| power-user | 5 | Product | Efficiency, integration, customization |
-| casual-user | 3 | Product | Simplicity, low learning curve |
-| skeptic-user | 3 | Product | Trust, ROI, migration cost |
-| enthusiast-user | 3 | Product | Community, feature depth |
-| budget-conscious | 3 | Product | Pricing, free tier, value |
-| accessibility-user | 3 | Product | Screen reader, motor, cognitive |
-| red-team | 5 | Adversarial | Attack patterns, edge cases |
+| general-consumer | 8 | Product | Everyday product/app evaluation, pricing, onboarding |
+| startup-panel | 8 | Startup | Business plan, pitch deck, market and funding scrutiny |
+| **Total** | **66** | | |
 
-Each persona is defined by a complete behavior_profile, motivations, decision_rules, quit_triggers, and continue_triggers. The 75-persona count reflects coverage across domains, not redundancy; Jaccard distance analysis (Section 6.2) measures actual differentiation.
+Each persona is defined by a complete behavior_profile, motivations, decision_rules, quit_triggers, and continue_triggers. The 66-persona count reflects coverage across domains, not redundancy; Jaccard distance analysis (Section 5.2) measures actual differentiation. This is the complete inventory as of the v0.3.0 release: there is no red-team persona pack, and the product-facing pool is 16 personas in two packs, not the six finer-grained packs described in earlier drafts of this work.
 
-### 3.3 Cross-Examination Protocol
+### 3.3 Cross-Examination Protocol (specification; not implemented in v0.3.0)
 
-The cross-examination protocol is the core differentiator of AudienceLens. It proceeds in three rounds:
+> **Implementation status.** Sections 3.3 through 3.6 specify a protocol that the current release does not execute. There is no live multi-agent rebuttal: no LLM call is made for cross-examination, `vote_changes` is always empty, the reported confidence delta is hard-coded to zero, and $\theta_{\text{change}}$ is read by no code path. Section 4.6 gives the per-mechanism status. Everything in these four sections should be read as a design proposal, not as a description of system behaviour, and no result reported anywhere in this paper depends on it.
+
+The cross-examination protocol is the core *intended* differentiator of AudienceLens. As specified, it proceeds in three rounds:
 
 **Round 1: Position Statement.** Each persona independently reviews the input material and produces a structured output including scores, key issues, evidence, and a primary stance. All outputs are collected into a shared position pool. Critically, personas are not aware of each other's existence at this stage—they evaluate the material in complete isolation.
 
@@ -194,23 +212,25 @@ where $s_{i,j}^{(1)}$ denotes persona $p_i$'s severity rating on issue $j$. In R
 
 $$|c_i^{(2)} - c_i^{(1)}| > \theta_{\text{change}}$$
 
-where $\theta_{\text{change}} = 0.15$. Note: $\theta_{\text{change}}$ is a configurable engineering parameter, initially set to 0.15 for prototype experiments. This threshold is not empirically validated and should be tuned per model and domain.
+where $\theta_{\text{change}} = 0.15$. Note: $\theta_{\text{change}}$ is a proposed engineering parameter, set to 0.15 for the specification. It is not empirically validated and would need to be tuned per model and domain. In the current codebase the value appears only in `src/config/aggregation-rules.yaml` and in prompt text; no Python module reads it, so it is presently inert.
 
-### 3.4 Vote Change Mechanism
+### 3.4 Vote Change Mechanism (specification; not implemented in v0.3.0)
 
 The vote change mechanism is designed to model realistic opinion dynamics while preventing cascading conformity. Key design choices:
 
 **Confidence threshold.** A persona may only change stance when their confidence shifts by more than $\theta_{\text{change}}$. This threshold was chosen to be large enough to filter out noise (minor fluctuations in LLM output probabilities) while small enough to capture genuine persuasion. We acknowledge this value is empirically set and plan to calibrate it through controlled experiments in future work. We do not interpret self-reported confidence as calibrated probability; LLM confidence scores may not reflect true epistemic uncertainty.
 
-**Change provenance.** Every stance change is recorded with: (1) the triggering argument and its source persona; (2) the confidence before and after; (3) the confidence delta; and (4) a free-text reason provided by the changing persona. This provenance chain enables post-hoc analysis of persuasion dynamics and supports the calibration honesty dimension of the Harness framework.
+**Change provenance.** Under the specification, every stance change would be recorded with: (1) the triggering argument and its source persona; (2) the confidence before and after; (3) the confidence delta; and (4) a free-text reason provided by the changing persona. Such a provenance chain would enable post-hoc analysis of persuasion dynamics. In v0.3.0 the `vote_changes` array in the cross-examination result is constructed empty and never populated, and the `delta` field of every `confidence_changes` entry is hard-coded to 0, so no provenance data is produced.
 
-**Anti-collusion design.** Personas cannot directly communicate; influence propagates only through the shared position pool. This prevents the "echo chamber" effect where personas reinforce each other's positions through direct interaction, and ensures that any stance change is driven by the quality of arguments rather than social pressure.
+**Anti-collusion design.** Personas cannot directly communicate; under the specification, influence would propagate only through the shared position pool, which is intended to prevent the "echo chamber" effect and ensure that any stance change is driven by argument quality rather than social pressure. We note two caveats. First, the corresponding argument-anonymisation property is not present in the shipped prompt template (Section 3.1, item 5). Second, because no rebuttal round runs, this design has never been exercised and we present no evidence that it achieves its aim.
 
 **No majority weighting.** The system does not weight personas by their agreement with the majority. A single persona holding a minority position is as valid as five personas in agreement—the value lies in understanding *why* they disagree, not in counting votes.
 
-### 3.5 Consensus Evolution Tracking
+### 3.5 Consensus Evolution Tracking (specification; not implemented in v0.3.0)
 
-After the three-round protocol completes, the system classifies the group's consensus trajectory into one of four patterns:
+> **Implementation status.** No consensus-evolution mechanism exists in the codebase. The identifiers `consensus_strength`, `converging`, `diverging`, `oscillating`, `tipping_point`, and `cascade_point` do not appear anywhere under `src/`. What the system actually computes is a *single-round* stance distribution in `src/runner/aggregator.py`, using a `consensus_threshold` of 0.7 read from `src/config/aggregation-rules.yaml`. There is no multi-round trajectory to classify, and no divergence-hotspot or polarization output. The remainder of this subsection specifies what such a mechanism would compute.
+
+Under the specification, after the three-round protocol completes the system would classify the group's consensus trajectory into one of four patterns:
 
 | Pattern | Definition | Indicator |
 |---------|-----------|-----------|
@@ -231,48 +251,53 @@ We acknowledge that modal stance proportion is a coarse metric. Future versions 
 - **Segment-weighted disagreement**: Weight disagreements by persona segment relevance, so that a domain-expert persona's opposition carries more weight than a casual user's.
 - **Minority report preservation**: Explicitly flag and preserve minority positions even when consensus is strong, as minority perspectives often identify risks missed by the majority.
 
-The system also tracks **divergence hotspots**—issues where confidence changes are largest—and **polarization**, defined as the condition where the group splits into two roughly equal opposing camps rather than converging.
+The specification also calls for tracking **divergence hotspots**—issues where confidence changes are largest—and **polarization**, defined as the condition where the group splits into two roughly equal opposing camps rather than converging. Neither is implemented.
 
-### 3.6 Tipping Point Detection
+### 3.6 Tipping Point Detection (specification; not implemented in v0.3.0)
 
-Tipping points are moments where the discussion trajectory changes qualitatively. AudienceLens detects three types:
+Tipping points are moments where the discussion trajectory changes qualitatively. The specification defines three types; **none of them is detected by the current implementation**, which has no cross-round state to compare:
 
-**Flip points** (red): A persona changes from one stance category to another (e.g., from "would buy" to "would not buy"). These indicate that a counterargument was sufficiently compelling to overcome the persona's initial position.
+**Flip points** (red): A persona changes from one stance category to another (e.g., from "would buy" to "would not buy"). These would indicate that a counterargument was sufficiently compelling to overcome the persona's initial position.
 
-**Cascade points** (amber): One persona's stance change triggers changes in other personas within the same round. These indicate that the changing persona's reasoning provided a new frame that resonated with others.
+**Cascade points** (amber): One persona's stance change triggers changes in other personas within the same round. These would indicate that the changing persona's reasoning provided a new frame that resonated with others.
 
-**Anchor points** (green): A persona maintains their stance despite strong counterarguments. These indicate deeply held positions that are resistant to persuasion, often tied to core behavioral traits (e.g., a persona with very high `price_sensitivity` refusing to endorse a product regardless of its features).
+**Anchor points** (green): A persona maintains their stance despite strong counterarguments. These would indicate deeply held positions that are resistant to persuasion, often tied to core behavioral traits (e.g., a persona with very high `price_sensitivity` refusing to endorse a product regardless of its features).
 
-The formal detection rule for tipping points is:
+The proposed formal detection rule for tipping points is:
 
 $$\text{TippingPoint}(r) = \begin{cases} \text{true} & \text{if } |\{p_i : s_i^{(r)} \neq s_i^{(r-1)}\}| \geq 2 \\ \text{true} & \text{if } \max_i |c_i^{(r)} - c_i^{(r-1)}| \geq 0.3 \\ \text{false} & \text{otherwise} \end{cases}$$
 
 ### 3.7 Harness Evaluation Framework
 
-The Harness is an 8-dimension quality evaluation framework that assesses synthetic review outputs against quantitative thresholds. We define initial operational thresholds for prototype evaluation. These thresholds are not validated norms; they serve as engineering guardrails and should be calibrated through future empirical work.
+The Harness is an 8-dimension quality evaluation rubric that scores a completed synthetic review against quantitative thresholds. We define initial operational thresholds for prototype evaluation. These thresholds are not validated norms; they serve as engineering guardrails and should be calibrated through future empirical work.
+
+Two properties of the implementation should be stated before the thresholds, because they bound what the Harness can be claimed to do:
+
+- **It is a post-hoc scorecard, not a gate.** The evaluation is disabled by default (`enable_evaluation = False`) and, when enabled, runs *after* a review has completed. It does not filter, reject, block, or re-run any persona output, and a failing score does not prevent a report from being produced. Everything the Harness reports is diagnostic.
+- **The thresholds are declared once and read at runtime.** All eight live in `src/harness/thresholds.yaml`, which the evaluator loads rather than hard-coding, and the file carries a `threshold_note` recording that they are prototype values that have not been empirically validated. The table below is a transcription of that file.
 
 | # | Dimension | Core Question | Threshold |
 |---|-----------|---------------|-----------|
 | 1 | Actionability | Are recommendations specific and implementable? | $\geq 70\%$ of suggestions include concrete steps (prototype, not validated) |
 | 2 | Input Grounding | Do arguments reference specific input material details? | $\geq 80\%$ of claims cite input evidence; direct evidence ratio $\geq 60\%$ (prototype, not validated) |
-| 3 | Persona Differentiation | Do different personas produce genuinely different perspectives? | Mean Jaccard distance $\geq 0.3$; Kruskal-Wallis $H$ test $p < 0.05$ (prototype, not validated) |
+| 3 | Persona Differentiation | Do different personas produce genuinely different perspectives? | Mean Jaccard distance $\geq 0.3$ (prototype, not validated) |
 | 4 | Stereotype Check | Are judgments based on behavioral profiles, not demographics? | Zero demographic-causal inference patterns (prototype, not validated) |
 | 5 | Structural Integrity | Does the report contain all required sections? | 100% of required sections present (prototype, not validated) |
 | 6 | Calibration Honesty | Are findings correctly labeled as hypotheses rather than facts? | 100% of hypotheses correctly annotated (prototype, not validated) |
 | 7 | Risk Detection | Are critical risks identified? | $\geq 1$ critical/high severity issue identified (prototype, not validated) |
 | 8 | Segment Conflict | Do persona segments exhibit meaningful disagreement? | $\geq 2$ meaningful disagreements (prototype, not validated) |
 
-Each dimension is scored on a 1–5 scale using rubric definitions. A score of 0–1 indicates FAIL, 2–3 indicates NEEDS_IMPROVEMENT, and 4–5 indicates PASS. The overall evaluation passes only if all dimensions score $\geq 2$ and the average score is $\geq 3.0$.
+Each dimension is scored on a 1–5 scale using rubric definitions. A score of 0–1 indicates FAIL, 2–3 indicates NEEDS_IMPROVEMENT, and 4–5 indicates PASS. Dimensions carry weights (stereotype check 1.5, calibration honesty 1.2, all others 1.0), and the overall result is a **weighted mean on the same 1–5 scale**; it passes only if every dimension scores $\geq 2$ and the weighted mean is $\geq 3.0$. There is no aggregate points-out-of-40 score; any such figure attributed to this system is not something the evaluator emits.
 
 The Harness includes test fixtures (high-quality and low-quality game concepts, good and bad landing pages) that serve as calibration anchors, and expected output structures that define required report sections for each task type.
 
 ## 4. Implementation
 
-### 4.1 Skill-Based Architecture
+### 4.1 Architecture and Entry Points
 
-AudienceLens is implemented as a skill pack for AI coding assistants, currently supporting Claude Code and Trae AI. Each skill is defined by a `SKILL.md` file that specifies the skill's behavior, resource files, execution phases, and hard rules. This architecture enables zero-install deployment—users copy skill files to their assistant's skill directory and invoke them via slash commands (e.g., `/synthetic-playtest concept_review path/to/concept.md`).
+AudienceLens v0.3.0 is an MIT-licensed Python package (`audiencelens`) with the review engine under `src/runner/` and the evaluation rubric under `src/harness/`. It is reachable through five entry points: a command-line interface, a Python API, an MCP server, a web application (FastAPI backend), and a Docker image. Provider presets ship for six model vendors. On top of the engine, a skill-pack front-end is provided for AI coding assistants (Claude Code and Trae AI); each skill is defined by a `SKILL.md` file specifying behavior, resource files, execution phases, and hard rules, and is invoked via slash commands (e.g., `/synthetic-playtest concept_review path/to/concept.md`).
 
-The skill-based approach offers several advantages over traditional SaaS deployment: (1) **Privacy**: input materials never leave the user's local environment; (2) **Customization**: users can modify persona definitions, aggregation rules, and prompt templates; (3) **Composability**: skills can be chained (e.g., running `audience-panel` followed by `red-team-audience` on the same material); and (4) **Cost efficiency**: the system uses the user's existing LLM subscription without additional per-review fees.
+The local-first deployment offers several advantages over hosted SaaS: (1) **Privacy**: input materials never leave the user's local environment; (2) **Customization**: users can modify persona definitions, aggregation rules, and prompt templates; (3) **Composability**: skills can be chained (e.g., running `audience-panel` followed by `red-team-audience` on the same material); and (4) **Cost efficiency**: the system uses the user's own model credentials without additional per-review fees.
 
 ### 4.2 CCGS Repository Standard
 
@@ -280,25 +305,30 @@ AudienceLens follows the CCGS (Claude Code Group Standard) repository structure,
 
 ```
 .claude/
-├── agents/          # 50 persona agent definitions
+├── agents/          # 50 persona agent definitions (game pool)
 ├── hooks/           # Lifecycle hooks (session-start, validate-report, etc.)
-├── rules/           # Evaluation and ethics rules
-└── skills/          # 4 skill definitions with resources
+├── launch.json
+└── skills/          # 1 skill definition (synthetic-playtest) with resources
 .trae/
-└── skills/          # Trae-compatible skill mirrors
+├── documents/
+├── skills/          # 4 skill mirrors (synthetic-playtest, audience-panel,
+│                    #   red-team-audience, persona-generate)
+└── specs/
 ```
 
-The CCGS standard enables interoperability between different AI coding assistants while maintaining consistent behavior. Each persona agent is defined as a standalone Markdown file (e.g., `P01-indie-core-operator.md`) that the skill dispatcher loads and injects into the LLM context when that persona is selected for a review panel.
+Two corrections to earlier descriptions of this layout: there is no `.claude/rules/` directory — evaluation thresholds live in `src/harness/thresholds.yaml` and aggregation parameters in `src/config/aggregation-rules.yaml` — and `.claude/skills/` currently holds one skill, not four; the full set of four skill definitions exists only under `.trae/skills/`. Skill-pack coverage across the two assistants is therefore asymmetric.
+
+Each persona agent is defined as a standalone Markdown file (e.g., `P01-indie-core-operator.md`) that the skill dispatcher loads and injects into the LLM context when that persona is selected for a review panel. Note that the 50 agent Markdown files mirror the game pool only; the canonical persona definitions used by the Python engine are the 10 YAML packs under `src/personas/`.
 
 ### 4.3 Ethics Service
 
 The ethics service enforces the identity-behavior decoupling principle through a multi-layer compliance system:
 
-**Stereotype detection.** The system scans persona outputs for forbidden patterns where demographic attributes are used as causal explanations for behavioral judgments. Four categories of forbidden patterns are defined: gender-as-cause, age-as-stereotype, region-as-assumption, and MBTI-as-decision-logic. Each category includes both explicit patterns (e.g., "as a female player, I prefer...") and implicit patterns (e.g., "players of this age group typically...").
+**Stereotype detection.** The system scans persona outputs for forbidden patterns where demographic attributes are used as causal explanations for behavioral judgments. Detection has two layers. The first is a regex pass covering four categories — gender-as-cause, age-as-stereotype, region-as-assumption, and MBTI-as-decision-logic — with both explicit patterns (e.g., "as a female player, I prefer...") and implicit ones (e.g., "players of this age group typically..."), in Chinese and English. The second is an LLM judge that catches rephrased demographic-to-behavior inferences the regexes miss; it is **conditional on an API key being configured**, and when unavailable the system reports the count of unchecked outputs rather than silently treating them as clean.
 
 **Evidence grounding.** Every claim in a persona's output must be annotated with an inference level: `[direct]` (explicitly present in input material), `[inferred: basis]` (reasonably inferred from material + persona priors, capped at $\leq 40\%$ of total evidence), or `[gap]` (no evidence available, must be labeled "unspecified"). Gap-filling—fabricating information not present in the input—is strictly prohibited.
 
-**Compliance scoring.** Each persona output receives an ethics compliance score (0–100) based on five weighted dimensions: behavior_over_demographics (30%), evidence_grounding (25%), gap_filling_control (20%), caveat_specificity (15%), and mbti_usage_correctness (10%). Scores $\geq 80$ pass; scores 60–79 require revision; scores $< 60$ are rejected.
+**Compliance scoring.** The report carries an ethics compliance score in the range 0–100. We describe it precisely, because it is coarser than its numeric range suggests. The score is computed in `src/runner/aggregator.py` as $100 - 10 \times |V|$, clamped to $[0, 100]$, where $V$ is the set of identity-behavior decoupling violations found across all persona outputs. It therefore takes only multiples of ten, and its sole input is the decoupling check — it is *not* a weighted composite of five dimensions, and evidence grounding, gap-filling, caveat specificity, and MBTI usage are enforced elsewhere (by the validator and the Harness rubric) rather than folded into this number. Bands are: $\geq 80$ pass, $50$–$79$ needs revision, $< 50$ rejected. A five-dimension weighted composite (behavior_over_demographics 30%, evidence_grounding 25%, gap_filling_control 20%, caveat_specificity 15%, mbti_usage_correctness 10%) remains a design goal and is not implemented.
 
 **MBTI prohibition rule.** MBTI types are permitted only as style modifiers (affecting tone and communication style) and are explicitly prohibited from serving as causal explanations for judgments. This rule is enforced through both prompt engineering and post-hoc pattern matching.
 
@@ -312,37 +342,40 @@ AudienceLens generates three output formats: structured JSON (machine-readable),
 - **Score bars**: Width = score × 20% with color classes (s1=red through s5=green)
 - **Typography**: Space Mono for code/HUD elements, Noto Sans SC for body text, Noto Serif SC for headings
 
-The HTML report is generated by reading the `report-template.html` style reference and injecting aggregated report data according to the data injection rules, rather than using template rendering engines. This approach ensures compatibility across different runtime environments.
+The HTML report is rendered by the aggregation layer from `report-template.html` using Jinja2 (`jinja2.Environment` with a `FileSystemLoader` in `src/runner/aggregator.py`); persona and cross-examination prompts are rendered from Handlebars-style Markdown templates that are converted to Jinja2 syntax before rendering.
 
-### 4.5 Case Study: Cyber Scavenger Game Concept Review
+### 4.5 On the Absence of a Case Study
 
-To illustrate the system's output, we present a prototype run using the Cyber Scavenger (赛博拾荒者) game concept as input.
+Earlier versions of this paper included a worked example ("Cyber Scavenger game concept review") reporting a panel of six personas, two stance changes, a tipping point, a Harness score of 31/40 against a threshold of 28, and an ethics compliance score of 72/100. **We have removed it, and we state why rather than quietly dropping it.**
 
-**Input**: A game concept document describing a cyberpunk-themed survival crafting game with risk-credit mechanics, mini-program platform constraints, and idle-core loop design.
+The numbers were not reproducible from the system as implemented. Three of them were not merely unverified but unreachable: the ethics compliance score can only take multiples of ten (Section 4.3), so 72 is not in its range, and the attributed cause — insufficient calibration honesty — is not among that score's inputs; the "2 of 6 personas changed stance" figure depends on the vote-change mechanism, which produces an empty result set (Section 3.4); and "31/40 (threshold 28)" is not a scale the evaluator emits, which reports a weighted mean in $[1,5]$ (Section 3.7). No input or output artifact from that run is archived in the repository. Presenting such figures — even under a disclaimer that they do not constitute empirical validation — would still tell a reader that the system performs cross-examination and tipping-point detection, which is the specific misreading this paper is trying to prevent.
 
-**Panel**: 6 personas selected from the game-core package:
-- P01 (Core Indie Explorer): neutral → positive (confidence 78%)
-- P02 (System Theory Strategist): positive (confidence 82%)
-- P07 (Light Fragment Player): negative (confidence 32%)
-- P08 (New Player Observer): negative → neutral (confidence 45%, vote changed)
-- P11 (TapTap Review Follower): neutral → positive (confidence 58%, vote changed)
-- P13 (Publisher Scout): neutral (confidence 55%)
+We therefore report no example run. AudienceLens produces three output formats (structured JSON, Markdown, and HTML; Section 4.4), and a reader who wants to see one can generate it from the open-source repository. Publishing an archived, byte-reproducible example run — with the input material, the model and version used, and the full output tree committed alongside the paper — is straightforward and is planned for the next revision. Until then we prefer an absent example to an illustrative one.
 
-**Cross-Examination Results**:
-- 2 of 6 personas changed stance during rebuttal rounds
-- Key controversy: risk-credit cognitive threshold too high (cited by 3/6 personas)
-- Tipping point: P08's shift from negative to neutral after P02's rebuttal on tutorial scaffolding
+### 4.6 Implementation Status: Specification vs. v0.3.0
 
-**Output Summary**:
-- Overall recommendation: Conditional Continue (需简化核心机制)
-- Risk level: Medium
-- Harness score: 31/40 (PASS, threshold 28)
-- Evidence grounding rate: 62% direct evidence
-- Persona differentiation: Jaccard distance 0.41
+Because this paper contains both implemented mechanisms and specified-only ones, we give a single table stating the status of each and the file a reader can check it against. This is the authoritative statement; where any prose elsewhere in the paper conflicts with it, this table governs.
 
-**Ethics Compliance**: Score 72/100 (NEEDS-REVISION), primarily due to insufficient calibration honesty warnings.
-
-This case study illustrates the system's workflow and output format. It does not constitute empirical validation of the framework's effectiveness.
+| Mechanism | Section | Status in v0.3.0 | Where to verify |
+|---|---|---|---|
+| Three-level evidence labelling (`direct`/`inferred`/`gap`) | 4.3 | **Implemented** | `src/runner/validator.py` |
+| 40% inferred-evidence cap, enforced by rejection | 4.3 | **Implemented** | `src/runner/validator.py` |
+| Demographic fields withheld from the model prompt | 6.1 | **Implemented** | `CORE_FIELDS` in `src/runner/persona_agent.py` |
+| Stereotype detection, regex layer | 6.2 | **Implemented** | `src/harness/stereotype_judge.py` |
+| Stereotype detection, LLM judge layer | 6.2 | **Implemented, conditional on an API key** | `src/harness/stereotype_judge.py` |
+| 8-dimension Harness rubric and thresholds | 3.7 | **Implemented**; off by default, post-hoc, non-blocking | `src/harness/thresholds.yaml`, `src/harness/evaluator.py` |
+| Single-round consensus (modal stance vs. threshold 0.7) | 3.5 | **Implemented** | `src/runner/aggregator.py`, `src/config/aggregation-rules.yaml` |
+| Ethics compliance score | 4.3 | **Implemented** as $100 - 10\lvert V\rvert$, single input | `src/runner/aggregator.py` |
+| Context isolation between persona calls | 3.1 | **Implemented** (stateless per-call prompts, thread pool) | `src/runner/cli.py` |
+| Live three-round rebuttal between personas | 3.3 | **Not implemented.** Runtime returns `mode: "derived_summary"`, `is_live_debate: false`, and a `limitation` string stating no live rebuttal was executed. The rendered cross-examination prompt is never sent to a model. | `src/runner/cross_exam.py`, `src/runner/cli.py` |
+| Vote-change mechanism and change provenance | 3.4 | **Not implemented.** `vote_changes` is always empty; every confidence `delta` is hard-coded to 0. | `src/runner/cross_exam.py` |
+| Confidence threshold $\theta_{\text{change}} = 0.15$ | 3.3 | **Inert.** Present in a YAML file and in prompt text; no Python module reads it. | `src/config/aggregation-rules.yaml` |
+| Consensus evolution across rounds (converging / diverging / stable / oscillating) | 3.5 | **Not implemented.** None of these identifiers exists under `src/`. | — |
+| Tipping-point and cascade-point detection | 3.6 | **Not implemented.** Neither identifier exists under `src/`. | — |
+| Argument anonymisation in rebuttal prompts | 3.1 | **Not implemented, and the shipped template does the opposite** (interpolates persona names). Unexercised, since no rebuttal runs. | `src/templates/cross-exam-prompt.md` |
+| Kruskal-Wallis test / score standard-deviation check | 5.1 | **Not implemented.** The differentiation dimension computes Jaccard distance only; the project has no statistical-testing dependency. | `src/harness/evaluator.py` |
+| Warning when $>30\%$ of personas are skipped for insufficient evidence | 6.5 | **Not implemented.** A degradation banner exists but triggers on model-call failures, not on evidence-based skips. | `src/runner/cli.py` |
+| Automated regression suite | — | **Implemented**: 394 engine tests and 294 backend tests (1 skipped) pass as of the v0.3.0 tag; counts move with development. | `tests/`, `web/backend/tests/` |
 
 ## 5. Evaluation
 
@@ -362,7 +395,7 @@ To validate the effectiveness of cross-examination, we plan the following contro
 
 **Hypothesis**: Group B will show higher persona differentiation, better risk detection, and more actionable recommendations than Group A, at the cost of increased token usage.
 
-We note that this evaluation has not yet been conducted; results will be reported in a future version of this paper.
+This evaluation has not been conducted. It also cannot be conducted against v0.3.0 as released: Group B requires a live cross-examination implementation, which does not exist (Section 4.6). Implementing the protocol is therefore a prerequisite for this experiment, not merely a step in running it.
 
 ### 5.1 Harness 8-Dimension Evaluation
 
@@ -376,7 +409,7 @@ The Harness framework provides both quantitative thresholds and qualitative rubr
 
 $$d_J(p_i, p_j) = 1 - \frac{|K_i \cap K_j|}{|K_i \cup K_j|}$$
 
-where $K_i$ is the set of key issue titles from persona $p_i$. The mean Jaccard distance across all pairs must be $\geq 0.3$, and a Kruskal-Wallis $H$ test on score distributions must yield $p < 0.05$. Additionally, the standard deviation of scores across personas must average $\geq 0.5$ across all score dimensions.
+where $K_i$ is the set of key issue titles from persona $p_i$. The mean Jaccard distance across all pairs must be $\geq 0.3$. This is the whole of the implemented check: **the evaluator performs no statistical hypothesis test**. Earlier descriptions of this dimension specified a Kruskal-Wallis $H$ test at $p < 0.05$ and a mean across-persona score standard deviation of $\geq 0.5$; neither is implemented, and the project has no statistical-computing dependency that would support them. Adding a significance test is desirable — a mean Jaccard distance alone cannot distinguish genuine perspective diversity from noise — but until it exists we make no distributional claim.
 
 **Stereotype Check** uses pattern matching to detect forbidden causal patterns. The system scans for regex patterns matching "as a [demographic]... therefore/so..." constructions and flags any output where demographic attributes are used as causal explanations. The threshold is zero tolerance: any detected violation results in a FAIL for this dimension.
 
@@ -390,15 +423,15 @@ where $K_i$ is the set of key issue titles from persona $p_i$. The mean Jaccard 
 
 ### 5.2 Persona Differentiation Analysis
 
-To validate that our 75 personas produce genuinely different perspectives, we conduct a Jaccard distance analysis on the `key_issues` and `motivations` fields across persona pairs within each skill:
+To assess whether the 66 personas produce genuinely different perspectives, the system computes a Jaccard distance over the `key_issues` titles across persona pairs in a panel (Section 5.1). The 50 game personas span 8 packs with distinct behavioral profiles; the target mean Jaccard distance on `key_issues` is $\geq 0.5$ (deep differentiation) for personas from different packs and $\geq 0.3$ (basic differentiation) for personas within the same pack.
 
-For the synthetic-playtest skill, the 50 game personas span 8 categories with distinct behavioral profiles. The expected mean Jaccard distance on `key_issues` is $\geq 0.5$ (deep differentiation) for personas from different categories and $\geq 0.3$ (basic differentiation) for personas within the same category.
+These targets are design intentions. We have not run this analysis over the shipped persona set and report no measured differentiation figures.
 
-The differentiation guarantee is enforced at persona design time through the `persona-generate` skill, which requires that all persona pairs within a panel have a Jaccard distance $\geq 0.3$ on their `motivations` + `decision_rules` sets. Personas that fail this threshold are rejected and regenerated.
+A differentiation criterion is also stated at persona *design* time: the `persona-generate` skill instructs that all persona pairs within a panel reach a Jaccard distance $\geq 0.3$ on their `motivations` + `decision_rules` sets, and that personas failing it be regenerated. We must be precise about the strength of this: `persona-generate` is a skill Markdown file executed by an LLM agent, so the criterion is an instruction the agent is asked to follow, **not a programmatic gate**. It should not be read as a guarantee about any persona pack in the repository.
 
-### 5.3 Cross-Examination Effectiveness
+### 5.3 Cross-Examination Effectiveness (proposed metrics; not computable in v0.3.0)
 
-We propose two metrics for evaluating cross-examination effectiveness:
+We propose two metrics for evaluating cross-examination effectiveness. Neither can be computed from the current implementation, since both require the multi-round stance data that v0.3.0 does not produce (Section 4.6). We state them so that the planned experiment in Section 5.0 is well-defined.
 
 **Vote change rate** ($VCR$): The proportion of personas that change their stance between Round 1 and Round 3:
 
@@ -414,7 +447,7 @@ Positive $\Delta C$ indicates convergence, negative indicates divergence, and ne
 
 ### 5.4 Comparison with Single-Round Review
 
-To quantify the value added by cross-examination, we propose a comparative evaluation between AudienceLens's three-round protocol and a single-round baseline (equivalent to skipping Phases 5 and 7). We hypothesize that:
+To quantify the value added by cross-examination, we propose a comparative evaluation between the specified three-round protocol and a single-round baseline (equivalent to skipping Phases 5 and 7). This comparison is contingent on the protocol first being implemented (Section 4.6). We hypothesize that:
 
 1. Cross-examination will produce higher calibration honesty scores, as personas forced to defend their positions will reveal lower-confidence judgments.
 
@@ -430,15 +463,19 @@ We note that these hypotheses remain to be empirically validated, which we discu
 
 The central ethical innovation of AudienceLens is the **identity-behavior decoupling principle**: persona judgments must be causally traceable to behavioral profiles and motivations, never to demographic attributes. This principle is motivated by the long-standing argument in UX research that behavior, goals, and context are more actionable persona attributes than demographics alone (Cooper 1999; Pruitt & Adlin 2006), and by the risk that synthetic personas could reinforce rather than challenge existing stereotypes.
 
-In practice, this means that while personas may have demographic attributes (gender, age range, region), these attributes serve only as weak modifiers of expression style and perspective diversity. They are explicitly prohibited from serving as causal explanations for preferences or judgments. For example, a persona may be described as female and may have a communication style influenced by that attribute, but the system will reject any output that claims "as a female player, I prefer narrative games"—the preference must be traced to the `behavior_profile` (e.g., high `emotional_engagement` + high `novelty_seeking`).
+In practice, this means that while persona *definitions* may carry demographic attributes (gender, age range, region), those attributes serve only to diversify the authored pool. They are explicitly prohibited from serving as causal explanations for preferences or judgments.
+
+The enforcement is structural rather than instructional, and this is the point we most want to make about it. When a persona is prepared for a model call, `_minify_persona` serialises only a fixed `CORE_FIELDS` allowlist — `id`, `name`, `archetype`, `identity_summary`, `behavior_profile`, `motivations`, `decision_rules`, `quit_triggers`, `continue_triggers`, `first_scan_focus`, `review_output`. Gender, age, and region are not in that list, so **the model is never shown them**. A persona cannot write "as a female player, I prefer narrative games" on the basis of its own record, because it does not have that record; any preference it expresses has to come from the `behavior_profile` (e.g., high `emotional_engagement` plus high `novelty_seeking`), which is what the allowlist does contain.
+
+We draw the distinction deliberately. A prompt that instructs a model not to reason from demographics is a request the model may or may not honour, and it degrades silently under paraphrase, model substitution, or a long context. Removing the fields from the payload changes what is possible rather than what is asked for, and it holds regardless of which model is behind the call. The residual risk is that a model infers demographics from a persona's name or `identity_summary`; the stereotype detector (Section 6.2) is the second line of defence against that, and it is a detector, not a guarantee.
 
 ### 6.2 Stereotype Detection
 
 The stereotype detection system operates at two levels:
 
-**Generation time**: The `persona-generate` skill includes a mandatory ethics check phase (Phase 5) that scans generated personas for forbidden patterns. This check is non-bypassable—personas that fail are rejected and must be regenerated.
+**Generation time** *(instruction, not a code gate)*: The `persona-generate` skill defines an ethics check phase (Phase 5) that scans generated personas for forbidden patterns, and its hard rules state that a FAIL may not be skipped. Because the skill is a Markdown specification executed by an LLM agent, this is a mandatory *instruction* rather than a programmatic barrier; we describe it as such and do not claim it is non-bypassable.
 
-**Output time**: Each persona's review output is scanned for forbidden causal patterns using regex matching and semantic analysis. Detected violations are classified by severity (CRITICAL, HIGH, MEDIUM, LOW) with corresponding enforcement actions (reject, require revision, warn, suggest improvement).
+**Output time** *(implemented in code)*: Each persona's review output is scanned for forbidden causal patterns by the regex layer, and, when an API key is configured, by an LLM judge that catches rephrased demographic-to-behavior inferences. Detected violations feed the identity-behavior decoupling count that drives the ethics compliance score (Section 4.3) and the stereotype-check dimension of the Harness (Section 3.7). We note the limits of the current enforcement: the compliance score subtracts ten points per violation and is reported alongside the review, and the Harness dimension is a post-hoc score — neither suppresses or regenerates the offending output. A severity taxonomy (CRITICAL / HIGH / MEDIUM / LOW) with differentiated enforcement actions is a design goal and is not implemented.
 
 ### 6.3 MBTI Prohibition Rule
 
@@ -464,11 +501,19 @@ A core design principle of AudienceLens is **calibration honesty**: the system m
 
 2. **Confidence calibration**: Persona confidence scores are required to reflect evidence strength. A persona that lacks sufficient evidence must report low confidence rather than fabricating a confident judgment.
 
-3. **Gap acknowledgment**: When input materials are insufficient for a persona to form a judgment (evidence coverage $< 30\%$), the persona is skipped and the report explicitly notes the gap. If $> 30\%$ of personas are skipped for this reason, the report includes a prominent warning.
+3. **Gap acknowledgment**: When input materials are insufficient for a persona to form a judgment, an evidence pre-check skips that persona and the skipped count is carried through to the report. A separate degradation banner is added when personas fail during the run, stating how many completed and that the conclusions rest only on those. We correct an earlier claim here: there is **no** rule that adds a prominent warning specifically when more than 30% of personas are skipped for insufficient evidence. The banner's trigger is failure count, not skip proportion. A skip-proportion warning would be a reasonable addition and is not present.
 
 4. **Caveat specificity**: Each persona output must include at least one specific caveat (e.g., "this review is based on store page screenshots only; no hands-on demo was available, so手感 assessments are speculative"). Generic caveats like "for reference only" are rejected.
 
 ## 7. Limitations and Future Work
+
+### 7.0 The Cross-Examination Protocol Is Not Implemented
+
+The most consequential limitation of this work is that its headline mechanism does not run. Sections 3.3–3.6 specify a three-round debate protocol, a confidence-gated vote-change mechanism, consensus-evolution classification, and tipping-point detection; Section 4.6 documents that v0.3.0 implements none of them. What the system does today is a single round of isolated persona reviews followed by aggregation, with a cross-examination report section derived from those single-round outputs and labelled as derived by the runtime itself.
+
+This bounds the contribution of the paper honestly. AudienceLens's implemented value is in *constraining* synthetic review output — evidence provenance with a rejection threshold, demographics withheld from the model, a declared and annotated evaluation rubric — not in multi-agent deliberation. Readers evaluating whether to build on this system should treat Sections 3.3–3.6 as a specification they would have to implement, and should not cite this work as evidence about the behaviour of multi-agent debate.
+
+**Future work**: Implement the protocol. Concretely, this requires wiring the already-rendered cross-examination prompt to a model call, populating `vote_changes` from parsed model output, making $\theta_{\text{change}}$ a read parameter rather than a dormant configuration key, and adding cross-round state so that consensus trajectory and tipping points become computable. The specification and the prompt template already exist; the missing piece is execution and the evaluation that would follow it (Section 5.0).
 
 ### 7.1 No Real-World Parity Study
 
@@ -490,13 +535,13 @@ AudienceLens does not hold SOC 2 certification, which may limit its adoption in 
 
 ### 7.4 Empirically Set Thresholds
 
-Several thresholds in the system (confidence change threshold of 0.15, consensus threshold of 0.7, Jaccard distance threshold of 0.3, evidence coverage threshold of 30%) are set based on engineering judgment rather than empirical optimization. While these values produce reasonable behavior in practice, they may not be optimal.
+Several thresholds in the system (consensus threshold of 0.7, Jaccard distance threshold of 0.3, evidence coverage threshold, and the eight Harness thresholds) are set based on engineering judgment rather than empirical optimization. They may not be optimal, and we make no claim that they are. The confidence change threshold of 0.15 is a further case: it is not merely unvalidated but currently unused, since no code path reads it (Section 4.6).
 
 **Future work**: Controlled experiments to calibrate these thresholds, using both synthetic and real-user data. We plan to use a grid search approach, varying each threshold independently and measuring the impact on Harness evaluation scores and parity metrics.
 
 ### 7.5 Over-Convergence Risk
 
-Multi-agent debate systems are susceptible to over-convergence, where all agents converge to the same position regardless of the input quality. This risk is particularly acute when the underlying LLM has strong priors about what constitutes "good" or "bad" design. Our anti-collusion design (fork isolation, no direct communication) mitigates this risk, but does not eliminate it entirely.
+Multi-agent debate systems are susceptible to over-convergence, where all agents converge to the same position regardless of the input quality. This risk is particularly acute when the underlying LLM has strong priors about what constitutes "good" or "bad" design. Two points follow. In v0.3.0 the risk does not arise from debate, because no debate occurs; it arises instead from a shared model prior producing similar single-round reviews across nominally different personas, which the Jaccard differentiation check is meant to surface but which we have not measured (Section 5.2). Once the protocol of Section 3.3 is implemented, the debate form of the risk applies, and the isolation design is intended to mitigate it — but that mitigation is untested, and we make no claim that it works.
 
 **Future work**: Investigation of convergence dynamics in the cross-examination protocol, including analysis of whether anchor points (personas resistant to persuasion) effectively prevent over-convergence, and whether the confidence threshold needs to be adaptive rather than fixed.
 
@@ -508,15 +553,15 @@ The current system supports panels of 3–8 personas. Scaling to larger panels i
 
 ## 8. Conclusion
 
-We have proposed and implemented a prototype of AudienceLens, a multi-agent cross-examination system for synthetic audience review that addresses three critical limitations of existing synthetic user research tools: the absence of cross-examination, the lack of stance revision mechanisms, and the absence of systematic quality evaluation frameworks.
+We have presented AudienceLens, an open-source prototype for synthetic audience review, and we have been explicit throughout about which of its mechanisms execute and which are specifications awaiting implementation.
 
-Our three-round debate protocol with fork-isolated persona agents enables structured argumentation that mirrors the dynamics of real focus groups—where participants challenge each other's assumptions and sometimes revise their positions. The vote change mechanism with confidence thresholds and full change provenance provides transparency into opinion dynamics that is impossible to obtain from single-turn synthetic interviews. The consensus evolution tracking and tipping point detection offer novel analytical tools for understanding how and why group opinions shift.
+What the system does today is constrain synthetic review output rather than simulate deliberation. Three mechanisms carry that weight. Evidence provenance is mandatory and enforced: every claim carries a `direct` / `inferred` / `gap` label, and a validator rejects outputs whose inferred share exceeds 40%, so a persona cannot pad a review with plausible invention and have it pass. Identity-behavior decoupling is structural rather than instructional: demographic fields are removed from the payload before it reaches the model, so demographic-causal reasoning is unavailable rather than discouraged — a property that survives a change of model, which a prompt instruction does not. And the 8-dimension Harness rubric keeps its thresholds in a single runtime-read file that ships annotated as unvalidated prototype values, so a reader can check every number in Section 3.7 against one file and see that the system does not claim more for them than we do.
 
-The 8-dimension Harness evaluation framework represents, to our knowledge, the first systematic quality gate for synthetic audience review outputs, providing quantitative thresholds across dimensions ranging from actionability to stereotype checking. The identity-behavior decoupling principle and its enforcement through the ethics service address the growing concern that synthetic personas could reinforce rather than challenge existing stereotypes.
+What the system does not do is equally important. The three-round cross-examination protocol, the vote-change mechanism, consensus-evolution classification, and tipping-point detection are specifications in this paper, not behaviours of the release. The runtime says so itself — it labels its own cross-examination output as derived rather than debated — and Section 4.6 records the status of each mechanism against the file where it can be verified. We have removed the worked example that earlier versions of this paper carried, because its figures were not reproducible and two of them depended on mechanisms that do not exist.
 
-We are transparent about AudienceLens's limitations: it has not been validated against real user research data, it does not support multi-modal evaluation, and several design parameters are empirically set rather than experimentally optimized. We believe that acknowledging these limitations is essential for responsible deployment of synthetic audience tools, and we are committed to addressing them through future empirical validation.
+The remaining limitations are the familiar ones and we do not minimise them: no parity study against real user research, no multi-modal evaluation, no measured persona differentiation over the shipped pool, and thresholds set by engineering judgment rather than experiment. The result is a narrower paper than its earlier drafts. We think a narrow claim that survives a reader running `grep` over the repository is worth more than a broad one that does not.
 
-AudienceLens is open-source and available as a skill pack for Claude Code and Trae AI coding assistants, comprising 75 behavior-driven personas across four specialized skills. We invite the research community to use, evaluate, and extend the system, and we welcome collaborations for real-world validation studies.
+AudienceLens is open-source under the MIT license, with CLI, Python, MCP, web, and Docker entry points, and ships 66 behavior-driven personas across 10 packs and 14 task types. We invite the research community to use, evaluate, and extend the system — including by implementing the protocol specified here — and we welcome collaborations for real-world validation studies.
 
 ## References
 

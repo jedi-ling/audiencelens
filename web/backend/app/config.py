@@ -3,10 +3,28 @@
 设计原则：每条"预埋线"都有一个开关 + 一个可用的默认实现。
 默认配置 = 单机开源形态（匿名、BYOK、无配额、内存队列），
 改几个环境变量即可切到托管 SaaS 形态（登录、服务端 key、配额计费、外部队列）。
+
+启动自检（见 Settings._validate_startup）：
+默认值是为「本机单人开发」调的，直接拿去对公网提供服务就是裸奔。
+所以这里有一组「看起来像生产就拒绝启动 / 大声告警」的检查。
+判据不是 AL_ENV 一个字段——最危险的情况恰恰是照着 DEPLOY.md 部署却忘了
+`cp .env.production.example .env`：AL_ENV 还是 development，服务已经在公网上跑。
+所以只要 CORS 白名单或站点地址指向公网主机，就按生产对待；
+回环 / RFC1918 私网 / .local 一律不算，局域网里的本地开发不会被误伤。
 """
 
+import ipaddress
+import logging
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
+
+_log = logging.getLogger("audiencelens")
+
+# 开发默认 JWT 密钥。它同时是落库加密密钥的回落值——泄露 = 所有已存 API key 可解。
+DEV_JWT_SECRET = "dev-insecure-secret-change-me"
+# 后台令牌是静态共享密钥、无有效期，长度就是它唯一的强度来源。
+ADMIN_TOKEN_MIN_LENGTH = 16
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -21,6 +39,34 @@ def _int(name: str, default: int) -> int:
         return int(os.environ.get(name, default))
     except (TypeError, ValueError):
         return default
+
+
+def _float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_public_host(raw: str) -> bool:
+    """origin / URL 是否指向公网可达的主机。
+
+    解析不出主机名时按「公网」处理：`.env` 里留着 `https://你的域名.com`
+    这种占位符正是最该被拦下的情况，不该因为解析失败而放行。
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return False
+    host = (urlparse(raw if "://" in raw else "//" + raw).hostname or "").lower()
+    if not host:
+        return True
+    if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".test")):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True  # 是个域名 → 当作公网
+    return not (ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified)
 
 
 class Settings:
@@ -43,16 +89,19 @@ class Settings:
         ]
 
         # ---- 数据库 ----
+        # 用 `or` 而不是 get(name, default)：docker-compose 里 `${AL_DATABASE_URL:-}`
+        # 会把变量设成空字符串（"已设置但为空"），此时 get() 拿到的是 ""，
+        # create_engine("") 直接抛异常。空值一律等同未设置。
         default_db = os.path.join(self.backend_dir, "data", "reviews.db")
-        self.database_url: str = os.environ.get(
-            "AL_DATABASE_URL", f"sqlite:///{default_db}"
+        self.database_url: str = (
+            os.environ.get("AL_DATABASE_URL", "").strip() or f"sqlite:///{default_db}"
         )
 
         # ---- 身份 / 认证（埋线：默认匿名，打开后走 JWT）----
         # False: 所有请求归入匿名身份，无需登录（开源单机形态）
         # True : 需要 Bearer token，注册/登录接口生效（托管形态）
         self.auth_enabled: bool = _bool("AL_AUTH_ENABLED", False)
-        self.jwt_secret: str = os.environ.get("AL_JWT_SECRET", "dev-insecure-secret-change-me")
+        self.jwt_secret: str = os.environ.get("AL_JWT_SECRET", DEV_JWT_SECRET)
         self.jwt_ttl_seconds: int = _int("AL_JWT_TTL_SECONDS", 7 * 24 * 3600)
         self.anonymous_user_id: str = "anonymous"
         # BYOK/平台 key 落库加密的密钥，与 JWT 签名密钥分离——
@@ -60,20 +109,12 @@ class Settings:
         # 未设置时回落 jwt_secret（兼容存量数据：旧密文都是用 jwt_secret 加密的）。
         self.encryption_key: str = os.environ.get("AL_ENCRYPTION_KEY") or self.jwt_secret
 
-        # 生产环境裸奔检查：默认 JWT 密钥同时守着登录态和 key 加密，
-        # production 下必须显式配置，否则拒绝启动（fail fast 好过带病上线）。
-        if self.env == "production" and self.jwt_secret == "dev-insecure-secret-change-me":
-            raise RuntimeError(
-                "AL_ENV=production 但 AL_JWT_SECRET 仍是开发默认值。"
-                "请设置强随机密钥后再启动（openssl rand -hex 32）。"
-            )
-
         # ---- LLM key 解析策略（埋线：BYOK vs 托管）----
         # "byok"    : 只用用户自带 key（服务端不垫钱）
         # "managed" : 只用服务端 key（你垫钱，必须配合配额/计费）
         # "hybrid"  : 用户有 key 用用户的，否则回落服务端 key
-        self.key_mode: str = os.environ.get("AL_KEY_MODE", "byok").lower()
-        self.server_llm_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
+        self.key_mode: str = (os.environ.get("AL_KEY_MODE", "").strip() or "byok").lower()
+        self.server_llm_key: str = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
         # ---- 配额 / 计费（埋线：默认关闭，打开即生效）----
         self.quota_enabled: bool = _bool("AL_QUOTA_ENABLED", False)
@@ -81,12 +122,14 @@ class Settings:
         # credits = 纯次数制：每次服务端 key 评审消耗 1 次 CDK 余额，用完即止，无每日刷新
         #           ——"一个码 10 次，用完就没了"，适合 CDK 发码运营
         self.quota_mode: str = os.environ.get("AL_QUOTA_MODE", "plan").lower()
+        # 这两项是平台垫付的止血阀：后台面板可实时覆盖（见 admin_settings_service），
+        # 真正的读取点是 plan_service._free_plan(db)。
         self.quota_free_reviews_per_day: int = _int("AL_QUOTA_FREE_REVIEWS_PER_DAY", 5)
-        self.quota_free_cost_usd_per_day: float = float(
-            os.environ.get("AL_QUOTA_FREE_COST_USD_PER_DAY", "1.0")
-        )
+        self.quota_free_cost_usd_per_day: float = _float("AL_QUOTA_FREE_COST_USD_PER_DAY", 1.0)
 
         # ---- 限流（埋线：内存令牌桶，可换 Redis）----
+        # 两个旋钮各管各的：per_minute 管普通接口，review_per_hour 只管发起评审
+        # （评审直接烧平台垫付的钱，必须能单独收紧）。解析逻辑见 deps.rate_limit。
         self.ratelimit_enabled: bool = _bool("AL_RATELIMIT_ENABLED", True)
         self.ratelimit_per_minute: int = _int("AL_RATELIMIT_PER_MINUTE", 60)
         self.ratelimit_review_per_hour: int = _int("AL_RATELIMIT_REVIEW_PER_HOUR", 20)
@@ -100,15 +143,21 @@ class Settings:
         self.review_concurrency: int = _int("AUDIENCELENS_MAX_CONCURRENCY", 6)
 
         # ---- 邮件（埋线：默认 console，不真发信也能跑通验证/找回链路）----
-        self.mail_backend: str = os.environ.get("AL_MAIL_BACKEND", "console").lower()
-        self.mail_from: str = os.environ.get("AL_MAIL_FROM", "AudienceLens <noreply@localhost>")
-        self.smtp_host: str = os.environ.get("AL_SMTP_HOST", "")
+        # console 档只把邮件写进日志（令牌脱敏，见 mail_service._redact），
+        # 用户拿不到可用链接 —— 类生产 + 开了账号体系时启动自检会拦下。
+        self.mail_backend: str = (os.environ.get("AL_MAIL_BACKEND", "").strip() or "console").lower()
+        self.mail_from: str = (
+            os.environ.get("AL_MAIL_FROM", "").strip() or "AudienceLens <noreply@localhost>"
+        )
+        self.smtp_host: str = os.environ.get("AL_SMTP_HOST", "").strip()
         self.smtp_port: int = _int("AL_SMTP_PORT", 587)
         self.smtp_user: str = os.environ.get("AL_SMTP_USER", "")
         self.smtp_password: str = os.environ.get("AL_SMTP_PASSWORD", "")
         self.smtp_use_ssl: bool = _bool("AL_SMTP_USE_SSL", False)
         # 邮件里链接的落点（前端地址）——本地开发默认 vite 端口
-        self.public_web_url: str = os.environ.get("AL_PUBLIC_WEB_URL", "http://localhost:5199")
+        self.public_web_url: str = (
+            os.environ.get("AL_PUBLIC_WEB_URL", "").strip() or "http://localhost:5199"
+        )
         self.email_token_ttl_seconds: int = _int("AL_EMAIL_TOKEN_TTL_SECONDS", 24 * 3600)
         self.reset_token_ttl_seconds: int = _int("AL_RESET_TOKEN_TTL_SECONDS", 3600)
 
@@ -146,6 +195,16 @@ class Settings:
         # 未设置时 /api/admin/* 全部返回 503——安全默认值，绝不无密钥暴露管理接口。
         self.admin_token: str = os.environ.get("AL_ADMIN_TOKEN", "")
 
+        # ---- 危险默认值的逃生舱（必须显式打开，且只在类生产环境下才有意义）----
+        # 留逃生舱而不是一刀切：单人自建、内网试跑这类场景确实可能就是要这么跑，
+        # 但必须是一次「明知故犯」的动作，而不是忘了配置的默认结果。
+        self.allow_shared_anonymous: bool = _bool("AL_ALLOW_SHARED_ANONYMOUS", False)
+        self.allow_console_mail: bool = _bool("AL_ALLOW_CONSOLE_MAIL", False)
+
+        # ---- 启动自检 ----
+        self.startup_warnings: list = []
+        self._validate_startup()
+
     # 便捷判断
     @property
     def is_managed(self) -> bool:
@@ -155,8 +214,134 @@ class Settings:
     def admin_enabled(self) -> bool:
         return bool(self.admin_token)
 
+    @property
+    def looks_like_production(self) -> bool:
+        """「看起来像生产」：显式声明，或已经在对公网主机提供服务。
+
+        只看 AL_ENV 是不够的——docker-compose 曾把它默认成 development，
+        于是所有生产检查永远不触发，忘了配 .env 也能正常起来、健康检查还通过。
+        """
+        if self.env == "production":
+            return True
+        if any(_is_public_host(o) for o in self.cors_origins):
+            return True
+        return _is_public_host(self.public_web_url)
+
+    # ---------------------------- 启动自检 ----------------------------
+
+    def _validate_startup(self) -> None:
+        """拒绝启动 / 大声告警。拒绝启动的每一条都给出可执行的修复动作。"""
+        # 后台令牌强度：与是不是生产无关——静态共享密钥、无有效期、无失败上限，
+        # 长度是它唯一的强度来源；非 ASCII 还会让 hmac 比较抛 TypeError（每请求 500）。
+        self._validate_admin_token()
+
+        if not self.looks_like_production:
+            return
+
+        # 类生产环境下没显式设 AL_DEBUG 就关掉 debug：
+        # debug=True 会把异常类型和消息回给调用方（见 core/errors.py）。
+        if os.environ.get("AL_DEBUG") is None:
+            self.debug = False
+
+        if self.jwt_secret == DEV_JWT_SECRET:
+            raise RuntimeError(
+                "检测到类生产环境（AL_ENV=production 或 CORS/站点地址指向公网），"
+                "但 AL_JWT_SECRET 仍是开发默认值。该密钥同时用于签发登录态和加密落库的 "
+                "API Key，泄露即等于所有用户的 key 全部可解。"
+                "请先生成强随机密钥：openssl rand -hex 32"
+            )
+
+        if not self.auth_enabled and not self.allow_shared_anonymous:
+            raise RuntimeError(
+                "检测到类生产环境，但 AL_AUTH_ENABLED=false。"
+                "关闭认证时所有请求共用同一个 anonymous 身份——访客能看到彼此的评审、"
+                "彼此的用量和彼此填的 API Key。"
+                "对公网提供服务请设 AL_AUTH_ENABLED=true；"
+                "若确认是单人自用且接受共享身份，显式设 AL_ALLOW_SHARED_ANONYMOUS=true。"
+            )
+
+        if self.mail_backend == "smtp" and not self.smtp_host:
+            raise RuntimeError(
+                "AL_MAIL_BACKEND=smtp 但未配置 AL_SMTP_HOST。"
+                "此时 mail_service 会静默回落到 console 发送器——"
+                "用户收不到验证/重置邮件，而令牌会被写进日志。请补齐 SMTP 配置。"
+            )
+
+        if self.mail_backend != "smtp" and self.auth_enabled and not self.allow_console_mail:
+            raise RuntimeError(
+                "检测到类生产环境且已开启账号体系（AL_AUTH_ENABLED=true），"
+                f"但邮件后端是 {self.mail_backend!r}（非 smtp）。"
+                "此时邮箱验证和密码重置邮件不会真的发出，用户无法完成注册与找回；"
+                "且邮件正文会进日志，能看日志的人即可接管任意账号。"
+                "请配置 AL_MAIL_BACKEND=smtp 与 AL_SMTP_HOST；"
+                "若确认暂不需要邮件链路，显式设 AL_ALLOW_CONSOLE_MAIL=true。"
+            )
+
+        # ---- 以下只告警，不拦启动 ----
+        if not os.environ.get("AL_ENCRYPTION_KEY"):
+            self._warn(
+                "未设置 AL_ENCRYPTION_KEY，落库加密密钥回落到 AL_JWT_SECRET。"
+                "此后轮换 JWT 密钥会让所有已存的 API Key 解不开。建议现在就分开设置。"
+            )
+
+        if self.env != "production":
+            self._warn(
+                f"AL_ENV={self.env!r} 但服务已对公网主机提供服务"
+                f"（CORS={self.cors_origins}，站点={self.public_web_url}）。"
+                "请显式设 AL_ENV=production。"
+            )
+
+        if self.is_managed and self.server_llm_key and not self.quota_enabled:
+            self._warn(
+                f"AL_KEY_MODE={self.key_mode} 且已配置平台垫付 key，但 AL_QUOTA_ENABLED=false——"
+                "任何人都能无限量地花你的钱。上线前请开启配额。"
+            )
+
+        if self.allow_shared_anonymous and not self.auth_enabled:
+            self._warn(
+                "AL_ALLOW_SHARED_ANONYMOUS=true：所有访客共用 anonymous 身份，"
+                "彼此可见对方的评审与用量。仅当此实例是单人自用时才应如此。"
+            )
+
+        if self.allow_console_mail and self.mail_backend != "smtp":
+            self._warn(
+                "AL_ALLOW_CONSOLE_MAIL=true：验证/重置邮件不会真的发出，"
+                "且邮件正文（含令牌）会写进日志。请确保日志的访问权限等同于账号权限。"
+            )
+
+    def _validate_admin_token(self) -> None:
+        token = self.admin_token
+        if not token:
+            return
+        if any(not (33 <= ord(c) <= 126) for c in token):
+            raise RuntimeError(
+                "AL_ADMIN_TOKEN 含空白字符或非 ASCII 可见字符。"
+                "该令牌走 HTTP 头传输并用 hmac 恒定时间比较，非 ASCII 会让每个后台请求 500。"
+                "请改用 ASCII 可见字符，例如 openssl rand -hex 32 的输出。"
+            )
+        if len(token) < ADMIN_TOKEN_MIN_LENGTH:
+            raise RuntimeError(
+                f"AL_ADMIN_TOKEN 太短（{len(token)} 字符，至少 {ADMIN_TOKEN_MIN_LENGTH}）。"
+                "它是后台的唯一凭据，静态、无有效期，长度就是全部强度。"
+                "请用 openssl rand -hex 32 生成。"
+            )
+
+    def _warn(self, message: str) -> None:
+        """记录并立刻打印。
+
+        启动自检发生在 import 期，早于 core.logging.setup_logging 装 handler；
+        WARNING 级别会走 logging 的 lastResort handler 直接落到 stderr，
+        所以 docker compose logs 里一定看得见。
+        """
+        self.startup_warnings.append(message)
+        _log.warning("[启动自检] %s", message)
+
     def sanitized(self) -> dict:
-        """给 /health 用：绝不泄露密钥。"""
+        """给 /health 用：绝不泄露密钥。
+
+        不含 admin_enabled——那等于向公网广播「这里有后台管理接口」，
+        而后台是静态共享令牌，没必要主动告诉扫描器它存在。
+        """
         return {
             "env": self.env,
             "auth_enabled": self.auth_enabled,
@@ -167,7 +352,6 @@ class Settings:
             "queue_backend": self.queue_backend,
             "ledger_enabled": self.ledger_enabled,
             "review_concurrency": self.review_concurrency,
-            "admin_enabled": self.admin_enabled,
         }
 
 

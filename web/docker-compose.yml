@@ -1,6 +1,14 @@
 # 基础编排：backend + 用户前端 + 后台管理面板。
 # 变量从同目录 .env 读取（模板见 .env.production.example）。
 # 生产 TLS 叠加：docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# 这个文件是**部署产物**，不是本地开发入口（本地开发用 backend/run.py + vite，
+# 见 backend/Dockerfile 里关于 8000/8001 的注释）。所以默认值按"生产"取：
+#   - AL_ENV 默认 production（曾经默认 development，导致后端的生产自检永远不触发，
+#     忘了 cp .env 也能正常起来、健康检查还通过——那才是最危险的状态）
+#   - AL_JWT_SECRET 用 `${VAR:?...}` 声明为必填：没设就在 compose 解析阶段直接报错退出，
+#     既不会起一个裸奔的栈，也不会留下一个反复重启的容器
+#   - AL_AUTH_ENABLED 默认 true：关掉认证时所有访客共用一个 anonymous 身份，互相看得见
 services:
   backend:
     build:
@@ -14,21 +22,40 @@ services:
       - ../audiencelens-v0.2-harness:/audiencelens-v0.2-harness:ro
       - backend-data:/app/data
     environment:
-      - AL_ENV=${AL_ENV:-development}
-      - AL_CORS_ORIGINS=${AL_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
-      - AL_JWT_SECRET=${AL_JWT_SECRET:-dev-insecure-secret-change-me}
+      - AL_ENV=${AL_ENV:-production}
+      - AL_CORS_ORIGINS=${AL_CORS_ORIGINS:?必须设置正式域名（逗号分隔），例：AL_CORS_ORIGINS=https://example.com。见 .env.production.example}
+      - AL_JWT_SECRET=${AL_JWT_SECRET:?必须设置强随机 JWT 密钥：openssl rand -hex 32。它同时守着登录态和落库 API Key 的加密}
+      # 不设时回落 AL_JWT_SECRET（兼容存量密文），后端会在启动日志里告警。
+      # 一旦有用户存过 key 就不要再改这个值——改了 = 所有已存 key 解不开。
       - AL_ENCRYPTION_KEY=${AL_ENCRYPTION_KEY:-}
       - AL_ADMIN_TOKEN=${AL_ADMIN_TOKEN:-}
-      - AL_AUTH_ENABLED=${AL_AUTH_ENABLED:-false}
+      - AL_AUTH_ENABLED=${AL_AUTH_ENABLED:-true}
       - AL_KEY_MODE=${AL_KEY_MODE:-byok}
       - AL_QUOTA_ENABLED=${AL_QUOTA_ENABLED:-false}
       - AL_QUOTA_MODE=${AL_QUOTA_MODE:-plan}
+      - AL_QUOTA_FREE_REVIEWS_PER_DAY=${AL_QUOTA_FREE_REVIEWS_PER_DAY:-5}
+      - AL_QUOTA_FREE_COST_USD_PER_DAY=${AL_QUOTA_FREE_COST_USD_PER_DAY:-1.0}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - AL_RATELIMIT_PER_MINUTE=${AL_RATELIMIT_PER_MINUTE:-60}
       - AL_RATELIMIT_REVIEW_PER_HOUR=${AL_RATELIMIT_REVIEW_PER_HOUR:-20}
       - AL_QUEUE_WORKERS=${AL_QUEUE_WORKERS:-2}
       - AUDIENCELENS_MAX_CONCURRENCY=${AUDIENCELENS_MAX_CONCURRENCY:-6}
       - AL_DATABASE_URL=${AL_DATABASE_URL:-}
+      # 邮件：console 档不真发信（用户收不到验证/重置邮件）。
+      # AL_AUTH_ENABLED=true 时后端会拒绝以 console 档启动，除非显式
+      # 设 AL_ALLOW_CONSOLE_MAIL=true 表示"我知道且接受"。
+      - AL_MAIL_BACKEND=${AL_MAIL_BACKEND:-console}
+      - AL_MAIL_FROM=${AL_MAIL_FROM:-AudienceLens <noreply@localhost>}
+      - AL_SMTP_HOST=${AL_SMTP_HOST:-}
+      - AL_SMTP_PORT=${AL_SMTP_PORT:-587}
+      - AL_SMTP_USER=${AL_SMTP_USER:-}
+      - AL_SMTP_PASSWORD=${AL_SMTP_PASSWORD:-}
+      - AL_SMTP_USE_SSL=${AL_SMTP_USE_SSL:-false}
+      # 邮件里链接的落点。留空会指向 localhost，用户点了打不开。
+      - AL_PUBLIC_WEB_URL=${AL_PUBLIC_WEB_URL:-}
+      # 危险默认值的逃生舱（只在确实要这么跑时才设 true）
+      - AL_ALLOW_SHARED_ANONYMOUS=${AL_ALLOW_SHARED_ANONYMOUS:-false}
+      - AL_ALLOW_CONSOLE_MAIL=${AL_ALLOW_CONSOLE_MAIL:-false}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=5)"]
       interval: 30s

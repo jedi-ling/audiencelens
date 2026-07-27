@@ -454,7 +454,19 @@
   <!-- Cross-Examination Record -->
   {% if cross_examination %}
   <div class="section-card">
-    <div class="section-title"><span class="icon">⚔️</span> 交叉质询记录</div>
+    <div class="section-title"><span class="icon">⚔️</span> 争议点摘要（派生，非实时辩论）</div>
+
+    {# 引擎恒定返回 is_live_debate=false + limitation 字段；不渲染出来的话，
+       这一段读起来就像人格真的互相辩论过，而它只是把既有输出里的对立立场并排摆出来。 #}
+    {% if cross_examination.is_live_debate is not sameas true %}
+    <div style="border:2px solid var(--warn,#d97706);background:rgba(217,119,6,.10);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;">
+      <b>这不是一场辩论。</b>下面的正反论据是从各人格<b>已经产出的评审意见</b>中派生出来的摘要：
+      系统挑出分歧最大的争议点，把持相反立场的两位人格的原话并排摆出。
+      <b>人格之间没有发生任何实时反驳，也没有任何人因此改变立场。</b>
+      引擎输出标记：<code>mode: "derived_summary"</code>、<code>is_live_debate: false</code>。
+      {% if cross_examination.limitation %}<br/><span style="opacity:.85">{{cross_examination.limitation}}</span>{% endif %}
+    </div>
+    {% endif %}
 
     {% if cross_examination.rounds %}
     <div class="round-indicator">
