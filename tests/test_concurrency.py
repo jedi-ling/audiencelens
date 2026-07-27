@@ -145,13 +145,24 @@ class TestExplicitApiKey:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-env")
         monkeypatch.setattr(runner_cli, "precheck_panel", _passthrough_precheck)
         seen = []
-        real = runner_cli.run_single_persona
 
         def spy(persona, task_type, artifact_summary, artifact_texts, config,
                 artifact_bundle=None, api_key=None, **kwargs):
             seen.append(api_key)
-            return real(persona, task_type, artifact_summary, artifact_texts,
-                        config, artifact_bundle, api_key=None)
+            # 直接回一份模拟输出，绝不碰网络。原来这里转调 run_single_persona(api_key=None)，
+            # 但那个函数的 env 回落会捡起本测试设的假 key 去真调 Anthropic——6 个人格
+            # 全 401，测试却仍然"通过"，正是因为 run_panel 会把全员失败包装成一份
+            # 合法报告。全员失败现在会抛 AllPersonasFailedError，这条通路必须改掉。
+            return {
+                "persona_id": persona["id"],
+                "output": runner_cli._build_simulated_output(persona, task_type),
+                "prompt": "",
+                "model": "test-model",
+                "cost": 0.0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "error": None,
+            }
 
         monkeypatch.setattr(runner_cli, "run_single_persona", spy)
         result = _panel(bundle, max_concurrency=4)  # 不传 api_key → 回落环境变量

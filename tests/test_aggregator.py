@@ -287,31 +287,33 @@ class TestComputePriorityFixes:
         assert crash_item["score"] > typo_item["score"]
 
     def test_affected_count_increases_score(self):
+        # 两个"不同议题"的标题必须真的不像：去重改成相似度聚类后，
+        # 原来用的 "Bug A"/"Bug B" 字面相似度 0.8 会被正确地判为同一个议题。
         personas = [
             _make_persona(
                 "p1",
                 key_issues=[
-                    {"severity": "high", "title": "Bug A", "why_it_matters": "bad", "suggested_fix": "fix"},
+                    {"severity": "high", "title": "Crash on launch", "why_it_matters": "bad", "suggested_fix": "fix"},
                 ],
             ),
             _make_persona(
                 "p2",
                 key_issues=[
-                    {"severity": "high", "title": "Bug A", "why_it_matters": "bad", "suggested_fix": "fix"},
+                    {"severity": "high", "title": "Crash on launch", "why_it_matters": "bad", "suggested_fix": "fix"},
                 ],
             ),
             _make_persona(
                 "p3",
                 key_issues=[
-                    {"severity": "high", "title": "Bug B", "why_it_matters": "bad", "suggested_fix": "fix"},
+                    {"severity": "high", "title": "Typo in tooltip", "why_it_matters": "bad", "suggested_fix": "fix"},
                 ],
             ),
         ]
         rules = load_aggregation_rules(RULES_PATH)
         result = compute_priority_fixes(personas, rules)
-        bug_a = next(r for r in result if r["issue"] == "Bug A")
-        bug_b = next(r for r in result if r["issue"] == "Bug B")
-        assert bug_a["score"] > bug_b["score"]
+        crash = next(r for r in result if r["issue"] == "Crash on launch")
+        typo = next(r for r in result if r["issue"] == "Typo in tooltip")
+        assert crash["score"] > typo["score"]
 
     def test_empty_issues(self):
         personas = [_make_persona("p1", key_issues=[])]
@@ -338,6 +340,114 @@ class TestComputePriorityFixes:
         assert "affected_personas" in item
         assert "suggested_fix" in item
         assert "score" in item
+
+
+class _StubSimilarity:
+    """确定性相似度：groups 里映射到同一 key 的标题视为同一议题。
+
+    真机上的相似度档位取决于有没有装 sentence-transformers（semantic/lexical
+    两套阈值），聚类语义的断言必须和它解耦，否则测试会随环境飘。
+    """
+
+    method = "stub"
+
+    def __init__(self, groups):
+        self.groups = groups
+
+    def is_same_issue(self, a: str, b: str) -> bool:
+        return self.groups.get(a, a) == self.groups.get(b, b)
+
+
+class TestPriorityFixesDedupMatchesClustering:
+    """priority_fixes 以前用 title 精确相等去重，而 disagreements/controversy 用相似度
+    聚类——同一个问题换个措辞就裂成 N 条、每条 affected_count=1，排序退化成只看
+    severity。这组测试锁住"同口径去重 + severity 取最高"。"""
+
+    @staticmethod
+    def _rules():
+        return load_aggregation_rules(RULES_PATH)
+
+    def test_reworded_titles_merge_into_one_fix(self):
+        sim = _StubSimilarity({
+            "新手引导讲不清": "onboarding",
+            "教程没说明白核心循环": "onboarding",
+            "前 10 分钟不知道要干什么": "onboarding",
+        })
+        personas = [
+            _make_persona("p1", key_issues=[{"severity": "medium", "title": "新手引导讲不清", "why_it_matters": "a", "suggested_fix": "x"}]),
+            _make_persona("p2", key_issues=[{"severity": "medium", "title": "教程没说明白核心循环", "why_it_matters": "b", "suggested_fix": "y"}]),
+            _make_persona("p3", key_issues=[{"severity": "medium", "title": "前 10 分钟不知道要干什么", "why_it_matters": "c", "suggested_fix": "z"}]),
+        ]
+        result = compute_priority_fixes(personas, self._rules(), similarity=sim)
+        assert len(result) == 1
+        assert sorted(result[0]["affected_personas"]) == ["p1", "p2", "p3"]
+        assert len(result[0]["title_variants"]) == 3
+        assert result[0]["dedup_method"] == "stub"
+
+    def test_severity_takes_max_not_first_reporter(self):
+        """A 说 low、B/C 说 critical 时，合并后必须是 critical——
+        旧实现取第一个报出者的值，等于把最严重的判断永久吞掉。"""
+        sim = _StubSimilarity({"存档偶尔丢": "save", "存档丢失导致进度归零": "save"})
+        personas = [
+            _make_persona("p1", key_issues=[{"severity": "low", "title": "存档偶尔丢", "why_it_matters": "小概率", "suggested_fix": "看看"}]),
+            _make_persona("p2", key_issues=[{"severity": "critical", "title": "存档丢失导致进度归零", "why_it_matters": "直接退款", "suggested_fix": "加校验"}]),
+        ]
+        result = compute_priority_fixes(personas, self._rules(), similarity=sim)
+        assert len(result) == 1
+        assert result[0]["severity"] == "critical"
+        # 描述跟着最严重的那份走，避免 critical 配一句无关痛痒的理由
+        assert result[0]["why_it_matters"] == "直接退款"
+        assert result[0]["suggested_fix"] == "加校验"
+
+    def test_widely_reported_issue_outranks_isolated_critical(self):
+        """排序不再退化成只看 severity：3 人都提的 medium（1.0×3）
+        必须排在 1 人提的 critical（2.0×1）前面。"""
+        sim = _StubSimilarity({
+            "手感偏钝": "feel",
+            "打击感不足": "feel",
+            "反馈太轻": "feel",
+        })
+        personas = [
+            _make_persona("p1", key_issues=[{"severity": "medium", "title": "手感偏钝", "why_it_matters": "a", "suggested_fix": "x"}]),
+            _make_persona("p2", key_issues=[{"severity": "medium", "title": "打击感不足", "why_it_matters": "b", "suggested_fix": "y"}]),
+            _make_persona(
+                "p3",
+                key_issues=[
+                    {"severity": "medium", "title": "反馈太轻", "why_it_matters": "c", "suggested_fix": "z"},
+                    {"severity": "critical", "title": "某个孤立的崩溃", "why_it_matters": "d", "suggested_fix": "w"},
+                ],
+            ),
+        ]
+        result = compute_priority_fixes(personas, self._rules(), similarity=sim)
+        assert result[0]["issue"] in ("手感偏钝",)
+        assert result[0]["priority"] == 1
+        assert len(result[0]["affected_personas"]) == 3
+        assert result[1]["severity"] == "critical"
+
+    def test_uses_real_similarity_not_exact_equality_by_default(self):
+        """不注入 similarity 时也必须走相似度：措辞差一个字不该裂成两条。"""
+        from runner.similarity import get_issue_similarity
+
+        sim = get_issue_similarity(force_lexical=True)
+        personas = [
+            _make_persona("p1", key_issues=[{"severity": "high", "title": "UI lag on menus", "why_it_matters": "a", "suggested_fix": "x"}]),
+            _make_persona("p2", key_issues=[{"severity": "high", "title": "UI lag on menu", "why_it_matters": "b", "suggested_fix": "y"}]),
+        ]
+        result = compute_priority_fixes(personas, self._rules(), similarity=sim)
+        assert len(result) == 1
+        assert len(result[0]["affected_personas"]) == 2
+        assert result[0]["dedup_method"] == "lexical"
+
+    def test_report_shares_one_dedup_method_across_sections(self):
+        """同一份报告里 disagreements 和 priority_fixes 必须同口径。"""
+        personas = [
+            _make_persona("p1", primary_stance="positive", key_issues=[{"severity": "high", "title": "UI lag", "why_it_matters": "a", "suggested_fix": "x"}]),
+            _make_persona("p2", primary_stance="negative", key_issues=[{"severity": "low", "title": "UI lag", "why_it_matters": "b", "suggested_fix": "y"}]),
+        ]
+        report = aggregate_report(personas, "demo_first_play", "GameX", self._rules())
+        methods = {f["dedup_method"] for f in report["priority_fixes"]}
+        methods |= {d["dedup_method"] for d in report["major_disagreements"]}
+        assert len(methods) == 1
 
 
 class TestAggregateReport:

@@ -36,6 +36,21 @@ def _create_review(client, token, title="我的评审"):
 
 
 @pytest.fixture(autouse=True)
+def _server_key(monkeypatch):
+    """给 POST /api/reviews 一把可解析的 key。
+
+    v1 创建接口现在和 v2 一样挂了 resolve_llm_key 依赖（无 key → 428）——
+    此前它三道闸全无，配额用尽的用户换到这个端点就能无限跑平台 key。
+    本文件测的是**归属**而不是 key 链路，所以直接给一把平台 key 让请求过闸。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "key_mode", "hybrid")
+    monkeypatch.setattr(settings, "server_llm_key", "sk-ownership-test")
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _cleanup(db):
     from app.models import Review, User
 

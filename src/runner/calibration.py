@@ -2,19 +2,46 @@ from itertools import combinations
 from typing import List, Optional
 
 
+# 形状归一化的正主是 persona_agent.normalize_persona_output（模型输出的唯一入口边界）。
+# 这里只补"绕过那道边界"的路径：老数据回放、外部直接调 calibration、单测。
+# 历史上本模块用 p["persona_id"] 硬下标，v2 全靠 cli.py 里的 setdefault 才没崩，
+# 直接调用路径一个缺字段的输出就能让整轮校准 KeyError。
+
+
+def _persona_id(persona_output: dict, index: int) -> str:
+    """persona_id 缺失时给个稳定的占位键，避免 KeyError 让整轮校准作废。
+    用下标而不是空串，否则多个缺 id 的输出会在 per_persona 里互相覆盖。"""
+    pid = persona_output.get("persona_id")
+    if isinstance(pid, str) and pid:
+        return pid
+    return f"unknown-persona-{index}"
+
+
+def _dict_items(value) -> List[dict]:
+    """只留 dict 元素——第三方模型会把 evidence/key_issues 吐成字符串数组，
+    对字符串调 .get()/["title"] 会 AttributeError / TypeError。"""
+    if isinstance(value, dict):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
 def compute_role_consistency_rate(persona_outputs: List[dict]) -> dict:
     if not persona_outputs:
         return {"per_persona": {}, "average": 0.0, "below_threshold": []}
 
     per_persona = {}
-    for p in persona_outputs:
+    for index, p in enumerate(persona_outputs):
         check = p.get("must_comment_on_check", {})
+        if not isinstance(check, dict):
+            check = {}
         total = len(check)
         if total == 0:
-            per_persona[p["persona_id"]] = 0.0
+            per_persona[_persona_id(p, index)] = 0.0
         else:
             true_count = sum(1 for v in check.values() if v)
-            per_persona[p["persona_id"]] = true_count / total
+            per_persona[_persona_id(p, index)] = true_count / total
 
     average = sum(per_persona.values()) / len(per_persona) if per_persona else 0.0
     below_threshold = [pid for pid, rate in per_persona.items() if rate < 0.8]
@@ -28,9 +55,17 @@ def compute_role_consistency_rate(persona_outputs: List[dict]) -> dict:
 
 def compute_coverage_score(persona_outputs: List[dict]) -> dict:
     issue_sets = {}
-    for p in persona_outputs:
-        titles = set(issue["title"] for issue in p.get("key_issues", []))
-        issue_sets[p["persona_id"]] = titles
+    for index, p in enumerate(persona_outputs):
+        # 只取 dict 形态的 issue 且 title 非空：字符串形态的 issue 会让 issue["title"]
+        # 抛 TypeError（string indices must be integers），实测 {"key_issues": "无重大问题"}
+        titles = set(
+            title
+            for title in (
+                issue.get("title", "") for issue in _dict_items(p.get("key_issues", []))
+            )
+            if isinstance(title, str) and title
+        )
+        issue_sets[_persona_id(p, index)] = titles
 
     ids = list(issue_sets.keys())
     pairwise_distances = {}
@@ -68,25 +103,31 @@ def compute_hallucination_rate(persona_outputs: List[dict], artifact_texts: List
     per_persona = {}
     high_risk_personas = []
 
-    for p in persona_outputs:
+    for index, p in enumerate(persona_outputs):
+        pid = _persona_id(p, index)
         direct_evidence = [
-            e for e in p.get("evidence", []) if e.get("inference_level") == "direct"
+            e
+            for e in _dict_items(p.get("evidence", []))
+            if e.get("inference_level") == "direct"
         ]
         if not direct_evidence:
-            per_persona[p["persona_id"]] = 0.0
+            per_persona[pid] = 0.0
             continue
 
         unsupported = 0
         for e in direct_evidence:
-            content = e["content"]
+            content = e.get("content", "")
+            if not isinstance(content, str) or not content:
+                # 没有可核对的原文就不算"未被支持"，否则会凭空推高幻觉率
+                continue
             found = any(content in text for text in artifact_texts)
             if not found:
                 unsupported += 1
 
         rate = unsupported / len(direct_evidence)
-        per_persona[p["persona_id"]] = rate
+        per_persona[pid] = rate
         if rate > 0.5:
-            high_risk_personas.append(p["persona_id"])
+            high_risk_personas.append(pid)
 
     average = sum(per_persona.values()) / len(per_persona) if per_persona else 0.0
 
@@ -98,8 +139,14 @@ def compute_hallucination_rate(persona_outputs: List[dict], artifact_texts: List
 
 
 def compute_rerun_stability(outputs_run1: List[dict], outputs_run2: List[dict]) -> dict:
-    run1_map = {p["persona_id"]: p["primary_stance"] for p in outputs_run1}
-    run2_map = {p["persona_id"]: p["primary_stance"] for p in outputs_run2}
+    # primary_stance 缺失时用空串占位：两轮都缺就算"一致"，一轮缺就算"分歧"，
+    # 都比 KeyError 让整个稳定性检查作废合理
+    run1_map = {
+        _persona_id(p, i): p.get("primary_stance", "") for i, p in enumerate(outputs_run1)
+    }
+    run2_map = {
+        _persona_id(p, i): p.get("primary_stance", "") for i, p in enumerate(outputs_run2)
+    }
 
     common_ids = set(run1_map.keys()) & set(run2_map.keys())
     if not common_ids:

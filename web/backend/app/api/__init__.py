@@ -30,8 +30,9 @@ from app.schemas import (
     TaskTypeResponse,
 )
 from app.db import get_db
-from app.deps import Identity, optional_identity
+from app.deps import Identity, optional_identity, rate_limit, resolve_llm_key
 from app.services import MaterialExtractor, PersonaService, ReviewService, report_gating
+from app.services import quota_service
 from app.services.evaluation_service import EvaluationService
 from app.services.ethics_service import EthicsService
 from app.websocket import manager
@@ -54,13 +55,30 @@ def get_session() -> Session:
         session.close()
 
 
-@router.post("/reviews", response_model=ReviewResponse)
+@router.post(
+    "/reviews",
+    response_model=ReviewResponse,
+    dependencies=[Depends(rate_limit("review", None, 3600))],
+)
 def create_review(
     data: ReviewCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     identity: Identity = Depends(optional_identity),
+    resolved=Depends(resolve_llm_key),  # 无 key → 428，绝不静默跑模拟数据
 ):
+    """发起评审（v1 同步链路）。
+
+    三道闸必须和 v2（platform.py::create_review_v2）**完全一致**：限流 → key → 配额。
+    此前这里三道全无，而 run_review 内部照样 resolve_key（managed 形态下拿到的是
+    平台 key）——于是配额用尽的用户只要把请求换到这个端点就能无限跑，平台垫钱；
+    credits 模式下 CDK 余额为 0 也照跑不误，CDK 等于纯装饰。
+    安全和计费只加固新链路、把旧链路留成后门，是这个仓库最大的洞源。
+    """
+    quota_service.check_quota(
+        session, identity.user_id, key_source=resolved.source, plan=identity.plan
+    )
+
     svc = ReviewService(session)
     review = svc.create_review(
         task_type=data.task_type,
@@ -96,6 +114,35 @@ def _check_review_owner(review: Review, identity: Identity) -> None:
         raise HTTPException(status_code=404, detail="Review not found")
 
 
+def _review_response_for(review: Review, identity: Identity) -> ReviewResponse:
+    """把一条 Review 序列化成"这个身份该看到的"响应。
+
+    匿名要裁三处，缺一处登录墙就白做：
+      · report_json      —— 结构化裁剪（执行摘要 + 第一条修复项）
+      · report_markdown  —— 整份报告的纯文本镜像，一给就等于全给
+      · persona_outputs  —— "各角色怎么看"是本产品要卖的东西，不能从侧门免费拿
+
+    历史教训：匿名裁剪当初只接在 GET /reviews/{id}/report 上，而
+    GET /reviews/{id} 和 /reviews/{id}/result 原样返回全量内容，
+    前端显示"登录看完整"、换个端点请求一下全文到手。
+    所以现在所有会吐报告内容的 v1 端点统一走这个函数，不各自拼装。
+
+    artifact_bundle 不裁：那是用户自己上传的材料，本来就是他的东西。
+    """
+    resp = ReviewResponse.model_validate(review)
+    if not identity.is_anonymous:
+        return resp
+    return resp.model_copy(
+        update={
+            "report_json": report_gating.gate_report_for_anonymous(resp.report_json),
+            "report_markdown": report_gating.gate_markdown_for_anonymous(resp.report_markdown),
+            "persona_outputs": report_gating.gate_persona_outputs_for_anonymous(
+                resp.persona_outputs
+            ),
+        }
+    )
+
+
 @router.get("/reviews", response_model=List[ReviewListItemResponse])
 def list_reviews(
     offset: int = Query(0, ge=0),
@@ -121,7 +168,7 @@ def get_review(
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
     _check_review_owner(review, identity)
-    return review
+    return _review_response_for(review, identity)
 
 
 @router.delete("/reviews/{review_id}")
@@ -151,11 +198,15 @@ def get_report(
         raise HTTPException(status_code=404, detail="Review not found")
     _check_review_owner(review, identity)
     report_json = review.report_json
+    report_markdown = review.report_markdown
     if identity.is_anonymous:
         report_json = report_gating.gate_report_for_anonymous(report_json)
+        # 这一行是重点：以前只裁了 report_json，紧接着把 report_markdown 原文
+        # 一起发出去——markdown 里就是整份报告，登录墙等于没有。
+        report_markdown = report_gating.gate_markdown_for_anonymous(report_markdown)
     return ReportResponse(
         report_json=report_json,
-        report_markdown=review.report_markdown,
+        report_markdown=report_markdown,
         calibration=review.calibration,
     )
 
@@ -171,19 +222,29 @@ def get_review_result(
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
     _check_review_owner(review, identity)
+
+    # 先定下"这个身份能看到的 json"，再拿它去渲染 HTML——顺序反了就会
+    # 渲染出一份完整报告的 HTML 发给匿名用户（此前正是如此：这个端点
+    # 把原始 json + markdown + 渲染好的整份 HTML 一起返回，一个字没裁）。
+    report_json = review.report_json
+    report_md = review.report_markdown
+    if identity.is_anonymous:
+        report_json = report_gating.gate_report_for_anonymous(report_json)
+        report_md = report_gating.gate_markdown_for_anonymous(report_md)
+
     report_html = None
-    if review.report_json:
+    if report_json:
         try:
             html_template_path = os.path.join(PROJECT_ROOT, "src", "templates", "report-template.html")
             if os.path.isfile(html_template_path):
                 from runner.html_report import generate_html_report
-                report_html = generate_html_report(review.report_json, html_template_path)
+                report_html = generate_html_report(report_json, html_template_path)
         except Exception:
             pass
     return ReviewResult(
         session_id=review.id,
-        report_json=review.report_json,
-        report_md=review.report_markdown,
+        report_json=report_json,
+        report_md=report_md,
         report_html=report_html,
     )
 
@@ -392,7 +453,13 @@ def _extract_text_from_file(content: bytes, ext: str) -> str:
             raise HTTPException(status_code=400, detail="无法解析文件编码，请上传 UTF-8 或 GBK 编码的文本文件")
 
 
-@router.post("/extract-materials", response_model=ExtractedMaterialsResponse)
+@router.post(
+    "/extract-materials",
+    response_model=ExtractedMaterialsResponse,
+    # 这个端点会拿 resolved key 真调 LLM（managed 形态下是平台 key），
+    # 且能一次喂进 10MB 文本，此前一个守卫都没有。窗口对齐 /uploads。
+    dependencies=[Depends(rate_limit("upload", 20, 3600))],
+)
 async def extract_materials(
     task_type: str = Form(...),
     file: UploadFile = File(...),
@@ -438,13 +505,27 @@ async def extract_materials(
     return result
 
 
-@router.post("/evaluations/{review_id}", response_model=EvaluationScorecardResponse)
-def run_evaluation(review_id: str, session: Session = Depends(get_session)):
-    """对指定评审运行完整评估"""
+@router.post(
+    "/evaluations/{review_id}",
+    response_model=EvaluationScorecardResponse,
+    dependencies=[Depends(rate_limit("evaluation", 20, 3600))],
+)
+def run_evaluation(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
+    """对指定评审运行完整评估。
+
+    归属校验不能省：这三个 evaluations 端点此前连 identity 参数都没有，
+    任何人拿到（或枚举到）别人的 review_id 就能读走别人评审的 8 维评分、
+    critical_failures 和伦理报告，POST 这个还能往别人的评审上写记分卡。
+    """
     svc = ReviewService(session)
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
     if review.status != "completed":
         raise HTTPException(status_code=400, detail="评审尚未完成，无法运行评估")
 
@@ -474,8 +555,18 @@ def run_evaluation(review_id: str, session: Session = Depends(get_session)):
 
 
 @router.get("/evaluations/{review_id}", response_model=EvaluationScorecardResponse)
-def get_evaluation(review_id: str, session: Session = Depends(get_session)):
-    """获取指定评审的评估结果"""
+def get_evaluation(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
+    """获取指定评审的评估结果（先验归属，见 run_evaluation 的说明）"""
+    svc = ReviewService(session)
+    review = svc.get_review(review_id)
+    if review is None:
+        raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
+
     scorecard = EvaluationService.get_evaluation(session, review_id)
     if scorecard is None:
         raise HTTPException(status_code=404, detail="评估结果不存在，请先运行 POST /api/evaluations/{review_id}")
@@ -504,12 +595,17 @@ def get_evaluation(review_id: str, session: Session = Depends(get_session)):
 
 
 @router.get("/evaluations/{review_id}/ethics", response_model=List[EthicsReportResponse])
-def get_ethics_reports(review_id: str, session: Session = Depends(get_session)):
-    """获取指定评审中每个 persona 的伦理报告"""
+def get_ethics_reports(
+    review_id: str,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
+    """获取指定评审中每个 persona 的伦理报告（先验归属，见 run_evaluation 的说明）"""
     svc = ReviewService(session)
     review = svc.get_review(review_id)
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
+    _check_review_owner(review, identity)
 
     reports = EthicsService.get_ethics_reports_for_review(session, review_id)
     return [

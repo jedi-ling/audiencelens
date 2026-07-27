@@ -14,6 +14,15 @@ except ImportError:
     from runner.similarity import get_issue_similarity
 
 
+# severity 合并用的强弱序：多个人格对同一议题报了不同 severity 时取最高。
+# 与 cross_exam.SEVERITY_MAP 同一套口径，这里独立定义避免 aggregator 依赖 cross_exam。
+SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def _severity_rank(severity: str) -> int:
+    return SEVERITY_RANK.get(severity, SEVERITY_RANK["medium"])
+
+
 def load_aggregation_rules(rules_path: str) -> dict:
     if not os.path.isfile(rules_path):
         raise FileNotFoundError(f"Rules file not found: {rules_path}")
@@ -139,43 +148,84 @@ def compute_disagreements(persona_outputs: List[dict], similarity=None) -> List[
     return disagreements
 
 
-def compute_priority_fixes(persona_outputs: List[dict], rules: dict) -> List[dict]:
-    severity_boost = rules.get("severity_boost", {})
-    issue_map = {}
+def compute_priority_fixes(
+    persona_outputs: List[dict], rules: dict, similarity=None
+) -> List[dict]:
+    """按"影响人数 × severity 加成"排优先级。
 
+    去重口径必须和 compute_disagreements / extract_controversy_points 一致（同一套
+    相似度聚类）：旧实现用 title 精确相等建 map，同一个问题换个措辞就裂成 N 条、
+    每条 affected_count 都是 1，排序退化成只看 severity——"5 个人都说新手引导讲不清"
+    这种最该先修的问题反而排不上去。
+
+    severity 取参与人格里的最高值：旧实现记第一个报出该 title 的人格的值，
+    A 说 low、B/C 说 critical 时会被永久记作 low，等于把最严重的判断吞掉。
+    """
+    if similarity is None:
+        similarity = get_issue_similarity()
+
+    severity_boost = rules.get("severity_boost", {})
+
+    clusters = []  # [{"title", "severity", "why_it_matters", "suggested_fix", "affected_personas", "title_variants"}]
     for p in persona_outputs:
+        persona_id = p.get("persona_id", "")
         for issue in p.get("key_issues", []):
             if not isinstance(issue, dict):
                 continue
             title = issue.get("title", "")
             if not title:
                 continue
-            if title not in issue_map:
-                issue_map[title] = {
-                    "severity": issue.get("severity", "medium"),
+            severity = issue.get("severity", "medium")
+
+            target = None
+            for cluster in clusters:
+                if similarity.is_same_issue(title, cluster["title"]):
+                    target = cluster
+                    break
+
+            if target is None:
+                clusters.append({
+                    "title": title,
+                    "severity": severity,
                     "why_it_matters": issue.get("why_it_matters", ""),
                     "suggested_fix": issue.get("suggested_fix", ""),
-                    "affected_personas": [],
-                }
-            issue_map[title]["affected_personas"].append(p.get("persona_id", ""))
+                    "affected_personas": [persona_id],
+                    "title_variants": [title],
+                })
+                continue
+
+            target["affected_personas"].append(persona_id)
+            if title not in target["title_variants"]:
+                target["title_variants"].append(title)
+            if _severity_rank(severity) > _severity_rank(target["severity"]):
+                target["severity"] = severity
+                # 描述跟着最严重的那份走，免得出现"critical 配一句无关痛痒的理由"
+                if issue.get("why_it_matters"):
+                    target["why_it_matters"] = issue["why_it_matters"]
+                if issue.get("suggested_fix"):
+                    target["suggested_fix"] = issue["suggested_fix"]
 
     results = []
-    for title, info in issue_map.items():
-        boost = severity_boost.get(info["severity"], 1.0)
+    for cluster in clusters:
+        boost = severity_boost.get(cluster["severity"], 1.0)
         weight = 1.0
-        affected_count = len(set(info["affected_personas"]))
-        score = boost * weight * affected_count
+        affected = list(dict.fromkeys(cluster["affected_personas"]))  # 去重且保序（确定性）
+        score = boost * weight * len(affected)
         results.append({
             "priority": 0,
-            "issue": title,
-            "severity": info["severity"],
-            "why_it_matters": info["why_it_matters"],
-            "affected_personas": list(set(info["affected_personas"])),
-            "suggested_fix": info["suggested_fix"],
+            "issue": cluster["title"],
+            "severity": cluster["severity"],
+            "why_it_matters": cluster["why_it_matters"],
+            "affected_personas": affected,
+            "suggested_fix": cluster["suggested_fix"],
             "score": score,
+            # 声明去重精度 + 被合并掉的措辞，方便人工核对"这几条真是同一个问题吗"
+            "dedup_method": similarity.method,
+            "title_variants": cluster["title_variants"],
         })
 
-    results.sort(key=lambda x: x["score"], reverse=True)
+    # 同分时让更严重的排前面（原来只按 score 排，同分顺序取决于出现次序）
+    results.sort(key=lambda x: (x["score"], _severity_rank(x["severity"])), reverse=True)
     for i, item in enumerate(results):
         item["priority"] = i + 1
 
@@ -188,10 +238,15 @@ def aggregate_report(
     target: str,
     rules: dict,
     cross_exam_data: Optional[dict] = None,
+    similarity=None,
 ) -> dict:
     consensus = compute_consensus(persona_outputs, threshold=rules.get("consensus_threshold", 0.7))
-    disagreements = compute_disagreements(persona_outputs)
-    priority_fixes = compute_priority_fixes(persona_outputs, rules)
+    # 一份报告只建一个相似度比较器：分歧聚类和修复项去重必须同口径（否则同一批
+    # 议题在两个 section 里被切成不同组），顺带避免重复加载 embedding 模型。
+    if similarity is None:
+        similarity = get_issue_similarity()
+    disagreements = compute_disagreements(persona_outputs, similarity=similarity)
+    priority_fixes = compute_priority_fixes(persona_outputs, rules, similarity=similarity)
 
     stance_counter = Counter(p.get("primary_stance", "观望") for p in persona_outputs)
     primary_recommendation = stance_counter.most_common(1)[0][0] if stance_counter else ""

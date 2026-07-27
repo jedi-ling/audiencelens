@@ -343,3 +343,105 @@ class TestCheckIdentityBehaviorDecoupling:
         result = check_identity_behavior_decoupling(output)
         assert result["decoupled"] is False
         assert len(result["violations"]) >= 2
+
+
+class TestIdentityBehaviorFalsePositives:
+    """旧正则 (?:作为[男女女性男性]|她|他).*?(?:所以|因此) 把裸"他"当人称指代，
+    会命中「其他」「他们」里的那个字。中文里"其他…所以"密度极高，正常 UX 建议被判
+    违规 → aggregator 每条扣 10 分 → 5 条就 ethics_score<50 → compliance"驳回"
+    + "全部评审结果需要人工复核"。两个方向都必须测：正常文本放行、真违规仍被抓。"""
+
+    NORMAL_TEXTS = [
+        "其他玩家很容易困惑，所以建议加提示",
+        "他们看不懂教程，因此会流失",
+        "这个功能没有其他入口，所以要改",
+        # 「他人」同样是泛指，不是身份刻板推理
+        "看不到他人的进度，所以缺少对比动力",
+        # 「性」字曾因错写的字符类 [男女女性男性] 单独触发
+        "游戏性说明不足，因此第一印象弱",
+        # 跨句连结：两件无关的事不该被 .*? 串成一条违规
+        "她提到教程不清晰。另外价格偏高，所以建议调整定价",
+    ]
+
+    VIOLATION_TEXTS = [
+        "作为女性玩家她肯定不喜欢硬核战斗，所以要降低难度",
+        "作为男性所以更喜欢动作游戏",
+        "她因此不喜欢暴力游戏",
+        # 「她们」显式带性别，属于性别泛化，保留为违规
+        "她们对数值成长没兴趣，所以要弱化养成线",
+    ]
+
+    @pytest.mark.parametrize("text", NORMAL_TEXTS)
+    def test_normal_chinese_not_flagged(self, text):
+        output = _make_valid_output()
+        output["evidence"] = [{"content": text, "inference_level": "direct"}]
+        result = check_identity_behavior_decoupling(output)
+        assert result["decoupled"] is True, f"误伤正常文本: {result['violations']}"
+
+    @pytest.mark.parametrize("text", VIOLATION_TEXTS)
+    def test_real_violation_still_caught(self, text):
+        output = _make_valid_output()
+        output["evidence"] = [{"content": text, "inference_level": "direct"}]
+        result = check_identity_behavior_decoupling(output)
+        assert result["decoupled"] is False, f"漏放真违规: {text}"
+
+    def test_five_normal_issues_keep_ethics_clean(self):
+        # 这就是实跑复现的场景：5 条正常报告条目，旧正则全中 → 报告被判驳回
+        output = _make_valid_output()
+        output["evidence"] = [
+            {"content": t, "inference_level": "inferred"} for t in self.NORMAL_TEXTS
+        ]
+        output["key_issues"] = [
+            {"severity": "medium", "title": "提示缺失",
+             "why_it_matters": "其他玩家很容易困惑，所以建议加提示",
+             "suggested_fix": "在首屏加一行说明，因此其他入口也要同步"}
+        ]
+        result = check_identity_behavior_decoupling(output)
+        assert result["violations"] == []
+
+    def test_offschema_shapes_do_not_crash(self):
+        # 字符串形态的 evidence/key_issues（第三方模型实测）不能让伦理检查崩
+        result = check_identity_behavior_decoupling(
+            {"evidence": ["文案不清晰"], "key_issues": "无重大问题"}
+        )
+        assert result["decoupled"] is True
+
+    def test_violation_inside_string_shaped_issue_still_caught(self):
+        # 兜底分支不能变成违规文本的逃生通道
+        result = check_identity_behavior_decoupling(
+            {"key_issues": ["作为女性她不玩这类游戏，所以不用管这块"]}
+        )
+        assert result["decoupled"] is False
+
+    def test_violation_in_whole_string_key_issues_still_caught(self):
+        # key_issues 整体被吐成一句话时，旧写法会 for 出单个字符、一条都查不出来
+        result = check_identity_behavior_decoupling(
+            {"key_issues": "作为女性她不玩这类游戏，所以不用管这块"}
+        )
+        assert result["decoupled"] is False
+
+    def test_violation_in_mapping_shaped_key_issues_still_caught(self):
+        # {维度: 描述} 形态：描述里的违规必须查出来
+        result = check_identity_behavior_decoupling(
+            {"key_issues": {"目标人群": "作为女性玩家她不感兴趣，所以砍掉"}}
+        )
+        assert result["decoupled"] is False
+
+    def test_violation_in_inference_basis_caught(self):
+        # inference_basis 恰恰是刻板推理最爱藏的字段，旧实现只看 content
+        result = check_identity_behavior_decoupling({
+            "evidence": [{
+                "content": "教程冗长",
+                "inference_level": "inferred",
+                "inference_basis": "她是女性所以耐心低",
+            }]
+        })
+        assert result["decoupled"] is False
+
+    def test_normalizer_backfilled_basis_is_not_a_violation(self):
+        # 归一化会给缺层级的 evidence 补一条 inference_basis 说明；伦理检查现在也扫
+        # 这个字段，所以那句说明本身绝不能命中正则，否则每个 off-schema 输出都被判违规
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({"evidence": ["文案不清晰", "价格没写"]})
+        assert check_identity_behavior_decoupling(out)["violations"] == []

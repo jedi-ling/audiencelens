@@ -362,6 +362,47 @@ class TestRunCalibrationCheck:
         result = run_calibration_check(personas)
         assert result["overall_pass"] is False
 
+
+class TestOffSchemaInputDoesNotCrash:
+    """形状归一化的正主是 persona_agent.normalize_persona_output，但直接调 calibration
+    的路径（老数据回放、外部集成、单测）没过那道边界，本模块自己也要顶住：
+    历史实现里 issue["title"] / e["content"] / p["persona_id"] 都是硬下标，
+    第三方模型吐的字符串形态能让整轮校准直接抛异常。"""
+
+    def test_string_key_issues_do_not_crash_coverage(self):
+        # calibration.py 旧 :33 —— issue["title"] 对字符串是 TypeError
+        p1 = _make_persona("p1", key_issues="无重大问题")
+        p2 = _make_persona("p2", key_issues=["纯字符串问题", {"title": "Bug A"}])
+        result = compute_coverage_score([p1, p2])
+        # 字符串形态没有可比的 title，不参与集合距离，但不能崩
+        assert result["pairwise_distances"][("p1", "p2")] == 1.0
+
+    def test_string_evidence_do_not_crash_hallucination(self):
+        # calibration.py 旧 :73/:80 —— e.get(...) / e["content"] 对字符串是 AttributeError
+        p = _make_persona("p1", evidence=["文案不清晰"])
+        result = compute_hallucination_rate([p], ["页面原文"])
+        assert result["per_persona"]["p1"] == 0.0
+
+    def test_missing_persona_id_falls_back_instead_of_keyerror(self):
+        # calibration.py 旧 :14/:74/:88/:101 —— p["persona_id"] 硬下标
+        p1 = {"primary_stance": "观望", "must_comment_on_check": {"a": True}}
+        p2 = {"primary_stance": "值得推进", "must_comment_on_check": {"a": False}}
+        rate = compute_role_consistency_rate([p1, p2])
+        assert len(rate["per_persona"]) == 2  # 占位键不能互相覆盖
+        assert compute_hallucination_rate([p1], ["页面原文"])["average"] == 0.0
+
+    def test_missing_stance_does_not_crash_stability(self):
+        # calibration.py 旧 :101 —— p["primary_stance"] 硬下标
+        run1 = [{"persona_id": "p1"}]
+        run2 = [{"persona_id": "p1", "primary_stance": "观望"}]
+        result = compute_rerun_stability(run1, run2)
+        assert result["disagreed_personas"] == ["p1"]
+
+    def test_non_dict_must_comment_check_does_not_crash(self):
+        p = _make_persona("p1", must_comment_on_check=["独特性", "首15分钟"])
+        result = compute_role_consistency_rate([p])
+        assert result["per_persona"]["p1"] == 0.0
+
     def test_with_artifact_texts(self):
         artifact_texts = ["The UI is clear."]
         personas = [

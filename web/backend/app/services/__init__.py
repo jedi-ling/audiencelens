@@ -829,6 +829,9 @@ class ReviewService:
             self.session.commit()
 
             persona_outputs_data = []
+            # 逐个人格的失败原因。以前失败只写进 po.output_json 就没人再看了，
+            # 于是"全员失败"和"全员通过"在后面的聚合阶段长得一模一样（见循环之后的检查）。
+            persona_failures: List[tuple] = []
             total_cost = 0.0
             total_input_tokens = 0
             total_output_tokens = 0
@@ -889,6 +892,9 @@ class ReviewService:
                     po.status = "failed"
                     po.output_json = {"error": str(e)}
                     po.completed_at = datetime.now(timezone.utc)
+                    persona_failures.append(
+                        (persona["id"], persona.get("name", persona["id"]), str(e))
+                    )
 
                     self._ws_emit(ws_manager, review.id, "review.persona_failed", {
                         "persona_id": persona["id"],
@@ -897,6 +903,22 @@ class ReviewService:
                     })
 
                 self.session.commit()
+
+            # ---- 失败必须是失败，不能伪装成"没发现问题" ----
+            #
+            # 以前这里什么都不检查：全部人格挂掉 → persona_outputs_data 为空 →
+            # aggregate_report([]) 产出 release_risk="low"、0 条修复项 → 状态还被
+            # 无条件置成 completed。用户看到的是"评审跑完了，没发现风险"，
+            # 实际是一个人格都没跑成（key 过期/欠费/模型名写错都会这样）。
+            # 这类失败比崩溃危险得多——它伪装成正常结果，用户会据此做决定。
+            if not persona_outputs_data:
+                detail = "；".join(f"{name}: {err}" for _pid, name, err in persona_failures[:3])
+                more = f"（另有 {len(persona_failures) - 3} 位同样失败）" if len(persona_failures) > 3 else ""
+                raise RuntimeError(
+                    f"全部 {len(persona_failures)} 位人格都没能完成评审，未生成任何报告。"
+                    f"常见原因：API Key 失效/欠费、模型名不被服务商识别、中转地址不可达。"
+                    f"错误详情——{detail}{more}"
+                )
 
             cross_exam_results = []
             if persona_outputs_data and mode_config["cross_examination"]:
@@ -932,6 +954,27 @@ class ReviewService:
                 rules,
                 cross_exam_results if cross_exam_results else None,
             )
+
+            # 部分失败：出报告，但必须如实标注结论是据几位人格得出的。
+            # 8 位挂 6 位时共识度和 release_risk 完全按剩下 2 位算，不标注
+            # 就等于把"两个人的看法"包装成"评审团的结论"。
+            # 字段名/结构必须和引擎链路（runner/cli.py 的 report["degradation"]）**完全一致**，
+            # 否则前端要为两条链路各写一套读法——那正是本仓库"同一概念两处定义"的老毛病。
+            if persona_failures and isinstance(report, dict):
+                report["degradation"] = {
+                    "degraded": True,
+                    "attempted_count": len(persona_output_records),
+                    "succeeded_count": len(persona_outputs_data),
+                    "failed_count": len(persona_failures),
+                    "failed_personas": [
+                        {"persona_id": pid, "persona_name": name, "error": err}
+                        for pid, name, err in persona_failures
+                    ],
+                    "notice": (
+                        f"本次有 {len(persona_failures)} 位人格未能完成，"
+                        f"以下结论仅据 {len(persona_outputs_data)} 位得出。"
+                    ),
+                }
 
             self._ws_emit(ws_manager, review.id, "review.aggregation_completed", {})
 
@@ -969,7 +1012,9 @@ class ReviewService:
                     self.session,
                     review.user_id or "anonymous",
                     review_id=review.id,
-                    persona_count=len(persona_output_records),
+                    # 真实成功数，不是尝试数：token 只在成功分支累加，
+                    # 这里若记尝试数就会出现"6 位人格却只有 2 位的 token"的对不上账。
+                    persona_count=len(persona_outputs_data),
                     cost_usd=total_cost,
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,

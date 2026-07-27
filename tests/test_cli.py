@@ -6,7 +6,16 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from runner.cli import load_artifact_bundle, main, run_panel, run_single_persona
+from runner import cli as runner_cli
+from runner.cli import (
+    AllPersonasFailedError,
+    filter_genuine_controversies,
+    load_artifact_bundle,
+    main,
+    run_panel,
+    run_single_persona,
+    truncate_panel,
+)
 from src import cli as audiencelens_cli
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -498,6 +507,241 @@ class TestRunPanel:
             )
 
 
+def _llm_json(persona_id: str, severity: str = "medium", title: str = "上手门槛偏高") -> str:
+    """一份能通过 parse/normalize 的最小合法人格输出，用来伪造 LLM 返回。"""
+    return json.dumps(
+        {
+            "persona_id": persona_id,
+            "persona_name": persona_id,
+            "persona_version": "0.1.0",
+            "task_type": "concept_review",
+            "primary_stance": "观望",
+            "confidence": 0.6,
+            "evidence_sufficiency": 0.7,
+            "evidence": [{"content": "核心循环写得比较清楚", "inference_level": "direct"}],
+            "scores": {"base": {"clarity": 3, "trust": 3}, "task_specific": {"overall": 3}},
+            "key_issues": [
+                {
+                    "severity": severity,
+                    "title": title,
+                    "why_it_matters": "新玩家可能在第一关就走不下去",
+                    "suggested_fix": "补一段引导",
+                }
+            ],
+            "continue_triggers": [],
+            "quit_triggers": [],
+            "first_scan_observations": ["定位一句话说清了"],
+            "must_comment_on_check": {},
+            "missing_information": [],
+            "voice_sample": "看起来还行，但门槛有点高。",
+            "meta": {"caveats": [], "is_synthetic": True},
+        },
+        ensure_ascii=False,
+    )
+
+
+def _rich_bundle():
+    """材料覆盖全部 evidence_types_needed，让证据预检一个人格都不跳过——
+    多人格断言必须建立在"面板真的有多人"之上（默认的 sample bundle 只过得了 P01）。"""
+    return TestRunPanel._rich_bundle()
+
+
+def _panel(**overrides):
+    kwargs = dict(
+        task_type="concept_review",
+        personas_path=PERSONAS_PATH,
+        presets_path=PRESETS_PATH,
+        rules_path=RULES_PATH,
+        budget_path=BUDGET_PATH,
+        output_schema_path=OUTPUT_SCHEMA_PATH,
+        report_schema_path=REPORT_SCHEMA_PATH,
+        persona_prompt_path=PERSONA_PROMPT_PATH,
+        cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+        report_template_path=REPORT_TEMPLATE_PATH,
+    )
+    kwargs.update(overrides)
+    return run_panel(**kwargs)
+
+
+class TestPanelFailureIsNeverSilent:
+    """全员失败时曾经会返回一份 primary_recommendation=""、release_risk="low"、
+    0 条修复项的"合法"报告——用户读成"都评过了，没问题"，实际一个都没跑成。
+    这组测试锁住"失败必须让调用方无法忽略"。"""
+
+    def test_all_personas_failed_raises_instead_of_returning_report(self, monkeypatch):
+        def boom(**kwargs):
+            raise RuntimeError("模拟 provider 429：额度用尽")
+
+        monkeypatch.setattr(runner_cli, "chat_completion", boom)
+
+        with pytest.raises(AllPersonasFailedError) as exc:
+            _panel(artifact_bundle=_rich_bundle(), api_key="sk-test-not-real")
+
+        err = exc.value
+        assert err.attempted > 1
+        assert err.failed_count == err.attempted
+        # 各人格的错误必须带出来，否则用户/日志只知道"失败了"不知道为什么
+        assert len(err.failures) == err.attempted
+        assert all(f["persona_id"] for f in err.failures)
+        assert all("429" in f["error"] for f in err.failures)
+        assert "429" in str(err)
+
+    def test_empty_panel_also_raises(self, sample_artifact_bundle, monkeypatch):
+        """一个人格都没进来（面板为空 / 全被证据预检跳过）同样不许产出报告。"""
+        monkeypatch.setattr(
+            runner_cli,
+            "precheck_panel",
+            lambda panel, bundle: {
+                "valid_personas": [],
+                "skipped_personas": [{"persona_id": p["id"], "reason": "no evidence"} for p in panel],
+            },
+        )
+
+        with pytest.raises(AllPersonasFailedError) as exc:
+            _panel(artifact_bundle=sample_artifact_bundle)
+
+        assert exc.value.attempted == 0
+        assert exc.value.skipped_count > 0
+
+    def test_partial_failure_is_degraded_and_counts_only_successes(self, monkeypatch):
+        """部分失败可以出报告，但必须带降级标记，且 persona_count 是真实成功数。"""
+        ok_persona = "P01-indie-core-operator"
+
+        def flaky(**kwargs):
+            if ok_persona in kwargs["prompt"]:
+                return _llm_json(ok_persona), 100, 200
+            raise RuntimeError("模拟 provider 超时")
+
+        monkeypatch.setattr(runner_cli, "chat_completion", flaky)
+
+        result = _panel(artifact_bundle=_rich_bundle(), api_key="sk-test-not-real")
+
+        cost = result["cost_summary"]
+        assert cost["persona_count"] == 1  # 真实成功数，不是发起数
+        assert cost["attempted_count"] > 1
+        assert cost["failed_count"] == cost["attempted_count"] - 1
+
+        assert result["degraded"] is True
+        assert len(result["failed_personas"]) == cost["failed_count"]
+        assert all("超时" in f["error"] for f in result["failed_personas"])
+
+        degradation = result["report"]["degradation"]
+        assert degradation["degraded"] is True
+        assert degradation["succeeded_count"] == 1
+        assert degradation["failed_count"] == cost["failed_count"]
+        assert ok_persona not in [f["persona_id"] for f in degradation["failed_personas"]]
+        # 降级必须在渲染产物里也看得见，不能只躺在 JSON 里
+        assert "未能完成" in result["markdown"]
+
+    def test_all_success_is_not_marked_degraded(self):
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = _panel(artifact_bundle=_rich_bundle())
+        cost = result["cost_summary"]
+        assert result["degraded"] is False
+        assert result["failed_personas"] == []
+        assert cost["persona_count"] == cost["attempted_count"] > 0
+        assert cost["failed_count"] == 0
+        assert result["report"]["degradation"]["degraded"] is False
+
+
+class TestControversyFiltering:
+    """无争议时不许凭空制造对立：variance==0 或参与人格 <2 的议题不得进争议列表。"""
+
+    def test_zero_variance_and_single_persona_points_are_dropped(self):
+        points = [
+            {  # 只有一个人格提到——进了交叉质证 pro/con 会是同一个人
+                "title": "单人格议题",
+                "severity_variance": 0.0,
+                "persona_views": [{"persona_id": "p1", "severity": "high"}],
+            },
+            {  # 两个人格但严重度完全一致，没有分歧可言
+                "title": "一致议题",
+                "severity_variance": 0.0,
+                "persona_views": [
+                    {"persona_id": "p1", "severity": "medium"},
+                    {"persona_id": "p2", "severity": "medium"},
+                ],
+            },
+            {  # 真分歧：一个说 low 一个说 critical
+                "title": "真争议",
+                "severity_variance": 2.25,
+                "persona_views": [
+                    {"persona_id": "p1", "severity": "low"},
+                    {"persona_id": "p2", "severity": "critical"},
+                ],
+            },
+        ]
+        kept = filter_genuine_controversies(points)
+        assert [p["title"] for p in kept] == ["真争议"]
+
+    def test_no_cross_exam_when_everyone_agrees(self):
+        """模拟模式下 6 位人格都报同一条 medium 议题（方差 0）——
+        以前这里照样生成一份 pro/con 全是占位文案的"争议"。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = _panel(artifact_bundle=_rich_bundle())
+        assert len(result["report"]["persona_notes"]) > 1
+        assert result["report"]["cross_examination"] is None
+
+    def test_cross_exam_still_runs_on_real_disagreement(self, monkeypatch):
+        """有真分歧时交叉质证必须照跑——过滤不能把正常争议一起干掉。"""
+        severities = {
+            "P01-indie-core-operator": "critical",
+            "P02-systems-theorycrafter": "low",
+        }
+
+        def fake(**kwargs):
+            prompt = kwargs["prompt"]
+            for pid, severity in severities.items():
+                if pid in prompt:
+                    return _llm_json(pid, severity=severity, title="核心循环说不清"), 10, 20
+            raise RuntimeError("本次只让两位人格成功")
+
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+        result = _panel(artifact_bundle=_rich_bundle(), api_key="sk-test-not-real")
+
+        cross = result["report"]["cross_examination"]
+        assert cross is not None
+        dispute = cross["disputes"][0]
+        # pro/con 必须是两个不同人格，不能自己跟自己吵
+        assert dispute["pro_args"][0]["persona_id"] != dispute["con_args"][0]["persona_id"]
+
+
+class TestTruncatePanelKeepsDissenter:
+    """select_panel 把唱反调人格放在列表末尾，从头切等于系统性删掉唯一负面视角。"""
+
+    @staticmethod
+    def _panel_of(*ids):
+        return [{"id": i} for i in ids]
+
+    def test_dissenter_survives_truncation(self):
+        panel = self._panel_of("P01-a", "P02-b", "P04-c", "P06-d", "P15-toxic-skeptic-reviewer")
+        kept = truncate_panel(panel, 3)
+        assert len(kept) == 3
+        assert [p["id"] for p in kept] == ["P01-a", "P02-b", "P15-toxic-skeptic-reviewer"]
+
+    def test_no_replacement_when_dissenter_already_kept(self):
+        panel = self._panel_of("P16-veteran", "P01-a", "P02-b", "P04-c")
+        kept = truncate_panel(panel, 2)
+        assert [p["id"] for p in kept] == ["P16-veteran", "P01-a"]
+
+    def test_panel_without_dissenter_is_plain_head_slice(self):
+        panel = self._panel_of("P01-a", "P02-b", "P04-c")
+        assert [p["id"] for p in truncate_panel(panel, 2)] == ["P01-a", "P02-b"]
+
+    def test_no_truncation_when_panel_fits(self):
+        panel = self._panel_of("P01-a", "P15-x")
+        assert truncate_panel(panel, 5) == panel
+
+    def test_quick_mode_panel_keeps_dissenter(self):
+        """端到端：quick 档（3 人）跑 concept_review 预设（6 人，P16 在末位）时，
+        面板里必须仍有唱反调的人格，否则共识度和 release_risk 系统性偏乐观。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = _panel(artifact_bundle=TestRunPanel._rich_bundle(), mode="quick")
+        persona_ids = [n["persona_id"] for n in result["report"]["persona_notes"]]
+        assert len(persona_ids) <= 3
+        assert any(pid.startswith(("P15", "P16")) for pid in persona_ids), persona_ids
+
+
 class TestMain:
     def test_argument_parsing(self, artifact_json_file):
         import sys
@@ -521,6 +765,36 @@ class TestMain:
             json_files = [f for f in os.listdir(output_dir) if f.endswith(".json") and "concept_review" in f]
             md_files = [f for f in os.listdir(output_dir) if f.endswith(".md") and "concept_review" in f]
             assert len(json_files) > 0 or len(md_files) > 0
+        finally:
+            sys.argv = original_argv
+
+    def test_all_failed_exits_nonzero_and_writes_no_report(self, artifact_json_file, tmp_path, monkeypatch):
+        """CLI 全员失败时必须非零退出、且磁盘上不留任何"无风险"假报告。"""
+        import sys
+
+        def boom(**kwargs):
+            raise RuntimeError("模拟 provider 鉴权失败")
+
+        monkeypatch.setattr(runner_cli, "chat_completion", boom)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-real")
+
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "cli.py",
+                "concept_review",
+                artifact_json_file,
+                "--output-dir",
+                str(tmp_path),
+                "--personas",
+                PERSONAS_PATH,
+                "--presets",
+                PRESETS_PATH,
+            ]
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 1
+            assert list(tmp_path.iterdir()) == []
         finally:
             sys.argv = original_argv
 

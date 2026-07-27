@@ -17,7 +17,7 @@ try:
     )
     from .evidence_precheck import precheck_panel
     from .llm_client import chat_completion
-    from .panel_selector import load_personas, load_presets, select_panel
+    from .panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
     from .persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
     from .validator import load_schema, validate_output
 except ImportError:
@@ -30,7 +30,7 @@ except ImportError:
     )
     from runner.evidence_precheck import precheck_panel
     from runner.llm_client import chat_completion
-    from runner.panel_selector import load_personas, load_presets, select_panel
+    from runner.panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
     from runner.persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
     from runner.validator import load_schema, validate_output
 
@@ -54,6 +54,92 @@ try:
     from .task_types import VALID_TASK_TYPES
 except ImportError:
     from runner.task_types import VALID_TASK_TYPES
+
+
+class AllPersonasFailedError(RuntimeError):
+    """一个人格都没跑成时抛出——绝不允许拿空报告冒充"没发现问题"。
+
+    为什么必须抛异常而不是返回报告：aggregate_report([]) 会产出
+    primary_recommendation=""、release_risk="low"、0 条修复项的"干净"报告，
+    用户读到的是"8 个人格都评了，没发现问题"，实际是 8 个全挂了。
+    这种伪装成正常结果的失败比直接崩溃危险得多，所以必须让调用方无法忽略。
+
+    异常也是两个调用方都已经能自然处理的形态：src/cli.py 的 run 命令外层
+    catch Exception → 打印错误并 exit 1；web 后端 run_review_task 外层
+    catch Exception → 把 Review 标成 failed 并广播 review.failed。
+
+    failures：[{"persona_id": ..., "error": ...}]，各人格的真实报错原因。
+    attempted / skipped_count：分别是实际发起的人格数、被证据预检等跳过的人格数。
+    """
+
+    def __init__(self, failures: List[dict], attempted: int, skipped_count: int = 0, message: str = None):
+        self.failures = list(failures or [])
+        self.attempted = attempted
+        self.failed_count = len(self.failures)
+        self.skipped_count = skipped_count
+        super().__init__(message or self._build_message())
+
+    def _build_message(self) -> str:
+        if self.attempted == 0:
+            return (
+                "本次没有任何人格进入评审（预设面板为空，或全部被证据预检跳过），"
+                f"跳过 {self.skipped_count} 位。没有任何人格输出，因此不产出报告。"
+            )
+        details = "; ".join(
+            f"{f.get('persona_id', '?')}: {str(f.get('error', ''))[:200]}"
+            for f in self.failures
+        )
+        return (
+            f"全部 {self.attempted} 位人格评审失败，未产出任何有效输出，因此不产出报告。"
+            f"各人格错误：{details}"
+        )
+
+
+def _is_dissenter(persona: dict) -> bool:
+    """唱反调人格（P15 毒舌怀疑者 / P16 竞品老兵），口径复用 panel_selector 的前缀表。"""
+    return any(str(persona.get("id", "")).startswith(prefix) for prefix in DISSENTER_PREFIXES)
+
+
+def truncate_panel(panel_selected: List[dict], max_personas: int) -> List[dict]:
+    """按档位截断面板，但必须保住"唱反调"名额。
+
+    为什么不能直接 panel_selected[:max_personas]：select_panel 为保证面板里有异议者，
+    是把 P15 **append 到列表末尾**的，从头切等于系统性地把唯一的负面视角切掉——
+    quick 档（3 人）遇到预设 5 人时 P15 永远被丢弃，共识度和 release_risk 因此
+    结构性偏乐观（"大家都挺看好"其实是因为唱反调的那个人没被叫来）。
+    """
+    if max_personas < 1 or len(panel_selected) <= max_personas:
+        return panel_selected
+
+    kept = panel_selected[:max_personas]
+    if any(_is_dissenter(p) for p in kept):
+        return kept
+
+    dissenter = next((p for p in panel_selected[max_personas:] if _is_dissenter(p)), None)
+    if dissenter is None:
+        return kept
+    # 用异议者替换掉名单里最后一位，人数上限不变（档位的省钱承诺不打折）
+    return kept[:-1] + [dissenter]
+
+
+def filter_genuine_controversies(controversy_points: List[dict]) -> List[dict]:
+    """只保留真有分歧的议题：severity 方差 > 0 且至少 2 个不同人格参与。
+
+    extract_controversy_points 只按方差倒序取 top3、不过滤方差为 0 的议题，于是
+    只要有任何人格提了任何 issue，争议列表就恒非空 —— 单人格议题进了交叉质证后
+    pro/con 是同一个 persona_id，论点还是"未从原始 persona 输出中提取到…"这类占位
+    文案，用户读到的是被制造出来的对立。宁可显示"本次无显著分歧"，也不要假造争议。
+    """
+    genuine = []
+    for cp in controversy_points:
+        views = cp.get("persona_views", []) or []
+        participants = {v.get("persona_id", "") for v in views}
+        if len(participants) < 2:
+            continue
+        if (cp.get("severity_variance") or 0) <= 0:
+            continue
+        genuine.append(cp)
+    return genuine
 
 
 def load_artifact_bundle(path: str) -> dict:
@@ -309,8 +395,8 @@ def run_panel(
         panel_skipped = panel["skipped"]
 
     mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
-    if mode_config and len(panel_selected) > mode_config["max_personas"]:
-        panel_selected = panel_selected[: mode_config["max_personas"]]
+    if mode_config:
+        panel_selected = truncate_panel(panel_selected, mode_config["max_personas"])
 
     precheck = precheck_panel(panel_selected, artifact_bundle)
     valid_personas = precheck["valid_personas"]
@@ -360,6 +446,7 @@ def run_panel(
             persona_results = [f.result() for f in futures]
 
     persona_outputs = []
+    failed_personas = []
     for r in persona_results:
         if r["output"] is not None:
             validation = validate_output(
@@ -370,11 +457,34 @@ def run_panel(
             )
             r["validation"] = validation
             persona_outputs.append(r["output"])
+        else:
+            # 失败的人格必须被记下来并透出去：以前这里直接 continue，
+            # 每个人格的 error 从头到尾没有一条带出 run_panel。
+            failed_personas.append({
+                "persona_id": r["persona_id"],
+                "error": r.get("error") or "未知错误",
+                "model": r.get("model", ""),
+            })
+
+    # 全盘失败（含"一个人格都没进来"）绝不产出报告——见 AllPersonasFailedError 的说明
+    if not persona_outputs:
+        raise AllPersonasFailedError(
+            failures=failed_personas,
+            attempted=len(persona_results),
+            skipped_count=skipped_count,
+        )
+
+    attempted_count = len(persona_results)
+    succeeded_count = len(persona_outputs)
+    failed_count = len(failed_personas)
+    degraded = failed_count > 0
 
     cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
     cross_exam_data = None
     if cross_exam_enabled and persona_outputs and cross_exam_prompt_path:
-        controversy_points = extract_controversy_points(persona_outputs)
+        controversy_points = filter_genuine_controversies(
+            extract_controversy_points(persona_outputs)
+        )
         if controversy_points:
             cross_exam_prompt = render_cross_exam_prompt(
                 controversy_points, persona_outputs, cross_exam_prompt_path
@@ -394,6 +504,22 @@ def run_panel(
     if simulated:
         report["simulation_notice"] = SIMULATION_WARNING
 
+    # 降级标记进 report 本体：web 后端把 report 整份落库（report_json），
+    # 前端读的也是它——只放在返回值顶层的话，重新打开历史报告就看不到"本次有人
+    # 没跑成"了，那份报告又会被当成完整结论。
+    report["degradation"] = {
+        "degraded": degraded,
+        "attempted_count": attempted_count,
+        "succeeded_count": succeeded_count,
+        "failed_count": failed_count,
+        "failed_personas": failed_personas,
+        "notice": (
+            f"本次有 {failed_count} 位人格未能完成评审，以下结论仅基于 {succeeded_count} 位人格的输出。"
+            if degraded
+            else ""
+        ),
+    }
+
     calibration_enabled = mode_config["calibration"] if mode_config else True
     calibration = run_calibration_check(persona_outputs, artifact_texts) if calibration_enabled else None
 
@@ -402,6 +528,10 @@ def run_panel(
         markdown = render_markdown_report(report, report_template_path)
         if simulated:
             markdown = f"> **{SIMULATION_WARNING}**\n\n{markdown}"
+        # 报告模板不认识 degradation 字段（模板不在本次改动范围），横幅在这里补上，
+        # 保证降级信息在渲染产物里也看得见，而不是只躺在 JSON 里
+        if degraded:
+            markdown = f"> **⚠️ {report['degradation']['notice']}**\n\n{markdown}"
 
     report["_persona_outputs"] = persona_outputs
     html = ""
@@ -412,6 +542,16 @@ def run_panel(
                 '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
                 'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
                 f"{SIMULATION_WARNING}</div>"
+            )
+            idx = html.index(">", html.index("<body")) + 1
+            html = html[:idx] + banner + html[idx:]
+        if degraded and "<body" in html:
+            failed_list = "、".join(f["persona_id"] for f in failed_personas)
+            banner = (
+                '<div style="background:#fee2e2;border:2px solid #dc2626;color:#991b1b;'
+                'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
+                f"⚠️ {report['degradation']['notice']}未完成的人格：{failed_list}"
+                "</div>"
             )
             idx = html.index(">", html.index("<body")) + 1
             html = html[:idx] + banner + html[idx:]
@@ -427,9 +567,16 @@ def run_panel(
         "html": html,
         "calibration": calibration,
         "simulated": simulated,
+        # 降级标记也放顶层：调用方在落库前就能判断要不要提示用户 / 要不要按满额计费
+        "degraded": degraded,
+        "failed_personas": failed_personas,
         "cost_summary": {
             "total_cost": total_cost,
-            "persona_count": len(persona_results),
+            # persona_count 必须是真实成功数：以前算的是 len(persona_results)（把失败的
+            # 也算进去），于是"8 个人格"的说法和计费都建立在没跑成的人格上。
+            "persona_count": succeeded_count,
+            "attempted_count": attempted_count,
+            "failed_count": failed_count,
             "skipped_count": skipped_count,
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
@@ -461,19 +608,26 @@ def main():
     cross_exam_prompt_path = os.path.join(src_root, "templates", "cross-exam-prompt.md")
     report_template_path = os.path.join(src_root, "templates", "report-template.md")
 
-    result = run_panel(
-        task_type=args.task_type,
-        artifact_bundle=artifact_bundle,
-        personas_path=personas_path,
-        presets_path=presets_path,
-        rules_path=rules_path,
-        budget_path=budget_path,
-        output_schema_path=output_schema_path,
-        report_schema_path=report_schema_path,
-        persona_prompt_path=persona_prompt_path,
-        cross_exam_prompt_path=cross_exam_prompt_path,
-        report_template_path=report_template_path,
-    )
+    try:
+        result = run_panel(
+            task_type=args.task_type,
+            artifact_bundle=artifact_bundle,
+            personas_path=personas_path,
+            presets_path=presets_path,
+            rules_path=rules_path,
+            budget_path=budget_path,
+            output_schema_path=output_schema_path,
+            report_schema_path=report_schema_path,
+            persona_prompt_path=persona_prompt_path,
+            cross_exam_prompt_path=cross_exam_prompt_path,
+            report_template_path=report_template_path,
+        )
+    except AllPersonasFailedError as e:
+        # 一份文件都不写：宁可什么都没有，也不要在磁盘上留一份"无风险"的假报告
+        print("=" * 60)
+        print(f"评审失败：{e}")
+        print("=" * 60)
+        raise SystemExit(1)
 
     os.makedirs(args.output_dir, exist_ok=True)
 

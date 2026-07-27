@@ -227,6 +227,26 @@ async def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_d
 # 让"你的东西归你"不只是一句承诺，而是用户能亲手验证的两个按钮。
 
 
+def _require_own_identity(identity: Identity) -> None:
+    """这两个接口必须有"唯一属于你"的身份，匿名一律拒绝。
+
+    原因是匿名身份不是"某个人"，而是一个**所有人共用的桶**：
+    AL_AUTH_ENABLED=false（默认值！）时每个请求都拿到同一个
+    settings.anonymous_user_id，全实例的评审 user_id 也都是它。
+    于是 delete_user_data(db, "anonymous") 匹配到的不是"我的数据"，
+    而是**全库所有人的数据**——任何访客不用登录不用密码就能清空整个实例；
+    导出接口同理会把所有人的材料原文和报告打包给调用方。
+
+    注意别误伤 CDK 兑换出来的游客：他们持 token、有独立 user_id、
+    is_anonymous=False，属于真实身份，照常放行。
+    """
+    if identity.is_anonymous:
+        raise BadRequest(
+            "这个操作需要一个属于你自己的账号。当前是未登录的共享身份，"
+            "无法区分哪些数据属于你——请先注册或登录。"
+        )
+
+
 @router.get("/auth/me/export", dependencies=[Depends(rate_limit("data_export", 5, 3600))])
 async def export_my_data(
     identity: Identity = Depends(optional_identity),
@@ -235,6 +255,7 @@ async def export_my_data(
     """导出我的全部数据（JSON）。密钥只给掩码，不导出明文。"""
     from app.services import user_data_service
 
+    _require_own_identity(identity)
     return user_data_service.export_user_data(db, identity.user_id)
 
 
@@ -257,15 +278,18 @@ async def delete_my_account(
     """彻底删除我的内容与账号。财务流水改为切断关联的墓碑 id（见 user_data_service）。"""
     from app.services import user_data_service
 
+    # 顺序要紧：先卡身份再看确认词。匿名身份下这个接口会删全库
+    # （见 _require_own_identity），不能让它有任何走到删除逻辑的机会。
+    _require_own_identity(identity)
+
     if body.confirm != DELETE_CONFIRM_PHRASE:
         raise BadRequest(f"请输入「{DELETE_CONFIRM_PHRASE}」以确认此操作")
 
-    if not identity.is_anonymous:
-        user = db.get(User, identity.user_id)
-        if not user:
-            raise NotFound("账号不存在")
-        if not body.password or not verify_password(body.password, user.password_hash):
-            raise Unauthorized("密码不正确")
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+    if not body.password or not verify_password(body.password, user.password_hash):
+        raise Unauthorized("密码不正确")
 
     stats = user_data_service.delete_user_data(db, identity.user_id)
     return {"deleted": True, "detail": stats}
