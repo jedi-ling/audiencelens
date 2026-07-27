@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import AmbientMotes from '@/components/AmbientMotes'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
 import { connectReviewSocket } from '@/lib/ws'
@@ -90,7 +91,7 @@ function confidenceLevel(confidence: number): { label: string; barClass: string 
 /** 助手身份头像 —— 金色渐变徽记 + 微光，让对话双方一眼可辨 */
 function AssistantAvatar() {
   return (
-    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neon-green/40 bg-gradient-to-br from-neon-green/25 to-neon-green-dim/5 shadow-[0_0_12px_rgba(212,169,78,0.25)]">
+    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neon-green/40 bg-gradient-to-br from-neon-green/25 to-neon-green-dim/5 shadow-[0_0_12px_rgba(183,126,59,0.25)]">
       <Sparkles className="h-3.5 w-3.5 text-gold-cream" strokeWidth={1.5} />
     </div>
   )
@@ -594,6 +595,8 @@ export default function AskPage() {
   }
 
   const ready = canReview()
+  // 只有开场白、用户还没开口 —— 对话区此时是「空状态」，才允许挂环境浮尘
+  const isEmptyChat = messages.length === 1 && !messages.some((m) => m.role === 'user')
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
@@ -647,13 +650,18 @@ export default function AskPage() {
       <div
         ref={listRef}
         className={cn(
-          'chat-backdrop relative flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
+          // isolate：让浮尘层的负 z-index 被限制在这个容器内，只沉到自身背景之上、气泡之下
+          'chat-backdrop relative isolate flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
           dragging ? 'border-neon-green/60 bg-neon-green/5' : 'border-border bg-bg-card/60'
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* 浮尘只在「只有开场白、用户一句话都还没发」时出现：
+            此时对话区基本是空的，需要一点氛围；一旦有真实对话就摘掉——
+            正文文字底下飘东西会持续偷注意力。DOM 放在气泡前，天然在内容层下面 */}
+        {isEmptyChat && <AmbientMotes className="-z-10" />}
         {messages.map((m) => (
           <ChatBubble
             key={m.id}
@@ -994,7 +1002,7 @@ export default function AskPage() {
           }}
         />
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary shadow-[0_0_16px_rgba(212,169,78,0.35)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_0_24px_rgba(212,169,78,0.5)] disabled:opacity-50 disabled:shadow-none"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary shadow-[0_0_16px_rgba(183,126,59,0.35)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_0_24px_rgba(183,126,59,0.5)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
           disabled={busy || (!input.trim() && attachments.length === 0)}
           aria-label="发送"
@@ -1275,9 +1283,11 @@ function ReviewStatusBody({
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neon-green" strokeWidth={2} />
             评审团正在评审中…
           </p>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
+          {/* shimmer-bar 挂在轨道外层：跑批时百分比会在某个人格思考时卡住十几秒，
+              静止的条会被读成「卡死」，流光负责传达「还在跑」。仅此分支（pending/running）渲染 */}
+          <div className="shimmer-bar mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
             <div
-              className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all duration-500"
+              className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all duration-500"
               style={{ width: `${reviewState.progress}%` }}
             />
           </div>
@@ -1295,8 +1305,10 @@ function ReviewStatusBody({
         </div>
       )}
 
+      {/* animate-pop-in：报告卡片顶替进度条这一刻需要一个落点，
+          否则内容凭空换掉，用户不确定是跑完了还是界面抖了一下 */}
       {reviewState.status === 'completed' && (
-        <div className="rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
+        <div className="animate-pop-in rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <h3 className="min-w-0 truncate text-[15px] font-semibold text-gold-cream font-display">
               {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
@@ -1410,7 +1422,7 @@ function ReportModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-neon-green/30 bg-bg-secondary shadow-[0_0_36px_rgba(212,169,78,0.08)]"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-neon-green/30 bg-bg-secondary shadow-[0_0_36px_rgba(183,126,59,0.08)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
@@ -1616,13 +1628,13 @@ function ChatBubble({
                   key={i}
                   src={src}
                   alt={`附图 ${i + 1}`}
-                  className="h-20 w-20 rounded-lg border border-neon-green/30 object-cover shadow-[0_2px_16px_rgba(212,169,78,0.2)]"
+                  className="h-20 w-20 rounded-lg border border-neon-green/30 object-cover shadow-[0_2px_16px_rgba(183,126,59,0.2)]"
                 />
               ))}
             </div>
           )}
           {message.text && (
-            <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(212,169,78,0.25)]">
+            <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(183,126,59,0.25)]">
               {message.text}
             </div>
           )}
@@ -1698,7 +1710,7 @@ function ChatBubble({
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
+          <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
             <ReviewStatusBody reviewState={reviewState} onStartFollowUp={onStartFollowUp} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
@@ -1742,7 +1754,7 @@ function ChatBubble({
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
       <div className="flex w-full max-w-[85%] flex-col">
-        <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(212,169,78,0.08)]">
+        <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
           <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
@@ -1818,7 +1830,7 @@ function ChatBubble({
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
               <div
-                className={`h-full rounded-full ${conf.barClass} shadow-[0_0_8px_rgba(212,169,78,0.5)] transition-all`}
+                className={`h-full rounded-full ${conf.barClass} shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all`}
                 style={{ width: `${Math.round(intent.confidence * 100)}%` }}
               />
             </div>
@@ -1830,7 +1842,7 @@ function ChatBubble({
           </div>
 
           <button
-            className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(212,169,78,0.3)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_4px_24px_rgba(212,169,78,0.4)] disabled:opacity-50"
+            className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(183,126,59,0.3)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_4px_24px_rgba(183,126,59,0.4)] disabled:opacity-50"
             onClick={() => onConfirm(intent, activePersonas)}
             disabled={busy}
           >

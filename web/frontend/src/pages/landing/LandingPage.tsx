@@ -214,7 +214,7 @@ export default function LandingPage() {
             if (a.y < 0 || a.y > canvas.height) a.vy *= -1
             ctx.beginPath()
             ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2)
-            ctx.fillStyle = 'rgba(212,169,78,' + a.a + ')'
+            ctx.fillStyle = 'rgba(183,126,59,' + a.a + ')'
             ctx.fill()
             for (let j = i + 1; j < parts.length; j++) {
               const b = parts[j]
@@ -225,7 +225,7 @@ export default function LandingPage() {
                 ctx.beginPath()
                 ctx.moveTo(a.x, a.y)
                 ctx.lineTo(b.x, b.y)
-                ctx.strokeStyle = 'rgba(212,169,78,' + (1 - d / 130) * 0.06 + ')'
+                ctx.strokeStyle = 'rgba(183,126,59,' + (1 - d / 130) * 0.06 + ')'
                 ctx.lineWidth = 0.5
                 ctx.stroke()
               }

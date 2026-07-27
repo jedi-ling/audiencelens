@@ -18,7 +18,7 @@ export default function TaskTypeCard({ taskType, selected, onClick }: TaskTypeCa
         'bg-bg-card hover:bg-bg-card-hover',
         selected
           ? 'border-neon-green border-glow-green'
-          : 'border-border hover:border-border-hover hover:shadow-[0_0_12px_rgba(212,169,78,0.12)]'
+          : 'border-border hover:border-border-hover hover:shadow-[0_0_12px_rgba(183,126,59,0.12)]'
       )}
     >
       <div className={cn(

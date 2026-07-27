@@ -1026,7 +1026,7 @@ export default function CreateReviewPage() {
             className={cn(
               'flex items-center gap-2 px-5 md:px-6 py-2.5 rounded-lg font-medium transition-all text-sm',
               canNext()
-                ? 'bg-neon-green text-bg-primary hover:bg-neon-green-dim hover:shadow-[0_0_20px_rgba(212,169,78,0.25)]'
+                ? 'bg-neon-green text-bg-primary hover:bg-neon-green-dim hover:shadow-[0_0_20px_rgba(183,126,59,0.25)]'
                 : 'bg-bg-card text-text-muted cursor-not-allowed'
             )}
           >

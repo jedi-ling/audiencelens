@@ -381,7 +381,8 @@ export default function ReviewProgressPage() {
           <span className="text-text-muted">总进度</span>
           <span className="font-medium text-text-secondary">{overallProgress}%</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-bg-card">
+        {/* 跑批时百分比会在某个人格思考时卡住十几秒，静止的条会被读成「卡死」→ 非终态挂流光 */}
+        <div className={cn('h-2 overflow-hidden rounded-full bg-bg-card', !terminal && 'shimmer-bar')}>
           <div
             className="h-full rounded-full bg-neon-green transition-all duration-700"
             style={{ width: `${overallProgress}%` }}
@@ -463,7 +464,8 @@ export default function ReviewProgressPage() {
             <h3 className="text-sm font-medium text-text-primary">评审进行中</h3>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
+            {/* 本分支只在非终态渲染，恒挂流光 */}
+            <div className="shimmer-bar flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
               <div
                 className="h-full bg-cyan rounded-full transition-all duration-700"
                 style={{ width: `${overallProgress}%` }}
@@ -471,9 +473,11 @@ export default function ReviewProgressPage() {
             </div>
             <span className="font-mono text-sm text-text-secondary">{overallProgress}%</span>
           </div>
+          {/* 上方进度条已经在流光传达「没卡死」，这里再转一个 spinner 是重复噪音，
+              改成整行呼吸：同样在动，但安静得多 */}
           {!hasV2Signal && (
-            <p className="text-xs text-text-muted mt-3 flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.25} />
+            <p className="animate-breathe text-xs text-text-muted mt-3 flex items-center gap-1.5">
+              <Hourglass className="w-3 h-3" strokeWidth={1.25} />
               等待评审团就位…
             </p>
           )}
@@ -495,7 +499,9 @@ export default function ReviewProgressPage() {
                     'rounded-xl border-2 p-3 md:p-4 transition-all',
                     'bg-bg-card',
                     po.status === 'completed' ? 'border-neon-green/20' :
-                    po.status === 'running' ? 'border-cyan/20' : 'border-border'
+                    po.status === 'running' ? 'border-cyan/20' : 'border-border',
+                    // 「一位人格交卷」是离散事件，给个落点脉冲
+                    po.status === 'completed' && 'animate-pop-in',
                   )}
                 >
                   <div className="flex items-center gap-2.5 mb-3">
@@ -530,7 +536,13 @@ export default function ReviewProgressPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <span className={cn('text-xs', psc.color)}>{psc.label}</span>
                     {po.status !== 'pending' && (
-                      <div className="flex-1 h-2 bg-bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'flex-1 h-2 bg-bg-secondary rounded-full overflow-hidden',
+                          // 只有真在跑的人格才流光；completed 还在流光是错误信号
+                          po.status === 'running' && 'shimmer-bar',
+                        )}
+                      >
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-700',
@@ -568,12 +580,14 @@ export default function ReviewProgressPage() {
             {/* v2：逐人格打勾（事件只告诉我们谁完成了） */}
             {v2CompletedIds.map((pid) => {
               const persona = personas.find((p) => p.id === pid)
+              // 卡片是随 WS 事件一个个 push 进来的，天然适合入场脉冲
               return (
                 <div
                   key={pid}
-                  className="rounded-xl border-2 border-neon-green/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
+                  className="animate-pop-in rounded-xl border-2 border-neon-green/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
                 >
-                  <div className="relative shrink-0">
+                  {/* animate-ring-out 的 ::before 依赖这层 relative 定位 */}
+                  <div className="animate-ring-out relative shrink-0">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full border border-neon-green/40 bg-neon-green/10 text-xs font-semibold text-neon-green">
                       {(persona?.name ?? pid).slice(0, 1)}
                     </div>
@@ -606,7 +620,11 @@ export default function ReviewProgressPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Swords className="w-4 h-4 text-warm-orange" strokeWidth={1.5} />
+            {/* 排队中也给点生命感；running 已有流光，别两个动效打架 */}
+            <Swords
+              className={cn('w-4 h-4 text-warm-orange', !terminal && crossExamPhase === 'waiting' && 'animate-breathe')}
+              strokeWidth={1.5}
+            />
             <h3 className="text-sm font-medium text-text-primary">交叉质询</h3>
             <span
               className={cn(
@@ -622,7 +640,14 @@ export default function ReviewProgressPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden',
+                // !terminal 是必须的：评审在交叉质询中途失败时 phase 会停在 running，
+                // 光看 phase 会让终态的条一直流光 = 骗用户「还在跑」
+                !terminal && crossExamPhase === 'running' && 'shimmer-bar',
+              )}
+            >
               <div
                 className="h-full bg-warm-orange rounded-full transition-all duration-700"
                 style={{ width: `${crossExamProgress}%` }}
@@ -634,7 +659,10 @@ export default function ReviewProgressPage() {
 
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="w-4 h-4 text-neon-green" strokeWidth={1.5} />
+            <BarChart3
+              className={cn('w-4 h-4 text-neon-green', !terminal && aggregationPhase === 'waiting' && 'animate-breathe')}
+              strokeWidth={1.5}
+            />
             <h3 className="text-sm font-medium text-text-primary">聚合分析</h3>
             <span
               className={cn(
@@ -650,7 +678,12 @@ export default function ReviewProgressPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'flex-1 h-3 bg-bg-secondary rounded-full overflow-hidden',
+                !terminal && aggregationPhase === 'running' && 'shimmer-bar',
+              )}
+            >
               <div
                 className="h-full bg-neon-green rounded-full transition-all duration-700"
                 style={{ width: `${aggregationProgress}%` }}

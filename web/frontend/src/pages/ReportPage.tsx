@@ -16,8 +16,15 @@ import { useState, useEffect, useRef } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/apiClient'
-import type { Review, ReviewMode, EvaluationScorecard, EthicsReport, Severity } from '@/lib/mock-data'
-import { EVALUATION_DIMENSIONS } from '@/lib/mock-data'
+import type { Review, ReviewMode, EvaluationScorecard, EthicsReportView, Severity } from '@/lib/mock-data'
+import {
+  EVALUATION_DIMENSIONS,
+  ETHICS_SEVERITY_BADGE_CLASSES,
+  ETHICS_SEVERITY_LABELS,
+  stereotypeRiskBadgeClass,
+  stereotypeRiskLabel,
+  toEthicsReportView,
+} from '@/lib/mock-data'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -93,7 +100,8 @@ const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
 }
 
 // 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
-const STANCE_PALETTE = ['#D4A94E', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '#a78bfa']
+// 首色用绸缎金 #F9D67D 而非品牌主色 #B77E3B：主色明度太低，紧邻 #ffbb33 会糊成一团
+const STANCE_PALETTE = ['#F9D67D', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '#a78bfa']
 
 const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
@@ -118,7 +126,8 @@ export default function ReportPage() {
   const [expandedIssues, setExpandedIssues] = useState<Set<number>>(new Set())
   const [showHtmlReport, setShowHtmlReport] = useState(false)
   const [evaluationScorecard, setEvaluationScorecard] = useState<EvaluationScorecard | null>(null)
-  const [ethicsReports, setEthicsReports] = useState<EthicsReport[]>([])
+  // 存收敛后的视图：违规项与风险档位在进 state 前就已经过类型守卫
+  const [ethicsReports, setEthicsReports] = useState<EthicsReportView[]>([])
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
   const [evaluating, setEvaluating] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
@@ -176,7 +185,7 @@ export default function ReportPage() {
   useEffect(() => {
     if (!id) return
     fetchEvaluation(id).then(setEvaluationScorecard).catch(() => {})
-    fetchEthicsReport(id).then(setEthicsReports).catch(() => {})
+    fetchEthicsReport(id).then((reports) => setEthicsReports(reports.map(toEthicsReportView))).catch(() => {})
   }, [id])
 
   useEffect(() => {
@@ -752,7 +761,7 @@ export default function ReportPage() {
                   return {
                     name: dim?.name ?? r.dimension,
                     score: r.score,
-                    fill: r.passed ? '#D4A94E' : '#ff3355',
+                    fill: r.passed ? '#B77E3B' : '#ff3355',
                   }
                 })}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
@@ -861,37 +870,46 @@ export default function ReportPage() {
                       />
                     </div>
                   </div>
+                  {/* 刻板印象风险只有 low/medium/high 三档，没有百分比可言：
+                      原来按 0–1 小数乘 100 显示，实际收到字符串，于是永远是
+                      NaN% + 恒红「高风险」，进度条 width: NaN% 还是非法 CSS。 */}
                   <div className="flex-1">
-                    <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                      <span>刻板印象风险</span>
-                      <span className={cn(
-                        'font-mono font-bold',
-                        er.stereotype_risk < 0.3 ? 'text-neon-green' : er.stereotype_risk < 0.6 ? 'text-severity-medium' : 'text-severity-critical'
-                      )}>
-                        {(er.stereotype_risk * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-bg-secondary overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all',
-                          er.stereotype_risk < 0.3 ? 'bg-neon-green' : er.stereotype_risk < 0.6 ? 'bg-severity-medium' : 'bg-severity-critical'
-                        )}
-                        style={{ width: `${er.stereotype_risk * 100}%` }}
-                      />
-                    </div>
+                    <div className="text-xs text-text-muted mb-1">刻板印象风险</div>
+                    <span className={cn(
+                      'inline-block px-2 py-0.5 rounded text-xs font-medium',
+                      stereotypeRiskBadgeClass(er.stereotype_risk)
+                    )}>
+                      {stereotypeRiskLabel(er.stereotype_risk)}
+                    </span>
                   </div>
                 </div>
                 {er.violations.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-text-muted mb-1.5">违规项</h4>
-                    <div className="flex flex-wrap gap-1">
+                    <h4 className="text-xs font-medium text-text-muted mb-1.5">违规项 {er.violations.length}</h4>
+                    <ul className="space-y-2">
+                      {/* 后端给的是 {severity, rule, detail} 对象，老数据里还可能是
+                          字符串——两种都在 toEthicsReportView 里收敛过了，这里
+                          三个字段各自成列渲染，不会再把对象整个塞进 JSX。 */}
                       {er.violations.map((v, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded text-xs bg-severity-critical/10 text-severity-critical">
-                          {v}
-                        </span>
+                        <li
+                          key={`${v.rule ?? 'legacy'}-${i}`}
+                          className="rounded-lg border border-border bg-bg-secondary/50 px-2.5 py-2"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn(
+                              'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                              ETHICS_SEVERITY_BADGE_CLASSES[v.severity]
+                            )}>
+                              {ETHICS_SEVERITY_LABELS[v.severity]}
+                            </span>
+                            {v.rule && (
+                              <code className="text-[10px] font-mono text-gold-cream break-all">{v.rule}</code>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-secondary leading-relaxed">{v.detail}</p>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
               </div>

@@ -19,12 +19,147 @@ export interface EvaluationScorecard {
   critical_failures: string[]
 }
 
+/** 伦理违规的严重度。后端 ethics_service 只从 RISK_KEYWORDS 的键里取值
+ * （high / medium / low，一个都没命中时兜底成 medium），不会出现站内 Severity
+ * 里的 critical——所以单独定义一个类型，别跟 Severity 混用。 */
+export type EthicsSeverity = 'high' | 'medium' | 'low'
+
+/** 刻板印象风险档位。后端 ethics_service.evaluate_persona_output 是按
+ * high_count / medium_count 直接赋 'high' / 'medium' / 'low' 三档字符串的，
+ * 它从来不是 0–1 的连续量：以前前端当小数乘 100 显示，结果每张卡片都是
+ * NaN%，颜色判断 'low' < 0.3 恒为 false，于是所有人格永远被标成高风险。 */
+export type StereotypeRisk = 'high' | 'medium' | 'low'
+
+/** 一条伦理违规。字段与后端 ethics_service 里 append 的 dict 一一对应：
+ * severity 是严重度，rule 是命中的规则 id，detail 是人类可读描述。 */
+export interface EthicsViolation {
+  severity: EthicsSeverity
+  rule: string
+  detail: string
+}
+
+/** violations 的数组元素有两种形态：新数据是上面的 EthicsViolation 对象；
+ * 早期版本把 check_stereotypes() 返回的 "[rule_id] 描述" 字符串原样存进了
+ * violations_json，库里还留着这种老行。类型上如实承认两种形态，渲染侧靠
+ * 类型守卫分流——之前类型写成 string[] 却收到 dict，才导致对象被直接塞进
+ * JSX、React 抛 "Objects are not valid as a React child" 整页白屏。 */
+export type EthicsViolationEntry = EthicsViolation | string
+
 export interface EthicsReport {
   persona_id: string
   passed: boolean
   score: number
-  violations: string[]
-  stereotype_risk: number
+  violations: EthicsViolationEntry[]
+  stereotype_risk: StereotypeRisk
+}
+
+/** 展示用的违规视图：老数据补不出 rule 时为 null，UI 就不画规则徽标。 */
+export interface EthicsViolationView {
+  severity: EthicsSeverity
+  rule: string | null
+  detail: string
+}
+
+function isEthicsSeverity(value: unknown): value is EthicsSeverity {
+  return value === 'high' || value === 'medium' || value === 'low'
+}
+
+/** 类型守卫：三个字段都合规才认成新格式的违规对象。
+ * 这里不用 as EthicsViolation，因为数据是后端 JSON——断言只会把
+ * 「把对象当字符串渲染」的崩溃从编译期推到运行期。 */
+export function isEthicsViolation(entry: unknown): entry is EthicsViolation {
+  return (
+    typeof entry === 'object' && entry !== null &&
+    'severity' in entry && isEthicsSeverity(entry.severity) &&
+    'rule' in entry && typeof entry.rule === 'string' &&
+    'detail' in entry && typeof entry.detail === 'string'
+  )
+}
+
+/** 老数据形态是 "[gender_assumption] 基于性别的刻板假设"。 */
+const LEGACY_VIOLATION_RE = /^\[([^\]]+)\]\s*(.*)$/
+
+/** 把任意一条 violations 元素收敛成可渲染的视图。入参用 unknown 而不是
+ * EthicsViolationEntry，是因为这值最终来自网络 JSON，运行时可能连这两种
+ * 形态都不是；宁可显示一条「读不懂的记录」，也不要整页崩掉。 */
+export function toEthicsViolationView(entry: unknown): EthicsViolationView {
+  if (isEthicsViolation(entry)) {
+    return { severity: entry.severity, rule: entry.rule, detail: entry.detail }
+  }
+  if (typeof entry === 'string') {
+    // 按后端同样的拆法把 rule 前缀拆出来，老报告也能显示规则 id
+    const matched = LEGACY_VIOLATION_RE.exec(entry)
+    if (matched) {
+      return { severity: 'medium', rule: matched[1], detail: matched[2] || entry }
+    }
+    return { severity: 'medium', rule: null, detail: entry }
+  }
+  return { severity: 'medium', rule: null, detail: '（这条违规记录格式无法识别）' }
+}
+
+/** 收敛 stereotype_risk：认不出来（老数据里的数字、空串、拼错的枚举）就返回
+ * null，让 UI 显示「未知」。宁可承认读不懂，也不要像以前那样一律标红。 */
+export function toStereotypeRisk(value: unknown): StereotypeRisk | null {
+  return isEthicsSeverity(value) ? value : null
+}
+
+/** 展示用的伦理报告：两个易漂移的字段都已经收敛过，UI 拿到就能直接渲染。 */
+export interface EthicsReportView {
+  persona_id: string
+  passed: boolean
+  score: number
+  violations: EthicsViolationView[]
+  stereotype_risk: StereotypeRisk | null
+}
+
+/** 在 API 边界做一次性收敛，而不是在 JSX 里逐个判断：这样页面里既不会重复
+ * 调守卫，也不可能有人不小心又把原始 dict 直接渲染出去。violations 这里再
+ * 兜一层 Array.isArray，是防老后端/老缓存整个字段都没给。 */
+export function toEthicsReportView(report: EthicsReport): EthicsReportView {
+  return {
+    persona_id: report.persona_id,
+    passed: report.passed,
+    score: report.score,
+    violations: Array.isArray(report.violations) ? report.violations.map(toEthicsViolationView) : [],
+    stereotype_risk: toStereotypeRisk(report.stereotype_risk),
+  }
+}
+
+const STEREOTYPE_RISK_LABELS: Record<StereotypeRisk, string> = {
+  low: '低风险',
+  medium: '中风险',
+  high: '高风险',
+}
+
+/** 三档配色：低=品牌金（正常），中=severity-medium，高=severity-critical。
+ * 全部走语义 token，配色从暖金换古铜金时不需要动这里。 */
+const STEREOTYPE_RISK_BADGE_CLASSES: Record<StereotypeRisk, string> = {
+  low: 'bg-neon-green/10 text-neon-green',
+  medium: 'bg-severity-medium/10 text-severity-medium',
+  high: 'bg-severity-critical/10 text-severity-critical',
+}
+
+export function stereotypeRiskLabel(risk: StereotypeRisk | null): string {
+  return risk === null ? '未知' : STEREOTYPE_RISK_LABELS[risk]
+}
+
+export function stereotypeRiskBadgeClass(risk: StereotypeRisk | null): string {
+  return risk === null ? 'bg-bg-secondary text-text-muted' : STEREOTYPE_RISK_BADGE_CLASSES[risk]
+}
+
+/** severity 徽标文案与配色。三档整体上移一档（high→critical、medium→high、
+ * low→medium）：违规项本身就是坏消息，最高一档该用站内最红的 critical；
+ * 而 severity-low 是青色，在站内读起来像「没问题」，用在违规上会误导。 */
+export const ETHICS_SEVERITY_LABELS: Record<EthicsSeverity, string> = {
+  high: '高危',
+  medium: '中危',
+  low: '低危',
+}
+
+export const ETHICS_SEVERITY_BADGE_CLASSES: Record<EthicsSeverity, string> = {
+  high: 'bg-severity-critical/10 text-severity-critical',
+  medium: 'bg-severity-high/10 text-severity-high',
+  low: 'bg-severity-medium/10 text-severity-medium',
 }
 
 export interface SkillDetail {

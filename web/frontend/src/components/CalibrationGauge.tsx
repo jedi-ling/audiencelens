@@ -11,7 +11,8 @@ export default function CalibrationGauge({ label, value, max = 1 }: CalibrationG
   const angle = (percentage / 100) * 180
 
   const getColor = () => {
-    if (percentage >= 80) return '#D4A94E'
+    // 梯度靠明度递增表达"越高越好"，顶档必须比 80 分以下更亮，故用绸缎金而非偏暗的品牌主色
+    if (percentage >= 80) return '#F9D67D'
     if (percentage >= 60) return '#ffbb33'
     if (percentage >= 40) return '#ff6b35'
     return '#ff3355'

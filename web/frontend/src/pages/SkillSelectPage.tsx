@@ -70,7 +70,7 @@ export default function SkillSelectPage() {
                     <img
                       src={skill.icon}
                       alt={skill.name}
-                      className="h-7 w-7 object-contain drop-shadow-[0_2px_8px_rgba(212,169,78,0.3)]"
+                      className="h-7 w-7 object-contain drop-shadow-[0_2px_8px_rgba(183,126,59,0.3)]"
                       loading="lazy"
                     />
                   </span>

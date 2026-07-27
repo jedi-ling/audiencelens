@@ -2,8 +2,16 @@ import { useParams, Link } from 'react-router'
 import { useState, useEffect } from 'react'
 import { fetchReview, fetchEvaluation, fetchEthicsReport } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { Review, EvaluationScorecard, EthicsReport } from '@/lib/mock-data'
-import { EVALUATION_DIMENSIONS, SKILLS } from '@/lib/mock-data'
+import type { Review, EvaluationScorecard, EthicsReportView } from '@/lib/mock-data'
+import {
+  EVALUATION_DIMENSIONS,
+  SKILLS,
+  ETHICS_SEVERITY_BADGE_CLASSES,
+  ETHICS_SEVERITY_LABELS,
+  stereotypeRiskBadgeClass,
+  stereotypeRiskLabel,
+  toEthicsReportView,
+} from '@/lib/mock-data'
 import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
 import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
 
@@ -11,7 +19,8 @@ export default function EvaluationPage() {
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
   const [scorecard, setScorecard] = useState<EvaluationScorecard | null>(null)
-  const [ethicsData, setEthicsData] = useState<EthicsReport[]>([])
+  // 存收敛后的视图：违规项与风险档位在进 state 前就已经过类型守卫
+  const [ethicsData, setEthicsData] = useState<EthicsReportView[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
 
@@ -26,7 +35,7 @@ export default function EvaluationPage() {
         ])
         setReview(reviewData)
         setScorecard(scorecardData)
-        setEthicsData(ethicsResult)
+        setEthicsData(ethicsResult.map(toEthicsReportView))
       } catch {
         // ignore
       } finally {
@@ -276,33 +285,38 @@ export default function EvaluationPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                      <span>刻板印象风险</span>
-                      <span className={cn(
-                        'font-mono font-bold',
-                        er.stereotype_risk < 0.3 ? 'text-neon-green' : er.stereotype_risk < 0.6 ? 'text-severity-medium' : 'text-severity-critical'
-                      )}>
-                        {(er.stereotype_risk * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-bg-secondary overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full',
-                          er.stereotype_risk < 0.3 ? 'bg-neon-green' : er.stereotype_risk < 0.6 ? 'bg-severity-medium' : 'bg-severity-critical'
-                        )}
-                        style={{ width: `${er.stereotype_risk * 100}%` }}
-                      />
-                    </div>
+                  {/* 刻板印象风险是三档枚举，不是百分比：这里只给档位徽标，
+                      不再做百分比和进度条——把枚举画成进度条是在编造精度。 */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-text-muted">刻板印象风险</span>
+                    <span className={cn(
+                      'px-2 py-0.5 rounded font-medium',
+                      stereotypeRiskBadgeClass(er.stereotype_risk)
+                    )}>
+                      {stereotypeRiskLabel(er.stereotype_risk)}
+                    </span>
                   </div>
                   {er.violations.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {er.violations.map((v, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-severity-critical/10 text-severity-critical">
-                          {v}
-                        </span>
-                      ))}
+                    <div className="pt-1">
+                      <div className="text-xs text-text-muted mb-1.5">违规项 {er.violations.length}</div>
+                      <ul className="space-y-1.5">
+                        {er.violations.map((v, i) => (
+                          <li key={`${v.rule ?? 'legacy'}-${i}`} className="rounded-lg bg-bg-secondary/60 px-2 py-1.5">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className={cn(
+                                'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                                ETHICS_SEVERITY_BADGE_CLASSES[v.severity]
+                              )}>
+                                {ETHICS_SEVERITY_LABELS[v.severity]}
+                              </span>
+                              {v.rule && (
+                                <code className="text-[10px] font-mono text-gold-cream break-all">{v.rule}</code>
+                              )}
+                            </div>
+                            <p className="text-xs text-text-secondary leading-relaxed">{v.detail}</p>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>

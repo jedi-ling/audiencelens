@@ -43,7 +43,7 @@ const PROVIDER_CONFIG: Record<Provider, {
       border: 'border-neon-green/50',
       bg: 'bg-neon-green/10',
       text: 'text-neon-green',
-      glow: 'shadow-[0_0_15px_rgba(212,169,78,0.15)]',
+      glow: 'shadow-[0_0_15px_rgba(183,126,59,0.15)]',
     },
     desc: 'Claude 官方 API',
   },

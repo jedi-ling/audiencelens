@@ -60,15 +60,18 @@ export default function Layout() {
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-neon-green/40 to-transparent" />
         <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           {/* 品牌标志与营销落地页统一：金色星芒 + Audience（白）/ Lens（金） */}
+          {/* 星芒与紧邻的 "Lens" 字样必须同色，否则品牌组合是两种金。
+              实测 #B77E3B 在 bg-primary #0c0a08 上对比度 5.70:1（图形元素要求 3:1），
+              余量充足，不需要提亮；#F9D67D 按 index.css 的定义只用于强调文字，不用于标志。 */}
           <Link to="/" className="flex items-center gap-2.5 group shrink-0">
             <svg
               viewBox="0 0 24 24"
-              className="w-5 h-5 shrink-0 drop-shadow-[0_0_10px_rgba(212,169,78,0.5)]"
+              className="w-5 h-5 shrink-0 drop-shadow-[0_0_10px_rgba(183,126,59,0.5)]"
               aria-hidden="true"
             >
               <path
                 d="M12 2l1.9 6.2L20 10l-6.1 1.8L12 18l-1.9-6.2L4 10l6.1-1.8L12 2z"
-                fill="#D4A94E"
+                fill="#B77E3B"
               />
             </svg>
             <span className="font-display font-bold text-lg whitespace-nowrap">

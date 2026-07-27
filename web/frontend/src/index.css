@@ -1,38 +1,44 @@
 @import "tailwindcss";
 
 /*
- * 统一调色板 —— 与营销落地页（REMOVED/landing-page）同一套"金色 · 炭黑"高级规格。
- * 品牌主色由原霓虹绿改为暖金 #D4A94E，次色由青改为薄荷 #4ECDC4，背景/文字换暖调。
+ * 统一调色板 —— 古铜金（Antique Bronze）规格，替换此前的暖金 · 炭黑规格。
+ * 品牌主色由暖金 #D4A94E 改为古铜金 #B77E3B（Gilded Amber），
+ * 暗调由 #b8923e 改为深古铜 #4C3217（Antique Bronze），背景改用带古铜暖调的近黑（Ebony Elegance 系）。
+ * 次色薄荷 #4ECDC4 保留不动，作为古铜底色上的冷色对比点缀。
  * 语义 token 名（neon-green / cyan）保持不变，全站沿用即自动换色，无需逐组件改。
  * 字体走系统栈（含中文回退），不再依赖 Google Fonts CDN（国内加载慢/被墙）。
  */
 @theme {
-  --color-bg-primary: #0f0f12;
-  --color-bg-secondary: #16161a;
-  --color-bg-card: #1a1a1f;
-  --color-bg-card-hover: #202027;
-  --color-border: #26262e;
-  --color-border-hover: #37373f;
-  /* 品牌主色：暖金（token 名沿用 neon-green，全站引用不变） */
-  --color-neon-green: #D4A94E;
-  --color-neon-green-dim: #b8923e;
-  /* 金色系第二级：奶油金，用于暗底上的强调文字（标题/关键数值） */
-  --color-gold-cream: #fce1b6;
+  --color-bg-primary: #0c0a08;
+  --color-bg-secondary: #15100b;
+  --color-bg-card: #1c140d;
+  --color-bg-card-hover: #241a11;
+  --color-border: #2e2116;
+  --color-border-hover: #443019;
+  /* 品牌主色：古铜金 Gilded Amber（token 名沿用 neon-green，全站引用不变） */
+  --color-neon-green: #B77E3B;
+  --color-neon-green-dim: #4C3217;
+  /* 金色系第二级：绸缎金 Satin Gold，用于暗底上的强调文字（标题/关键数值） */
+  --color-gold-cream: #F9D67D;
   /* 次色：薄荷（token 名沿用 cyan） */
   --color-cyan: #4ECDC4;
   --color-cyan-dim: #3bb3ab;
   --color-warm-orange: #e0913c;
   --color-warm-orange-dim: #b8742c;
   --color-text-primary: #ECE9E2;
-  --color-text-secondary: #9a9aa5;
-  --color-text-muted: #6b6b76;
+  --color-text-secondary: #a39a8f;
+  --color-text-muted: #746b60;
   --color-severity-critical: #ff5a5a;
   --color-severity-high: #e0913c;
+  /* 注意：这个值和旧品牌亮金 #E8C36B 撞了，但它是 severity 语义色不是品牌色，
+   * 机械替换成任何一种新金都只会让它撞上 --color-gold-cream 或 severity-high
+   * （实测和 #F9D67D 的对比度只有 1.2:1，肉眼同色）。真正的修法要重排整条
+   * severity 梯度或给"中风险"加非颜色线索，属于调色板架构问题，本次不动。 */
   --color-severity-medium: #e8c36b;
   --color-severity-low: #4ECDC4;
-  --color-status-waiting: #6b6b76;
+  --color-status-waiting: #746b60;
   --color-status-running: #4ECDC4;
-  --color-status-completed: #D4A94E;
+  --color-status-completed: #B77E3B;
   --color-status-failed: #ff5a5a;
   --font-mono: "SF Mono", ui-monospace, "Cascadia Code", "Roboto Mono", "JetBrains Mono", monospace;
   --font-sans: "Inter", system-ui, -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -43,18 +49,18 @@
    * shadcn 风格语义别名 —— Ask/Ledger/Settings 页面按这套命名写的
    * (bg-card / bg-primary / text-muted-foreground 等)，全部映射到同一套金色调色板。
    */
-  --color-background: #0f0f12;
+  --color-background: #0c0a08;
   --color-foreground: #ECE9E2;
-  --color-card: #1a1a1f;
+  --color-card: #1c140d;
   --color-card-foreground: #ECE9E2;
-  --color-primary: #D4A94E;
-  --color-primary-foreground: #14140f;
-  --color-secondary: #16161a;
+  --color-primary: #B77E3B;
+  --color-primary-foreground: #17110a;
+  --color-secondary: #15100b;
   --color-secondary-foreground: #ECE9E2;
-  --color-muted: #16161a;
-  --color-muted-foreground: #9a9aa5;
-  --color-accent: #202027;
-  --color-accent-foreground: #D4A94E;
+  --color-muted: #15100b;
+  --color-muted-foreground: #a39a8f;
+  --color-accent: #241a11;
+  --color-accent-foreground: #B77E3B;
   --color-destructive: #ff5a5a;
   --color-destructive-foreground: #ECE9E2;
 }
@@ -87,7 +93,7 @@ html, body {
 }
 
 .glow-green {
-  box-shadow: 0 0 15px rgba(212,169,78, 0.3), 0 0 30px rgba(212,169,78, 0.1);
+  box-shadow: 0 0 15px rgba(183,126,59, 0.3), 0 0 30px rgba(183,126,59, 0.1);
 }
 
 .glow-cyan {
@@ -99,7 +105,7 @@ html, body {
 }
 
 .text-glow-green {
-  text-shadow: 0 0 10px rgba(212,169,78, 0.5), 0 0 20px rgba(212,169,78, 0.2);
+  text-shadow: 0 0 10px rgba(183,126,59, 0.5), 0 0 20px rgba(183,126,59, 0.2);
 }
 
 .text-glow-cyan {
@@ -108,7 +114,7 @@ html, body {
 
 .border-glow-green {
   border-color: var(--color-neon-green);
-  box-shadow: 0 0 10px rgba(212,169,78, 0.2), inset 0 0 10px rgba(212,169,78, 0.05);
+  box-shadow: 0 0 10px rgba(183,126,59, 0.2), inset 0 0 10px rgba(183,126,59, 0.05);
 }
 
 .animate-pulse-glow {
@@ -152,8 +158,8 @@ html, body {
  */
 .chat-backdrop {
   background-image:
-    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(212, 169, 78, 0.06), transparent 70%),
-    radial-gradient(circle, rgba(212, 169, 78, 0.05) 1px, transparent 1px);
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(183, 126, 59, 0.06), transparent 70%),
+    radial-gradient(circle, rgba(183, 126, 59, 0.05) 1px, transparent 1px);
   background-size: 100% 100%, 22px 22px;
 }
 
@@ -313,8 +319,8 @@ html, body {
 /* 霓虹网格底纹（用于板块背景，配合 mask 渐隐） */
 .grid-lines {
   background-image:
-    linear-gradient(rgba(212,169,78, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(212,169,78, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(183,126,59, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(183,126,59, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
@@ -342,5 +348,119 @@ html, body {
   .scan-sweep::before,
   .terminal-cursor::after {
     animation: none;
+  }
+}
+
+/* ═══════════════════════ 动效基元 ═══════════════════════
+ *
+ * 放置原则：动效按"用户在这个页面正在干什么"分配，不满站铺。
+ *   · 等待中的界面（评审跑批要 30–120s）→ 动效做实功，告诉用户「没卡死」
+ *   · 阅读 / 输入的界面（报告正文、设置、填 API Key）→ 几乎不动，别抢注意力
+ * 满屏粒子会让工具显得廉价，正好和古铜金想要的质感相反。
+ *
+ * 实现上一律只动 transform / opacity（GPU 合成，不触发 layout/paint 重排），
+ * 不用 canvas + requestAnimationFrame（那会持续占 CPU、掉电、且难以尊重系统偏好），
+ * 并且全部在 prefers-reduced-motion 下关停。
+ */
+
+/* 进度条流光。
+ * 跑批时百分比可能卡在 40% 十几秒（某个人格正在思考），静止的条会被读成"卡死了"。
+ * 流光让「还在跑」这件事不依赖数字变化——这是动效在干实事，不是装饰。 */
+.shimmer-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(249, 214, 125, 0.5) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmerSweep 1.9s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmerSweep {
+  to { transform: translateX(100%); }
+}
+
+/* 呼吸：等待中的占位节点用。比 spinner 安静，适合同屏出现多个而不吵。 */
+.animate-breathe {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.42; }
+  50%      { opacity: 1; }
+}
+
+/* 完成脉冲：离散事件（一位人格交卷）值得一个有落点的动作，
+ * 让「又完成一个」可被感知，而不是数字悄悄 +1。 */
+.animate-pop-in {
+  animation: popIn 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.82); }
+  60%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* 完成时向外扩散一圈古铜金光环，0.9s 后自灭（挂在 relative 容器上） */
+.animate-ring-out::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1.5px solid var(--color-gold-cream);
+  animation: ringOut 0.9s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ringOut {
+  0%   { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.55); }
+}
+
+/* 环境浮尘（AmbientMotes 组件用）——纯 CSS，无 canvas 无 rAF。
+ * 只用于 hero / 空状态这类「没有内容要读」的区域，绝不铺在正文底下。 */
+.mote {
+  position: absolute;
+  border-radius: 9999px;
+  background: var(--color-neon-green);
+  animation: moteDrift var(--mote-dur, 18s) ease-in-out var(--mote-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes moteDrift {
+  0%   { opacity: 0;    transform: translate(0, 0) scale(0.7); }
+  20%  { opacity: 0.5; }
+  50%  { transform: translate(var(--mote-dx, 24px), var(--mote-dy, -38px)) scale(1); }
+  80%  { opacity: 0.35; }
+  100% { opacity: 0;    transform: translate(0, 0) scale(0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-bar::after,
+  .animate-breathe,
+  .animate-pop-in,
+  /* 这两个是本次之前就有的，一直漏在 reduced-motion 之外：
+   * .animate-fade-in 挂在 8 个页面的最外层容器（整页位移入场），
+   * .animate-pulse-glow 是无限循环的呼吸闪烁 —— 都属于必须能被关掉的那类 */
+  .animate-fade-in,
+  .animate-pulse-glow,
+  .mote {
+    animation: none;
+  }
+  /* 关掉动画后这两个只会留下静止的残影（一圈不消失的环 / 一堆色点），直接隐藏 */
+  .animate-ring-out::before,
+  .mote {
+    display: none;
   }
 }
