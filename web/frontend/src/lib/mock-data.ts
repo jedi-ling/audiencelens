@@ -205,6 +205,345 @@ export interface ReviewModeConfig {
   description: string
 }
 
+// ---------- 交叉质询（report_json.cross_examination） ----------
+//
+// 字段契约以 src/runner/cross_exam.py::run_cross_exam_protocol 的返回体为准。
+// 这里全部做运行时收敛而不是 `as CrossExamView`：这份数据来自数据库里的
+// report_json，库里同时存在三代形状——
+//   1. 当前形状：带 mode / threshold / suppressed_changes 的完整 dict；
+//   2. 老引擎形状：dict，但只有 mode/is_live_debate/limitation/disputes/
+//      vote_changes/confidence_changes/rounds，缺 threshold 等新字段；
+//   3. 老 v1 后端形状：直接把 parse_cross_exam_output 的**原始数组**存了进去，
+//      里面是模型自由输出的 JSON，没有任何可依赖的字段。
+// 断言只会把「读不出字段」从编译期推到运行期——本仓库刚因为「前端类型撒谎」
+// 出过整页白屏和 NaN%，这一次从类型开始就如实承认多形态。
+
+/** 三档模式是三件不同的事，用户有权知道自己这份报告是哪一种：
+ *  derived_summary     —— 没跑反驳轮，内容由各人格原始输出派生；
+ *  moderated_rebuttal  —— 一次仲裁式反驳轮（模型统一处理全部争议点）；
+ *  multi_agent_rebuttal—— 每位涉事人格各自被重新调用一次。 */
+export type CrossExamMode = 'derived_summary' | 'moderated_rebuttal' | 'multi_agent_rebuttal'
+
+/** 单个争议点的反驳完成度。partial = 只有一方产出了反驳，不能显示成"已完成"。 */
+export type RebuttalStatus = 'ok' | 'partial' | 'failed' | 'skipped'
+
+const CROSS_EXAM_MODES: CrossExamMode[] = ['derived_summary', 'moderated_rebuttal', 'multi_agent_rebuttal']
+const REBUTTAL_STATUSES: RebuttalStatus[] = ['ok', 'partial', 'failed', 'skipped']
+
+/** 一条论据。注意 persona_id 放的是**展示名**（引擎里的历史口径，为了兼容
+ *  report-template.html），真 id 在 persona_key —— 两个字段别弄反。 */
+export interface CrossExamArgument {
+  argument_id: string
+  point: string
+  /** 展示名（历史口径） */
+  persona_id: string
+  /** 真 persona id */
+  persona_key: string
+  severity: string
+  /** 这一方针对**对方**论据写出的反驳；没跑反驳轮时为空串 */
+  rebuttal: string
+}
+
+export interface CrossExamDispute {
+  point_id: string
+  topic: string
+  /** A 系列：认为问题更严重的一方 */
+  pro_args: CrossExamArgument[]
+  /** B 系列：认为问题更轻的一方 */
+  con_args: CrossExamArgument[]
+  rebuttal_status: RebuttalStatus
+  rebuttal_error: string
+}
+
+/** 改票记录。这里的 persona_id 是**真 id**，展示要用 persona_name（引擎在
+ *  vote_changes 与 confidence_changes 两处的 persona_id 语义不同，别复用读法）。
+ *  suppressed_reason 只出现在 suppressed_changes 里。 */
+export interface CrossExamVoteChange {
+  point_id: string
+  topic: string
+  argument_id: string
+  persona_id: string
+  persona_name: string
+  from_stance: string
+  to_stance: string
+  /** 0–1 小数；读不出来时为 null，UI 显示 "—" 而不是 NaN */
+  confidence_before: number | null
+  confidence_after: number | null
+  delta: number | null
+  threshold: number | null
+  reason: string
+  suppressed_reason: string
+}
+
+/** 逐人格的置信度变化。before/after/delta 是**百分点整数**（引擎已乘 100 取整），
+ *  confidence_* 才是 0–1 小数——别把百分点再乘一次 100。 */
+export interface CrossExamConfidenceChange {
+  /** 展示名（历史口径） */
+  persona_id: string
+  /** 真 persona id */
+  persona_key: string
+  before: number | null
+  after: number | null
+  delta: number | null
+  confidence_before: number | null
+  confidence_after: number | null
+}
+
+export interface CrossExamFailure {
+  stage: string
+  error: string
+  point_id: string
+  argument_id: string
+}
+
+export interface CrossExamUsage {
+  calls: number
+  input_tokens: number
+  output_tokens: number
+  /** false 表示模型只回了文本、拿不到 token 数，成本统计可能偏低 */
+  token_counts_available: boolean
+}
+
+export interface CrossExamView {
+  /** 收敛后的三档模式；认不出来时为 null（UI 显示"未知模式"而不是假装派生摘要） */
+  mode: CrossExamMode | null
+  /** 引擎给的原始 mode 字符串，认不出来时原样展示，便于排查 */
+  mode_raw: string
+  /**
+   * 真的发生过反驳 LLM 调用吗。
+   * 取 mode 与 is_live_debate 的**交集**：协议里两者恒等（is_live_debate 严格由
+   * mode 推出），一旦库里的数据两者不一致，说明这行是老数据或被改坏了——
+   * 此时按更保守的那个读。宁可少声称"跑了辩论"，不可多声称。
+   */
+  is_live_debate: boolean
+  /** 调用方请求的模式；与 mode 不同就是发生了回落 */
+  requested_mode: CrossExamMode | null
+  requested_mode_raw: string
+  /** 引擎生成的局限说明，原样展示，不做改写 */
+  limitation: string
+  threshold: number | null
+  threshold_source: string
+  allow_stance_update: boolean
+  /** 实际执行的反驳轮数（derived 时为 0） */
+  rounds_run: number
+  disputes: CrossExamDispute[]
+  vote_changes: CrossExamVoteChange[]
+  suppressed_changes: CrossExamVoteChange[]
+  confidence_changes: CrossExamConfidenceChange[]
+  failures: CrossExamFailure[]
+  usage: CrossExamUsage | null
+  /** true = 老 v1 后端存下的原始数组形状，字段读不出来，只能如实说明 */
+  is_legacy_array: boolean
+  /** 老数组形状下的元素条数，用于告诉用户"有记录但格式过旧" */
+  legacy_entry_count: number
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  return ''
+}
+
+/** 数字收敛：非有限数（null / undefined / "" / NaN / 对象）一律返回 null。
+ *  返回 0 会是撒谎——"delta 为 0"和"读不出 delta"在报告里含义完全不同。 */
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function asNonNegativeInt(value: unknown): number {
+  const num = asFiniteNumber(value)
+  return num === null || num < 0 ? 0 : Math.round(num)
+}
+
+function asCrossExamMode(value: unknown): CrossExamMode | null {
+  return CROSS_EXAM_MODES.includes(value as CrossExamMode) ? (value as CrossExamMode) : null
+}
+
+function toCrossExamArgument(raw: unknown): CrossExamArgument {
+  const r = isRecord(raw) ? raw : {}
+  return {
+    argument_id: asText(r.argument_id),
+    point: asText(r.point),
+    persona_id: asText(r.persona_id),
+    persona_key: asText(r.persona_key),
+    severity: asText(r.severity),
+    rebuttal: asText(r.rebuttal),
+  }
+}
+
+function toCrossExamDispute(raw: unknown): CrossExamDispute {
+  const r = isRecord(raw) ? raw : {}
+  const status = REBUTTAL_STATUSES.includes(r.rebuttal_status as RebuttalStatus)
+    ? (r.rebuttal_status as RebuttalStatus)
+    // 老数据没有这个字段：不能默认成 'ok'（那就是把"未知"说成"已完成"）
+    : 'skipped'
+  return {
+    point_id: asText(r.point_id),
+    topic: asText(r.topic),
+    pro_args: (Array.isArray(r.pro_args) ? r.pro_args : []).map(toCrossExamArgument),
+    con_args: (Array.isArray(r.con_args) ? r.con_args : []).map(toCrossExamArgument),
+    rebuttal_status: status,
+    rebuttal_error: asText(r.rebuttal_error),
+  }
+}
+
+function toCrossExamVoteChange(raw: unknown): CrossExamVoteChange {
+  const r = isRecord(raw) ? raw : {}
+  return {
+    point_id: asText(r.point_id),
+    topic: asText(r.topic),
+    argument_id: asText(r.argument_id),
+    persona_id: asText(r.persona_id),
+    persona_name: asText(r.persona_name),
+    // 老引擎只写了 before/after 两个别名，新引擎两套都写；读不到新名就退回别名
+    from_stance: asText(r.from_stance) || asText(r.before),
+    to_stance: asText(r.to_stance) || asText(r.after),
+    confidence_before: asFiniteNumber(r.confidence_before),
+    confidence_after: asFiniteNumber(r.confidence_after),
+    delta: asFiniteNumber(r.delta),
+    threshold: asFiniteNumber(r.threshold),
+    reason: asText(r.reason),
+    suppressed_reason: asText(r.suppressed_reason),
+  }
+}
+
+function toCrossExamConfidenceChange(raw: unknown): CrossExamConfidenceChange {
+  const r = isRecord(raw) ? raw : {}
+  return {
+    persona_id: asText(r.persona_id),
+    persona_key: asText(r.persona_key),
+    before: asFiniteNumber(r.before),
+    after: asFiniteNumber(r.after),
+    delta: asFiniteNumber(r.delta),
+    confidence_before: asFiniteNumber(r.confidence_before),
+    confidence_after: asFiniteNumber(r.confidence_after),
+  }
+}
+
+function toCrossExamFailure(raw: unknown): CrossExamFailure {
+  const r = isRecord(raw) ? raw : {}
+  return {
+    stage: asText(r.stage),
+    error: asText(r.error) || (typeof raw === 'string' ? raw.trim() : ''),
+    point_id: asText(r.point_id),
+    argument_id: asText(r.argument_id),
+  }
+}
+
+/**
+ * 把 report_json.cross_examination 收敛成可直接渲染的视图。
+ *
+ * 返回 null 只代表"这份报告里没有交叉质询区块"（quick 档不跑、匿名体验版被
+ * report_gating 裁成 null、老报告根本没这个键）——此时页面整节不渲染。
+ * 而"跑了但失败了"是有区块的，会带 failures / limitation，必须显示出来：
+ * 这两种情况在页面上长得一样，就等于把失败伪装成了没做。
+ */
+export function toCrossExamView(raw: unknown): CrossExamView | null {
+  if (raw === null || raw === undefined) return null
+
+  const empty: CrossExamView = {
+    mode: null,
+    mode_raw: '',
+    is_live_debate: false,
+    requested_mode: null,
+    requested_mode_raw: '',
+    limitation: '',
+    threshold: null,
+    threshold_source: '',
+    allow_stance_update: true,
+    rounds_run: 0,
+    disputes: [],
+    vote_changes: [],
+    suppressed_changes: [],
+    confidence_changes: [],
+    failures: [],
+    usage: null,
+    is_legacy_array: false,
+    legacy_entry_count: 0,
+  }
+
+  // 老 v1 后端把模型原始输出的数组存进了这个字段。里面是自由 JSON，硬解只会
+  // 把猜测当事实——如实标成"格式过旧"，让 UI 说明"这份报告读不出反驳明细"。
+  if (Array.isArray(raw)) {
+    return { ...empty, is_legacy_array: true, legacy_entry_count: raw.length }
+  }
+  if (!isRecord(raw)) return null
+
+  const mode = asCrossExamMode(raw.mode)
+  const liveByMode = mode === 'moderated_rebuttal' || mode === 'multi_agent_rebuttal'
+  const allowUpdate = raw.allow_stance_update
+
+  return {
+    ...empty,
+    mode,
+    mode_raw: asText(raw.mode),
+    // 见 CrossExamView.is_live_debate 的注释：两个字段必须同时为真
+    is_live_debate: liveByMode && raw.is_live_debate === true,
+    requested_mode: asCrossExamMode(raw.requested_mode),
+    requested_mode_raw: asText(raw.requested_mode),
+    limitation: asText(raw.limitation),
+    threshold: asFiniteNumber(raw.threshold),
+    threshold_source: asText(raw.threshold_source),
+    allow_stance_update: typeof allowUpdate === 'boolean' ? allowUpdate : true,
+    rounds_run: Array.isArray(raw.rounds) ? raw.rounds.length : 0,
+    disputes: (Array.isArray(raw.disputes) ? raw.disputes : []).map(toCrossExamDispute),
+    vote_changes: (Array.isArray(raw.vote_changes) ? raw.vote_changes : []).map(toCrossExamVoteChange),
+    suppressed_changes: (Array.isArray(raw.suppressed_changes) ? raw.suppressed_changes : []).map(toCrossExamVoteChange),
+    confidence_changes: (Array.isArray(raw.confidence_changes) ? raw.confidence_changes : []).map(toCrossExamConfidenceChange),
+    failures: (Array.isArray(raw.failures) ? raw.failures : []).map(toCrossExamFailure),
+    usage: isRecord(raw.usage)
+      ? {
+          calls: asNonNegativeInt(raw.usage.calls),
+          input_tokens: asNonNegativeInt(raw.usage.input_tokens),
+          output_tokens: asNonNegativeInt(raw.usage.output_tokens),
+          // 缺这个键的老数据按 false 处理：没证据说明 token 数可信时不该声称可信
+          token_counts_available: raw.usage.token_counts_available === true,
+        }
+      : null,
+  }
+}
+
+/** 三档模式的展示文案。措辞与 cross_exam.py 的 limitation 口径一致，
+ *  尤其 moderated 档必须写明"不是每个人格各自独立重新发言"——含糊就是撒谎。 */
+export const CROSS_EXAM_MODE_LABELS: Record<CrossExamMode, string> = {
+  derived_summary: '派生摘要（未进行反驳轮）',
+  moderated_rebuttal: '仲裁式反驳（1 轮）',
+  multi_agent_rebuttal: '多智能体反驳',
+}
+
+export const CROSS_EXAM_MODE_DESCRIPTIONS: Record<CrossExamMode, string> = {
+  derived_summary:
+    '本节没有进行反驳轮：内容全部由各人格独立评审时的原始输出派生而来，人格之间没有相互反驳，也没有人因此改票。',
+  moderated_rebuttal:
+    '本次执行了一次仲裁式反驳轮：模型拿到双方已记录的论据后统一给出反驳与更新后的立场。这不是每个人格各自独立重新发言。',
+  multi_agent_rebuttal:
+    '本次执行了多智能体反驳：每位涉事人格都带着对手的论据被重新调用一次，各自产出反驳与最终立场。',
+}
+
+/** 反驳完成度的展示文案。'ok' 之外都必须让人一眼看出"这条没跑完"。 */
+export const REBUTTAL_STATUS_LABELS: Record<RebuttalStatus, string> = {
+  ok: '双方均已反驳',
+  partial: '仅单方反驳',
+  failed: '反驳未完成',
+  skipped: '未进行反驳',
+}
+
+export const REBUTTAL_STATUS_CLASSES: Record<RebuttalStatus, string> = {
+  ok: 'bg-neon-green/10 text-neon-green',
+  partial: 'bg-severity-medium/10 text-severity-medium',
+  failed: 'bg-severity-critical/10 text-severity-critical',
+  skipped: 'bg-bg-secondary text-text-muted',
+}
+
 export interface TaskTypeDetail {
   task_type: string
   name_zh: string

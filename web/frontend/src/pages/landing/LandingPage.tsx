@@ -110,9 +110,13 @@ export default function LandingPage() {
 
     // P0-3：争议点摘要卡片 stagger 入场（反方→配对分隔→正方），尊重 prefers-reduced-motion
     // 仅在 hero 首次进入视口时触发一次，避免反复播放。
-    // 类名沿用历史的 .debate-* / .debate-flip（CSS 里同名，不改），但它展示的是
-    // "同一争议点的正反论据并排"，不是实时辩论、更不是改票——engine 侧 cross_exam.py
-    // 明确返回 is_live_debate:False、vote_changes 恒空。改文案时别把"辩论/改票"写回去。
+    // 类名沿用历史的 .debate-* / .debate-flip（CSS 里同名，不改）。
+    // 这张卡是**示意图 + 样例数据**，不是某次真实评审的截图，文案里已标注。
+    // 口径更新：cross_exam.py 现在会真的发反驳调用（standard 档 1 次仲裁式、
+    // full 档每位涉事人格各 1 次），改票由代码比较反驳前后的立场与置信度判定。
+    // 但仍然**只有一轮**——改文案时不要写成"多轮辩论"，也不要用"多智能体辩论"
+    // 笼统盖过 standard 档（那一档是仲裁式，不是各自独立发言）。
+    // quick 档一次反驳调用都不发，无 api_key 时同样不发。
     const debateCard = root.querySelector<HTMLElement>('.debate-card')
     if (debateCard) {
       const opposeEl = debateCard.querySelector<HTMLElement>('.debate-msg.oppose')

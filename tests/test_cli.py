@@ -507,12 +507,21 @@ class TestRunPanel:
             )
 
 
-def _llm_json(persona_id: str, severity: str = "medium", title: str = "上手门槛偏高") -> str:
-    """一份能通过 parse/normalize 的最小合法人格输出，用来伪造 LLM 返回。"""
+def _llm_json(
+    persona_id: str,
+    severity: str = "medium",
+    title: str = "上手门槛偏高",
+    persona_name: str = None,
+    why_it_matters: str = "新玩家可能在第一关就走不下去",
+) -> str:
+    """一份能通过 parse/normalize 的最小合法人格输出，用来伪造 LLM 返回。
+
+    persona_name / why_it_matters 可覆盖：交叉质询的匿名化测试要让论据正文里
+    真的嵌着人格名，才能验证它到了提示词里已被洗掉。"""
     return json.dumps(
         {
             "persona_id": persona_id,
-            "persona_name": persona_id,
+            "persona_name": persona_name or persona_id,
             "persona_version": "0.1.0",
             "task_type": "concept_review",
             "primary_stance": "观望",
@@ -524,7 +533,7 @@ def _llm_json(persona_id: str, severity: str = "medium", title: str = "上手门
                 {
                     "severity": severity,
                     "title": title,
-                    "why_it_matters": "新玩家可能在第一关就走不下去",
+                    "why_it_matters": why_it_matters,
                     "suggested_fix": "补一段引导",
                 }
             ],
@@ -704,6 +713,425 @@ class TestControversyFiltering:
         dispute = cross["disputes"][0]
         # pro/con 必须是两个不同人格，不能自己跟自己吵
         assert dispute["pro_args"][0]["persona_id"] != dispute["con_args"][0]["persona_id"]
+
+
+# --- 交叉质询接线 -----------------------------------------------------------
+#
+# cli.py 以前把 cross_exam_prompt 渲染出来就原地丢掉，一次模型调用都没发过——
+# 报告里那段"交叉质询"从头到尾只是派生摘要。这一组锁住三件事：
+#   1. 反驳调用真的发生了，且按档位分流（quick 不跑 / standard 1 次 / full 每人各 1 次）；
+#   2. mode 与 is_live_debate 的声称和实际一致，跑失败就如实回落并留下可见说明；
+#   3. 新增调用的 token / 成本进了 cost_summary（不计就是计费漏洞）。
+
+DUEL_PRO = "P01-indie-core-operator"    # 严重度判 critical → 论据 A1
+DUEL_CON = "P02-systems-theorycrafter"  # 严重度判 low      → 论据 B1
+DUEL_TITLE = "核心循环说不清"
+DUEL_SEVERITIES = {DUEL_PRO: "critical", DUEL_CON: "low"}
+
+# 交叉质询提示词（moderated / rebutter 两段都带"交叉质询"字样）与人格评审提示词的
+# 判别标志——靠它把两类调用分开记账，"反驳调用真的发生了"这种断言才有意义。
+CROSS_EXAM_MARKER = "交叉质询"
+CROSS_EXAM_TOKENS = (30, 40)
+PERSONA_TOKENS = (100, 200)
+
+
+def _persona_display_names() -> dict:
+    with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
+        pack = yaml.safe_load(f)
+    return {p["id"]: p.get("name", "") for p in pack["personas"]}
+
+
+def _moderated_reply(a1=("观望", 0.6), b1=("观望", 0.6)):
+    """仲裁式反驳的模型回复：一次调用覆盖 C1 的两条论据。"""
+
+    def reply(_prompt):
+        return json.dumps(
+            [
+                {
+                    "point_id": "C1",
+                    "rebuttals": [
+                        {
+                            "argument_id": "A1",
+                            "rebuttal": "对方把影响范围放小了",
+                            "stance_after": a1[0],
+                            "confidence_after": a1[1],
+                        },
+                        {
+                            "argument_id": "B1",
+                            "rebuttal": "对方的推理链有跳步",
+                            "stance_after": b1[0],
+                            "confidence_after": b1[1],
+                        },
+                    ],
+                }
+            ],
+            ensure_ascii=False,
+        )
+
+    return reply
+
+
+def _rebutter_reply(stance_by_arg=None, conf_by_arg=None):
+    """多智能体反驳的模型回复：只回自己那一条论据。
+
+    own_argument_id 从提示词里读回来——rebutter 段的输出骨架里就写着
+    `"argument_id": "A1"`，真实模型也是照着它填的。"""
+    import re
+
+    def reply(prompt):
+        match = re.search(r'"argument_id":\s*"([AB]\d+)"', prompt)
+        arg_id = match.group(1) if match else ""
+        return json.dumps(
+            {
+                "argument_id": arg_id,
+                "rebuttal": f"对方论据没说服我（{arg_id}）",
+                "stance_after": (stance_by_arg or {}).get(arg_id, "观望"),
+                "confidence_after": (conf_by_arg or {}).get(arg_id, 0.6),
+            },
+            ensure_ascii=False,
+        )
+
+    return reply
+
+
+class _FakeProvider:
+    """假 chat_completion：人格评审调用与交叉质询调用分开应答、分开留档。"""
+
+    def __init__(self, cross_exam_reply=None, cross_exam_error=None, severities=None, display_names=None):
+        self.cross_exam_reply = cross_exam_reply or _moderated_reply()
+        self.cross_exam_error = cross_exam_error
+        self.severities = severities or DUEL_SEVERITIES
+        self.display_names = display_names or {}
+        self.persona_prompts = []
+        self.cross_exam_prompts = []
+
+    def __call__(self, **kwargs):
+        prompt = kwargs["prompt"]
+        if CROSS_EXAM_MARKER in prompt:
+            self.cross_exam_prompts.append(prompt)
+            if self.cross_exam_error:
+                raise RuntimeError(self.cross_exam_error)
+            return (self.cross_exam_reply(prompt),) + CROSS_EXAM_TOKENS
+
+        self.persona_prompts.append(prompt)
+        for pid, severity in self.severities.items():
+            if pid in prompt:
+                name = self.display_names.get(pid)
+                return (
+                    _llm_json(
+                        pid,
+                        severity=severity,
+                        title=DUEL_TITLE,
+                        persona_name=name,
+                        # 论据正文里嵌上人格自己的名字：渲染层必须把它洗掉
+                        why_it_matters=(
+                            f"{name}判断新玩家会在第一关走不下去" if name
+                            else "新玩家可能在第一关就走不下去"
+                        ),
+                    ),
+                ) + PERSONA_TOKENS
+        raise AssertionError(f"未预期的人格提示词：{prompt[:60]}")
+
+
+def _duel_panel(monkeypatch, fake, **overrides):
+    """固定成 P01 vs P02 的两人对局：恰好 1 个真争议点、恰好 2 条对立论据。
+    于是 standard 档应发 1 次反驳调用、full 档应发 2 次——次数可以硬断言。"""
+    monkeypatch.setattr(runner_cli, "chat_completion", fake)
+    kwargs = dict(
+        artifact_bundle=_rich_bundle(),
+        selected_personas=[DUEL_PRO, DUEL_CON],
+        api_key="sk-test-not-real",
+    )
+    kwargs.update(overrides)
+    return _panel(**kwargs)
+
+
+def _synthetic_duel():
+    """不经过 run_panel 直接喂给 run_cross_exam_stage 的最小对局数据。"""
+    outputs = [
+        {
+            "persona_id": "P01",
+            "persona_name": "甲",
+            "primary_stance": "观望",
+            "confidence": 0.6,
+            "key_issues": [
+                {
+                    "title": DUEL_TITLE,
+                    "severity": "critical",
+                    "why_it_matters": "新玩家看不懂核心循环",
+                    "suggested_fix": "补一段引导",
+                }
+            ],
+        },
+        {
+            "persona_id": "P02",
+            "persona_name": "乙",
+            "primary_stance": "值得推进",
+            "confidence": 0.5,
+            "key_issues": [
+                {
+                    "title": DUEL_TITLE,
+                    "severity": "low",
+                    "why_it_matters": "老玩家两分钟就能自己摸清",
+                    "suggested_fix": "不必特别处理",
+                }
+            ],
+        },
+    ]
+    points = [
+        {
+            "title": DUEL_TITLE,
+            "severity_variance": 2.25,
+            "persona_views": [
+                {"persona_id": "P01", "severity": "critical", "title": DUEL_TITLE},
+                {"persona_id": "P02", "severity": "low", "title": DUEL_TITLE},
+            ],
+        }
+    ]
+    return outputs, points
+
+
+class TestCrossExamIsWiredToTheModel:
+    def test_standard_mode_runs_one_moderated_rebuttal(self, monkeypatch):
+        fake = _FakeProvider()
+        result = _duel_panel(monkeypatch, fake, mode="standard")
+
+        # 反驳调用真的发出去了——这条线以前是断的
+        assert len(fake.cross_exam_prompts) == 1
+        cross = result["report"]["cross_examination"]
+        assert cross["mode"] == "moderated_rebuttal"
+        assert cross["is_live_debate"] is True
+        assert cross["usage"]["calls"] == 1
+        assert cross["rounds"] == [{"round_num": 1, "is_current": True}]
+        # 仲裁视角不属于任何人格，不该被注入身份卡
+        assert "[PERSONA CARD]" not in fake.cross_exam_prompts[0]
+
+    def test_standard_mode_tokens_and_cost_land_in_cost_summary(self, monkeypatch):
+        fake = _FakeProvider()
+        result = _duel_panel(monkeypatch, fake, mode="standard")
+
+        cost = result["cost_summary"]
+        # 2 位人格各 (100, 200) + 1 次反驳 (30, 40)
+        assert cost["total_input_tokens"] == 2 * PERSONA_TOKENS[0] + CROSS_EXAM_TOKENS[0]
+        assert cost["total_output_tokens"] == 2 * PERSONA_TOKENS[1] + CROSS_EXAM_TOKENS[1]
+        assert cost["cross_exam"] == {
+            "calls": 1,
+            "input_tokens": CROSS_EXAM_TOKENS[0],
+            "output_tokens": CROSS_EXAM_TOKENS[1],
+            "cost": cost["cross_exam"]["cost"],
+            "mode": "moderated_rebuttal",
+        }
+        # 花了钱就必须记出钱：反驳调用的成本大于 0，且已含在 total_cost 里
+        assert cost["cross_exam"]["cost"] > 0
+        assert cost["total_cost"] > cost["cross_exam"]["cost"]
+
+    def test_full_mode_recalls_every_involved_persona(self, monkeypatch):
+        fake = _FakeProvider(cross_exam_reply=_rebutter_reply())
+        result = _duel_panel(monkeypatch, fake, mode="full")
+
+        cross = result["report"]["cross_examination"]
+        assert cross["mode"] == "multi_agent_rebuttal"
+        assert cross["is_live_debate"] is True
+        # 双方各被重新调用一次，且每次都带着自己的身份卡（不是一次通用调用糊过去）
+        assert len(fake.cross_exam_prompts) == 2
+        assert all("[PERSONA CARD]" in p for p in fake.cross_exam_prompts)
+        assert sum(1 for p in fake.cross_exam_prompts if DUEL_PRO in p) == 1
+        assert sum(1 for p in fake.cross_exam_prompts if DUEL_CON in p) == 1
+        assert cross["usage"]["calls"] == 2
+
+    def test_full_mode_costs_more_calls_than_standard(self, monkeypatch):
+        """full 档的多智能体反驳成本随涉事人格数上升——这正是它只在 full 档开的原因。"""
+        standard = _FakeProvider()
+        _duel_panel(monkeypatch, standard, mode="standard")
+        full = _FakeProvider(cross_exam_reply=_rebutter_reply())
+        result_full = _duel_panel(monkeypatch, full, mode="full")
+
+        assert len(full.cross_exam_prompts) > len(standard.cross_exam_prompts)
+        assert result_full["cost_summary"]["cross_exam"]["input_tokens"] == 2 * CROSS_EXAM_TOKENS[0]
+        assert result_full["cost_summary"]["cross_exam"]["output_tokens"] == 2 * CROSS_EXAM_TOKENS[1]
+
+    def test_full_mode_rebuttal_prompt_never_leaks_the_opponent(self, monkeypatch):
+        """人格知道自己是谁（要保持自己的口吻），但不许知道对手是谁——
+        否则反驳会变成按身份结盟/让位，而不是对论据的检验。"""
+        names = _persona_display_names()
+        fake = _FakeProvider(
+            cross_exam_reply=_rebutter_reply(),
+            display_names={DUEL_PRO: names[DUEL_PRO], DUEL_CON: names[DUEL_CON]},
+        )
+        _duel_panel(monkeypatch, fake, mode="full")
+
+        pro_prompt = next(p for p in fake.cross_exam_prompts if DUEL_PRO in p)
+        con_prompt = next(p for p in fake.cross_exam_prompts if DUEL_CON in p)
+
+        assert names[DUEL_PRO] in pro_prompt          # 自己的身份卡在
+        assert names[DUEL_CON] not in pro_prompt      # 对手的名字一个字都没有
+        assert DUEL_CON not in pro_prompt
+        assert names[DUEL_PRO] not in con_prompt
+        assert DUEL_PRO not in con_prompt
+        # 论据正文里原本嵌着人格名，渲染层把它洗成了匿名占位
+        assert "某位评审" in pro_prompt
+        assert "论据 B1" in pro_prompt
+
+    def test_no_mode_behaves_like_full(self, monkeypatch):
+        """CLI / MCP 走的就是 mode=None 这条路（run_panel 文档里的口径是"等价于 full"）。
+        它必须真的跑多智能体反驳，否则这两个入口的用户永远拿不到真反驳。"""
+        fake = _FakeProvider(cross_exam_reply=_rebutter_reply())
+        result = _duel_panel(monkeypatch, fake)
+
+        assert result["report"]["cross_examination"]["mode"] == "multi_agent_rebuttal"
+        assert len(fake.cross_exam_prompts) == 2
+
+    def test_quick_mode_sends_no_rebuttal_call_at_all(self, monkeypatch):
+        fake = _FakeProvider()
+        result = _duel_panel(monkeypatch, fake, mode="quick")
+
+        assert fake.cross_exam_prompts == []
+        assert result["report"]["cross_examination"] is None
+        assert result["cost_summary"]["cross_exam"]["calls"] == 0
+        assert result["cost_summary"]["cross_exam"]["mode"] is None
+
+    def test_no_genuine_controversy_sends_no_rebuttal_call(self, monkeypatch):
+        """两位人格对同一议题给出同一严重度 → 方差 0 → filter_genuine_controversies
+        全部滤掉。不许为了"看起来辩论过"而花钱造一场对立。"""
+        fake = _FakeProvider(severities={DUEL_PRO: "medium", DUEL_CON: "medium"})
+        result = _duel_panel(monkeypatch, fake, mode="full")
+
+        assert result["report"]["cross_examination"] is None
+        assert fake.cross_exam_prompts == []
+        assert result["cost_summary"]["cross_exam"]["calls"] == 0
+
+    def test_rebuttal_failure_keeps_the_review_and_is_disclosed(self, monkeypatch):
+        """反驳失败不许让整场评审失败，也不许被吞掉：如实回落 + 报告里留痕。"""
+        fake = _FakeProvider(cross_exam_error="模拟 provider 503：反驳调用失败")
+        result = _duel_panel(monkeypatch, fake, mode="standard")
+
+        assert len(result["report"]["persona_notes"]) == 2
+        assert result["degraded"] is False  # 人格评审全部成功，别把两件事混在一起
+
+        cross = result["report"]["cross_examination"]
+        assert cross["mode"] == "derived_summary"
+        assert cross["is_live_debate"] is False
+        assert cross["requested_mode"] == "moderated_rebuttal"  # 看得出落差
+        assert cross["failures"]
+        assert "503" in cross["limitation"]
+        assert cross["disputes"][0]["rebuttal_status"] == "failed"
+
+        # 只躺在 JSON 里不算留痕——渲染产物里必须看得见
+        assert result["cross_exam_notice"]
+        assert "交叉质询未完整完成" in result["markdown"]
+        assert "交叉质询未完整完成" in result["html"]
+
+        # 发过但没成的调用要在账面上看得见，同时不该产生成本
+        assert result["cost_summary"]["cross_exam"]["calls"] == 1
+        assert result["cost_summary"]["cross_exam"]["cost"] == 0.0
+
+    def test_successful_rebuttal_adds_no_failure_banner(self, monkeypatch):
+        fake = _FakeProvider()
+        result = _duel_panel(monkeypatch, fake, mode="standard")
+        assert result["cross_exam_notice"] == ""
+        assert "交叉质询未完整完成" not in result["markdown"]
+
+    def test_vote_change_is_computed_on_the_wired_path(self, monkeypatch):
+        """立场真变 + 置信度变化达到 θ（0.6 → 0.85，delta 0.25 ≥ 0.15）→ 记一次改票。"""
+        fake = _FakeProvider(
+            cross_exam_reply=_rebutter_reply(
+                stance_by_arg={"A1": "值得推进"}, conf_by_arg={"A1": 0.85}
+            )
+        )
+        result = _duel_panel(monkeypatch, fake, mode="full")
+
+        cross = result["report"]["cross_examination"]
+        assert [vc["persona_id"] for vc in cross["vote_changes"]] == [DUEL_PRO]
+        vc = cross["vote_changes"][0]
+        assert vc["from_stance"] == "观望"
+        assert vc["to_stance"] == "值得推进"
+        assert vc["delta"] == pytest.approx(0.25)
+        assert vc["threshold"] == 0.15  # 来自 aggregation-rules.yaml，不是硬编码
+
+    def test_below_threshold_stance_change_is_suppressed_not_counted(self, monkeypatch):
+        """置信度只动了 0.05（< θ=0.15）：模型说改了也不采纳，只在 suppressed 里留痕。"""
+        fake = _FakeProvider(
+            cross_exam_reply=_rebutter_reply(
+                stance_by_arg={"A1": "值得推进"}, conf_by_arg={"A1": 0.65}
+            )
+        )
+        result = _duel_panel(monkeypatch, fake, mode="full")
+
+        cross = result["report"]["cross_examination"]
+        assert cross["vote_changes"] == []
+        assert len(cross["suppressed_changes"]) == 1
+        assert "未达阈值 0.15" in cross["suppressed_changes"][0]["suppressed_reason"]
+
+    def test_threshold_comes_from_the_rules_file(self, monkeypatch, tmp_path):
+        """θ 真的是从 aggregation-rules.yaml 读的：把阈值调到 0.3，同一份
+        0.25 的变化就不再算改票。以前这个值全仓库零读取点。"""
+        with open(RULES_PATH, "r", encoding="utf-8") as f:
+            rules = yaml.safe_load(f)
+        rules["cross_exam"]["confidence_change_threshold"] = 0.3
+        custom = tmp_path / "aggregation-rules.yaml"
+        custom.write_text(yaml.dump(rules, allow_unicode=True), encoding="utf-8")
+
+        fake = _FakeProvider(
+            cross_exam_reply=_rebutter_reply(
+                stance_by_arg={"A1": "值得推进"}, conf_by_arg={"A1": 0.85}
+            )
+        )
+        result = _duel_panel(monkeypatch, fake, mode="full", rules_path=str(custom))
+
+        cross = result["report"]["cross_examination"]
+        assert cross["threshold"] == 0.3
+        assert cross["vote_changes"] == []
+        assert len(cross["suppressed_changes"]) == 1
+
+    def test_simulated_mode_sends_no_rebuttal_call_and_stays_derived(self):
+        """没有 api_key 时一次调用都发不出去：如实标成派生摘要，而不是先发一轮
+        注定失败的调用、再在报告里写"交叉质询失败"（真实原因是根本没有 key）。"""
+        outputs, points = _synthetic_duel()
+        usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+
+        data = runner_cli.run_cross_exam_stage(
+            persona_outputs=outputs,
+            controversy_points=points,
+            personas=[],
+            template_path=CROSS_EXAM_PROMPT_PATH,
+            rules=None,
+            budget_config={},
+            usage=usage,
+            mode="full",
+            api_key=None,
+        )
+
+        assert usage["calls"] == 0
+        assert data["mode"] == "derived_summary"
+        assert data["is_live_debate"] is False
+        assert data["failures"] == []
+        assert data["rounds"] == []
+
+    def test_multi_agent_rebuttal_requires_the_persona_card(self, monkeypatch, budget_config):
+        """拿不到身份卡就不是"该人格重新发言"，只是一次没有人格的通用调用——
+        必须记成失败并如实回落，不许悄悄降级还照旧宣称多智能体反驳。"""
+        outputs, points = _synthetic_duel()
+        usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+        fake = _FakeProvider(cross_exam_reply=_rebutter_reply())
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+
+        data = runner_cli.run_cross_exam_stage(
+            persona_outputs=outputs,
+            controversy_points=points,
+            personas=[],  # 面板里查不到 P01 / P02
+            template_path=CROSS_EXAM_PROMPT_PATH,
+            rules=None,
+            budget_config=budget_config,
+            usage=usage,
+            mode="full",
+            api_key="sk-test-not-real",
+        )
+
+        assert fake.cross_exam_prompts == []  # 一次请求都没真的发出去
+        assert data["mode"] == "derived_summary"
+        assert data["is_live_debate"] is False
+        assert len(data["failures"]) == 2
+        assert all("无法注入身份卡" in f["error"] for f in data["failures"])
 
 
 class TestTruncatePanelKeepsDissenter:

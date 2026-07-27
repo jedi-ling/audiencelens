@@ -18,5 +18,9 @@ report_sections:
   - next_human_test
 cross_exam:
   max_controversy_points: 3
+  # 改票判定阈值 θ：反驳前后的置信度变化绝对值达到这个值，立场变化才被记为一次改票。
+  # 由 runner/cross_exam.py 的 load_cross_exam_rules() 真实读取并执行
+  # （改这里的数值，vote_changes 的判定结果会跟着变，测试正面校验了这一点）。
   confidence_change_threshold: 0.15
+  # false 时一律不采纳立场更新，只在 suppressed_changes 里留痕。同样被代码读取。
   allow_stance_update: true

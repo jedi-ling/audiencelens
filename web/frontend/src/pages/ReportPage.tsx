@@ -20,22 +20,38 @@
 
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { api, claimPendingReviews, getToken, rememberPendingReview } from '@/lib/apiClient'
-import type { Review, ReviewMode, EvaluationScorecard, EthicsReportView, Severity } from '@/lib/mock-data'
+import type {
+  Review,
+  ReviewMode,
+  EvaluationScorecard,
+  EthicsReportView,
+  Severity,
+  CrossExamView,
+  CrossExamArgument,
+  CrossExamMode,
+  CrossExamVoteChange,
+} from '@/lib/mock-data'
 import {
   EVALUATION_DIMENSIONS,
   ETHICS_SEVERITY_BADGE_CLASSES,
   ETHICS_SEVERITY_LABELS,
+  CROSS_EXAM_MODE_LABELS,
+  CROSS_EXAM_MODE_DESCRIPTIONS,
+  REBUTTAL_STATUS_LABELS,
+  REBUTTAL_STATUS_CLASSES,
   stereotypeRiskBadgeClass,
   stereotypeRiskLabel,
+  toCrossExamView,
   toEthicsReportView,
 } from '@/lib/mock-data'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -94,6 +110,8 @@ interface RealReport {
   persona_notes?: RealPersonaNote[]
   information_gaps?: string[]
   next_human_test?: { suggested_tasks?: string[]; recruit_types?: string[]; next_materials?: string[] } | null
+  /** 库里同时存在三代形状（新 dict / 老 dict / 老 v1 的原始数组），所以保持
+   *  unknown，一律经 toCrossExamView() 运行时收敛，不在类型层面撒谎。 */
   cross_examination?: unknown
   compliance?: { status?: string; ethics_score?: number; recommended_steps?: string[] } | null
   simulation_notice?: string | null
@@ -224,6 +242,421 @@ function LimitationsSection({ caveats }: { caveats?: string[] }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+// ---------- 交叉质询 ----------
+
+/** 三档模式的徽标配色。派生摘要**故意**用最暗的中性色：它是三档里最弱的一种，
+ *  给它绿色徽标会让"没跑反驳"看起来像一项成就。 */
+const CROSS_EXAM_MODE_BADGE: Record<CrossExamMode, string> = {
+  derived_summary: 'bg-bg-secondary text-text-muted border-border',
+  moderated_rebuttal: 'bg-cyan/10 text-cyan border-cyan/30',
+  multi_agent_rebuttal: 'bg-neon-green/10 text-neon-green border-neon-green/30',
+}
+
+/** 正反两方的准确叫法。引擎里 pro = 认为问题更严重的一方（A 系列），
+ *  con = 认为更轻的一方（B 系列）——不是"支持/反对某个方案"，别简写成"支持方"。 */
+const CROSS_EXAM_SIDE_META = {
+  pro: { label: '认为问题更严重', color: 'text-warm-orange', border: 'border-warm-orange/25' },
+  con: { label: '认为问题更轻', color: 'text-cyan', border: 'border-cyan/25' },
+} as const
+
+/** 0–1 小数转百分比。null（读不出来）显示 "—"，绝不产出 "NaN%"——本仓库刚因为
+ *  把三档字符串当小数乘 100 而满页 NaN%。 */
+function confidencePct(value: number | null): string {
+  return value === null ? '—' : `${Math.round(value * 100)}%`
+}
+
+/** confidence_changes 的 before/after 已经是百分点整数，不能再乘 100。 */
+function pointPct(value: number | null): string {
+  return value === null ? '—' : `${Math.round(value)}%`
+}
+
+/** 带正号的增量；null 显示 "—"。0 也照实显示成 0，不省略。 */
+function signedNumber(value: number | null, digits: number): string {
+  if (value === null) return '—'
+  const fixed = Number(value.toFixed(digits))
+  return `${fixed > 0 ? '+' : ''}${fixed}`
+}
+
+/**
+ * 引擎的 limitation 里带 markdown 粗体标记（`**一次仲裁式反驳轮**`）。这段话
+ * 必须逐字展示（docs 引用它，措辞本身就是承诺），所以既不能删标记改写，也不该
+ * 走 dangerouslySetInnerHTML —— 拆成 React 节点渲染，标记生效、文字不动。
+ */
+function renderEmphasis(text: string): ReactNode[] {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter((chunk) => chunk !== '')
+    .map((chunk, i) =>
+      chunk.startsWith('**') && chunk.endsWith('**') && chunk.length > 4
+        ? <strong key={i} className="font-semibold text-text-primary">{chunk.slice(2, -2)}</strong>
+        : <span key={i}>{chunk}</span>
+    )
+}
+
+function CrossExamArgumentBlock({ arg, role, live }: { arg: CrossExamArgument; role: 'pro' | 'con'; live: boolean }) {
+  const meta = CROSS_EXAM_SIDE_META[role]
+  const severity = VALID_SEVERITIES.includes(arg.severity as Severity) ? (arg.severity as Severity) : null
+  return (
+    <div className={cn('rounded-lg border bg-bg-secondary/40 p-3', meta.border)}>
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <span className={cn('text-xs font-medium', meta.color)}>{meta.label}</span>
+        {arg.argument_id && (
+          <span className="rounded bg-bg-card px-1.5 font-mono text-xs text-text-muted">{arg.argument_id}</span>
+        )}
+        {/* pro_args/con_args 里的 persona_id 放的是展示名（引擎历史口径） */}
+        {arg.persona_id && <span className="text-xs text-text-secondary">{arg.persona_id}</span>}
+        {/* severity 为空串时不画徽标：默认成"中"等于替引擎编了一个判定 */}
+        {severity && <SeverityBadge severity={severity} />}
+      </div>
+      <p className="whitespace-pre-line text-xs text-text-primary">{arg.point}</p>
+      {arg.rebuttal ? (
+        <div className="mt-2 border-l-2 border-neon-green/50 bg-bg-card/60 py-1.5 pl-2.5">
+          <p className="mb-0.5 flex items-center gap-1 text-[11px] text-text-muted">
+            <MessageSquareQuote className="h-3 w-3" strokeWidth={1.5} />
+            这一方对对手论据的反驳
+          </p>
+          <p className="whitespace-pre-line text-xs text-text-secondary">{arg.rebuttal}</p>
+        </div>
+      ) : (
+        // 只在真跑过反驳轮时才说"未产出反驳"；派生摘要档本来就没人反驳过，
+        // 逐条写"未产出"只会让人以为这是一次失败。
+        live && arg.argument_id && (
+          <p className="mt-2 text-[11px] text-text-muted">这一方没有产出反驳。</p>
+        )
+      )}
+    </div>
+  )
+}
+
+/** 改票 / 未采纳改票共用一张卡。accepted=false 时措辞必须是"模型声称改为"——
+ *  suppressed_changes 里的 to_stance 是被代码驳回的主张，不是最终立场。 */
+function CrossExamChangeCard({
+  change,
+  accepted,
+  fallbackThreshold,
+}: {
+  change: CrossExamVoteChange
+  accepted: boolean
+  fallbackThreshold: number | null
+}) {
+  const threshold = change.threshold ?? fallbackThreshold
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-3',
+        accepted ? 'border-neon-green/25 bg-neon-green/5' : 'border-border bg-bg-secondary/40'
+      )}
+    >
+      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        {/* vote_changes 的 persona_id 是**真 id**，展示要用 persona_name */}
+        <span className="text-sm font-medium text-text-primary">
+          {change.persona_name || change.persona_id || '未知人格'}
+        </span>
+        {change.argument_id && (
+          <span className="rounded bg-bg-card px-1.5 font-mono text-xs text-text-muted">{change.argument_id}</span>
+        )}
+        {change.topic && <span className="text-xs text-text-muted">{change.topic}</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary">{change.from_stance || '—'}</span>
+        {accepted ? (
+          <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-neon-green" strokeWidth={1.5} />
+        ) : (
+          <MinusCircle className="h-3.5 w-3.5 shrink-0 text-text-muted" strokeWidth={1.5} />
+        )}
+        <span
+          className={cn(
+            'rounded px-1.5 py-0.5',
+            accepted ? 'bg-neon-green/10 text-neon-green' : 'text-text-muted line-through'
+          )}
+        >
+          {accepted ? '' : '模型声称改为 '}
+          {change.to_stance || '—'}
+        </span>
+      </div>
+      <p className="mt-1.5 text-xs text-text-muted">
+        置信度 {confidencePct(change.confidence_before)} → {confidencePct(change.confidence_after)}
+        （变化 {signedNumber(change.delta, 2)}
+        {threshold !== null && `，采纳阈值 θ=${threshold}`}）
+      </p>
+      {!accepted && change.suppressed_reason && (
+        <p className="mt-1.5 text-xs text-severity-medium">未采纳原因：{change.suppressed_reason}</p>
+      )}
+      {change.reason && (
+        <p className="mt-1.5 whitespace-pre-line text-xs text-text-secondary">依据（反驳原文）：{change.reason}</p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 交叉质询区块。
+ *
+ * 这一节的展示规则来自引擎侧的六条底线（见 src/runner/cross_exam.py 顶部注释），
+ * 其中三条直接决定这里怎么画：
+ *   1. 三档模式（派生摘要 / 仲裁式反驳 / 多智能体反驳）是三件不同的事，必须
+ *      在页面上分得清——派生摘要档要明确写"未进行反驳轮"，不能靠留白暗示；
+ *   2. 反驳失败要如实显示，不能与"本来就没有争议点"长成一样；
+ *   3. 没有人改票是完全正常的结果，要写出来，不能留一片空白让人以为渲染坏了。
+ *
+ * 传进来的 view 已经在 toCrossExamView() 里做过运行时收敛，这里不再有 as 断言。
+ */
+function CrossExamSection({ view }: { view: CrossExamView }) {
+  // 老 v1 后端把模型原始输出的数组直接存进了这个字段，解不出争议点与改票明细。
+  // 硬解等于把猜测当事实，如实说明即可。
+  if (view.is_legacy_array) {
+    return (
+      <div className="mb-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Swords className="h-5 w-5 text-text-muted" strokeWidth={1.25} />
+          <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+        </div>
+        <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
+          这份报告由旧版本生成，交叉质询记录以旧格式保存（{view.legacy_entry_count} 条原始条目），
+          无法解析出争议点、反驳内容与改票明细。重新发起一次评审即可得到完整记录。
+        </div>
+      </div>
+    )
+  }
+
+  const live = view.is_live_debate
+  const modeLabel = view.mode ? CROSS_EXAM_MODE_LABELS[view.mode] : `未知模式${view.mode_raw ? `（${view.mode_raw}）` : ''}`
+  const modeBadgeClass = view.mode ? CROSS_EXAM_MODE_BADGE[view.mode] : 'bg-severity-medium/10 text-severity-medium border-severity-medium/30'
+  const modeDescription = view.mode
+    ? CROSS_EXAM_MODE_DESCRIPTIONS[view.mode]
+    : '这份报告没有标明交叉质询的执行方式，无法判断是否真的发生过反驳——请按"未发生反驳"理解。'
+  // 请求的档位跑不成会回落，落差本身是用户该知道的信息
+  const fellBack = view.requested_mode !== null && view.mode !== null && view.requested_mode !== view.mode
+  const hasFailures = view.failures.length > 0
+  // 引擎那句 limitation 的显示强度按实际情况分三档，不一律标红也不一律缩成小字：
+  //   alert —— 真挂了（有 failures），是坏消息；
+  //   info  —— 只是回落（比如没有可反驳的对立论据），是"没跑成但也不算故障"；
+  //   muted —— 一切正常，它只是补充说明。
+  // 全部拉到最高档会让真正的失败贬值，全压成小字又等于藏起来。
+  const limitationTone: 'alert' | 'info' | 'muted' =
+    view.limitation === '' ? 'muted' : hasFailures ? 'alert' : fellBack ? 'info' : 'muted'
+
+  return (
+    <div className="mb-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Swords className={cn('h-5 w-5', live ? 'text-neon-green' : 'text-text-muted')} strokeWidth={1.25} />
+        <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+        <span className={cn('rounded border px-2 py-0.5 text-xs font-medium', modeBadgeClass)}>{modeLabel}</span>
+        {live && view.rounds_run > 0 && (
+          <span className="text-xs text-text-muted">实际执行 {view.rounds_run} 轮</span>
+        )}
+      </div>
+
+      {/* 模式说明：用户有权知道自己这份报告是三档里的哪一种 */}
+      <div
+        className={cn(
+          'mb-3 rounded-xl border p-4 text-sm md:p-5',
+          live ? 'border-border bg-bg-card text-text-primary' : 'border-border bg-bg-secondary/40 text-text-secondary'
+        )}
+      >
+        <p>{modeDescription}</p>
+        {fellBack && (
+          <p className="mt-2 text-xs text-severity-medium">
+            本次请求的是「{view.requested_mode ? CROSS_EXAM_MODE_LABELS[view.requested_mode] : view.requested_mode_raw}」，
+            实际回落为「{modeLabel}」。
+          </p>
+        )}
+        {view.limitation && limitationTone === 'muted' && (
+          <p className="mt-2 text-xs text-text-muted">引擎原始说明：{renderEmphasis(view.limitation)}</p>
+        )}
+      </div>
+
+      {limitationTone !== 'muted' && (
+        <div
+          className={cn(
+            'mb-3 rounded-xl p-4',
+            limitationTone === 'alert'
+              ? 'border-2 border-warm-orange bg-warm-orange/10'
+              : 'border border-severity-medium/40 bg-severity-medium/5'
+          )}
+        >
+          <div className="flex items-start gap-3">
+            {limitationTone === 'alert' ? (
+              <AlertOctagon className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+            ) : (
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-severity-medium" strokeWidth={1.5} />
+            )}
+            <p className="text-sm text-text-primary">{renderEmphasis(view.limitation)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* 失败逐条列出。吞掉失败正是这个仓库在系统性清除的模式：
+          "跑了但挂了"和"本来就没有争议点"在页面上必须长得不一样。 */}
+      {hasFailures && (
+        <div className="mb-3 rounded-xl border border-severity-critical/40 bg-severity-critical/5 p-4 md:p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-severity-critical" strokeWidth={1.5} />
+            <h4 className="text-sm font-medium text-severity-critical">
+              交叉质询过程中的失败（{view.failures.length} 条）
+            </h4>
+          </div>
+          <ul className="space-y-1">
+            {view.failures.map((f, i) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-1.5 text-xs text-text-secondary">
+                <span className="rounded bg-bg-secondary px-1.5 font-mono text-text-muted">
+                  {[f.stage, f.point_id, f.argument_id].filter(Boolean).join(' · ') || '未标注阶段'}
+                </span>
+                <span>{f.error || '未给出原因'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 争议点 + 双方论据 + 反驳 */}
+      {view.disputes.length > 0 ? (
+        <div className="mb-3 flex flex-col gap-3">
+          {view.disputes.map((d, i) => (
+            <div key={d.point_id || i} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {d.point_id && (
+                  <span className="rounded bg-bg-secondary px-1.5 font-mono text-xs text-text-muted">{d.point_id}</span>
+                )}
+                <p className="flex-1 text-sm font-medium text-text-primary">{d.topic || '未命名争议点'}</p>
+                <span className={cn('rounded px-2 py-0.5 text-xs font-medium', REBUTTAL_STATUS_CLASSES[d.rebuttal_status])}>
+                  {REBUTTAL_STATUS_LABELS[d.rebuttal_status]}
+                </span>
+              </div>
+              {d.rebuttal_status !== 'ok' && d.rebuttal_error && (
+                <p className="mb-3 text-xs text-severity-medium">本争议点交叉质询未完成：{d.rebuttal_error}</p>
+              )}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {d.pro_args.map((arg, j) => (
+                  <CrossExamArgumentBlock key={arg.argument_id || `pro-${j}`} arg={arg} role="pro" live={live} />
+                ))}
+                {d.con_args.map((arg, j) => (
+                  <CrossExamArgumentBlock key={arg.argument_id || `con-${j}`} arg={arg} role="con" live={live} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // 空争议点不留白：说清楚是"没找到分歧"还是"这一步没跑成"。
+        // 上面已经把引擎给的具体原因摆出来了，就不要在这里另编一个原因——
+        // "没有可反驳的论据正文"和"大家意见一致"是两回事。
+        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
+          {limitationTone === 'muted'
+            ? '本次没有找到需要质询的争议点——各人格在关键判断上没有出现足够大的分歧。'
+            : '本次没有产出可展示的争议点，原因见上方说明。'}
+        </div>
+      )}
+
+      {/* 改票记录。"没有人改票"是正常结果，必须写出来而不是留空白。 */}
+      <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <ArrowRightLeft className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+          <h4 className="text-sm font-semibold text-text-primary">改票记录</h4>
+          {live && (
+            <span className="text-xs text-text-muted">
+              {view.vote_changes.length} 条
+              {view.threshold !== null && ` · 采纳阈值 θ=${view.threshold}`}
+            </span>
+          )}
+        </div>
+        {!live ? (
+          <p className="text-sm text-text-secondary">
+            本次未进行反驳轮，因此不存在改票记录。改票只能来自真实发生过的反驳。
+          </p>
+        ) : view.vote_changes.length === 0 ? (
+          <p className="text-sm text-text-secondary">
+            本轮双方立场未变。这是交叉质询中完全正常、而且常见的结果，不代表反驳没有发生。
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {view.vote_changes.map((vc, i) => (
+              <CrossExamChangeCard
+                key={`${vc.argument_id}-${i}`}
+                change={vc}
+                accepted
+                fallbackThreshold={view.threshold}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 模型想改票但代码没采纳：这一条不显示出来，用户会误以为模型压根没动摇过 */}
+        {view.suppressed_changes.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="mb-2 text-xs text-text-muted">
+              另有 {view.suppressed_changes.length} 条立场变化由模型提出、但未被采纳
+              （改票由代码判定，不采信模型自报）
+              {!view.allow_stance_update && '；本次配置为不接受立场更新'}
+            </p>
+            <div className="flex flex-col gap-2">
+              {view.suppressed_changes.map((sc, i) => (
+                <CrossExamChangeCard
+                  key={`${sc.argument_id}-suppressed-${i}`}
+                  change={sc}
+                  accepted={false}
+                  fallbackThreshold={view.threshold}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 逐人格置信度变化：只在真跑过反驳时有意义（派生摘要档 delta 恒为 0，
+          画出来只会让人以为发生过一场辩论） */}
+      {live && view.confidence_changes.length > 0 && (
+        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <h4 className="mb-3 text-sm font-semibold text-text-primary">反驳前后的置信度</h4>
+          <ul className="flex flex-col gap-2">
+            {view.confidence_changes.map((cc, i) => {
+              const delta = cc.delta
+              const Icon = delta === null || delta === 0 ? Minus : delta > 0 ? TrendingUp : TrendingDown
+              const deltaClass =
+                delta === null || delta === 0
+                  ? 'text-text-muted'
+                  : delta > 0
+                    ? 'text-neon-green'
+                    : 'text-severity-medium'
+              return (
+                <li key={cc.persona_key || `${cc.persona_id}-${i}`} className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* confidence_changes 的 persona_id 是展示名（引擎历史口径） */}
+                  <span className="min-w-24 text-text-primary">{cc.persona_id || cc.persona_key || '未知人格'}</span>
+                  <span className="text-text-secondary">
+                    {pointPct(cc.before)} → {pointPct(cc.after)}
+                  </span>
+                  <span className={cn('flex items-center gap-1', deltaClass)}>
+                    <Icon className="h-3 w-3" strokeWidth={1.5} />
+                    {delta === null ? '—' : `${signedNumber(delta, 0)} 个百分点`}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* 这一节是真花钱的模型调用，用量摆出来；拿不到 token 数就说明成本可能偏低。
+          calls 在引擎里按**尝试**计（失败的调用也算一次），文案必须跟着这个口径写，
+          否则"1 次调用 / 0 tokens"看起来像个 bug。 */}
+      {view.usage && view.usage.calls > 0 && (
+        <p className="text-xs text-text-muted">
+          本节发起 {view.usage.calls} 次模型调用（含失败的尝试）· 输入 {view.usage.input_tokens.toLocaleString()} tokens ·
+          输出 {view.usage.output_tokens.toLocaleString()} tokens
+          {!view.usage.token_counts_available && '（token 用量未被完整回报，实际成本可能高于账面）'}
+        </p>
+      )}
+
+      {/* θ 没读到配置、走了内置默认值时才提——正常读到 yaml 时展示文件路径只是噪音 */}
+      {view.threshold_source.startsWith('fallback-default') && (
+        <p className="mt-1 text-xs text-severity-medium">
+          改票阈值未能从配置读取，本次使用内置默认值（{view.threshold_source}）。
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -363,6 +796,9 @@ export default function ReportPage() {
   const personaNotes = report.persona_notes ?? []
   const disagreements = report.major_disagreements ?? []
   const informationGaps = report.information_gaps ?? []
+  // null 只代表"这份报告没有交叉质询区块"（quick 档不跑 / 老报告没这个键）；
+  // "跑了但失败了"仍然是个区块，会带 failures，必须渲染出来。
+  const crossExam = toCrossExamView(report.cross_examination)
 
   // 立场分布由 persona_notes 现场统计（引擎不单独输出这一项）
   const stanceCounts = new Map<string, number>()
@@ -748,6 +1184,9 @@ export default function ReportPage() {
           </div>
         </div>
       )}
+
+      {/* ---------- 交叉质询（争议点 / 反驳 / 改票）---------- */}
+      {crossExam && <CrossExamSection view={crossExam} />}
 
       {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -1284,6 +1723,31 @@ function generateMarkdown(report: RealReport): string {
       if (fix.suggested_fix) lines.push(`**建议**：${fix.suggested_fix}`)
       lines.push('')
     }
+  }
+  // 交叉质询：这条兜底路径里也必须写清楚是三档里的哪一种。导出件同样是"一份报告"，
+  // 少了这句话，读者只会按最强的那一档（多智能体反驳）理解。
+  const crossExam = toCrossExamView(report.cross_examination)
+  if (crossExam) {
+    lines.push('## 交叉质询')
+    lines.push('')
+    if (crossExam.is_legacy_array) {
+      lines.push('这份报告由旧版本生成，交叉质询记录格式过旧，无法解析出反驳与改票明细。')
+    } else {
+      const label = crossExam.mode ? CROSS_EXAM_MODE_LABELS[crossExam.mode] : `未知模式（${crossExam.mode_raw}）`
+      lines.push(`- 执行方式：${label}`)
+      const desc = crossExam.mode ? CROSS_EXAM_MODE_DESCRIPTIONS[crossExam.mode] : '无法判断是否真的发生过反驳。'
+      lines.push(`- ${desc}`)
+      if (crossExam.limitation) lines.push(`- 引擎说明：${crossExam.limitation}`)
+      lines.push(
+        crossExam.is_live_debate
+          ? `- 改票记录：${crossExam.vote_changes.length} 条${crossExam.vote_changes.length === 0 ? '（本轮双方立场未变，属正常结果）' : ''}`
+          : '- 改票记录：不适用（未进行反驳轮）'
+      )
+      if (crossExam.failures.length) {
+        lines.push(`- 过程中有 ${crossExam.failures.length} 条失败：${crossExam.failures.map((f) => f.error).join('；')}`)
+      }
+    }
+    lines.push('')
   }
   const gaps = report.information_gaps ?? []
   if (gaps.length) {

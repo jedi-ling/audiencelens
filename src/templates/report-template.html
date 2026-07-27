@@ -454,9 +454,26 @@
   <!-- Cross-Examination Record -->
   {% if cross_examination %}
   <div class="section-card">
+    {# 标题必须跟着实际执行的 mode 走。以前这里把"（派生，非实时辩论）"写死，
+       那在引擎恒定返回 derived_summary 的年代是对的；现在 standard/full 档会真的
+       发反驳调用，写死就变成了反方向的假话——下面明明列着改票记录，标题却说没辩论过。 #}
+    {% if cross_examination.mode == 'multi_agent_rebuttal' %}
+    <div class="section-title"><span class="icon">⚔️</span> 交叉质询（多智能体反驳：每位涉事人格各自重新发言一轮）</div>
+    {% elif cross_examination.mode == 'moderated_rebuttal' %}
+    <div class="section-title"><span class="icon">⚔️</span> 交叉质询（仲裁式反驳：一次调用代双方各写一轮，非各自独立发言）</div>
+    {% else %}
     <div class="section-title"><span class="icon">⚔️</span> 争议点摘要（派生，非实时辩论）</div>
+    {% endif %}
 
-    {# 引擎恒定返回 is_live_debate=false + limitation 字段；不渲染出来的话，
+    {# 跑成了也要把引擎的 limitation 原样带出来：仲裁式反驳的口径差别
+       （"不是每个人格各自独立重新发言"）就写在里面，藏起来就等于替引擎夸大。 #}
+    {% if cross_examination.is_live_debate is sameas true and cross_examination.limitation %}
+    <div style="border:1px solid var(--border,#334155);background:rgba(148,163,184,.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;opacity:.9;">
+      {{cross_examination.limitation}}
+    </div>
+    {% endif %}
+
+    {# 引擎返回 is_live_debate=false 时的横幅；不渲染出来的话，
        这一段读起来就像人格真的互相辩论过，而它只是把既有输出里的对立立场并排摆出来。 #}
     {% if cross_examination.is_live_debate is not sameas true %}
     <div style="border:2px solid var(--warn,#d97706);background:rgba(217,119,6,.10);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;">
@@ -486,6 +503,15 @@
     {% for d in cross_examination.disputes %}
     <div class="debate-card">
       <div class="debate-topic">{{d.topic}}</div>
+      {# 单边反驳（partial）绝不能显示成"完成"：不标出来，读者会以为双方都回应过。 #}
+      {% if d.rebuttal_status and d.rebuttal_status != 'ok' %}
+      <div style="font-size:11px;line-height:1.6;margin:-4px 0 10px;opacity:.85;">
+        {% if d.rebuttal_status == 'partial' %}⚠️ 本争议点只有一方产出了反驳
+        {% elif d.rebuttal_status == 'failed' %}⚠️ 本争议点交叉质询未完成
+        {% else %}◦ 本争议点未进行反驳{% endif %}
+        {% if d.rebuttal_error %}（{{d.rebuttal_error}}）{% endif %}
+      </div>
+      {% endif %}
       <div class="debate-sides">
         <div class="debate-side pro">
           <div class="debate-side-label">正方</div>
@@ -509,7 +535,9 @@
       <div class="sub-title" style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">改票记录</div>
       {% for vc in cross_examination.vote_changes %}
       <div class="vote-change-item">
-        <span class="vc-persona">{{vc.persona_id}}</span>
+        {# vote_changes[].persona_id 是**真 id**（P02），展示名在 persona_name。
+           直接渲染 persona_id 会让改票记录显示成"P02 观望 → 加愿望单"。 #}
+        <span class="vc-persona">{{vc.persona_name or vc.persona_id}}</span>
         <span class="vc-before">{{vc.before}}</span>
         <span class="vc-arrow">→</span>
         <span class="vc-after">{{vc.after}}</span>

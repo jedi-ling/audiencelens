@@ -22,10 +22,26 @@ for p in (PROJECT_ROOT, SRC_ROOT):
 
 from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report
 from runner.calibration import run_calibration_check
-from runner.cross_exam import extract_controversy_points, parse_cross_exam_output, render_cross_exam_prompt
+from runner.cross_exam import (
+    MODE_DERIVED,
+    MODE_MODERATED,
+    MODE_MULTI_AGENT,
+    extract_controversy_points,
+    run_cross_exam_protocol,
+)
 from runner.evidence_precheck import precheck_panel
 from runner.panel_selector import load_personas, load_presets, select_panel
-from runner.persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
+# _minify_persona 是人格身份卡的唯一裁剪口径（人格评审那一轮渲染
+# persona-prompt.md 的 [PERSONA CARD] 用的就是它）。full 档重新调用人格做反驳时
+# 复用它，避免在后端另开一套人格提示词——引擎链路（runner/cli.py）同样这么做。
+from runner.persona_agent import (
+    _minify_persona,
+    estimate_cost,
+    normalize_persona_output,
+    parse_persona_output,
+    render_prompt,
+    select_model,
+)
 from runner.validator import load_schema, validate_output
 
 PERSONAS_DIR = os.path.join(PROJECT_ROOT, "src", "personas")
@@ -158,6 +174,90 @@ REVIEW_MODES: Dict[str, Dict[str, Any]] = {
         "description": "正式评审，完整流程",
     },
 }
+
+# 交叉质询按档位选模式，与引擎链路（runner/cli.py）用同一套映射——
+# 同一个档位在两条链路上必须发生同一件事，否则"standard 到底反驳了没有"
+# 会因为用户走的是向导页还是 v2 而不同，那种不一致比功能缺失更难排查。
+#   standard → moderated_rebuttal：一次仲裁式反驳（+1 次模型调用）
+#   full     → multi_agent_rebuttal：每位涉事人格各被重新调用一次
+# quick 档在 REVIEW_MODES["quick"]["cross_examination"]=False 处就被挡掉，走不到这里。
+CROSS_EXAM_MODE_BY_REVIEW_MODE = {
+    "standard": MODE_MODERATED,
+    "full": MODE_MULTI_AGENT,
+}
+
+
+def _persona_identity_preamble(persona: dict) -> str:
+    """多智能体反驳（full 档）给人格带上"你是谁"。
+
+    为什么要有这段：不带身份，"每位人格各自反驳"就只是 N 次无身份的匿名调用，
+    配不上 multi_agent_rebuttal 这个名字。
+
+    身份卡本体复用 persona_agent._minify_persona —— 与人格评审那一轮渲染
+    persona-prompt.md 的 [PERSONA CARD] 是**同一份卡、同一套裁剪口径**，
+    不在这里另写一套人格描述（那样人格定义加字段时两边就会不一致）。
+    反驳的任务说明、输出格式、匿名化口径全在 cross-exam-prompt.md 的 rebutter 段里，
+    这里只补身份。
+
+    但 id / name 必须摘掉：交叉质询提示词里不出现人格名是这个环节的匿名化底线。
+    自己的名字露出来虽然谈不上"按身份结盟"，却会让"提示词里不含人格名"这条
+    可测的不变量破掉，也给模型留下自称身份、顺势把对手也往身份上带的口子。
+    """
+    anonymous = {k: v for k, v in (persona or {}).items() if k not in ("id", "name")}
+    return "[你的身份]\n" + _minify_persona(anonymous) + "\n\n"
+
+
+def _json_safe_key(key):
+    if isinstance(key, tuple):
+        return "|".join(str(k) for k in key)
+    if key is None or isinstance(key, (str, int, float, bool)):
+        return key
+    return str(key)
+
+
+def _json_safe(value):
+    """把不能进 JSON 列的字典键递归转成字符串。
+
+    起因是一个真挂的路径：run_calibration_check 返回的
+    coverage.pairwise_distances 用 (id1, id2) **元组**做键 —— 在 CLI 里被 Python
+    直接消费没问题，但 review.calibration 是 JSON 列，序列化时元组键直接
+    TypeError("keys must be str, int, float, bool or None, not tuple")，
+    整条 UPDATE 失败，被 run_review 外层 except 接住 → 评审标成 failed。
+    也就是说 v1 的 full 档（唯一跑校准的档位）只要有 ≥2 位人格就 100% 失败，
+    用户拿到的错误还是一句与评审毫无关系的 "keys must be str"。
+
+    元组键按 "id1|id2" 落地。修在持久化侧而不是 calibration.py：那是引擎的返回值，
+    元组键对它的 Python 消费方（CLI）完全合理，能不能进 JSON 列是这里的责任。
+    """
+    if isinstance(value, dict):
+        return {_json_safe_key(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+def _degraded_cross_exam_block(
+    persona_outputs: List[dict], rules: dict, requested_mode: str, reason: str
+) -> dict:
+    """交叉质询在进入协议核心之前/之外就挂了时的**诚实**兜底区块。
+
+    形状仍然由协议核心生成（不注入 llm_call，因此是 derived_summary），这样字段
+    与正常路径逐字相同，前端不必为"失败"再写一套读法；只把失败原因补进
+    failures 和 limitation。
+
+    为什么不是 `except Exception: pass`：那正是这个仓库在系统性清除的模式——
+    它曾经让"全盘失败"输出成一份"没发现风险"的报告。交叉质询挂了不该让整份
+    评审作废，但必须在报告里看得见"这一步没完成，以及为什么"。
+    """
+    block = run_cross_exam_protocol(persona_outputs, [], mode=MODE_DERIVED, rules=rules)
+    # requested_mode 记的是"本来想跑哪种"，保留它才能从报告里看出落差
+    block["requested_mode"] = requested_mode
+    block["failures"].append({"stage": "cross_examination", "error": reason})
+    block["limitation"] = (
+        f"本次交叉质询未能完成（{reason}）。报告其余部分照常给出，"
+        "但人格之间没有发生实际反驳，也没有人因此改票。"
+    )
+    return block
 
 
 class PersonaService:
@@ -762,6 +862,93 @@ class ReviewService:
         if ws_manager:
             ws_manager.broadcast_sync(review_id, {"event": event, "data": data})
 
+    def _run_cross_examination(
+        self,
+        persona_outputs_data: List[dict],
+        persona_defs_by_output_id: Dict[str, dict],
+        review_mode: str,
+        rules: dict,
+        resolved: Any,
+        ce_model: str,
+    ) -> Optional[dict]:
+        """执行交叉质询，返回可直接进报告的 cross_examination 区块。
+
+        没有任何争议点时返回 None（与引擎链路一致：不出这个区块，也不发调用）。
+
+        与引擎链路共用同一个协议核心 run_cross_exam_protocol —— 两条链路产出的
+        mode / is_live_debate / vote_changes / disputes 字段名与语义因此完全一致。
+        改票判定、θ 阈值读取、token 归一都在核心里做，这里只负责把"怎么调模型"
+        注入进去。
+
+        失败一律不吞：反驳调用失败由核心回落成 derived_summary 并把原因写进
+        limitation/failures；核心之外的意外由 _degraded_cross_exam_block 兜成
+        同样形状的诚实区块。两种情况下报告其余部分都照常给出。
+        """
+        # 函数级导入：测试用 monkeypatch 打在 runner.llm_client.chat_completion
+        # 这个模块属性上，调用时才取才能拿到补丁（与 run_review 同一处理）。
+        from runner.llm_client import chat_completion
+
+        requested_mode = CROSS_EXAM_MODE_BY_REVIEW_MODE.get(review_mode, MODE_MODERATED)
+
+        def _cross_exam_llm(prompt: str, persona_id: str = ""):
+            """协议核心注入的模型出口。
+
+            原样返回 chat_completion 的 (text, input_tokens, output_tokens) 三元组——
+            核心据此把用量累进 usage，run_review 再计进本次评审的 token 与成本。
+            只返回字符串的话这笔钱就会从账上消失（核心会把
+            token_counts_available 置 False 并在 limitation 里声明，但账还是少的）。
+
+            persona_id 只在 multi_agent_rebuttal 档非空：给提示词前面接上这位人格的
+            身份，让它按自己的判断标准反驳，而不是变成 N 次无身份的匿名调用。
+            """
+            body = prompt
+            persona_def = persona_defs_by_output_id.get(persona_id)
+            if persona_def:
+                body = _persona_identity_preamble(persona_def) + prompt
+            return chat_completion(
+                model=ce_model,
+                prompt=body,
+                api_key=resolved.key,
+                provider=resolved.provider,
+                api_base=resolved.api_base,
+            )
+
+        try:
+            controversy_points = extract_controversy_points(persona_outputs_data)
+        except Exception as e:
+            # 争议点连提取都失败（相似度模型加载异常等）。以前这类异常被 pass 吞掉，
+            # 报告里连"这一步存在过"都看不出来。
+            return _degraded_cross_exam_block(
+                persona_outputs_data,
+                rules,
+                requested_mode,
+                f"争议点提取失败（{type(e).__name__}: {e}）",
+            )
+
+        if not controversy_points:
+            # 真的没有分歧：不发调用、不出区块，与引擎链路同样处理
+            return None
+
+        try:
+            return run_cross_exam_protocol(
+                persona_outputs_data,
+                controversy_points,
+                llm_call=_cross_exam_llm,
+                mode=requested_mode,
+                template_path=CROSS_EXAM_PROMPT_PATH,
+                rules=rules,
+            )
+        except Exception as e:
+            # 反驳调用本身失败（超时/401/输出解析不了）核心内部已经转成 failures 了；
+            # 能抛到这里的是它没预料到的问题（数据形状异常、模板文件缺失等）。
+            # 一次评审不该因为交叉质询整份作废，但也绝不能静默。
+            return _degraded_cross_exam_block(
+                persona_outputs_data,
+                rules,
+                requested_mode,
+                f"交叉质询执行失败（{type(e).__name__}: {e}）",
+            )
+
     def run_review(self, review_id: str, ws_manager: Any = None):
         review = self.session.get(Review, review_id)
         if review is None:
@@ -838,6 +1025,10 @@ class ReviewService:
             # 逐个人格的失败原因。以前失败只写进 po.output_json 就没人再看了，
             # 于是"全员失败"和"全员通过"在后面的聚合阶段长得一模一样（见循环之后的检查）。
             persona_failures: List[tuple] = []
+            # full 档的多智能体反驳要按 persona_id 找回人格定义（把"你是谁"接回反驳提示词）。
+            # 键用**模型回报的** persona_id 而不是定义里的 id：交叉质询全程按输出里的
+            # persona_id 认人，万一模型没照抄（改写/漏字），按定义 id 建索引就查不到了。
+            persona_defs_by_output_id: Dict[str, dict] = {}
             total_cost = 0.0
             total_input_tokens = 0
             total_output_tokens = 0
@@ -886,6 +1077,8 @@ class ReviewService:
                     total_output_tokens += output_tokens
 
                     persona_outputs_data.append(output)
+                    output_pid = str(output.get("persona_id") or "").strip() or persona["id"]
+                    persona_defs_by_output_id[output_pid] = persona
 
                     self._ws_emit(ws_manager, review.id, "review.persona_completed", {
                         "persona_id": persona["id"],
@@ -945,30 +1138,62 @@ class ReviewService:
                     )
                 )
 
-            cross_exam_results = []
+            # ---- 交叉质询：真反驳，token 进账，失败如实标注 ----
+            #
+            # 三处历史问题一起修（都逐条核实过）：
+            #   1. 整段被 `except Exception: pass` 包着——反驳失败后报告里看不出
+            #      "这一步跑过且失败了"，与"本来就没有争议点"长得一模一样；
+            #   2. ce_in/ce_out 只加进了 token 总数，**成本一分没算**，
+            #      total_cost_usd 因此系统性低于实际支出（本仓库刚修过一批同类漏洞）；
+            #   3. 产出形状与引擎链路不一致：这里把 parse_cross_exam_output 的原始
+            #      列表直接当 cross_examination 塞进报告，引擎给的却是带
+            #      mode/limitation/vote_changes 的 dict。同一个概念两种形状，
+            #      前端就得写两套读法——degradation 字段刚吃过这个亏。
+            #      现在两条链路共用 run_cross_exam_protocol，字段名与语义完全一致。
+            cross_exam_data = None
             if persona_outputs_data and mode_config["cross_examination"]:
                 self._ws_emit(ws_manager, review.id, "review.cross_exam_started", {})
 
-                try:
-                    controversy_points = extract_controversy_points(persona_outputs_data)
-                    if controversy_points:
-                        cross_exam_prompt = render_cross_exam_prompt(
-                            controversy_points, persona_outputs_data, CROSS_EXAM_PROMPT_PATH
-                        )
-                        ce_raw, ce_in, ce_out = chat_completion(
-                            model=resolved.model or budget_config.get("default_model", "claude-sonnet"),
-                            prompt=cross_exam_prompt,
-                            api_key=resolved.key,
-                            provider=resolved.provider,
-                            api_base=resolved.api_base,
-                        )
-                        total_input_tokens += ce_in
-                        total_output_tokens += ce_out
-                        cross_exam_results = parse_cross_exam_output(ce_raw)
-                except Exception:
-                    pass
+                # 交叉质询用哪个模型：用户显式指定优先，否则取预算表的默认模型
+                #（不写 "claude-sonnet" 这种占位别名——它传给 Anthropic API 直接 404）
+                ce_model = resolved.model or budget_config.get(
+                    "default_model", "claude-sonnet-4-20250514"
+                )
 
-                self._ws_emit(ws_manager, review.id, "review.cross_exam_completed", {})
+                cross_exam_data = self._run_cross_examination(
+                    persona_outputs_data=persona_outputs_data,
+                    persona_defs_by_output_id=persona_defs_by_output_id,
+                    review_mode=mode,
+                    rules=rules,
+                    resolved=resolved,
+                    ce_model=ce_model,
+                )
+
+                # 反驳是真花钱的模型调用：token 和成本都得进账，缺一样就是计费漏洞。
+                ce_usage = (cross_exam_data or {}).get("usage") or {}
+                ce_in = int(ce_usage.get("input_tokens") or 0)
+                ce_out = int(ce_usage.get("output_tokens") or 0)
+                total_input_tokens += ce_in
+                total_output_tokens += ce_out
+                if ce_in or ce_out:
+                    try:
+                        ce_cost = estimate_cost(ce_in, ce_out, ce_model, budget_config)
+                    except Exception:
+                        # 与人格调用同一口径：第三方模型不在预算价目表里就记 0，不阻断评审
+                        ce_cost = 0.0
+                    total_cost += ce_cost
+
+                self._ws_emit(ws_manager, review.id, "review.cross_exam_completed", {
+                    # 如实播报：到底跑成没有、是哪种反驳、有没有人改票。
+                    # 以前这个事件是空 payload，前端只能显示"交叉质询完成"——
+                    # 即使一次调用都没成功也照样这么显示。
+                    "mode": (cross_exam_data or {}).get("mode", MODE_DERIVED),
+                    "is_live_debate": bool((cross_exam_data or {}).get("is_live_debate")),
+                    "vote_change_count": len((cross_exam_data or {}).get("vote_changes") or []),
+                    "failure_count": len((cross_exam_data or {}).get("failures") or []),
+                    "input_tokens": ce_in,
+                    "output_tokens": ce_out,
+                })
 
             self._ws_emit(ws_manager, review.id, "review.aggregation_started", {})
 
@@ -977,7 +1202,7 @@ class ReviewService:
                 review.task_type,
                 artifact_summary,
                 rules,
-                cross_exam_results if cross_exam_results else None,
+                cross_exam_data,
             )
 
             # 部分失败：出报告，但必须如实标注结论是据几位人格得出的。
@@ -1025,7 +1250,8 @@ class ReviewService:
             review.output_tokens = total_output_tokens
             review.report_json = report
             review.report_markdown = markdown
-            review.calibration = calibration
+            # 元组键洗成字符串再落库，否则 full 档整条 UPDATE 会炸（见 _json_safe）
+            review.calibration = _json_safe(calibration)
             self.session.commit()
 
             # 计量事实源：v1 此前完全没记 usage_records，token 报表看不到 v1 评审。

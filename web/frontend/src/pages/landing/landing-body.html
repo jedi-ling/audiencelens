@@ -6,7 +6,7 @@
       <div class="hero-copy">
         <div class="hero-badge"><span class="dot"></span>开源 · 多人格分组独立评审</div>
         <h1>让 66 个 AI 评审员<br>在你上线前<span class="grad-gold">找到风险</span></h1>
-        <p class="hero-sub">游戏、产品、定价页、众筹页、创业 BP —— 在投入真人测试前，先让一支合成评审团分组独立评审，再把<b>分歧最大的争议点和正反双方的原始论据</b>并排摆到你面前。</p>
+        <p class="hero-sub">游戏、产品、定价页、众筹页、创业 BP —— 在投入真人测试前，先让一支合成评审团分组独立评审，再挑出<b>分歧最大的争议点</b>让双方<b>真的互相反驳一轮</b>，正反论据、谁被说服改了口，都并排摆到你面前。</p>
 
         <div class="chips">
           <button class="chip" type="button">Steam 商店页</button>
@@ -42,7 +42,7 @@
             <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+63</span>
           </div>
           <span class="sep"></span>
-          <span><b>66 个人格</b> · <b>14 种场景</b> · <b>600+ 自动化测试</b></span>
+          <span><b>66 个人格</b> · <b>14 种场景</b> · <b>750+ 自动化测试</b></span>
         </div>
 
         <div class="hero-models">
@@ -56,18 +56,20 @@
         </div>
       </div>
 
-      <!-- 独有视觉：报告里"争议点摘要"区块的示意图。
+      <!-- 独有视觉：报告里"争议点 + 反驳"区块的示意图。
            两条铁律，改文案的人别破坏：
            1) 卡里的数值是样例，不是真实评审输出——所以头部明写"示意图 · 样例数据"。
            2) 只允许出现引擎真的会产出的字段：severity / evidence 等级 /
-              must_comment_on 覆盖率 / inferred 推断率。
+              must_comment_on 覆盖率 / inferred 推断率 / 反驳正文 / 改票（Δc 与阈值 θ）。
            曾经这里写的是"实时交叉质询 / ROUND 3 / 分歧度 / 说服力 / Δc +0.34"，
-           而 cross_exam.py 返回的是 is_live_debate:False、vote_changes 恒空、delta 恒 0，
-           引擎压根不产出"分歧度""说服力"。一个标着"实时"的假数据面板最容易被截图质疑，
-           别再往回改。 -->
+           当时 cross_exam.py 返回的是 is_live_debate:False、vote_changes 恒空、delta 恒 0，
+           所以全部撤掉了。现在反驳与改票是真的（cross_exam.py 会发调用，改票由代码比较
+           前后立场+置信度并与 yaml 里的 θ 比较），所以这两项可以出现——但
+           "ROUND 3""分歧度""说服力"依然不存在：只跑一轮，也不算说服力分。
+           别把这三个写回来。 -->
       <div class="debate-card reveal">
         <div class="debate-head">
-          <span class="debate-tag">◈ 争议点摘要</span>
+          <span class="debate-tag">◈ 争议点 · 反驳</span>
           <span class="debate-round">示意图 · 样例数据</span>
         </div>
         <div class="debate-msg oppose">
@@ -79,7 +81,7 @@
         </div>
         <div class="debate-flip">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4 4v5h5M20 20v-5h-5M4.5 15a8 8 0 0 0 14.1 3M19.5 9a8 8 0 0 0-14.1-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          同一争议点 · 正反论据并排
+          同一争议点 · 双方各反驳一轮
         </div>
         <div class="debate-msg agree">
           <span class="pav" style="background:linear-gradient(135deg,#B77E3B,#F9D67D)">P12</span>
@@ -92,7 +94,7 @@
           <div class="meter-row"><span>覆盖率</span><div class="bar"><i style="width:92%"></i></div><b>92%</b></div>
           <div class="meter-row"><span>推断率</span><div class="bar mint"><i style="width:34%"></i></div><b>34%</b></div>
         </div>
-        <div class="debate-foot">TOP-3 争议点 · 证据三级标注 · 派生摘要，非实时辩论</div>
+        <div class="debate-foot">TOP-3 争议点 · 证据三级标注 · 一轮反驳，不是多轮辩论</div>
       </div>
     </div>
   </div>
@@ -157,7 +159,11 @@
           </div>
           <div class="stage-item">
             <div class="ico">⇄</div>
-            <div><h4>Top-3 争议点正反论据配对</h4><p>同一个问题换了措辞也会被相似度聚类合并，系统据此挑出分歧最大的三个争议点，把正反双方各自的原始论据抽出来并排呈现。这是从已产出的评审意见派生的摘要，不是人格之间的实时辩论。</p></div>
+            <div><h4>Top-3 争议点 + 一轮真实反驳</h4><p>同一个问题换了措辞也会被相似度聚类合并，系统据此挑出分歧最大的三个争议点，把正反双方的原始论据抽出来，<b>再真的发一轮反驳调用</b>：标准档是一次仲裁式反驳，完整档是每位涉事人格各自重新发言。大家本来就一致的点会被滤掉，不为了"看起来辩论过"而造对立。只跑一轮，不是多轮辩论。</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⚖</div>
+            <div><h4>改票由代码判定，不听模型自报</h4><p>反驳之后谁改了口，由代码比较反驳前后的立场与置信度来判定：立场文字要真的变，且置信度变化要达到阈值 θ（写在开源的 aggregation-rules.yaml 里）。模型自己声称"我被说服了"不算数；够不到阈值的会单独列成"未采纳的改票"，让你看得见它想改而系统没让它改。θ 是工程经验值，尚未经过实证验证。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">✎</div>
@@ -224,7 +230,7 @@
     <div class="flow">
       <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么——页面、文案、概念、创业 BP 都行。</p></div>
       <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面——图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
-      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 分歧聚类 → Top-3 争议点正反论据配对，全程可追溯。</p></div>
+      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 分歧聚类 → Top-3 争议点双方各反驳一轮 → 改票由代码判定，全程可追溯。</p></div>
       <div class="flow-step reveal"><div class="fn">04</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
     </div>
   </div>
@@ -304,7 +310,7 @@
         </thead>
         <tbody>
           <tr><td class="dim-key">方法论</td><td class="us">多人格评审团</td><td>访谈式</td><td>真人访谈</td><td>对话式</td></tr>
-          <tr><td class="dim-key">分歧处理</td><td class="us"><span class="ck">✓</span> 分歧聚类 + Top-3 争议点正反论据配对</td><td><span class="cx">✕</span> 单轮</td><td><span class="cx">✕</span> 依赖主持人</td><td><span class="cx">✕</span> 单轮</td></tr>
+          <tr><td class="dim-key">分歧处理</td><td class="us"><span class="ck">✓</span> 分歧聚类 + Top-3 争议点各反驳一轮，改票由代码判定</td><td><span class="cx">✕</span> 单轮</td><td><span class="cx">✕</span> 依赖主持人</td><td><span class="cx">✕</span> 单轮</td></tr>
           <tr><td class="dim-key">证据可核验</td><td class="us"><span class="ck">✓</span> 三级标注 + 推断占比 ≤40% 硬上限</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
           <tr><td class="dim-key">多模态材料</td><td class="us"><span class="ck">✓</span> 截图 / BP 进视觉模型（限视觉模型）</td><td><span class="cx">✕</span> 仅文字</td><td>真人录屏</td><td><span class="cx">✕</span> 仅文字</td></tr>
           <tr><td class="dim-key">模型选择</td><td class="us"><span class="ck">✓</span> Anthropic + 国产任选</td><td><span class="cx">✕</span> 绑定自家云</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
@@ -326,11 +332,11 @@
     </div>
     <div class="stats">
       <!-- 数字只能写实跑出来的值。测试数会随开发变动，所以这一格必须带统计日期，
-           2026-07 实测：引擎 pytest 394 passed + 后端 294 passed/1 skipped = 688 passed。
+           2026-07 实测：引擎 pytest 453 passed + 后端 303 passed/1 skipped = 756 passed。
            不要再写"全绿"抹掉那个 skipped。 -->
       <div class="stat reveal"><div class="num" data-target="66">66</div><div class="lbl">行为驱动人格</div></div>
       <div class="stat reveal"><div class="num" data-target="14">14</div><div class="lbl">任务类型</div></div>
-      <div class="stat reveal"><div class="num" data-target="688">688</div><div class="lbl">自动化测试通过<br><span style="font-size:.74rem;opacity:.68">2026-07 实测 · 另 1 项 skipped</span></div></div>
+      <div class="stat reveal"><div class="num" data-target="756">756</div><div class="lbl">自动化测试通过<br><span style="font-size:.74rem;opacity:.68">2026-07 实测 · 另 1 项 skipped</span></div></div>
       <div class="stat reveal"><div class="num" data-target="10">10</div><div class="lbl">人格 Pack</div></div>
     </div>
   </div>

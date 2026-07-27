@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
-[![Tests](https://img.shields.io/badge/Tests-600+-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-750+-success.svg)](tests/)
 
 **基于合成人格的多代理交叉质询评审系统 · Python CLI + FastAPI + React**
 
@@ -26,7 +26,7 @@ AudienceLens is a **full-stack synthetic audience review system** that simulates
 
 Unlike simply asking ChatGPT for feedback, AudienceLens:
 1. Runs **multiple behavior-driven personas in isolation** (66 across 10 packs)
-2. Extracts the **top-3 controversies** across persona outputs and emits a structured cross-examination block **derived from those outputs** (see §3 for what this is and is not)
+2. Extracts the **top-3 controversies** across persona outputs and runs **one live rebuttal round** on them — arbitrated in `standard` mode, per-persona in `full` mode, skipped in `quick` (see §3 for exactly what each tier does)
 3. Enforces **ethical constraints** — stereotype detection, evidence tiering (`inferred` hard-capped at 40%), mandatory disclaimers
 4. Ships an optional **8-dimension quality scorecard** — post-hoc scoring, off by default; it grades a finished review, it does not gate or re-run one
 
@@ -46,7 +46,7 @@ The core execution engine is a 7-stage pipeline in `src/runner/`:
 | **Evidence Pre-check** | `evidence_precheck.py` | Filter out personas with <30% evidence coverage for required evidence types |
 | **Persona Execution** | `persona_agent.py` | Render 5-segment prompt (Persona Card → MBTI Boundary → Identity-Behavior Decoupling → Task → Evidence Rules); parse structured output |
 | **3-Layer Validation** | `validator.py` | Schema validation (Draft7Validator) → Role consistency (must_comment_on ≥80%, inferred ≤40%) → Evidence grounding (hallucination <30%) |
-| **Cross-Examination** | `cross_exam.py` | Extract top-3 controversies (by severity variance, semantic dedup with lexical fallback); pair the most opposed personas and emit a **derived** summary (`mode: "derived_summary"`, `is_live_debate: false`) — see §3 |
+| **Cross-Examination** | `cross_exam.py` | Extract top-3 controversies (by severity variance, semantic dedup with lexical fallback); pair the most opposed personas and run **one rebuttal round** against the model. `mode` is one of `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal`, and `is_live_debate` is true only for the latter two — see §3 |
 | **Rule-Driven Aggregation** | `aggregator.py` | Compute consensus, disagreements, priority fixes (severity × persona weight × affected count); release risk assessment |
 | **Calibration Check** | `calibration.py` | Role consistency rate, perspective coverage (Jaccard ≥0.3), hallucination rate, stability |
 
@@ -86,17 +86,31 @@ Personas are defined by **behavioral vectors**, not demographic labels. SCOPE re
 
 > Non-game personas live in the last two packs (16 of 66). There is **no red-team persona pack** — "red team" is a skill hint applied to an existing panel, not a set of personas.
 
-### 3. Cross-Examination — Controversy Extraction + Derived Summary
+### 3. Cross-Examination — Controversy Extraction + One Live Rebuttal Round
 
-Traditional "let the most disagreeing personas argue" often produces unproductive extreme-vs-extreme noise. AudienceLens instead assembles a structured controversy block **out of the persona outputs it already has**:
+Traditional "let the most disagreeing personas argue" often produces unproductive extreme-vs-extreme noise. AudienceLens narrows the debate to the points that are actually contested, then makes the personas defend them:
 
-1. **Controversy Extraction** — Extract top-3 controversies from all persona outputs, ranked by severity variance, deduplicated semantically (`similarity.py`) with a SequenceMatcher fallback
-2. **Opposing Stance Pairing** — For each controversy, pick the two personas holding the most opposed positions and surface each side's own wording as the pro/con argument
-3. **Honest Labeling** — The block is emitted with `mode: "derived_summary"`, `is_live_debate: false`, and an explicit `limitation` string that ships inside the report
+1. **Controversy Extraction** — Extract top-3 controversies from all persona outputs, ranked by severity variance, deduplicated semantically (`similarity.py`) with a SequenceMatcher fallback. Points where everyone already agrees are filtered out before any call is made — the system does not manufacture a disagreement to look busy
+2. **Opposing Stance Pairing** — For each controversy, pick the two personas holding the most opposed positions and surface each side's own wording as the pro/con argument, labelled `A1` / `B1`
+3. **Rebuttal Round** — Send those arguments back to the model and collect a rebuttal plus an updated stance and confidence for each side
+4. **Code-Adjudicated Vote Changes** — A stance change is recorded only if the stance text actually changed **and** `|Δconfidence| ≥ θ`, with `θ` read from `src/config/aggregation-rules.yaml` (0.15 today). A model asserting it changed its mind is not enough. Rejected claims are kept in `suppressed_changes` with the reason
+5. **Honest Labeling** — `mode` is `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal`, `is_live_debate` is true only when a rebuttal was actually parsed, and a `limitation` string shipped in the report spells out in plain language which tier ran
 
-> **Designed but not implemented — do not cite these as capabilities:** live multi-agent rebuttal rounds, persuasion scoring, a Δconfidence threshold that triggers stance revision, and vote-change provenance. In the current code `run_cross_exam_protocol()` returns `vote_changes: []` with a hard-coded `delta: 0`, and the rendered `cross_exam_prompt` is never sent to any model. The report's own `limitation` field says so: *no live multi-agent rebuttal was executed*. Read the cross-examination block as a structured restatement of where personas already disagreed — not as evidence that they argued.
+**The three tiers are not equivalent, and the difference matters more than the shared label:**
+
+| Mode | Rebuttal calls | What actually happens |
+|---|---|---|
+| `quick` | 0 | Not run at all |
+| `standard` | 1 | **One arbitrated round.** A single call writes both sides' rebuttals from a moderator's vantage point. It is a real rebuttal; it is **not** each persona speaking independently |
+| `full` | 1 per involved persona | **True multi-agent rebuttal.** Each persona is re-invoked with its own persona card and the opponent's argument stripped of attribution |
+
+**Opponent anonymity.** The prompt template has no persona-name slot at all, arguments are addressed only by ID, and the renderer additionally scrubs persona names out of argument *text*. Scope, stated precisely: what is guaranteed is that **no persona sees another persona's identity**. In `full` mode on the engine path a persona does still receive its own card (name included) so it argues in its own voice; the web v1 path strips even that.
+
+**When a rebuttal call fails**, the failure is not swallowed: `mode` falls back to `derived_summary`, the reason lands in `failures[]` and in the report's `limitation`, and the rest of the review is produced as normal. Rebuttal tokens and cost are billed into the review totals and broken out separately under `cost_summary["cross_exam"]`.
+
+> **Still designed but not implemented — do not cite these as capabilities:** the second and third debate rounds, early termination on convergence, panel-wide persuasion scoring (only the two most-opposed personas per point participate, and no 1–5 persuasiveness score is computed anywhere), consensus-evolution tracking, and tipping-point detection. `consensus_strength`, `converging`, `oscillating`, `tipping_point`, and `cascade_point` appear in zero source files. **And the implemented round has not been evaluated:** we have no measurement showing it makes a review better, and θ=0.15 is an engineering guess that is now consequential rather than validated.
 >
-> **One precise exception, so this caveat is not over-broad.** The above describes the **Python engine** — the path behind the CLI, the Python package, the MCP server, and the hosted Web app, i.e. everything most users touch. The **skill packs** (`.claude/skills/`, `.trae/skills/`) are a different path: there, an LLM coding agent reads `SKILL.md` and performs Phase 5 itself, including the persuasion scoring and the θ=0.15 stance update. So in the skill path the debate can genuinely occur — but it is an agent following Markdown instructions, with **no code enforcing it, no schema validating it, and no test covering it**. It is not deterministic and it is not a guarantee. Do not cite the skill path as evidence for the engine, or vice versa.
+> **One precise exception, so this stays honest in the other direction.** The above describes the **Python engine** — the path behind the CLI, the Python package, the MCP server, and the hosted Web app, i.e. everything most users touch. The **skill packs** (`.claude/skills/`, `.trae/skills/`) are a different path: there, an LLM coding agent reads `SKILL.md` and performs Phase 5 itself, including the persuasion scoring and the θ=0.15 stance update. So the skill path may do more than the engine does — but it is an agent following Markdown instructions, with **no code enforcing it, no schema validating it, and no test covering it**. It is not deterministic and it is not a guarantee. Do not cite the skill path as evidence for the engine, or vice versa.
 
 ### 4. Task Types — 14 Review Scenarios
 
@@ -134,8 +148,8 @@ The single source of truth is `src/runner/task_types.py::VALID_TASK_TYPES`; anyt
 | Mode | Personas | Cross-Exam | Calibration | Use Case |
 |---|---|---|---|---|
 | Quick | up to 3 | No | No | Rapid scan |
-| Standard | up to 6 | Yes | No | Balanced review |
-| Full | up to 8 | Yes | Yes | Complete analysis |
+| Standard | up to 6 | 1 arbitrated rebuttal call | No | Balanced review |
+| Full | up to 8 | 1 call per involved persona | Yes | Complete analysis |
 
 ### 6. Quality Harness — 8-Dimension Scorecard
 
@@ -303,7 +317,7 @@ audiencelens/
 │   │   ├── evidence_precheck.py       #   Evidence coverage filtering
 │   │   ├── persona_agent.py           #   Prompt rendering + output parsing
 │   │   ├── validator.py               #   3-layer validation
-│   │   ├── cross_exam.py              #   Controversy extraction + derived summary
+│   │   ├── cross_exam.py              #   Controversy extraction + rebuttal round
 │   │   ├── aggregator.py              #   Rule-driven report aggregation
 │   │   └── calibration.py             #   Quality calibration check
 │   ├── personas/                      # 10 persona packs (66 personas)
@@ -344,7 +358,7 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**688 automated tests pass, 1 skipped** — 394 engine (`tests/`) + 294 platform
+**756 automated tests pass, 1 skipped** — 453 engine (`tests/`) + 303 platform
 (`web/backend/tests/`), measured 2026-07. The counts move with development; run the
 two commands above rather than trusting this number. The 1 skipped test is skipped,
 not passing — it is counted separately on purpose.
@@ -357,8 +371,8 @@ not passing — it is counted separately on purpose.
 |---|---|---|
 | v0.1 | MVP — 16 personas, 6 task types, CLI runner, controversy extraction, 3-layer validation | Done |
 | v0.2 | Harness Edition — 8-dim scorecard, ethics service, expanded persona set, Web UI | Done |
-| **v0.3** | **66 personas / 10 packs, 14 task types, SaaS platform (auth / quota / admin / CDK), multimodal input** | **Current** |
-| v0.4 | **Wire the cross-examination protocol to an actual model call** — live rebuttal rounds, persuasion scoring, a read θ_change, populated `vote_changes` | Planned — see the §3 caveat for what does not exist today |
+| **v0.3** | **66 personas / 10 packs, 14 task types, SaaS platform (auth / quota / admin / CDK), multimodal input, plus one live cross-examination rebuttal round with code-adjudicated vote changes** | **Current** |
+| v0.4 | **Evaluate the rebuttal round, then extend it** — A/B the three tiers (§3) to find out whether rebuttal improves a review at all, calibrate θ_change against data, then add rounds 2–3 with cross-round state so consensus evolution and tipping points become computable | Planned — see the §3 caveat for what does not exist today |
 | v0.5 | Human-parity benchmark with real cohort data (tooling exists, cohort data pending) | Planned |
 | v1.0 | Big-Five replacement for MBTI, dynamic panel generation, cost-aware model routing | Planned |
 
@@ -393,7 +407,7 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 
 与直接问 ChatGPT 不同，AudienceLens：
 1. **隔离运行**多个行为驱动人格（10 个 Pack 共 66 个人格）
-2. 从人格输出中提取 **top-3 争议点**，并**由这些输出派生**出一份结构化的交叉质询区块（它是什么、不是什么见 §3）
+2. 从人格输出中提取 **top-3 争议点**，并对它们跑**一轮真实的反驳**——`standard` 档是仲裁式、`full` 档逐人格、`quick` 档不跑（每档到底做了什么见 §3）
 3. 强制**伦理约束**——刻板印象检测、证据三级标注（`inferred` 硬上限 40%）、强制免责声明
 4. 提供可选的 **8 维质量打分卡**——事后打分、默认关闭；它给已完成的报告打分，不拦截、不重跑
 
@@ -413,7 +427,7 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | **证据预检** | `evidence_precheck.py` | 过滤证据覆盖度 <30% 的人格 |
 | **人格执行** | `persona_agent.py` | 渲染五段式 Prompt（人格卡→MBTI边界→身份-行为解耦→任务→证据规则）；解析结构化输出 |
 | **三层校验** | `validator.py` | Schema校验(Draft7Validator) → 角色一致性(must_comment_on≥80%, inferred≤40%) → 证据接地(幻觉<30%) |
-| **交叉质询** | `cross_exam.py` | 提取 top-3 争议点（按 severity 方差排序，语义去重 + SequenceMatcher 回退）；配对立场最对立的人格，输出一份**派生**摘要（`mode: "derived_summary"`、`is_live_debate: false`）——见 §3 |
+| **交叉质询** | `cross_exam.py` | 提取 top-3 争议点（按 severity 方差排序，语义去重 + SequenceMatcher 回退）；配对立场最对立的人格，对模型跑**一轮反驳**。`mode` 取 `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal` 三者之一，只有后两种时 `is_live_debate` 才为真——见 §3 |
 | **规则聚合** | `aggregator.py` | 计算共识、分歧、优先修复项（severity×人格权重×影响人数）；发布风险评估 |
 | **校准检查** | `calibration.py` | 角色一致性率、视角覆盖度(Jaccard≥0.3)、幻觉率、稳定性 |
 
@@ -453,17 +467,31 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 
 > 非游戏人格集中在最后两个 Pack（66 个中的 16 个）。**不存在红队人格包**——"红队"是套在既有面板上的技能提示，不是一组人格。
 
-### 3. 交叉质询 — 争议点提取 + 派生摘要
+### 3. 交叉质询 — 争议点提取 + 一轮真实反驳
 
-传统"让分歧最大的两个人格互问"容易变成极端对立的无意义争吵。AudienceLens 改为**用已经拿到的人格输出**拼装一个结构化的争议区块：
+传统"让分歧最大的两个人格互问"容易变成极端对立的无意义争吵。AudienceLens 先把辩论收窄到真正有分歧的那几个点，再让人格为它们辩护：
 
-1. **争议提取** — 从所有人格输出中提取 top-3 争议点，按 severity 方差排序，语义去重（`similarity.py`）+ SequenceMatcher 回退
-2. **对立立场配对** — 对每个争议点，挑出立场最对立的两个人格，把各自的原话作为正反论据摆出来
-3. **诚实标注** — 该区块带 `mode: "derived_summary"`、`is_live_debate: false`，以及一个随报告一起下发的 `limitation` 字段
+1. **争议提取** — 从所有人格输出中提取 top-3 争议点，按 severity 方差排序，语义去重（`similarity.py`）+ SequenceMatcher 回退。所有人本来就一致的点会在发调用之前被滤掉——系统不会为了"看起来在干活"而制造一场对立
+2. **对立立场配对** — 对每个争议点，挑出立场最对立的两个人格，把各自的原话作为正反论据摆出来，编号 `A1` / `B1`
+3. **反驳轮次** — 把这些论据发回给模型，收回每一方的反驳，外加更新后的立场与置信度
+4. **改票由代码判定** — 只有立场文字确实变了**且** `|Δconfidence| ≥ θ` 时才记为一次改票，`θ` 从 `src/config/aggregation-rules.yaml` 读取（现在是 0.15）。模型自己声称"我改主意了"不算数。被否决的声称保留在 `suppressed_changes` 里并附原因
+5. **诚实标注** — `mode` 取 `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal`，只有确实解析到反驳时 `is_live_debate` 才为真；随报告下发的 `limitation` 字段会用白话写清这次跑的是哪一档
 
-> **只有设计、没有实现——请勿当作能力引用：** 实时多代理反驳轮次、说服力评分、触发立场修正的 Δconfidence 阈值、以及改票溯源。当前代码里 `run_cross_exam_protocol()` 返回 `vote_changes: []` 且 `delta` 硬编码为 0，渲染出来的 `cross_exam_prompt` 从未发给任何模型。报告自己的 `limitation` 字段就写着：*未执行实时多代理反驳*。请把交叉质询区块读作"对人格既有分歧的结构化复述"，而不是"它们真的辩论过"的证据。
+**三档并不等价，这个区别比它们共用的那个名字更重要：**
+
+| 模式 | 反驳调用次数 | 实际发生了什么 |
+|---|---|---|
+| `quick` | 0 | 完全不跑 |
+| `standard` | 1 | **一轮仲裁式反驳。** 一次调用从主持人视角写完双方的反驳。它确实是一轮真反驳；但它**不是**每个人格各自独立发言 |
+| `full` | 每位涉事人格各 1 次 | **真多智能体反驳。** 每位人格带着自己的人格卡被重新调用，对手论据已被剥掉署名 |
+
+**对手匿名。** 提示词模板里根本没有人格名槽位，论据只用编号指代，渲染层还会把人格名从论据*正文*里洗掉。范围要说准：已保证的是**任何人格都看不到另一位人格的身份**。`full` 档在引擎链路上，人格仍会拿到自己的卡（含自己的名字），好让它用自己的口吻立论；Web v1 链路连这一份也剥掉了。
+
+**反驳调用失败时**不会被吞：`mode` 回落 `derived_summary`，原因写进 `failures[]` 与报告的 `limitation`，评审其余部分照常产出。反驳的 token 与成本会计入评审总账，并在 `cost_summary["cross_exam"]` 里单列。
+
+> **仍然只有设计、没有实现——请勿当作能力引用：** 第二、三轮辩论，收敛后提前终止，全员说服力评分（每个点只有最对立的两位人格参与，任何地方都不计算 1–5 的说服力分），共识演化追踪，临界点检测。`consensus_strength`、`converging`、`oscillating`、`tipping_point`、`cascade_point` 在源码里 0 处命中。**而且已实现的这一轮没有被评估过：** 我们没有任何测量能表明它让评审变好了；θ=0.15 是一个工程判断值，它现在有后果，但仍未经验证。
 >
-> **一个必须说清的例外，免得这条警告矫枉过正。** 上面说的是 **Python 引擎**——也就是 CLI、Python 包、MCP Server、托管 Web 应用背后的那条链路，绝大多数用户碰到的就是它。**技能包**（`.claude/skills/`、`.trae/skills/`）是另一条链路：在那里由 LLM 编码代理读取 `SKILL.md` 并**自己执行** Phase 5，包括说服力评分和 θ=0.15 的立场更新。所以在技能链路上辩论确实可能真的发生——但那是一个代理在遵循 Markdown 指令，**没有任何代码强制它、没有 schema 校验它、也没有测试覆盖它**，不确定、不可保证。请勿拿技能链路给引擎背书，反之亦然。
+> **一个必须说清的例外，免得反过来也失真。** 上面说的是 **Python 引擎**——也就是 CLI、Python 包、MCP Server、托管 Web 应用背后的那条链路，绝大多数用户碰到的就是它。**技能包**（`.claude/skills/`、`.trae/skills/`）是另一条链路：在那里由 LLM 编码代理读取 `SKILL.md` 并**自己执行** Phase 5，包括说服力评分和 θ=0.15 的立场更新。所以技能链路可能比引擎做得更多——但那是一个代理在遵循 Markdown 指令，**没有任何代码强制它、没有 schema 校验它、也没有测试覆盖它**，不确定、不可保证。请勿拿技能链路给引擎背书，反之亦然。
 
 ### 4. 任务类型 — 14 种评审场景
 
@@ -501,8 +529,8 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | 模式 | 人格数 | 交叉质询 | 校准 | 适用场景 |
 |---|---|---|---|---|
 | 快速 | 最多 3 | 否 | 否 | 快速扫描 |
-| 标准 | 最多 6 | 是 | 否 | 均衡评审 |
-| 完整 | 最多 8 | 是 | 是 | 完整分析 |
+| 标准 | 最多 6 | 1 次仲裁式反驳调用 | 否 | 均衡评审 |
+| 完整 | 最多 8 | 每位涉事人格各 1 次 | 是 | 完整分析 |
 
 ### 6. 质量 Harness — 8 维打分卡
 
@@ -654,7 +682,7 @@ audiencelens/
 │   │   ├── evidence_precheck.py       #   证据覆盖度过滤
 │   │   ├── persona_agent.py           #   Prompt渲染 + 输出解析
 │   │   ├── validator.py               #   三层校验
-│   │   ├── cross_exam.py              #   争议点提取 + 派生摘要
+│   │   ├── cross_exam.py              #   争议点提取 + 反驳轮次
 │   │   ├── aggregator.py              #   规则驱动报告聚合
 │   │   └── calibration.py             #   质量校准检查
 │   ├── personas/                      # 10个人格Pack（66个人格）
@@ -695,7 +723,7 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**688 项自动化测试通过、1 项 skipped** —— 引擎 394（`tests/`）+ 平台 294（`web/backend/tests/`），2026-07 实测。这个数字会随开发变动，请以上面两条命令的实际输出为准。那 1 项是 **skipped，不是通过**，所以单独列出、不并进"全绿"。
+**756 项自动化测试通过、1 项 skipped** —— 引擎 453（`tests/`）+ 平台 303（`web/backend/tests/`），2026-07 实测。这个数字会随开发变动，请以上面两条命令的实际输出为准。那 1 项是 **skipped，不是通过**，所以单独列出、不并进"全绿"。
 
 ---
 
@@ -705,8 +733,8 @@ cd web/backend && python -m pytest tests/ -q
 |---|---|---|
 | v0.1 | MVP — 16个人格、6种任务类型、CLI引擎、争议点提取、三层校验 | 已完成 |
 | v0.2 | Harness版 — 8维打分卡、伦理服务、人格集扩充、Web UI | 已完成 |
-| **v0.3** | **66人格 / 10个Pack、14种任务类型、SaaS 平台（认证 / 配额 / 后台 / CDK）、多模态输入** | **当前** |
-| v0.4 | **把交叉质询协议接上真实模型调用**——实时反驳轮次、说服力评分、θ_change 变成会被读取的参数、`vote_changes` 真正填充 | 计划中——今天不存在什么，见 §3 的说明 |
+| **v0.3** | **66人格 / 10个Pack、14种任务类型、SaaS 平台（认证 / 配额 / 后台 / CDK）、多模态输入，外加一轮真实的交叉质询反驳、改票由代码判定** | **当前** |
+| v0.4 | **先评估这轮反驳，再扩展它**——A/B 三档（见 §3）看反驳到底有没有让评审变好、用数据校准 θ_change，然后补上第 2–3 轮与跨轮状态，使共识演化与临界点变得可计算 | 计划中——今天不存在什么，见 §3 的说明 |
 | v0.5 | 真人对照 benchmark（工具链已就绪，真人数据待积累） | 计划中 |
 | v1.0 | Big-Five替代MBTI、动态面板生成、成本感知模型路由 | 计划中 |
 

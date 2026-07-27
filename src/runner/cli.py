@@ -11,27 +11,48 @@ try:
     from .aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
     from .calibration import run_calibration_check
     from .cross_exam import (
+        MODE_DERIVED,
+        MODE_MODERATED,
+        MODE_MULTI_AGENT,
         extract_controversy_points,
-        render_cross_exam_prompt,
         run_cross_exam_protocol,
     )
     from .evidence_precheck import precheck_panel
     from .llm_client import chat_completion
     from .panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
-    from .persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
+    # _minify_persona 是人格身份卡的唯一裁剪口径（人格评审那一轮就是用它渲染
+    # persona-prompt.md 的 [PERSONA CARD]）。full 档重新调用人格做反驳时必须复用它，
+    # 否则就是在代码里另开一套人格提示词，两边迟早不一致。
+    from .persona_agent import (
+        _minify_persona,
+        estimate_cost,
+        normalize_persona_output,
+        parse_persona_output,
+        render_prompt,
+        select_model,
+    )
     from .validator import load_schema, validate_output
 except ImportError:
     from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
     from runner.calibration import run_calibration_check
     from runner.cross_exam import (
+        MODE_DERIVED,
+        MODE_MODERATED,
+        MODE_MULTI_AGENT,
         extract_controversy_points,
-        render_cross_exam_prompt,
         run_cross_exam_protocol,
     )
     from runner.evidence_precheck import precheck_panel
     from runner.llm_client import chat_completion
     from runner.panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
-    from runner.persona_agent import estimate_cost, normalize_persona_output, parse_persona_output, render_prompt, select_model
+    from runner.persona_agent import (
+        _minify_persona,
+        estimate_cost,
+        normalize_persona_output,
+        parse_persona_output,
+        render_prompt,
+        select_model,
+    )
     from runner.validator import load_schema, validate_output
 
 SIMULATION_WARNING = (
@@ -48,6 +69,29 @@ REVIEW_MODE_CONFIG = {
     "standard": {"max_personas": 6, "cross_examination": True, "calibration": False},
     "full": {"max_personas": 8, "cross_examination": True, "calibration": True},
 }
+
+# 档位 → 交叉质询模式。quick 档根本不会走到这张表（REVIEW_MODE_CONFIG 里
+# cross_examination=False，一次反驳调用都不发）。
+#   standard —— 一次仲裁式反驳：+1 次调用，主持人视角代双方各写一轮反驳。
+#   full     —— 真多智能体反驳：每位涉事人格带着匿名的对手论据被重新调用一次，
+#               成本随涉事人格数上升，所以只在 full 档开。
+# mode=None（CLI / MCP 等旧调用方）按 run_panel 文档里既有的口径"等价于 full"处理，
+# 与 calibration 对 None 的处理保持一致；否则这条链路上的用户永远拿不到真反驳，
+# 而 cli.py 渲染完提示词就丢掉正是本次要修的断线。
+CROSS_EXAM_MODE_BY_REVIEW_MODE = {
+    "standard": MODE_MODERATED,
+    "full": MODE_MULTI_AGENT,
+}
+
+# full 档给每位涉事人格重新发起反驳调用时，用这段把"你是谁"重新交代一遍。
+# 身份卡本体复用 persona_agent._minify_persona（与人格评审那一轮同一份卡、同一套裁剪），
+# 反驳的任务说明 / 输出格式 / 匿名化口径全在 src/templates/cross-exam-prompt.md 的
+# rebutter 段里——这里只补身份，不在代码里另写一套人格提示词。
+REBUTTAL_PERSONA_HEADER = (
+    "你是 AudienceLens 多人格评审系统中的一个固定玩家评审代理。\n"
+    "你必须严格按照下方 persona 卡发言，不得切换到「通用产品经理」或「AI 助手」口吻。\n\n"
+    "[PERSONA CARD]\n{persona_card}\n"
+)
 
 # 单一注册表：见 runner/task_types.py（这里 re-export 保持既有导入路径不破）
 try:
@@ -140,6 +184,102 @@ def filter_genuine_controversies(controversy_points: List[dict]) -> List[dict]:
             continue
         genuine.append(cp)
     return genuine
+
+
+def run_cross_exam_stage(
+    persona_outputs: List[dict],
+    controversy_points: List[dict],
+    personas: List[dict],
+    template_path: str,
+    rules: dict,
+    budget_config: dict,
+    usage: dict,
+    mode: Optional[str] = None,
+    api_key: Optional[str] = None,
+    provider: str = "anthropic",
+    model_override: Optional[str] = None,
+    api_base: Optional[str] = None,
+) -> dict:
+    """把交叉质询真的接到 LLM 上——以前这里只把提示词渲染出来，然后原地丢掉。
+
+    分档见 CROSS_EXAM_MODE_BY_REVIEW_MODE。没有 api_key（模拟模式）时**一次调用都不发**，
+    直接如实走派生摘要：先发一轮注定失败的调用再回落只会白记一条 failure，
+    并且会让报告里出现"交叉质询失败"这种误导性说明（真实情况是根本没有 key）。
+
+    usage 由调用方传进来、在这里累加（calls / input_tokens / output_tokens / cost），
+    调用方必须把它并进 cost_summary —— 这是新增的付费调用，不计就是计费漏洞。
+    反驳失败不在这里吞：异常照原样抛给协议核心，由它记进 failures[] 并回落 mode。
+    """
+    if not api_key:
+        return run_cross_exam_protocol(
+            persona_outputs,
+            controversy_points,
+            mode=MODE_DERIVED,
+            template_path=template_path,
+            rules=rules,
+        )
+
+    requested_mode = CROSS_EXAM_MODE_BY_REVIEW_MODE.get(mode or "", MODE_MULTI_AGENT)
+    personas_by_id = {p.get("id", ""): p for p in personas or []}
+    # 仲裁视角不属于任何人格，没有 model_hint 可依据：用预算配置的默认模型
+    # （select_model 对空人格就是返回 default_model，不另写一套选型规则）。
+    moderator_model = model_override or select_model({}, budget_config)
+
+    def llm_call(prompt, persona_id: str = ""):
+        """交叉质询的模型出口，走仓库统一的 llm_client.chat_completion。
+
+        persona_id 非空（full 档）时重新注入该人格的身份卡，并沿用它在人格评审
+        那一轮用的模型；为空（standard 档的仲裁视角）时用默认模型。
+        """
+        # 先记一次尝试：失败的调用也要在账面上看得见"发过、没成"，否则计费和重试
+        # 都成了黑箱。协议核心的 usage.calls 同样按尝试计，两边口径保持一致。
+        usage["calls"] += 1
+        model = moderator_model
+        if persona_id:
+            persona = personas_by_id.get(persona_id)
+            if persona is None:
+                # 拿不到身份卡就不能自称"多智能体反驳"——那只是一次没有人格的通用调用。
+                # 抛出去由协议核心记成该论据的失败（报告里会显示 partial/failed），
+                # 而不是悄悄降级成无人格反驳还照旧宣称每个人格都重新发言过。
+                raise ValueError(
+                    f"人格 {persona_id} 不在本次面板里，无法注入身份卡，跳过它的反驳调用"
+                )
+            prompt = (
+                REBUTTAL_PERSONA_HEADER.format(persona_card=_minify_persona(persona))
+                + "\n"
+                + prompt
+            )
+            model = model_override or select_model(persona, budget_config)
+
+        text, input_tokens, output_tokens = chat_completion(
+            model=model,
+            prompt=prompt,
+            api_key=api_key,
+            provider=provider,
+            api_base=api_base,
+        )
+        usage["input_tokens"] += input_tokens
+        usage["output_tokens"] += output_tokens
+        usage["cost"] += estimate_cost(input_tokens, output_tokens, model, budget_config)
+        return text, input_tokens, output_tokens
+
+    return run_cross_exam_protocol(
+        persona_outputs,
+        controversy_points,
+        llm_call=llm_call,
+        mode=requested_mode,
+        template_path=template_path,
+        rules=rules,
+    )
+
+
+def _insert_body_banner(html: str, banner_html: str) -> str:
+    """把横幅插到 <body> 开标签之后。没有 <body>（模板被换成片段）时原样返回，
+    不让"加个提示"这种事把整份报告搞崩。"""
+    if "<body" not in html:
+        return html
+    idx = html.index(">", html.index("<body")) + 1
+    return html[:idx] + banner_html + html[idx:]
 
 
 def load_artifact_bundle(path: str) -> dict:
@@ -325,7 +465,11 @@ def run_panel(
     mode：评审深度档位（quick/standard/full，见 REVIEW_MODE_CONFIG）——控制人数
     上限、是否交叉质证、是否校准检查。None（CLI/旧调用方）保持历史行为：不截人数、
     交叉质证和校准都跑，等价于 full。此前 Web v2 链路的 mode 只落库不进引擎，
-    "快速扫一眼"实际跑的是全量流程，人数和钱都没省——这个参数就是补那条断链的。"""
+    "快速扫一眼"实际跑的是全量流程，人数和钱都没省——这个参数就是补那条断链的。
+
+    交叉质询按档位分流（见 CROSS_EXAM_MODE_BY_REVIEW_MODE）：quick 不跑、
+    standard 一次仲裁式反驳（+1 次调用）、full 与 None 走多智能体反驳（每位涉事
+    人格各一次调用）。没有 api_key 的模拟模式下一次反驳调用都不发，如实标成派生摘要。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -481,17 +625,34 @@ def run_panel(
 
     cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
     cross_exam_data = None
+    # 交叉质询的用量单独记一份：它是人格评审之外新增的付费调用，必须并进 cost_summary
+    cross_exam_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+    cross_exam_notice = ""
     if cross_exam_enabled and persona_outputs and cross_exam_prompt_path:
+        # filter_genuine_controversies 仍然守在最前面：没有真分歧时连争议点都不产出，
+        # 更不会为了"看起来跑过辩论"而发一轮凭空造对立的反驳调用。
         controversy_points = filter_genuine_controversies(
             extract_controversy_points(persona_outputs)
         )
         if controversy_points:
-            cross_exam_prompt = render_cross_exam_prompt(
-                controversy_points, persona_outputs, cross_exam_prompt_path
+            cross_exam_data = run_cross_exam_stage(
+                persona_outputs=persona_outputs,
+                controversy_points=controversy_points,
+                personas=valid_personas,
+                template_path=cross_exam_prompt_path,
+                rules=rules,
+                budget_config=budget_config,
+                usage=cross_exam_usage,
+                mode=mode,
+                api_key=effective_api_key,
+                provider=provider,
+                model_override=model_override,
+                api_base=api_base,
             )
-            cross_exam_data = run_cross_exam_protocol(
-                persona_outputs, controversy_points
-            )
+            # 反驳失败/只完成一半不会让整场评审失败，但必须在渲染产物里留痕——
+            # 只躺在 JSON 的 limitation 里，读报告的人不会发现这场"辩论"其实没跑成。
+            if cross_exam_data.get("failures"):
+                cross_exam_notice = cross_exam_data.get("limitation", "")
 
     report = aggregate_report(
         persona_outputs,
@@ -528,6 +689,8 @@ def run_panel(
         markdown = render_markdown_report(report, report_template_path)
         if simulated:
             markdown = f"> **{SIMULATION_WARNING}**\n\n{markdown}"
+        if cross_exam_notice:
+            markdown = f"> **⚠️ 交叉质询未完整完成：{cross_exam_notice}**\n\n{markdown}"
         # 报告模板不认识 degradation 字段（模板不在本次改动范围），横幅在这里补上，
         # 保证降级信息在渲染产物里也看得见，而不是只躺在 JSON 里
         if degraded:
@@ -537,29 +700,40 @@ def run_panel(
     html = ""
     if html_template_path:
         html = render_html_report(report, html_template_path)
-        if simulated and "<body" in html:
-            banner = (
+        if simulated:
+            html = _insert_body_banner(
+                html,
                 '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
                 'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
-                f"{SIMULATION_WARNING}</div>"
+                f"{SIMULATION_WARNING}</div>",
             )
-            idx = html.index(">", html.index("<body")) + 1
-            html = html[:idx] + banner + html[idx:]
-        if degraded and "<body" in html:
+        if cross_exam_notice:
+            html = _insert_body_banner(
+                html,
+                '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
+                'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
+                f"⚠️ 交叉质询未完整完成：{cross_exam_notice}</div>",
+            )
+        if degraded:
             failed_list = "、".join(f["persona_id"] for f in failed_personas)
-            banner = (
+            html = _insert_body_banner(
+                html,
                 '<div style="background:#fee2e2;border:2px solid #dc2626;color:#991b1b;'
                 'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
                 f"⚠️ {report['degradation']['notice']}未完成的人格：{failed_list}"
-                "</div>"
+                "</div>",
             )
-            idx = html.index(">", html.index("<body")) + 1
-            html = html[:idx] + banner + html[idx:]
     del report["_persona_outputs"]
 
-    total_cost = sum(r["cost"] for r in persona_results)
-    total_input_tokens = sum(r.get("input_tokens", 0) for r in persona_results)
-    total_output_tokens = sum(r.get("output_tokens", 0) for r in persona_results)
+    # 交叉质询的用量必须一起计进总账：它是人格评审之外真实发生的付费调用，
+    # 漏掉就是"花了钱但账上看不到"——本仓库刚修过一批这类问题。
+    total_cost = sum(r["cost"] for r in persona_results) + cross_exam_usage["cost"]
+    total_input_tokens = (
+        sum(r.get("input_tokens", 0) for r in persona_results) + cross_exam_usage["input_tokens"]
+    )
+    total_output_tokens = (
+        sum(r.get("output_tokens", 0) for r in persona_results) + cross_exam_usage["output_tokens"]
+    )
 
     return {
         "report": report,
@@ -570,6 +744,8 @@ def run_panel(
         # 降级标记也放顶层：调用方在落库前就能判断要不要提示用户 / 要不要按满额计费
         "degraded": degraded,
         "failed_personas": failed_personas,
+        # 交叉质询没跑成时的说明（已写进 markdown/html 横幅，顶层再给一份供 API 直接透出）
+        "cross_exam_notice": cross_exam_notice,
         "cost_summary": {
             "total_cost": total_cost,
             # persona_count 必须是真实成功数：以前算的是 len(persona_results)（把失败的
@@ -580,6 +756,14 @@ def run_panel(
             "skipped_count": skipped_count,
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
+            # 交叉质询单列一份便于对账（已包含在上面的 total_* 里，不要再加一遍）
+            "cross_exam": {
+                "calls": cross_exam_usage["calls"],
+                "input_tokens": cross_exam_usage["input_tokens"],
+                "output_tokens": cross_exam_usage["output_tokens"],
+                "cost": cross_exam_usage["cost"],
+                "mode": (cross_exam_data or {}).get("mode"),
+            },
         },
     }
 
