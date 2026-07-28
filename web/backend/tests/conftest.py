@@ -8,6 +8,14 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
+# 测试不读开发机的 web/.env（config._load_dotenv_once 认这个开关）。
+# 必须在 import app.config 之前设置——那个函数在模块导入时就跑。
+# 理由同下面清 AL_ADMIN_TOKEN：本机 .env 里写什么是开发者的自由
+# （比如 AL_AUTH_ENABLED=true），但它不该决定测试断言的成败。
+# 实测：不加这行时 test_auth_and_gating / test_cdk 共 4 条会因为
+# 本机 .env 开了鉴权而失败——测试环境必须是确定的。
+os.environ["AL_SKIP_DOTENV"] = "1"
+
 # 每个测试会话用独立的临时库，绝不碰开发数据
 _tmp_db = os.path.join(tempfile.mkdtemp(prefix="al-test-"), "test.db")
 os.environ.setdefault("AL_DATABASE_URL", f"sqlite:///{_tmp_db}")

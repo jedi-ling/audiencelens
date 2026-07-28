@@ -20,6 +20,7 @@ import AmbientMotes from '@/components/AmbientMotes'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviews, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
 import { connectReviewSocket } from '@/lib/ws'
+import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
 import type { IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
@@ -294,16 +295,39 @@ export default function AskPage() {
     )
   }
 
+  /** 删除一条历史评审。
+   *
+   * 二次确认沿用 ReviewHistoryPage 的同一套模式（window.confirm），不另造交互——
+   * 触屏和键盘都能用，且两个入口的手感一致。文案里点名"报告 / 各角色意见 /
+   * 追问记录都会没"，因为这三样确实一起删且不可恢复。
+   *
+   * 失败必须看得见：以前失败只写进 historyError，而 historyError 从来不清，
+   * 一次失败会一直挂着、下一次成功也不消失。现在开始前先清、失败写明原因。
+   */
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!window.confirm('确定删除这条评审记录吗？此操作无法撤销。')) return
+    const target = reviewHistory?.find((r) => r.id === id)
+    const label =
+      target?.target_title || TASK_TYPES.find((t) => t.id === target?.task_type)?.name || '这条评审'
+    if (
+      !window.confirm(
+        `确定删除「${label}」吗？\n\n评审报告、各角色意见和全部追问记录都会一起删除，此操作无法撤销。`,
+      )
+    )
+      return
     setDeletingId(id)
+    setHistoryError(null)
     try {
       await deleteReview(id)
       setReviewHistory((prev) => (prev ? prev.filter((r) => r.id !== id) : prev))
-    } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : '删除失败')
+      // 删掉的正是当前对话区展示的那条评审——继续停在一条已经不存在的评审上
+      // 是错的（卡片会去拉一个 404 的详情），直接回到新对话。
+      if (searchParams.get('review') === id) startNewConversation()
+    } catch (err) {
+      setHistoryError(
+        err instanceof Error ? `删除失败：${err.message}` : '删除失败，请检查网络后重试',
+      )
     } finally {
       setDeletingId(null)
     }
@@ -1107,7 +1131,16 @@ function HistorySidebar({
         <div className="flex-1 overflow-y-auto px-3 pb-3">
           <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">评审历史</p>
 
-          {error && <p className="px-1 text-xs text-severity-critical">{error}</p>}
+          {/* 加载失败 / 删除失败都走这里，必须是明确可见的一块，不能只是一行灰字 */}
+          {error && (
+            <div
+              role="alert"
+              className="mb-2 flex items-start gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-2 py-1.5 text-[11px] leading-snug text-severity-critical"
+            >
+              <AlertTriangle className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
+              <span className="min-w-0">{error}</span>
+            </div>
+          )}
 
           {history === null ? (
             <div className="flex items-center gap-2 px-1 py-3 text-xs text-text-muted">
@@ -1131,16 +1164,21 @@ function HistorySidebar({
                     className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                   >
                     <span className="min-w-0 flex-1 truncate">{label}</span>
+                    {/* 删除按钮常驻可见（低对比度，hover/focus 才提亮）。
+                        以前是 opacity-0 + group-hover 才显形：触屏没有 hover，
+                        等于这台设备上根本删不掉；桌面端用户也压根发现不了。
+                        p-1.5 + h-3.5 图标 ≈ 26px 命中区，配合行高够手指点。 */}
                     <button
                       onClick={(e) => onDelete(e, r.id)}
                       disabled={deletingId === r.id}
-                      className="shrink-0 rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-severity-critical/10 hover:text-severity-critical group-hover:opacity-100 disabled:opacity-50"
-                      aria-label="删除"
+                      className="shrink-0 rounded p-1.5 text-text-muted/70 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted disabled:opacity-50"
+                      aria-label={`删除「${label}」`}
+                      title="删除这条评审（会二次确认）"
                     >
                       {deletingId === r.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
                       ) : (
-                        <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                       )}
                     </button>
                   </div>
@@ -1176,75 +1214,173 @@ type ReviewState = {
   progress: number
   detail?: ReviewDetail
   error?: string
+  /** 连接 / 同步的如实交代：同步失败、实时通道不可用、长时间没动静。
+   *  一个不动的进度条必须配一句话，否则用户只会读成"卡死了"。 */
+  notice?: string
 }
+
+/** WS 不通时轮询是唯一通道 */
+const POLL_FAST_MS = 3000
+/** WS 通时的保险丝：只为兜住"连着但事件没送达"，别打爆后端 */
+const POLL_SLOW_MS = 15000
+/** 多久没有任何进展就向用户交代一句 */
+const STALL_HINT_SEC = 45
 
 /** 追踪一个评审的实时状态——聊天卡片和历史侧栏弹窗共用这一份逻辑。
  *
  * 关键点：打开的可能是刚创建、正在跑的评审（WS 会实时推事件），
  * 也可能是历史里一个早就跑完的旧评审（WS 频道早就没人发事件了，
  * 直接订阅只会永远停在"评审中"）。所以先拉一次当前详情兜底：
- * 已经是终态就直接用，还在跑才订阅 WS/轮询。 */
+ * 已经是终态就直接用，还在跑才订阅 WS + 常驻轮询。
+ *
+ * 为什么轮询必须常驻（这一版修的就是这个）：
+ * 后端 ConnectionManager.broadcast 只推给当前在线连接，无重放无补发。
+ * 旧实现只在 onUnavailable（重试耗尽）里才启动轮询，于是有三条永久 pending 的路：
+ *   1. WS 一直卡在 connecting —— 既不 open 也不 close，没有任何回调会触发；
+ *   2. WS 连上但事件没送达（事件名不匹配 / 某条代码路径没发 / 半开连接）；
+ *   3. 断线重连成功 —— 断线期间的 review.completed 永久丢失，而重连成功
+ *      又让 onUnavailable 永远不会触发。
+ * 现在：订阅前就把轮询开起来，WS 通只降频不停表，终态是唯一的退出条件。 */
 function useReviewStatus(reviewId: string | null): ReviewState {
   const [state, setState] = useState<ReviewState>({ status: 'pending', progress: 0 })
 
   useEffect(() => {
     if (!reviewId) return
     let active = true
+    let done = false // 到过终态：所有定时器和连接都该停了
     let pollTimer: ReturnType<typeof setInterval> | null = null
+    let pollIntervalMs = 0
+    let stallTimer: ReturnType<typeof setInterval> | null = null
     let socket: ReturnType<typeof connectReviewSocket> | null = null
+    let failures = 0
+    let wsStatus: WsStatus = 'connecting'
+    let lastActivity = Date.now()
+    let lastStatus: 'pending' | 'running' = 'pending'
+
+    // 换一条评审 / 组件卸载 / 到终态，都走这里——定时器不留活口
+    const stopAll = () => {
+      done = true
+      if (pollTimer) clearInterval(pollTimer)
+      pollTimer = null
+      pollIntervalMs = 0
+      if (stallTimer) clearInterval(stallTimer)
+      stallTimer = null
+      socket?.close()
+    }
+
+    /** 连接 / 停滞交代。优先级：同步失败 > 实时通道异常 > 长时间无进展 */
+    const refreshNotice = () => {
+      if (!active || done) return
+      const idle = Math.round((Date.now() - lastActivity) / 1000)
+      const syncSec = (wsStatus === 'open' ? POLL_SLOW_MS : POLL_FAST_MS) / 1000
+      const notice =
+        failures >= 2
+          ? `无法同步评审进度（已连续失败 ${failures} 次），正在自动重试。评审在后台继续跑，不会因此中断。`
+          : wsStatus === 'unavailable'
+            ? `实时连接不可用，已改为每 ${POLL_FAST_MS / 1000} 秒主动同步一次进度。进度仍会更新，只是稍慢。`
+            : wsStatus === 'reconnecting'
+              ? '实时连接中断，正在重连；期间改用轮询同步进度。'
+              : idle >= STALL_HINT_SEC
+                ? `已有 ${idle} 秒没有新进展 —— 仍在处理中（某个人格的长文本推理可能比较久），每 ${syncSec} 秒会主动同步一次状态。`
+                : undefined
+      setState((s) => (s.notice === notice ? s : { ...s, notice }))
+    }
 
     const finish = (detail: ReviewDetail) => {
       if (!active) return
       if (detail.status === 'completed') {
         setState({ status: 'completed', progress: 100, detail })
+        stopAll()
       } else if (detail.status === 'failed') {
         setState({ status: 'failed', progress: 0, error: detail.error_message ?? '评审失败' })
+        stopAll()
       }
     }
 
-    void api.getReview(reviewId).then((detail) => {
-      if (!active) return
-      if (detail.status === 'completed' || detail.status === 'failed') {
-        finish(detail)
-        return // 已是终态，没有事件会再来，不用订阅
+    /** 拉一次全量状态。返回是否已终态。轮询、首拉、重连补拉共用这一条路径 */
+    const refreshOnce = async (): Promise<boolean> => {
+      try {
+        const d = await api.getReview(reviewId)
+        if (!active || done) return true
+        failures = 0
+        if (d.status === 'completed' || d.status === 'failed') {
+          finish(d)
+          return true
+        }
+        const next = d.status === 'running' ? 'running' : 'pending'
+        // 轮询拿到的状态变了也算"有进展"，重置停滞计时
+        if (next !== lastStatus) {
+          lastStatus = next
+          lastActivity = Date.now()
+        }
+        setState((s) => (s.status === next ? s : { ...s, status: next }))
+        refreshNotice()
+        return false
+      } catch {
+        // 不静默吞：计数并在卡片上如实说"同步失败，正在重试"
+        failures += 1
+        refreshNotice()
+        return false
       }
-      setState((s) => ({ ...s, status: detail.status === 'running' ? 'running' : 'pending' }))
+    }
+
+    const ensurePolling = (intervalMs: number) => {
+      if (done) return
+      if (pollTimer && pollIntervalMs === intervalMs) return
+      if (pollTimer) clearInterval(pollTimer)
+      pollIntervalMs = intervalMs
+      pollTimer = setInterval(() => void refreshOnce(), intervalMs)
+    }
+
+    // 先把兜底开起来，再去连 WS：WS 可能一直卡在 connecting，
+    // 那种情况下没有任何回调会触发，靠回调启动轮询等于没有兜底。
+    ensurePolling(POLL_FAST_MS)
+    stallTimer = setInterval(refreshNotice, 5000)
+
+    void refreshOnce().then((terminal) => {
+      // 已是终态（历史里跑完的旧评审）：没有事件会再来，不订阅 WS。
+      // 首拉失败也走下面订阅——轮询已经在跑，会自己重试。
+      if (!active || done || terminal) return
 
       socket = connectReviewSocket(reviewId, {
         onEvent: (evt: WsEvent) => {
-          if (!active) return
+          if (!active || done) return
+          lastActivity = Date.now()
           if (evt.event === 'review.progress') {
             const progress = (evt.data as { progress?: number }).progress
             setState((s) => ({ ...s, status: 'running', progress: progress ?? s.progress }))
           } else if (evt.event === 'review.started') {
             setState((s) => ({ ...s, status: 'running' }))
           } else if (evt.event === 'review.completed') {
-            void api.getReview(reviewId).then(finish)
+            // 走 refreshOnce 而不是裸 getReview().then(finish)：那个没有 catch，
+            // 一次网络抖动就会让卡片永远停在"评审中"（WS 此时已自己关掉了）
+            void refreshOnce()
           } else if (evt.event === 'review.failed') {
             const err = (evt.data as { error?: string }).error
             setState({ status: 'failed', progress: 0, error: err ?? '评审失败' })
+            stopAll()
           }
         },
-        onUnavailable: () => {
-          // WS 连不上：兜底轮询到终态为止
-          pollTimer = setInterval(() => {
-            void api.getReview(reviewId).then((d) => {
-              if (d.status === 'completed' || d.status === 'failed') {
-                if (pollTimer) clearInterval(pollTimer)
-                finish(d)
-              }
-            })
-          }, 3000)
+        onOpen: ({ reconnected }) => {
+          // WS 通了也**不停**轮询，只降频：broadcast 无补发，
+          // "连着但事件没送达"时轮询是唯一能到达终态的路径
+          ensurePolling(POLL_SLOW_MS)
+          // 断线期间推的事件（尤其是 review.completed）永久丢失 → 重连必须补拉
+          if (reconnected) void refreshOnce()
         },
+        onStatusChange: (s) => {
+          wsStatus = s
+          refreshNotice()
+        },
+        onClose: () => ensurePolling(POLL_FAST_MS),
+        onUnavailable: () => ensurePolling(POLL_FAST_MS),
       })
     })
 
     return () => {
       active = false
-      socket?.close()
-      if (pollTimer) clearInterval(pollTimer)
+      stopAll()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewId])
 
   return state
@@ -1292,6 +1428,14 @@ function ReviewStatusBody({
             />
           </div>
           <p className="mt-2 text-xs text-text-muted">跑完之前你可以继续在这聊别的，我不会打断你。</p>
+          {/* 同步 / 停滞交代：进度条静止时必须说明白是"还在跑"还是"连不上了"，
+              否则用户只能靠猜。文案由 useReviewStatus 按真实连接状态给出。 */}
+          {reviewState.notice && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-snug text-warm-orange">
+              <AlertTriangle className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
+              <span className="min-w-0">{reviewState.notice}</span>
+            </p>
+          )}
         </>
       )}
 
@@ -1334,6 +1478,26 @@ function ReviewStatusBody({
               const gated = rep?.gated_counts
               const fixCount = (rep?.priority_fixes?.length ?? 0) + (gated?.priority_fixes_hidden ?? 0)
               const personaCount = (rep?.persona_notes?.length ?? 0) + (gated?.persona_notes_hidden ?? 0)
+
+              // 详情还没到手 / 报告体为空 —— 绝不能拿 0 冒充"评审出来就是 0 条"。
+              // 一个 0 值行看起来跟正常结果一模一样，是这仓库反复犯的病：
+              // 读不到就说读不到，别让空壳伪装成结论。
+              if (!reviewState.detail) {
+                return (
+                  <span className="flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} />
+                    读取报告中…
+                  </span>
+                )
+              }
+              if (!rep || personaCount === 0) {
+                return (
+                  <span className="flex items-center gap-1 text-warm-orange">
+                    <FileWarning className="h-3 w-3" strokeWidth={1.75} />
+                    报告内容为空（没读到角色意见）
+                  </span>
+                )
+              }
               return (
                 <>
                   <span className="flex items-center gap-1">

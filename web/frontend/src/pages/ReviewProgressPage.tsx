@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchReview } from '@/lib/api'
 import { api } from '@/lib/apiClient'
 import { connectReviewSocket } from '@/lib/ws'
+import type { WsStatus } from '@/lib/ws'
 import { cn } from '@/lib/utils'
 import type { Review, WSMessage, ReviewMode } from '@/lib/mock-data'
 import type { ReviewDetail } from '@/lib/types'
@@ -21,6 +22,13 @@ import { usePersonaStore } from '@/store/persona-store'
 import { ArrowLeft, FileText, DollarSign, Clock, Loader2, CheckCircle2, AlertCircle, Zap, ListChecks, Microscope, Swords, BarChart3, Hourglass } from 'lucide-react'
 
 type PhaseStatus = 'waiting' | 'running' | 'completed'
+
+/** WS 不通时轮询是唯一通道 */
+const POLL_FAST_MS = 3000
+/** WS 通时的保险丝：只为兜住「连着但事件没送达」，别打爆后端 */
+const POLL_SLOW_MS = 15000
+/** 多久没有任何进展就向用户交代一句 */
+const STALL_HINT_SEC = 45
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: '等待中', color: 'text-text-muted', bg: 'bg-status-waiting' },
@@ -63,10 +71,21 @@ export default function ReviewProgressPage() {
   const [v2CompletedIds, setV2CompletedIds] = useState<string[]>([])
   const [wsError, setWsError] = useState<string | null>(null)
 
+  // WS 连接状态（如实反映给用户，而不是让进度条静止着装死）
+  const [wsStatus, setWsStatus] = useState<WsStatus>('connecting')
+  // 距上一次「有任何进展」过去多久（秒）。用于超时交代
+  const [idleSec, setIdleSec] = useState(0)
+  // 连续拉取失败次数（失败不静默吞）
+  const [pollFailures, setPollFailures] = useState(0)
+
   // 轮询兜底用：记住这条评审在哪个 API 上取得到
   const sourceRef = useRef<'v1' | 'v2'>('v1')
   const socketRef = useRef<{ close: () => void } | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollIntervalRef = useRef(0)
+  const pollFailRef = useRef(0)
+  // 0 = 还没记过；下面 activitySig 的 effect 首次渲染就会把它填成 Date.now()
+  const lastActivityRef = useRef(0)
   const { personas, initPersonas, initialized } = usePersonaStore()
 
   useEffect(() => {
@@ -112,39 +131,63 @@ export default function ReviewProgressPage() {
       clearInterval(pollRef.current)
       pollRef.current = null
     }
+    pollIntervalRef.current = 0
   }, [])
 
-  /** WS 彻底连不上时的兜底：2s 轮询，终态停止 */
-  const startPolling = useCallback(() => {
-    if (!id || pollRef.current) return
-    pollRef.current = setInterval(async () => {
-      try {
-        if (sourceRef.current === 'v2') {
-          const d = await api.getReview(id)
-          setDetail(d)
-          if (isTerminal(d.status)) {
-            if (d.status === 'completed') {
-              setCrossExamPhase('completed')
-              setAggregationPhase('completed')
-            }
-            stopPolling()
-          }
-        } else {
-          const data = await fetchReview(id)
-          setReview(data)
-          if (isTerminal(data.status)) {
-            if (data.status === 'completed') {
-              setCrossExamPhase('completed')
-              setAggregationPhase('completed')
-            }
-            stopPolling()
-          }
+  /** 拉一次状态。返回是否已到终态。轮询和「重连补拉」共用这一条路径 */
+  const refreshOnce = useCallback(async (): Promise<boolean> => {
+    if (!id) return false
+    try {
+      if (sourceRef.current === 'v2') {
+        const d = await api.getReview(id)
+        setDetail(d)
+        pollFailRef.current = 0
+        setPollFailures(0)
+        if (d.status === 'completed') {
+          setCrossExamPhase('completed')
+          setAggregationPhase('completed')
         }
-      } catch {
-        // 网络抖动：下个周期再试
+        return isTerminal(d.status)
       }
-    }, 2000)
-  }, [id, stopPolling])
+      const data = await fetchReview(id)
+      setReview(data)
+      pollFailRef.current = 0
+      setPollFailures(0)
+      if (data.status === 'completed') {
+        setCrossExamPhase('completed')
+        setAggregationPhase('completed')
+      }
+      return isTerminal(data.status)
+    } catch {
+      // 不静默吞：计数并在界面上如实说「同步失败，正在重试」
+      pollFailRef.current += 1
+      setPollFailures(pollFailRef.current)
+      return false
+    }
+  }, [id])
+
+  /**
+   * 常驻兜底轮询。
+   *
+   * 为什么不能「WS 通了就停」：后端 broadcast 无重放无补发，
+   * WS 连着但事件没送达（事件名不匹配 / 某条代码路径没发 / 半开连接）时，
+   * 只靠 WS 会永远停在 pending。所以轮询永远在跑，只有终态才停。
+   * WS 通时降到低频（只是保险），WS 不通时提到高频（此时它是唯一通道）。
+   */
+  const ensurePolling = useCallback(
+    (intervalMs: number) => {
+      if (!id) return
+      if (pollRef.current && pollIntervalRef.current === intervalMs) return
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollIntervalRef.current = intervalMs
+      pollRef.current = setInterval(() => {
+        void refreshOnce().then((done) => {
+          if (done) stopPolling()
+        })
+      }, intervalMs)
+    },
+    [id, refreshOnce, stopPolling],
+  )
 
   // 卸载时清掉轮询
   useEffect(() => () => stopPolling(), [stopPolling])
@@ -261,8 +304,18 @@ export default function ReviewProgressPage() {
   useEffect(() => {
     if (!id || loading || terminal) return
 
+    // 先把兜底开起来：WS 可能一直卡在 connecting（既不 open 也不 close），
+    // 那种情况下没有任何回调会触发，只靠回调启动轮询等于没有兜底
+    ensurePolling(POLL_FAST_MS)
+
+    // socket.close() 之后浏览器还会异步回一次 onclose —— 那时本 effect 已经
+    // 清理过了（终态 / 卸载 / 换 id）。不挡住的话 onClose 会重新 ensurePolling，
+    // 造出一个谁也关不掉的 3 秒 interval，在卸载后继续 setState。
+    let disposed = false
+
     const socket = connectReviewSocket(id, {
       onEvent: (payload) => {
+        if (disposed) return
         // 同一个处理器接两代事件：v2 有 event 字段，v1 有 type 字段
         const raw = payload as unknown as {
           event?: string
@@ -275,15 +328,71 @@ export default function ReviewProgressPage() {
           handleV1Event(raw as unknown as WSMessage)
         }
       },
-      onOpen: () => stopPolling(), // WS 通了就别双通道
-      onUnavailable: () => startPolling(), // 重试耗尽 → 轮询兜底
+      onOpen: ({ reconnected }) => {
+        if (disposed) return
+        // WS 通了也**不停**轮询，只降频：后端 broadcast 无补发，
+        // WS 连着但事件没送达时轮询是唯一能到达终态的路径
+        ensurePolling(POLL_SLOW_MS)
+        // 断线期间推的事件（尤其是 review.completed）永久丢失 → 重连必须补拉一次
+        if (reconnected) void refreshOnce().then((done) => { if (done) stopPolling() })
+      },
+      onStatusChange: (s) => {
+        if (disposed) return
+        setWsStatus(s)
+      },
+      // WS 不通时它是唯一通道 → 提到高频
+      onUnavailable: () => {
+        if (disposed) return
+        ensurePolling(POLL_FAST_MS)
+      },
+      onClose: () => {
+        if (disposed) return
+        ensurePolling(POLL_FAST_MS)
+      },
     })
     socketRef.current = socket
     return () => {
+      disposed = true
       socket.close()
       socketRef.current = null
     }
-  }, [id, loading, terminal, handleV1Event, handleV2Event, startPolling, stopPolling])
+  }, [id, loading, terminal, handleV1Event, handleV2Event, ensurePolling, refreshOnce, stopPolling])
+
+  // 到终态就彻底停：这是轮询唯一的退出条件
+  useEffect(() => {
+    if (terminal) stopPolling()
+  }, [terminal, stopPolling])
+
+  // 「有进展」的指纹：任一进度信号变化就重置计时
+  const activitySig = [
+    status,
+    v2Progress,
+    v2Done,
+    v2CompletedIds.length,
+    crossExamPhase,
+    aggregationPhase,
+    (review?.persona_outputs ?? []).map((p) => p.status).join(','),
+  ].join('|')
+
+  useEffect(() => {
+    lastActivityRef.current = Date.now()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIdleSec(0)
+  }, [activitySig])
+
+  // 停滞计时器：很久没动静时界面要说点什么，而不是杵着一个不动的进度条
+  useEffect(() => {
+    if (terminal || loading) return
+    const t = setInterval(() => {
+      // 0 = 还没记过基准（正常不会走到，防御一下，别算出一个天文数字的"已停滞 N 秒"）
+      if (!lastActivityRef.current) {
+        lastActivityRef.current = Date.now()
+        return
+      }
+      setIdleSec(Math.round((Date.now() - lastActivityRef.current) / 1000))
+    }, 5000)
+    return () => clearInterval(t)
+  }, [terminal, loading])
 
   if (loading) {
     return (
@@ -326,6 +435,32 @@ export default function ReviewProgressPage() {
   const costUsd = review?.total_cost_usd ?? detail?.total_cost_usd ?? 0
   const errorMessage = wsError ?? detail?.error_message ?? null
   const sc = statusConfig[status ?? 'pending'] ?? statusConfig.pending
+
+  // 连接 / 停滞提示。优先级：拉取失败 > 实时通道异常 > 长时间无进展
+  const connectionNotice: { text: string; tone: 'warn' | 'info' } | null =
+    pollFailures >= 2
+      ? {
+          tone: 'warn',
+          text: `无法从服务器同步进度（已连续失败 ${pollFailures} 次），正在自动重试。评审在后台继续运行，不会因此中断。`,
+        }
+      : wsStatus === 'unavailable'
+        ? {
+            tone: 'warn',
+            text: `实时连接不可用，已切换为每 ${POLL_FAST_MS / 1000} 秒轮询获取进度。进度仍会更新，只是稍慢。`,
+          }
+        : wsStatus === 'reconnecting'
+          ? {
+              tone: 'warn',
+              text: '实时连接中断，正在重连；期间已切换为轮询获取进度。',
+            }
+          : idleSec >= STALL_HINT_SEC
+            ? {
+                tone: 'info',
+                text: `已有 ${idleSec} 秒没有新进展 —— 仍在处理中（某个人格的长文本推理可能耗时较久）。页面每 ${
+                  (wsStatus === 'open' ? POLL_SLOW_MS : POLL_FAST_MS) / 1000
+                } 秒会主动同步一次状态。`,
+              }
+            : null
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
@@ -389,6 +524,27 @@ export default function ReviewProgressPage() {
           />
         </div>
       </div>
+
+      {/* 连接 / 停滞交代：不动的进度条必须配一句话，否则用户只会读成「卡死」 */}
+      {!terminal && connectionNotice && (
+        <div
+          className={cn(
+            'mb-6 rounded-xl border bg-bg-card p-3 flex items-start gap-2.5',
+            connectionNotice.tone === 'warn'
+              ? 'border-warm-orange/40'
+              : 'border-border',
+          )}
+        >
+          <AlertCircle
+            className={cn(
+              'w-4 h-4 shrink-0 mt-0.5',
+              connectionNotice.tone === 'warn' ? 'text-warm-orange' : 'text-text-muted',
+            )}
+            strokeWidth={1.25}
+          />
+          <p className="text-xs text-text-secondary">{connectionNotice.text}</p>
+        </div>
+      )}
 
       {/* 失败：如实展示 error_message */}
       {status === 'failed' && (

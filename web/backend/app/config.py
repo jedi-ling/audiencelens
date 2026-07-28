@@ -17,9 +17,55 @@ import ipaddress
 import logging
 import os
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlparse
 
 _log = logging.getLogger("audiencelens")
+
+
+def _load_dotenv_once() -> None:
+    """本地开发时加载 web/.env。
+
+    为什么需要这个：`web/.env.production.example` 是一份写得很详细的模板，
+    DEPLOY.md 也让人照着填 `web/.env`——但那条路径只在 Docker 下成立
+    （docker-compose 用 env_file 注入）。直接 `uvicorn app.main:app` 跑的时候，
+    下面所有配置读的都是 os.environ，**根本不看那个文件**。
+
+    结果就是一个典型的"看起来能用其实不读"：文件在、注释齐、填了没反应，
+    而且不报错——只能靠"为什么改了没生效"一路查到这里。
+    （更糟的变体：为了让本地能跑，把密钥塞进 .claude/launch.json 这类会进
+    版本库的文件——本仓库真发生过一次，差点把 SMTP 密钥提交上去。）
+
+    规则：**已存在的环境变量优先**。.env 只补空缺，不覆盖显式设置的值，
+    这样 CI、Docker、临时 `VAR=x python ...` 的行为一律不变。
+    """
+    if os.environ.get("AL_SKIP_DOTENV"):
+        return
+    # config.py 在 web/backend/app/ 下，.env 约定在 web/ 下
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    if not env_path.is_file():
+        return
+    loaded = 0
+    try:
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key or key in os.environ:
+                continue  # 显式设置的环境变量永远赢
+            os.environ[key] = value.strip().strip('"').strip("'")
+            loaded += 1
+    except OSError as exc:  # 权限/编码问题不该让服务起不来
+        _log.warning("读取 %s 失败，已跳过：%s", env_path, exc)
+        return
+    if loaded:
+        # 只报数量不报键名——键名里有 AL_SMTP_PASSWORD 这类，日志不该暗示它们的存在
+        _log.info("已从 %s 加载 %d 项配置（不覆盖已有环境变量）", env_path, loaded)
+
+
+_load_dotenv_once()
 
 # 开发默认 JWT 密钥。它同时是落库加密密钥的回落值——泄露 = 所有已存 API key 可解。
 DEV_JWT_SECRET = "dev-insecure-secret-change-me"
