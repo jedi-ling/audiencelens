@@ -49,7 +49,7 @@ export function TaskTypeStatsPanel() {
               </div>
               <div className="flex h-2.5 overflow-hidden rounded-sm bg-bg-secondary" style={{ width: `${width}%`, minWidth: '2rem' }}>
                 {t.completed > 0 && (
-                  <div className="bg-neon-green/70" style={{ flex: t.completed }} title={`完成 ${t.completed}`} />
+                  <div className="bg-brand-primary/70" style={{ flex: t.completed }} title={`完成 ${t.completed}`} />
                 )}
                 {t.failed > 0 && (
                   <div className="bg-severity-critical/70" style={{ flex: t.failed }} title={`失败 ${t.failed}`} />
@@ -65,7 +65,7 @@ export function TaskTypeStatsPanel() {
 
       {taskTypes.length > 0 && (
         <div className="mt-2 flex gap-4 font-mono text-[10px] text-text-muted">
-          <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-3 rounded-sm bg-neon-green/70" />完成</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-3 rounded-sm bg-brand-primary/70" />完成</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-3 rounded-sm bg-severity-critical/70" />失败</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-3 rounded-sm bg-text-muted/40" />进行中/其它</span>
         </div>

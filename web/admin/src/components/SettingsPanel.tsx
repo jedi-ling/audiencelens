@@ -49,7 +49,7 @@ export function SettingsPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Sliders className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        <Sliders className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
         运行时配置
         <span className="font-mono text-[10px] font-normal text-text-muted">改动无需重启</span>
       </h2>
@@ -69,7 +69,7 @@ export function SettingsPanel() {
               <button
                 onClick={() => void reset(row.key)}
                 disabled={pending === row.key}
-                className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-text-muted hover:border-neon-green/40 hover:text-neon-green transition-colors disabled:opacity-50"
+                className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-text-muted hover:border-brand-primary/40 hover:text-brand-primary transition-colors disabled:opacity-50"
               >
                 重置
               </button>
@@ -89,7 +89,7 @@ function SettingControl({ row, disabled, onChange }: { row: AdminSettingRow; dis
         checked={Boolean(row.effective_value)}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 shrink-0 accent-neon-green"
+        className="h-4 w-4 shrink-0 accent-brand-primary"
       />
     )
   }
@@ -99,7 +99,7 @@ function SettingControl({ row, disabled, onChange }: { row: AdminSettingRow; dis
         value={String(row.effective_value)}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="shrink-0 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-neon-green"
+        className="shrink-0 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-brand-primary"
       >
         {row.choices.map((c) => (
           <option key={c} value={c}>{c}</option>
@@ -117,7 +117,7 @@ function SettingControl({ row, disabled, onChange }: { row: AdminSettingRow; dis
         const v = row.type === 'int' ? parseInt(e.target.value, 10) : parseFloat(e.target.value)
         if (!Number.isNaN(v)) onChange(v)
       }}
-      className="w-24 shrink-0 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-neon-green"
+      className="w-24 shrink-0 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-brand-primary"
     />
   )
 }

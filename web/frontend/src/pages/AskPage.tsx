@@ -83,7 +83,7 @@ function formatTime(ts: number): string {
 
 /** 置信度 → 用户可理解的把握档位与配色 */
 function confidenceLevel(confidence: number): { label: string; barClass: string } {
-  if (confidence >= 0.8) return { label: '高', barClass: 'bg-neon-green' }
+  if (confidence >= 0.8) return { label: '高', barClass: 'bg-brand-primary' }
   if (confidence >= 0.6) return { label: '中', barClass: 'bg-cyan' }
   return { label: '偏低', barClass: 'bg-warm-orange' }
 }
@@ -91,7 +91,7 @@ function confidenceLevel(confidence: number): { label: string; barClass: string 
 /** 助手身份头像 —— 金色渐变徽记 + 微光，让对话双方一眼可辨 */
 function AssistantAvatar() {
   return (
-    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neon-green/40 bg-gradient-to-br from-neon-green/25 to-neon-green-dim/5 shadow-[0_0_12px_rgba(183,126,59,0.25)]">
+    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-primary/40 bg-gradient-to-br from-brand-primary/25 to-brand-primary-dim/5 shadow-[0_0_12px_rgba(183,126,59,0.25)]">
       <Sparkles className="h-3.5 w-3.5 text-gold-cream" strokeWidth={1.5} />
     </div>
   )
@@ -102,11 +102,11 @@ function ThinkingIndicator() {
   return (
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
-      <div className="flex items-center gap-1.5 rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-3.5">
+      <div className="flex items-center gap-1.5 rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-brand-primary/40 bg-bg-secondary px-4 py-3.5">
         {[0, 150, 300].map((delay) => (
           <span
             key={delay}
-            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neon-green/80 [animation-duration:1.4s]"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-primary/80 [animation-duration:1.4s]"
             style={{ animationDelay: `${delay}ms` }}
           />
         ))}
@@ -622,7 +622,7 @@ export default function AskPage() {
         >
           {sidebarOpen ? <PanelLeftClose className="h-4 w-4" strokeWidth={1.5} /> : <PanelLeftOpen className="h-4 w-4" strokeWidth={1.5} />}
         </button>
-        <Sparkles className="h-5 w-5 text-neon-green" strokeWidth={1.5} />
+        <Sparkles className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
         <div>
           <h1 className="text-lg font-semibold text-text-primary font-display">对话评审</h1>
           <p className="text-xs text-text-muted">说人话，剩下的交给评审团</p>
@@ -637,7 +637,7 @@ export default function AskPage() {
             <p className="mt-1 text-text-secondary">
               评审必须使用真实模型——模拟数据没有评审价值。
               <button
-                className="ml-1 text-neon-green underline underline-offset-2 hover:text-neon-green-dim"
+                className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
                 onClick={() => navigate('/settings')}
               >
                 去设置页填写
@@ -652,7 +652,7 @@ export default function AskPage() {
         className={cn(
           // isolate：让浮尘层的负 z-index 被限制在这个容器内，只沉到自身背景之上、气泡之下
           'chat-backdrop relative isolate flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
-          dragging ? 'border-neon-green/60 bg-neon-green/5' : 'border-border bg-bg-card/60'
+          dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border bg-bg-card/60'
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -677,8 +677,8 @@ export default function AskPage() {
         ))}
         {busy && <ThinkingIndicator />}
         {dragging && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed border-neon-green/60 bg-bg-primary/70 backdrop-blur-sm">
-            <p className="flex items-center gap-2 text-sm font-medium text-neon-green">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed border-brand-primary/60 bg-bg-primary/70 backdrop-blur-sm">
+            <p className="flex items-center gap-2 text-sm font-medium text-brand-primary">
               <ImageIcon className="h-5 w-5" strokeWidth={1.5} />
               松开以上传截图/文件
             </p>
@@ -709,7 +709,7 @@ export default function AskPage() {
             {EXAMPLES.map((ex) => (
               <button
                 key={ex}
-                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-neon-green/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
                 onClick={() => void send(ex)}
               >
                 {ex}
@@ -747,7 +747,7 @@ export default function AskPage() {
       )}
 
       {activeChatContext && (
-        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 rounded-md border border-neon-green/30 bg-neon-green/10 px-2.5 py-1.5 text-xs text-neon-green">
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 rounded-md border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1.5 text-xs text-brand-primary">
           <span className="flex items-center gap-1.5 truncate">
             <Sparkles className="h-3 w-3 shrink-0" strokeWidth={2} />
             正在追问 · {activeChatContext.label}
@@ -940,7 +940,7 @@ export default function AskPage() {
                     }
                   }}
                   placeholder="给项目起个名字…"
-                  className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1.5 text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green/40"
+                  className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1.5 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary/40"
                 />
                 <button
                   disabled={!newProjectName.trim()}
@@ -949,7 +949,7 @@ export default function AskPage() {
                     setNewProjectName('')
                     setProjectPickerOpen(false)
                   }}
-                  className="shrink-0 rounded-md bg-neon-green px-2.5 py-1.5 text-xs font-medium text-bg-primary disabled:opacity-40"
+                  className="shrink-0 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-bg-primary disabled:opacity-40"
                 >
                   创建
                 </button>
@@ -1002,7 +1002,7 @@ export default function AskPage() {
           }}
         />
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neon-green text-bg-primary shadow-[0_0_16px_rgba(183,126,59,0.35)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_0_24px_rgba(183,126,59,0.5)] disabled:opacity-50 disabled:shadow-none"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-primary text-bg-primary shadow-[0_0_16px_rgba(183,126,59,0.35)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_0_24px_rgba(183,126,59,0.5)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
           disabled={busy || (!input.trim() && attachments.length === 0)}
           aria-label="发送"
@@ -1097,7 +1097,7 @@ function HistorySidebar({
         <div className="shrink-0 p-3">
           <button
             onClick={onNewConversation}
-            className="flex w-full items-center gap-2 rounded-lg border border-neon-green/30 bg-neon-green/10 px-3 py-2 text-sm font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+            className="flex w-full items-center gap-2 rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-3 py-2 text-sm font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
           >
             <Plus className="h-4 w-4" strokeWidth={2} />
             新建对话
@@ -1252,7 +1252,7 @@ function useReviewStatus(reviewId: string | null): ReviewState {
 
 /** 评审状态的展示内容——聊天气泡和弹窗只是外壳不同，内容完全一致。 */
 const RISK_BADGE: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  low: { label: '低风险', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30' },
+  low: { label: '低风险', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
   medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
   high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
   critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
@@ -1280,14 +1280,14 @@ function ReviewStatusBody({
       {(reviewState.status === 'pending' || reviewState.status === 'running') && (
         <>
           <p className="flex items-center gap-2 font-medium text-text-primary">
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neon-green" strokeWidth={2} />
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-primary" strokeWidth={2} />
             评审团正在评审中…
           </p>
           {/* shimmer-bar 挂在轨道外层：跑批时百分比会在某个人格思考时卡住十几秒，
               静止的条会被读成「卡死」，流光负责传达「还在跑」。仅此分支（pending/running）渲染 */}
           <div className="shimmer-bar mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
             <div
-              className="h-full rounded-full bg-neon-green shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all duration-500"
+              className="h-full rounded-full bg-brand-primary shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all duration-500"
               style={{ width: `${reviewState.progress}%` }}
             />
           </div>
@@ -1364,7 +1364,7 @@ function ReviewStatusBody({
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={() => setReportOpen(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary/10 py-1.5 text-[13px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
             >
               查看完整报告
               <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
@@ -1422,7 +1422,7 @@ function ReportModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-neon-green/30 bg-bg-secondary shadow-[0_0_36px_rgba(183,126,59,0.08)]"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-brand-primary/30 bg-bg-secondary shadow-[0_0_36px_rgba(183,126,59,0.08)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
@@ -1474,7 +1474,7 @@ function ReportModal({
                       <p className="font-medium text-text-primary">{fix.title}</p>
                       {fix.why_it_matters && <p className="mt-0.5 text-xs text-text-secondary">{fix.why_it_matters}</p>}
                       {fix.suggested_fix && (
-                        <p className="mt-1 text-xs text-neon-green">建议：{fix.suggested_fix}</p>
+                        <p className="mt-1 text-xs text-brand-primary">建议：{fix.suggested_fix}</p>
                       )}
                     </div>
                   </div>
@@ -1513,7 +1513,7 @@ function ReportModal({
                           onStartFollowUp(detail.id, note.persona_id, note.persona_name ?? note.persona_id)
                           onClose()
                         }}
-                        className="rounded-full border border-neon-green/30 bg-neon-green/10 px-2 py-0.5 text-[11px] text-neon-green transition-colors hover:bg-neon-green/20"
+                        className="rounded-full border border-brand-primary/30 bg-brand-primary/10 px-2 py-0.5 text-[11px] text-brand-primary transition-colors hover:bg-brand-primary/20"
                       >
                         跟TA聊聊
                       </button>
@@ -1544,7 +1544,7 @@ function ReportModal({
                       </ul>
                     )}
                     {d.resolution_suggestion && (
-                      <p className="mt-1.5 text-xs text-neon-green">调解建议：{d.resolution_suggestion}</p>
+                      <p className="mt-1.5 text-xs text-brand-primary">调解建议：{d.resolution_suggestion}</p>
                     )}
                   </div>
                 ))}
@@ -1574,7 +1574,7 @@ function ReportModal({
               onStartFollowUp(detail.id, null, '这份报告')
               onClose()
             }}
-            className="flex items-center gap-1.5 rounded-md border border-neon-green/30 bg-neon-green/10 px-2.5 py-1.5 text-[13px] font-medium text-neon-green transition-colors hover:bg-neon-green/20"
+            className="flex items-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1.5 text-[13px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
           >
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
             追问这份报告
@@ -1628,13 +1628,13 @@ function ChatBubble({
                   key={i}
                   src={src}
                   alt={`附图 ${i + 1}`}
-                  className="h-20 w-20 rounded-lg border border-neon-green/30 object-cover shadow-[0_2px_16px_rgba(183,126,59,0.2)]"
+                  className="h-20 w-20 rounded-lg border border-brand-primary/30 object-cover shadow-[0_2px_16px_rgba(183,126,59,0.2)]"
                 />
               ))}
             </div>
           )}
           {message.text && (
-            <div className="rounded-xl rounded-br-sm bg-neon-green px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(183,126,59,0.25)]">
+            <div className="rounded-xl rounded-br-sm bg-brand-primary px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(183,126,59,0.25)]">
               {message.text}
             </div>
           )}
@@ -1654,7 +1654,7 @@ function ChatBubble({
               'rounded-xl rounded-tl-sm border border-l-[3px] px-4 py-2.5 text-sm leading-relaxed text-text-primary',
               message.isGated
                 ? 'border-warm-orange/30 border-l-warm-orange/50 bg-warm-orange/5'
-                : 'border-border border-l-neon-green/40 bg-bg-secondary',
+                : 'border-border border-l-brand-primary/40 bg-bg-secondary',
             )}
           >
             {message.text}
@@ -1665,7 +1665,7 @@ function ChatBubble({
                 </span>
                 <button
                   onClick={onGoLogin}
-                  className="font-medium text-neon-green underline underline-offset-2 hover:text-gold-cream"
+                  className="font-medium text-brand-primary underline underline-offset-2 hover:text-gold-cream"
                 >
                   登录看完整回答
                 </button>
@@ -1690,7 +1690,7 @@ function ChatBubble({
                 {message.text}
                 {message.needsKey && (
                   <button
-                    className="ml-2 text-neon-green underline underline-offset-2 hover:text-gold-cream"
+                    className="ml-2 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
                     onClick={onGoSettings}
                   >
                     去填写 API Key
@@ -1710,7 +1710,7 @@ function ChatBubble({
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
+          <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
             <ReviewStatusBody reviewState={reviewState} onStartFollowUp={onStartFollowUp} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
@@ -1724,14 +1724,14 @@ function ChatBubble({
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex max-w-[80%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-neon-green/40 bg-bg-secondary px-4 py-3 text-sm">
+          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-brand-primary/40 bg-bg-secondary px-4 py-3 text-sm">
             <p className="leading-relaxed text-text-primary">{message.question}</p>
             {message.candidates.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {message.candidates.map((c) => (
                   <button
                     key={c}
-                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-neon-green/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
                     onClick={() => onPickCandidate(c)}
                   >
                     {TASK_LABELS[c] ?? c}
@@ -1754,7 +1754,7 @@ function ChatBubble({
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
       <div className="flex w-full max-w-[85%] flex-col">
-        <div className="rounded-xl rounded-tl-sm border border-neon-green/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
+        <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
           <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
@@ -1842,7 +1842,7 @@ function ChatBubble({
           </div>
 
           <button
-            className="mt-4 w-full rounded-md bg-neon-green py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(183,126,59,0.3)] transition-all duration-150 hover:bg-neon-green-dim hover:shadow-[0_4px_24px_rgba(183,126,59,0.4)] disabled:opacity-50"
+            className="mt-4 w-full rounded-md bg-brand-primary py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(183,126,59,0.3)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_24px_rgba(183,126,59,0.4)] disabled:opacity-50"
             onClick={() => onConfirm(intent, activePersonas)}
             disabled={busy}
           >

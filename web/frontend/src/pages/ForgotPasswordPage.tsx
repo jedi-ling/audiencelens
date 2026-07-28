@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-6 py-16">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
-        <KeyRound className="h-6 w-6 text-neon-green" strokeWidth={1.5} />
+        <KeyRound className="h-6 w-6 text-brand-primary" strokeWidth={1.5} />
         <h1 className="text-xl font-semibold text-text-primary font-display">找回密码</h1>
         <p className="text-sm text-text-secondary">输入注册邮箱，我们会发一个重置链接给你</p>
       </div>
@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
             </p>
             <Link
               to="/login"
-              className="mt-5 inline-block text-sm text-neon-green underline underline-offset-2 hover:text-neon-green-dim"
+              className="mt-5 inline-block text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
             >
               返回登录
             </Link>
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void submit()}
-              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-neon-green transition-colors"
+              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
               placeholder="you@example.com"
               autoFocus
             />
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
             <button
               onClick={() => void submit()}
               disabled={busy || !email.trim()}
-              className="mt-5 w-full rounded-lg bg-neon-green py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-neon-green-dim disabled:opacity-50"
+              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
               {busy ? '发送中…' : '发送重置链接'}
             </button>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
 
       <p className="mt-4 text-center text-sm text-text-muted">
         想起来了？
-        <Link to="/login" className="ml-1 text-neon-green underline underline-offset-2 hover:text-neon-green-dim">
+        <Link to="/login" className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim">
           直接登录
         </Link>
       </p>

@@ -7,7 +7,7 @@ export function Pager({ total, offset, pageSize, onChange }: { total: number; of
       <button
         onClick={() => onChange(Math.max(0, offset - pageSize))}
         disabled={offset === 0}
-        className="rounded-md border border-border px-2 py-1 hover:border-neon-green/40 hover:text-neon-green transition-colors disabled:opacity-30"
+        className="rounded-md border border-border px-2 py-1 hover:border-brand-primary/40 hover:text-brand-primary transition-colors disabled:opacity-30"
       >
         上一页
       </button>
@@ -15,7 +15,7 @@ export function Pager({ total, offset, pageSize, onChange }: { total: number; of
       <button
         onClick={() => onChange(offset + pageSize)}
         disabled={offset + pageSize >= total}
-        className="rounded-md border border-border px-2 py-1 hover:border-neon-green/40 hover:text-neon-green transition-colors disabled:opacity-30"
+        className="rounded-md border border-border px-2 py-1 hover:border-brand-primary/40 hover:text-brand-primary transition-colors disabled:opacity-30"
       >
         下一页
       </button>

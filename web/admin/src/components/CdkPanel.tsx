@@ -11,7 +11,7 @@ const STATUS_LABEL: Record<CdkStatus, string> = {
 }
 
 const STATUS_COLOR: Record<CdkStatus, string> = {
-  active: 'text-neon-green bg-neon-green/10',
+  active: 'text-brand-primary bg-brand-primary/10',
   disabled: 'text-severity-critical bg-severity-critical/10',
   exhausted: 'text-text-muted bg-bg-secondary',
   expired: 'text-warm-orange bg-warm-orange/10',
@@ -180,9 +180,9 @@ export function CdkPanel() {
 
       {/* 刚生成的批次：一键复制分发 */}
       {lastBatch && (
-        <div className="mt-3 rounded-lg border border-neon-green/30 bg-bg-primary p-3">
+        <div className="mt-3 rounded-lg border border-brand-primary/30 bg-bg-primary p-3">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-xs text-neon-green">
+            <span className="font-mono text-xs text-brand-primary">
               本批 {lastBatch.count} 个 · 每码 {lastBatch.credits} 次 · 可兑 {lastBatch.max_uses} 人
             </span>
             <button
@@ -190,7 +190,7 @@ export function CdkPanel() {
               className="flex items-center gap-1 rounded-md bg-bg-secondary px-2.5 py-1 font-mono text-xs text-text-secondary hover:text-text-primary transition-colors"
             >
               {copied ? (
-                <Check className="h-3 w-3 text-neon-green" strokeWidth={1.5} />
+                <Check className="h-3 w-3 text-brand-primary" strokeWidth={1.5} />
               ) : (
                 <Copy className="h-3 w-3" strokeWidth={1.5} />
               )}

@@ -38,7 +38,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-6 py-16">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
-        <KeyRound className="h-6 w-6 text-neon-green" strokeWidth={1.5} />
+        <KeyRound className="h-6 w-6 text-brand-primary" strokeWidth={1.5} />
         <h1 className="text-xl font-semibold text-text-primary font-display">设置新密码</h1>
       </div>
 
@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
             <p className="text-sm text-severity-critical">链接不完整，缺少重置令牌。</p>
             <Link
               to="/forgot-password"
-              className="mt-4 inline-block text-sm text-neon-green underline underline-offset-2"
+              className="mt-4 inline-block text-sm text-brand-primary underline underline-offset-2"
             >
               重新申请重置链接
             </Link>
@@ -59,7 +59,7 @@ export default function ResetPasswordPage() {
             <p className="mt-2 text-xs text-text-muted">请用新密码登录。</p>
             <button
               onClick={() => navigate('/login')}
-              className="mt-5 w-full rounded-lg bg-neon-green py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-neon-green-dim"
+              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim"
             >
               去登录
             </button>
@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-neon-green transition-colors"
+              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
               placeholder="········"
               autoFocus
             />
@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void submit()}
-              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-neon-green transition-colors"
+              className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
               placeholder="········"
             />
             {mismatch && <p className="mt-1 text-xs text-warm-orange">两次输入不一致</p>}
@@ -93,7 +93,7 @@ export default function ResetPasswordPage() {
             <button
               onClick={() => void submit()}
               disabled={!canSubmit}
-              className="mt-5 w-full rounded-lg bg-neon-green py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-neon-green-dim disabled:opacity-50"
+              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
               {busy ? '提交中…' : '重置密码'}
             </button>

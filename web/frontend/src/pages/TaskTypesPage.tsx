@@ -69,14 +69,14 @@ export default function TaskTypesPage() {
           className={cn(
             'flex items-center gap-2 px-4 py-2 rounded-lg font-display font-medium text-sm whitespace-nowrap transition-all duration-200',
             selectedCategory === 'all'
-              ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+              ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
               : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
           )}
         >
           <span>全部</span>
           <span className={cn(
             'px-1.5 py-0.5 rounded text-xs font-mono',
-            selectedCategory === 'all' ? 'bg-neon-green/20 text-neon-green' : 'bg-bg-secondary/50 text-text-muted'
+            selectedCategory === 'all' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-secondary/50 text-text-muted'
           )}>
             {TASK_TYPES.length}
           </span>
@@ -92,7 +92,7 @@ export default function TaskTypesPage() {
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg font-display font-medium text-sm whitespace-nowrap transition-all duration-200',
                 selectedCategory === category.id
-                  ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                  ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                   : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
               )}
             >
@@ -100,7 +100,7 @@ export default function TaskTypesPage() {
               <span>{category.name}</span>
               <span className={cn(
                 'px-1.5 py-0.5 rounded text-xs font-mono',
-                selectedCategory === category.id ? 'bg-neon-green/20 text-neon-green' : 'bg-bg-secondary/50 text-text-muted'
+                selectedCategory === category.id ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-secondary/50 text-text-muted'
               )}>
                 {count}
               </span>
@@ -123,14 +123,14 @@ export default function TaskTypesPage() {
               <button
                 key={tt.id}
                 onClick={() => handleCardClick(tt.id)}
-                className="flex flex-col gap-3 p-5 rounded-xl border border-border bg-bg-card hover:bg-bg-card-hover hover:border-neon-green/30 transition-all text-left group"
+                className="flex flex-col gap-3 p-5 rounded-xl border border-border bg-bg-card hover:bg-bg-card-hover hover:border-brand-primary/30 transition-all text-left group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-neon-green/10 shrink-0">
-                    <Icon className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
+                  <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-primary/10 shrink-0">
+                    <Icon className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm text-text-primary group-hover:text-neon-green transition-colors truncate">
+                    <h3 className="font-medium text-sm text-text-primary group-hover:text-brand-primary transition-colors truncate">
                       {apiDetail?.name_zh ?? tt.name}
                     </h3>
                     <div className="flex items-center gap-1 text-xs text-text-muted">
@@ -170,7 +170,7 @@ export default function TaskTypesPage() {
                   </div>
                 )}
 
-                <div className="text-xs text-neon-green/60 group-hover:text-neon-green transition-colors mt-auto pt-1">
+                <div className="text-xs text-brand-primary/60 group-hover:text-brand-primary transition-colors mt-auto pt-1">
                   点击查看详情 →
                 </div>
               </button>
@@ -235,7 +235,7 @@ export default function TaskTypesPage() {
                     <span className="text-xs text-text-muted">基础维度 (base_dimensions)</span>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {selectedDetail.base_dimensions.map((d) => (
-                        <span key={d} className="px-2 py-1 rounded-md text-xs bg-neon-green/10 text-neon-green border border-neon-green/20">
+                        <span key={d} className="px-2 py-1 rounded-md text-xs bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
                           {d}
                         </span>
                       ))}

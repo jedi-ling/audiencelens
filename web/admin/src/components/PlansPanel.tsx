@@ -57,7 +57,7 @@ export function PlansPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Tags className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        <Tags className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
         套餐
         <span className="font-mono text-[10px] font-normal text-text-muted">可编辑，改动无需重启</span>
       </h2>
@@ -87,7 +87,7 @@ export function PlansPanel() {
                           const v = parseFloat(e.target.value)
                           if (!Number.isNaN(v) && v !== plan[field]) void apply(plan.id, field, v)
                         }}
-                        className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-neon-green"
+                        className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none focus:border-brand-primary"
                       />
                     </div>
                     {overridden && (

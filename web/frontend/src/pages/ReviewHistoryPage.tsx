@@ -37,14 +37,14 @@ import {
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: '等待中', color: 'text-text-muted', bg: 'bg-bg-secondary' },
   running: { label: '运行中', color: 'text-cyan', bg: 'bg-cyan/10' },
-  completed: { label: '已完成', color: 'text-neon-green', bg: 'bg-neon-green/10' },
+  completed: { label: '已完成', color: 'text-brand-primary', bg: 'bg-brand-primary/10' },
   failed: { label: '失败', color: 'text-severity-critical', bg: 'bg-severity-critical/10' },
   cancelled: { label: '已取消', color: 'text-text-muted', bg: 'bg-bg-secondary' },
 }
 
 const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', Icon: ListChecks },
+  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
@@ -170,7 +170,7 @@ export default function ReviewHistoryPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
       <div className="flex items-center gap-3 mb-6">
-        <History className="w-6 h-6 text-neon-green" strokeWidth={1.25} />
+        <History className="w-6 h-6 text-brand-primary" strokeWidth={1.25} />
         <div>
           <h1 className="text-xl font-semibold text-text-primary">评审历史</h1>
           <p className="text-sm text-text-secondary mt-0.5">你发起过的所有评审，点进去看报告或继续跟进</p>
@@ -202,7 +202,7 @@ export default function ReviewHistoryPage() {
             <p className="text-text-muted text-xs mb-4">这不代表记录被删除了，请重试或稍后再来</p>
             <button
               onClick={() => void loadFirstPage()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:border-neon-green/30 hover:text-text-primary transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-text-primary transition-colors"
             >
               重试
             </button>
@@ -213,7 +213,7 @@ export default function ReviewHistoryPage() {
             <p className="text-text-secondary text-sm mb-4">还没有评审记录</p>
             <Link
               to="/ask"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-green text-bg-primary text-sm font-bold hover:bg-neon-green-dim transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-colors"
             >
               发起第一次评审 →
             </Link>
@@ -230,7 +230,7 @@ export default function ReviewHistoryPage() {
               <div
                 key={r.id}
                 onClick={() => navigate(target)}
-                className="group flex items-center gap-4 p-4 rounded-xl border border-border bg-bg-card hover:border-neon-green/30 hover:bg-bg-card-hover transition-all cursor-pointer"
+                className="group flex items-center gap-4 p-4 rounded-xl border border-border bg-bg-card hover:border-brand-primary/30 hover:bg-bg-card-hover transition-all cursor-pointer"
               >
                 <span className={cn('shrink-0 px-2 py-1 rounded text-xs font-medium', sc.bg, sc.color)}>
                   {sc.label}
@@ -264,7 +264,7 @@ export default function ReviewHistoryPage() {
                 </div>
 
                 {r.status === 'completed' && (
-                  <FileText className="w-4 h-4 text-neon-green shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.25} />
+                  <FileText className="w-4 h-4 text-brand-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" strokeWidth={1.25} />
                 )}
 
                 <button
@@ -307,7 +307,7 @@ export default function ReviewHistoryPage() {
                   <button
                     onClick={() => void loadMore()}
                     disabled={loadingMore}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-bg-card text-sm text-text-secondary hover:border-neon-green/30 hover:text-text-primary transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-bg-card text-sm text-text-secondary hover:border-brand-primary/30 hover:text-text-primary transition-colors disabled:opacity-50"
                   >
                     {loadingMore ? (
                       <>

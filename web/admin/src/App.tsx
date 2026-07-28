@@ -61,7 +61,7 @@ export default function App() {
           <CenterMessage>
             <p className="text-text-primary">管理后台未启用</p>
             <p className="mt-2 max-w-md font-mono text-xs text-text-muted">
-              在后端服务的环境变量中设置 <span className="text-neon-green">AL_ADMIN_TOKEN</span> 后重启即可启用。
+              在后端服务的环境变量中设置 <span className="text-brand-primary">AL_ADMIN_TOKEN</span> 后重启即可启用。
               未设置时该接口整体返回 503 —— 安全默认值，绝不无密钥暴露管理接口。
             </p>
           </CenterMessage>
@@ -70,7 +70,7 @@ export default function App() {
         {gate === 'locked' && (
           <CenterMessage>
             <div className="mb-4 flex items-center gap-2 text-text-primary">
-              <Lock className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+              <Lock className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
               输入管理员令牌
             </div>
             <div className="flex w-full max-w-sm gap-2">
@@ -81,11 +81,11 @@ export default function App() {
                 onKeyDown={(e) => e.key === 'Enter' && void tryUnlock(tokenInput)}
                 placeholder="AL_ADMIN_TOKEN"
                 autoFocus
-                className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green transition-colors"
+                className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
               />
               <button
                 onClick={() => void tryUnlock(tokenInput)}
-                className="shrink-0 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
+                className="shrink-0 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
               >
                 解锁
               </button>
@@ -104,7 +104,7 @@ function AppHeader({ showLock, onLock }: { showLock: boolean; onLock: () => void
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg-secondary/60 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-6">
-        <Server className="h-5 w-5 text-neon-green" strokeWidth={1.5} />
+        <Server className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
         <span className="font-mono text-sm font-semibold text-text-primary">AudienceLens</span>
         <span className="font-mono text-xs text-text-muted">/ 管理后台</span>
         {showLock && (
@@ -183,7 +183,7 @@ function Dashboard() {
                 onClick={() => setSection(s.id)}
                 className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                   isActive
-                    ? 'border-l-2 border-neon-green bg-neon-green/10 text-neon-green'
+                    ? 'border-l-2 border-brand-primary bg-brand-primary/10 text-brand-primary'
                     : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
                 }`}
               >
@@ -204,7 +204,7 @@ function Dashboard() {
               onClick={() => setSection(s.id)}
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors ${
                 s.id === section
-                  ? 'bg-neon-green/15 text-neon-green'
+                  ? 'bg-brand-primary/15 text-brand-primary'
                   : 'bg-bg-card text-text-secondary'
               }`}
             >
@@ -220,7 +220,7 @@ function Dashboard() {
           </div>
           <button
             onClick={() => void refresh()}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-secondary hover:border-neon-green/40 hover:text-neon-green transition-colors"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs text-text-secondary hover:border-brand-primary/40 hover:text-brand-primary transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} strokeWidth={1.5} />
             刷新

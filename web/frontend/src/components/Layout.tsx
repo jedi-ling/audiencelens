@@ -58,7 +58,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip">
       <header className="sticky top-0 z-50 bg-bg-primary/60 backdrop-blur-xl border-b border-transparent shrink-0">
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-neon-green/40 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand-primary/40 to-transparent" />
         <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
           {/* 品牌标志与营销落地页统一：金色星芒 + Audience（白）/ Lens（金） */}
           {/* 星芒与紧邻的 "Lens" 字样必须同色，否则品牌组合是两种金。
@@ -77,7 +77,7 @@ export default function Layout() {
             </svg>
             <span className="font-display font-bold text-lg whitespace-nowrap">
               <span className="text-text-primary">Audience</span>
-              <span className="text-neon-green">Lens</span>
+              <span className="text-brand-primary">Lens</span>
             </span>
           </Link>
 
@@ -94,14 +94,14 @@ export default function Layout() {
                     className={cn(
                       'relative flex items-center px-2 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all',
                       isActive
-                        ? 'text-neon-green'
+                        ? 'text-brand-primary'
                         : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
                     <span>{item.label}</span>
                     <span
                       className={cn(
-                        'absolute bottom-0 left-0 h-0.5 rounded-full bg-neon-green transition-all duration-300',
+                        'absolute bottom-0 left-0 h-0.5 rounded-full bg-brand-primary transition-all duration-300',
                         isActive ? 'w-full' : 'w-0 group-hover:w-full'
                       )}
                     />
@@ -133,7 +133,7 @@ export default function Layout() {
             {!isCreatePage && (
               <Link
                 to="/review/new"
-                className="flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 hover:border-neon-green/50 transition-all"
+                className="flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20 hover:border-brand-primary/50 transition-all"
               >
                 <span>新建评审</span>
               </Link>
@@ -218,7 +218,7 @@ export default function Layout() {
                   className={cn(
                     'flex items-center px-4 py-3 rounded-lg text-sm transition-all mb-1',
                     isActive
-                      ? 'bg-neon-green/10 text-neon-green border-l-2 border-neon-green'
+                      ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
                       : 'text-text-secondary hover:text-text-primary hover:bg-bg-card'
                   )}
                 >
@@ -231,7 +231,7 @@ export default function Layout() {
               <Link
                 to="/review/new"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center px-4 py-3 mt-4 rounded-lg text-sm font-medium bg-neon-green/10 text-neon-green border border-neon-green/30 hover:bg-neon-green/20 transition-all"
+                className="flex items-center px-4 py-3 mt-4 rounded-lg text-sm font-medium bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20 transition-all"
               >
                 <span>新建评审</span>
               </Link>
@@ -318,7 +318,7 @@ export default function Layout() {
           <div className="flex flex-col gap-1 items-center md:items-start">
             <span className="font-display font-bold text-sm">
               <span className="text-text-primary">Audience</span>
-              <span className="text-neon-green">Lens</span>
+              <span className="text-brand-primary">Lens</span>
             </span>
             <span className="text-xs text-text-muted">
               多代理合成用户评审系统

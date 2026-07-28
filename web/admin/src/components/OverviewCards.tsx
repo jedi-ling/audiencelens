@@ -17,13 +17,13 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
     <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <StatCard
         icon={<ClipboardCheck className="h-4 w-4" strokeWidth={1.5} />}
-        accent="text-neon-green"
+        accent="text-brand-primary"
         label="评审总数"
         value={data.reviews.total}
       >
         <StatusBar
           items={[
-            { key: 'completed', label: '完成', count: data.reviews.by_status['completed'] ?? 0, cls: 'bg-neon-green/80' },
+            { key: 'completed', label: '完成', count: data.reviews.by_status['completed'] ?? 0, cls: 'bg-brand-primary/80' },
             { key: 'failed', label: '失败', count: data.reviews.by_status['failed'] ?? 0, cls: 'bg-severity-critical/80' },
           ]}
           rest={{ label: '进行中', cls: 'bg-text-muted/40' }}
@@ -61,13 +61,13 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
 
       <StatCard
         icon={<ListChecks className="h-4 w-4" strokeWidth={1.5} />}
-        accent="text-neon-green"
+        accent="text-brand-primary"
         label="任务队列"
         value={jobsTotal}
       >
         <StatusBar
           items={[
-            { key: 'done', label: '完成', count: data.jobs_by_status['done'] ?? 0, cls: 'bg-neon-green/80' },
+            { key: 'done', label: '完成', count: data.jobs_by_status['done'] ?? 0, cls: 'bg-brand-primary/80' },
             { key: 'failed', label: '失败', count: data.jobs_by_status['failed'] ?? 0, cls: 'bg-severity-critical/80' },
             { key: 'running', label: '运行中', count: data.jobs_by_status['running'] ?? 0, cls: 'bg-cyan/70' },
           ]}
@@ -181,7 +181,7 @@ function TokenSplit({ input, output }: { input: number; output: number }) {
     <div>
       <div className="flex h-2 overflow-hidden rounded-full bg-bg-secondary">
         {input > 0 && <div className="bg-gold-cream/70" style={{ flex: input }} title={`输入 ${input.toLocaleString('en-US')}`} />}
-        {output > 0 && <div className="bg-neon-green/70" style={{ flex: output }} title={`输出 ${output.toLocaleString('en-US')}`} />}
+        {output > 0 && <div className="bg-brand-primary/70" style={{ flex: output }} title={`输出 ${output.toLocaleString('en-US')}`} />}
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 font-mono text-[10px] text-text-muted">
         <span className="flex items-center gap-1">
@@ -189,7 +189,7 @@ function TokenSplit({ input, output }: { input: number; output: number }) {
           输入 {input.toLocaleString('en-US')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-neon-green/70" />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-primary/70" />
           输出 {output.toLocaleString('en-US')}
         </span>
       </div>

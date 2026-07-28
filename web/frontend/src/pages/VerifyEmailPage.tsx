@@ -40,19 +40,19 @@ export default function VerifyEmailPage() {
       <div className="rounded-xl border border-border bg-bg-card p-8 text-center">
         {state === 'pending' && (
           <>
-            <Loader2 className="mx-auto h-6 w-6 animate-spin text-neon-green" strokeWidth={1.5} />
+            <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-primary" strokeWidth={1.5} />
             <p className="mt-3 text-sm text-text-secondary">正在验证…</p>
           </>
         )}
 
         {state === 'ok' && (
           <>
-            <MailCheck className="mx-auto h-6 w-6 text-neon-green" strokeWidth={1.5} />
+            <MailCheck className="mx-auto h-6 w-6 text-brand-primary" strokeWidth={1.5} />
             <h1 className="mt-3 text-lg font-semibold text-text-primary font-display">邮箱已验证</h1>
             <p className="mt-1 text-sm text-text-secondary">{message}</p>
             <Link
               to="/ask"
-              className="mt-6 inline-block rounded-lg bg-neon-green px-5 py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-neon-green-dim"
+              className="mt-6 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim"
             >
               开始评审
             </Link>
@@ -69,7 +69,7 @@ export default function VerifyEmailPage() {
             </p>
             <Link
               to="/settings"
-              className="mt-5 inline-block text-sm text-neon-green underline underline-offset-2"
+              className="mt-5 inline-block text-sm text-brand-primary underline underline-offset-2"
             >
               去设置页
             </Link>

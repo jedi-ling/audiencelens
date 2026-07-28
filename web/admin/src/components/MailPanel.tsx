@@ -123,7 +123,7 @@ export function MailPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Mail className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        <Mail className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
         邮件发送
         <span className="font-mono text-[10px] font-normal text-text-muted">
           邮箱验证 / 密码重置走这条链路
@@ -161,7 +161,7 @@ export function MailPanel() {
               </div>
             </div>
           ) : (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-neon-green/30 bg-bg-primary px-4 py-3 font-mono text-xs text-neon-green">
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-brand-primary/30 bg-bg-primary px-4 py-3 font-mono text-xs text-brand-primary">
               <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
               SMTP 已配置，邮件会真的发出。是否送达仍以下面的测试为准。
             </div>
@@ -197,12 +197,12 @@ export function MailPanel() {
           }}
           onKeyDown={(e) => e.key === 'Enter' && void sendTest()}
           placeholder="收测试邮件的地址，填一个你能立刻打开的邮箱"
-          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green transition-colors"
+          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
         />
         <button
           onClick={() => void sendTest()}
           disabled={sending || !to.trim()}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           {sending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
@@ -228,7 +228,7 @@ export function MailPanel() {
       )}
 
       {result?.ok && result.delivered && (
-        <div className="mt-2 flex items-start gap-2 font-mono text-xs text-neon-green">
+        <div className="mt-2 flex items-start gap-2 font-mono text-xs text-brand-primary">
           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
           <span className="break-all">{result.message}</span>
         </div>

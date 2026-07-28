@@ -100,7 +100,7 @@ export default function EvaluationPage() {
           <div className={cn(
             'w-28 h-28 rounded-full flex items-center justify-center border-4 mb-4',
             scorecard.overall_score > 70
-              ? 'border-neon-green bg-neon-green/10'
+              ? 'border-brand-primary bg-brand-primary/10'
               : scorecard.overall_score >= 50
                 ? 'border-severity-medium bg-severity-medium/10'
                 : 'border-severity-critical bg-severity-critical/10'
@@ -108,7 +108,7 @@ export default function EvaluationPage() {
             <span className={cn(
               'text-3xl font-bold font-mono',
               scorecard.overall_score > 70
-                ? 'text-neon-green'
+                ? 'text-brand-primary'
                 : scorecard.overall_score >= 50
                   ? 'text-severity-medium'
                   : 'text-severity-critical'
@@ -119,7 +119,7 @@ export default function EvaluationPage() {
           <span className={cn(
             'inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-sm font-medium',
             scorecard.passed
-              ? 'bg-neon-green/10 text-neon-green'
+              ? 'bg-brand-primary/10 text-brand-primary'
               : 'bg-severity-critical/10 text-severity-critical'
           )}>
             {scorecard.passed ? '✅ 评估通过' : '❌ 评估未通过'}
@@ -191,7 +191,7 @@ export default function EvaluationPage() {
                 >
                   <div className={cn(
                     'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono',
-                    result.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                    result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {result.score}
                   </div>
@@ -200,7 +200,7 @@ export default function EvaluationPage() {
                       <span className="text-sm font-medium text-text-primary">{dim?.name ?? result.dimension}</span>
                       <span className={cn(
                         'text-xs px-1.5 py-0.5 rounded',
-                        result.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                        result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                       )}>
                         {result.passed ? '通过' : '未通过'}
                       </span>
@@ -222,7 +222,7 @@ export default function EvaluationPage() {
                         <span>评分</span>
                         <span className={cn(
                           'font-mono font-bold',
-                          result.score > 70 ? 'text-neon-green' : result.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
+                          result.score > 70 ? 'text-brand-primary' : result.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
                         )}>
                           {result.score}/100
                         </span>
@@ -231,7 +231,7 @@ export default function EvaluationPage() {
                         <div
                           className={cn(
                             'h-full rounded-full transition-all',
-                            result.score > 70 ? 'bg-neon-green' : result.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
+                            result.score > 70 ? 'bg-brand-primary' : result.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
                           )}
                           style={{ width: `${result.score}%` }}
                         />
@@ -259,7 +259,7 @@ export default function EvaluationPage() {
                   <span className="text-sm font-medium text-text-primary">{er.persona_id}</span>
                   <span className={cn(
                     'ml-auto text-xs px-2 py-0.5 rounded font-medium',
-                    er.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                    er.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {er.passed ? '通过' : '未通过'}
                   </span>
@@ -270,7 +270,7 @@ export default function EvaluationPage() {
                       <span>伦理评分</span>
                       <span className={cn(
                         'font-mono font-bold',
-                        er.score > 70 ? 'text-neon-green' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
+                        er.score > 70 ? 'text-brand-primary' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
                       )}>
                         {er.score}
                       </span>
@@ -279,7 +279,7 @@ export default function EvaluationPage() {
                       <div
                         className={cn(
                           'h-full rounded-full',
-                          er.score > 70 ? 'bg-neon-green' : er.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
+                          er.score > 70 ? 'bg-brand-primary' : er.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
                         )}
                         style={{ width: `${er.score}%` }}
                       />

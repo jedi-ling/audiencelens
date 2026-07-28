@@ -13,7 +13,7 @@ type ReviewKey = 'reviews_total' | 'reviews_completed' | 'reviews_failed'
 
 const LINES: Array<{ key: ReviewKey; color: string; label: string }> = [
   { key: 'reviews_total', color: 'var(--color-cyan)', label: '总量' },
-  { key: 'reviews_completed', color: 'var(--color-neon-green)', label: '完成' },
+  { key: 'reviews_completed', color: 'var(--color-brand-primary)', label: '完成' },
   { key: 'reviews_failed', color: 'var(--color-severity-critical)', label: '失败' },
 ]
 

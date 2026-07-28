@@ -130,7 +130,7 @@ interface RealCalibration {
 // ---------- 展示映射 ----------
 
 const RISK_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  low: { label: '低风险', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30' },
+  low: { label: '低风险', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
   medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
   high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
   critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
@@ -149,7 +149,7 @@ const STANCE_PALETTE = ['#F9D67D', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '
 
 const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', Icon: ListChecks },
+  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
@@ -252,7 +252,7 @@ function LimitationsSection({ caveats }: { caveats?: string[] }) {
 const CROSS_EXAM_MODE_BADGE: Record<CrossExamMode, string> = {
   derived_summary: 'bg-bg-secondary text-text-muted border-border',
   moderated_rebuttal: 'bg-cyan/10 text-cyan border-cyan/30',
-  multi_agent_rebuttal: 'bg-neon-green/10 text-neon-green border-neon-green/30',
+  multi_agent_rebuttal: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30',
 }
 
 /** 正反两方的准确叫法。引擎里 pro = 认为问题更严重的一方（A 系列），
@@ -313,7 +313,7 @@ function CrossExamArgumentBlock({ arg, role, live }: { arg: CrossExamArgument; r
       </div>
       <p className="whitespace-pre-line text-xs text-text-primary">{arg.point}</p>
       {arg.rebuttal ? (
-        <div className="mt-2 border-l-2 border-neon-green/50 bg-bg-card/60 py-1.5 pl-2.5">
+        <div className="mt-2 border-l-2 border-brand-primary/50 bg-bg-card/60 py-1.5 pl-2.5">
           <p className="mb-0.5 flex items-center gap-1 text-[11px] text-text-muted">
             <MessageSquareQuote className="h-3 w-3" strokeWidth={1.5} />
             这一方对对手论据的反驳
@@ -347,7 +347,7 @@ function CrossExamChangeCard({
     <div
       className={cn(
         'rounded-lg border p-3',
-        accepted ? 'border-neon-green/25 bg-neon-green/5' : 'border-border bg-bg-secondary/40'
+        accepted ? 'border-brand-primary/25 bg-brand-primary/5' : 'border-border bg-bg-secondary/40'
       )}
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -363,14 +363,14 @@ function CrossExamChangeCard({
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary">{change.from_stance || '—'}</span>
         {accepted ? (
-          <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-neon-green" strokeWidth={1.5} />
+          <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-brand-primary" strokeWidth={1.5} />
         ) : (
           <MinusCircle className="h-3.5 w-3.5 shrink-0 text-text-muted" strokeWidth={1.5} />
         )}
         <span
           className={cn(
             'rounded px-1.5 py-0.5',
-            accepted ? 'bg-neon-green/10 text-neon-green' : 'text-text-muted line-through'
+            accepted ? 'bg-brand-primary/10 text-brand-primary' : 'text-text-muted line-through'
           )}
         >
           {accepted ? '' : '模型声称改为 '}
@@ -442,7 +442,7 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
   return (
     <div className="mb-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Swords className={cn('h-5 w-5', live ? 'text-neon-green' : 'text-text-muted')} strokeWidth={1.25} />
+        <Swords className={cn('h-5 w-5', live ? 'text-brand-primary' : 'text-text-muted')} strokeWidth={1.25} />
         <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
         <span className={cn('rounded border px-2 py-0.5 text-xs font-medium', modeBadgeClass)}>{modeLabel}</span>
         {live && view.rounds_run > 0 && (
@@ -554,7 +554,7 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
       {/* 改票记录。"没有人改票"是正常结果，必须写出来而不是留空白。 */}
       <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <ArrowRightLeft className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+          <ArrowRightLeft className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
           <h4 className="text-sm font-semibold text-text-primary">改票记录</h4>
           {live && (
             <span className="text-xs text-text-muted">
@@ -619,7 +619,7 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
                 delta === null || delta === 0
                   ? 'text-text-muted'
                   : delta > 0
-                    ? 'text-neon-green'
+                    ? 'text-brand-primary'
                     : 'text-severity-medium'
               return (
                 <li key={cc.persona_key || `${cc.persona_id}-${i}`} className="flex flex-wrap items-center gap-2 text-xs">
@@ -871,7 +871,7 @@ export default function ReportPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => handleExport('json')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-neon-green/30 hover:text-neon-green transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
           >
             <File className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">JSON</span>
@@ -900,12 +900,12 @@ export default function ReportPage() {
             className={cn(
               'w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all',
               showHtmlReport
-                ? 'bg-neon-green/5 border-neon-green/30'
-                : 'bg-bg-card border-border hover:border-neon-green/30'
+                ? 'bg-brand-primary/5 border-brand-primary/30'
+                : 'bg-bg-card border-border hover:border-brand-primary/30'
             )}
           >
             <span className="flex items-center gap-2 text-sm font-medium text-text-secondary">
-              <Globe className="w-4 h-4 text-neon-green" strokeWidth={1.25} />
+              <Globe className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
               HTML 可视化报告
             </span>
             {showHtmlReport
@@ -1013,7 +1013,7 @@ export default function ReportPage() {
               {calibration.overall_pass != null && (
                 <p className={cn(
                   'mt-3 text-center text-xs font-medium',
-                  calibration.overall_pass ? 'text-neon-green' : 'text-warm-orange'
+                  calibration.overall_pass ? 'text-brand-primary' : 'text-warm-orange'
                 )}>
                   {calibration.overall_pass ? '校准通过' : '校准未达标——结论请谨慎采信'}
                 </p>
@@ -1140,7 +1140,7 @@ export default function ReportPage() {
                       <ul className="space-y-0.5">
                         {note.evidence_top3!.map((e, i) => (
                           <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                            <span className="text-neon-green mt-0.5">•</span>
+                            <span className="text-brand-primary mt-0.5">•</span>
                             {e}
                           </li>
                         ))}
@@ -1243,7 +1243,7 @@ export default function ReportPage() {
             <span className={cn(
               'ml-auto text-xs px-2 py-0.5 rounded font-medium',
               (report.compliance.ethics_score ?? 0) >= 80
-                ? 'bg-neon-green/10 text-neon-green'
+                ? 'bg-brand-primary/10 text-brand-primary'
                 : (report.compliance.ethics_score ?? 0) >= 50
                   ? 'bg-severity-medium/10 text-severity-medium'
                   : 'bg-severity-critical/10 text-severity-critical'
@@ -1296,7 +1296,7 @@ export default function ReportPage() {
                 <div className={cn(
                   'w-20 h-20 rounded-full flex items-center justify-center border-4',
                   evaluationScorecard.overall_score > 70
-                    ? 'border-neon-green bg-neon-green/10'
+                    ? 'border-brand-primary bg-brand-primary/10'
                     : evaluationScorecard.overall_score >= 50
                       ? 'border-severity-medium bg-severity-medium/10'
                       : 'border-severity-critical bg-severity-critical/10'
@@ -1304,7 +1304,7 @@ export default function ReportPage() {
                   <span className={cn(
                     'text-2xl font-bold font-mono',
                     evaluationScorecard.overall_score > 70
-                      ? 'text-neon-green'
+                      ? 'text-brand-primary'
                       : evaluationScorecard.overall_score >= 50
                         ? 'text-severity-medium'
                         : 'text-severity-critical'
@@ -1316,7 +1316,7 @@ export default function ReportPage() {
                   <span className={cn(
                     'inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium',
                     evaluationScorecard.passed
-                      ? 'bg-neon-green/10 text-neon-green'
+                      ? 'bg-brand-primary/10 text-brand-primary'
                       : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {evaluationScorecard.passed
@@ -1373,7 +1373,7 @@ export default function ReportPage() {
                   >
                     <div className={cn(
                       'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono',
-                      result.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                      result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                     )}>
                       {result.score}
                     </div>
@@ -1381,7 +1381,7 @@ export default function ReportPage() {
                       <span className="text-sm font-medium text-text-primary">{dim?.name ?? result.dimension}</span>
                       <span className={cn(
                         'ml-2 text-xs px-1.5 py-0.5 rounded',
-                        result.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                        result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                       )}>
                         {result.passed ? '通过' : '未通过'}
                       </span>
@@ -1419,7 +1419,7 @@ export default function ReportPage() {
                   <span className="text-sm font-medium text-text-primary">{er.persona_id}</span>
                   <span className={cn(
                     'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium',
-                    er.passed ? 'bg-neon-green/10 text-neon-green' : 'bg-severity-critical/10 text-severity-critical'
+                    er.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {er.passed
                       ? <><CheckCircle2 className="w-3 h-3" strokeWidth={1.5} />通过</>
@@ -1432,7 +1432,7 @@ export default function ReportPage() {
                       <span>伦理评分</span>
                       <span className={cn(
                         'font-mono font-bold',
-                        er.score > 70 ? 'text-neon-green' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
+                        er.score > 70 ? 'text-brand-primary' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
                       )}>
                         {er.score}
                       </span>
@@ -1441,7 +1441,7 @@ export default function ReportPage() {
                       <div
                         className={cn(
                           'h-full rounded-full transition-all',
-                          er.score > 70 ? 'bg-neon-green' : er.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
+                          er.score > 70 ? 'bg-brand-primary' : er.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
                         )}
                         style={{ width: `${er.score}%` }}
                       />
@@ -1536,11 +1536,11 @@ export default function ReportPage() {
 
       {/* ---------- 价值回填 ---------- */}
       {id && !feedbackSent && (
-        <section className="mb-6 rounded-xl border border-neon-green/30 bg-bg-card p-5">
+        <section className="mb-6 rounded-xl border border-brand-primary/30 bg-bg-card p-5">
           <h2 className="font-display text-sm font-semibold text-text-primary">这份报告真的有用吗？</h2>
           <p className="mt-1 text-xs text-text-muted">反馈将用于衡量建议采纳与决策影响，不用调用次数冒充价值。</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === true ? 'border-neon-green bg-neon-green/10 text-neon-green' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(true)}>有用</button>
+            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === true ? 'border-brand-primary bg-brand-primary/10 text-brand-primary' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(true)}>有用</button>
             <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === false ? 'border-severity-critical bg-severity-critical/10 text-severity-critical' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(false)}>没帮助</button>
           </div>
           {feedbackUseful !== null && (
@@ -1553,7 +1553,7 @@ export default function ReportPage() {
                       const title = fix.issue ?? `建议 ${i + 1}`
                       return (
                         <label key={i} className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
-                          <input type="checkbox" checked={adoptedFixes.includes(title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, title] : current.filter((t) => t !== title))} className="mt-0.5 accent-neon-green" />
+                          <input type="checkbox" checked={adoptedFixes.includes(title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, title] : current.filter((t) => t !== title))} className="mt-0.5 accent-brand-primary" />
                           <span>{title}</span>
                         </label>
                       )
@@ -1568,10 +1568,10 @@ export default function ReportPage() {
                 <input type="number" min={0} step="1" value={willingnessToPay} onChange={(e) => setWillingnessToPay(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
               </label>
               <label className="flex items-center gap-2 text-xs text-text-secondary sm:col-span-2">
-                <input type="checkbox" checked={decisionChanged} onChange={(e) => setDecisionChanged(e.target.checked)} className="accent-neon-green" />
+                <input type="checkbox" checked={decisionChanged} onChange={(e) => setDecisionChanged(e.target.checked)} className="accent-brand-primary" />
                 报告改变了我的产品或发布决策
               </label>
-              <button className="rounded-md bg-neon-green px-4 py-2 text-sm font-semibold text-bg-primary" onClick={async () => {
+              <button className="rounded-md bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary" onClick={async () => {
                 setFeedbackError(null)
                 try {
                   await api.submitReviewFeedback(id, {
@@ -1593,7 +1593,7 @@ export default function ReportPage() {
           {feedbackError && <p className="mt-3 text-xs text-severity-critical">{feedbackError}</p>}
         </section>
       )}
-      {feedbackSent && <p className="mb-6 text-sm text-neon-green">已记录。后续可在"判断复利"查看价值指标。</p>}
+      {feedbackSent && <p className="mb-6 text-sm text-brand-primary">已记录。后续可在"判断复利"查看价值指标。</p>}
     </div>
   )
 }
@@ -1661,8 +1661,8 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
         </div>
       )}
 
-      <div className="rounded-xl border border-neon-green/30 bg-neon-green/5 p-6 text-center">
-        <Lock className="w-6 h-6 text-neon-green mx-auto mb-3" strokeWidth={1.5} />
+      <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 p-6 text-center">
+        <Lock className="w-6 h-6 text-brand-primary mx-auto mb-3" strokeWidth={1.5} />
         <p className="text-text-primary font-medium">
           还有 {fixesHidden} 条优先修复项、{notesHidden} 条角色视角未展示
         </p>
@@ -1676,7 +1676,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
         </p>
         <Link
           to="/login"
-          className="mt-4 inline-block rounded-lg bg-neon-green px-5 py-2.5 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors"
+          className="mt-4 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
         >
           登录 / 注册看完整报告
         </Link>

@@ -40,9 +40,9 @@ const PROVIDER_CONFIG: Record<Provider, {
     label: 'Anthropic 原生',
     icon: Bot,
     color: {
-      border: 'border-neon-green/50',
-      bg: 'bg-neon-green/10',
-      text: 'text-neon-green',
+      border: 'border-brand-primary/50',
+      bg: 'bg-brand-primary/10',
+      text: 'text-brand-primary',
       glow: 'shadow-[0_0_15px_rgba(183,126,59,0.15)]',
     },
     desc: 'Claude 官方 API',
@@ -263,7 +263,7 @@ export default function SettingsPage() {
       <div className="space-y-8">
         <section className="pt-2">
           <h2 className="text-lg font-display font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
+            <KeyRound className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
             API Key（BYOK）
           </h2>
           <p className="text-xs text-text-muted mb-4">
@@ -284,9 +284,9 @@ export default function SettingsPage() {
               {keyStatus.keys.map((k) => (
                 <div
                   key={k.provider}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-card border border-neon-green/30"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-card border border-brand-primary/30"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-neon-green shrink-0" strokeWidth={1.25} />
+                  <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0" strokeWidth={1.25} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-text-primary font-medium">
                       {k.provider}
@@ -426,7 +426,7 @@ export default function SettingsPage() {
                   resetTest()
                 }}
                 placeholder={byokProvider === 'anthropic' ? 'sk-ant-…（输入 Anthropic API Key）' : '输入对应服务商的 API Key（Ollama 本地可留空）'}
-                className="w-full px-4 py-3 pr-12 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors font-mono text-sm"
+                className="w-full px-4 py-3 pr-12 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
               />
               <button
                 onClick={() => setShowByokKey(!showByokKey)}
@@ -459,7 +459,7 @@ export default function SettingsPage() {
                 'flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all shrink-0',
                 byokSaving || !byokKey.trim()
                   ? 'bg-bg-card text-text-muted cursor-not-allowed'
-                  : 'bg-neon-green text-bg-primary hover:bg-neon-green-dim'
+                  : 'bg-brand-primary text-bg-primary hover:bg-brand-primary-dim'
               )}
             >
               {byokSaving ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <Save className="w-4 h-4" strokeWidth={1.25} />}
@@ -468,7 +468,7 @@ export default function SettingsPage() {
           </div>
 
           {testStatus === 'success' && testResult && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-neon-green">
+            <div className="mt-2 flex items-center gap-2 text-sm text-brand-primary">
               <CheckCircle2 className="w-4 h-4" strokeWidth={1.25} />
               <span>连接成功</span>
               {testResult.model && <span className="text-text-muted font-mono text-xs">({testResult.model})</span>}
@@ -484,7 +484,7 @@ export default function SettingsPage() {
             </div>
           )}
           {byokSaved && (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-neon-green animate-fade-in">
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-brand-primary animate-fade-in">
               <CheckCircle2 className="w-4 h-4" strokeWidth={1.25} />
               Key 已保存
             </p>
@@ -548,7 +548,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {cdkSuccess && (
-              <p className="mt-2 flex items-center gap-1.5 text-sm text-neon-green animate-fade-in">
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-brand-primary animate-fade-in">
                 <CheckCircle2 className="w-4 h-4" strokeWidth={1.25} />
                 兑换成功 +{cdkSuccess.granted} 次，当前余额 {cdkSuccess.balance} 次
                 {cdkSuccess.guest && (
@@ -585,7 +585,7 @@ export default function SettingsPage() {
                   <div className="text-xs text-text-muted mb-1">
                     {usage.quota_mode === 'credits' ? '剩余次数' : '加量余额'}
                   </div>
-                  <div className="font-display font-bold text-neon-green">
+                  <div className="font-display font-bold text-brand-primary">
                     {usage.bonus_credits ?? 0}
                     <span className="text-text-muted font-normal text-xs"> 次</span>
                   </div>
@@ -624,7 +624,7 @@ export default function SettingsPage() {
          * 承诺才变成可验证的事实。 */}
         <section className="pt-8">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <ShieldCheck className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+            <ShieldCheck className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
             我的数据
           </h2>
           <p className="mt-1 text-xs text-text-muted">
@@ -638,7 +638,7 @@ export default function SettingsPage() {
           )}
 
           {deleteDone && (
-            <div className="mt-3 rounded-md border border-neon-green/30 bg-neon-green/10 px-3 py-2 text-xs text-neon-green">
+            <div className="mt-3 rounded-md border border-brand-primary/30 bg-brand-primary/10 px-3 py-2 text-xs text-brand-primary">
               已删除：{deleteDone.reviews_deleted} 条评审、{deleteDone.api_keys_deleted} 个密钥。
               计费流水已切断与你的关联（保留无主统计，见隐私政策）。
             </div>
@@ -648,7 +648,7 @@ export default function SettingsPage() {
             <button
               onClick={() => void handleExport()}
               disabled={exporting}
-              className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-neon-green/40 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
             >
               {exporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />

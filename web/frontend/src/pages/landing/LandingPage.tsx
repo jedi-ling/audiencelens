@@ -7,8 +7,17 @@ import './landing-in-app.css' // hero 顶距等适配，与共享 Layout 拼接�
 import landingBody from './landing-body.html?raw'
 
 /**
- * 营销落地页 —— 作为 `/` 路由，与 app 共用同一套 Layout（导航/页脚），
- * 金色主题与 app 内部的 neon-green 界面刻意区分。
+ * 营销落地页 —— 作为 `/` 路由，与 app 共用同一套 Layout（导航/页脚）。
+ *
+ * 配色与 app 内部**完全一致**：landing.css 的 --gold 和 index.css 的
+ * --color-brand-primary 都是古铜金 #B77E3B，--gold-bright / --color-gold-cream
+ * 都是 #F9D67D。落地页之所以还留着自己一套 CSS 变量，只是因为它的样式作用域
+ * 化在 .al-landing 里、不走 Tailwind token，不是因为要走另一套视觉。
+ *
+ * （这里原本写着"金色主题与 app 内部的 brand-primary 界面刻意区分"——那是 2026-07
+ * 全站统一成古铜金之前的旧状态。这条注释后来把一次 UI 审计带偏了：审计据此判定
+ * "品牌色系统精神分裂"并列为头号问题，而实测两边是同一个色值。
+ * 陈旧注释不是无害的，它会被下游当成事实。）
  * 正文走 dangerouslySetInnerHTML + 作用域化到 .al-landing 的 CSS，
  * 交互脚本在下面的 useEffect 里，内部链接已改成 React Router 跳转，实现 SPA 无刷新链路。
  */

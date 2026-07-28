@@ -103,7 +103,7 @@ export function ServerKeyPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Lock className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        <Lock className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
         平台级 API Key
         <span className="font-mono text-[10px] font-normal text-text-muted">managed/hybrid 模式垫付用</span>
       </h2>
@@ -119,7 +119,7 @@ export function ServerKeyPanel() {
             onClick={() => switchProvider(p)}
             className={`rounded-md px-3 py-1.5 transition-colors ${
               provider === p
-                ? 'bg-neon-green/15 text-neon-green border border-neon-green/40'
+                ? 'bg-brand-primary/15 text-brand-primary border border-brand-primary/40'
                 : 'bg-bg-secondary text-text-muted border border-border hover:text-text-secondary'
             }`}
           >
@@ -131,8 +131,8 @@ export function ServerKeyPanel() {
       {error && <p className="mt-3 font-mono text-xs text-severity-critical">{error}</p>}
 
       {status?.configured ? (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-neon-green/30 bg-bg-primary px-4 py-3">
-          <span className="font-mono text-sm text-neon-green">{status.key?.masked}</span>
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-primary/30 bg-bg-primary px-4 py-3">
+          <span className="font-mono text-sm text-brand-primary">{status.key?.masked}</span>
           {status.key?.model && <span className="font-mono text-xs text-text-secondary">{status.key.model}</span>}
           <span className="ml-auto font-mono text-[10px] text-text-muted">
             {status.key?.last_used_at ? `最近使用 ${new Date(status.key.last_used_at).toLocaleString()}` : '尚未使用'}
@@ -162,7 +162,7 @@ export function ServerKeyPanel() {
       )}
 
       {testStatus === 'success' && testResult && (
-        <div className="mt-2 flex items-center gap-2 font-mono text-xs text-neon-green">
+        <div className="mt-2 flex items-center gap-2 font-mono text-xs text-brand-primary">
           <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.5} />
           <span>连接成功</span>
           {testResult.model && <span className="text-text-muted">({testResult.model})</span>}
@@ -237,17 +237,17 @@ export function ServerKeyPanel() {
             resetTest()
           }}
           placeholder={provider === 'anthropic' ? 'sk-ant-…（轮换或首次设置）' : '对应服务商的 API Key（Ollama 本地可留空）'}
-          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-neon-green transition-colors"
+          className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
         />
         <button
           onClick={() => void save()}
           disabled={busy || !input.trim()}
-          className="shrink-0 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-neon-green-dim transition-colors disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           保存
         </button>
       </div>
-      {saved && <p className="mt-2 font-mono text-xs text-neon-green">已保存</p>}
+      {saved && <p className="mt-2 font-mono text-xs text-brand-primary">已保存</p>}
     </section>
   )
 }

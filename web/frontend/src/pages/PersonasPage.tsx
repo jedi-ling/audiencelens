@@ -89,7 +89,7 @@ export default function PersonasPage() {
           className={cn(
             'text-left px-3 py-2 rounded-lg text-sm transition-all',
             !selectedPack
-              ? 'bg-neon-green/10 text-neon-green border-l-2 border-neon-green'
+              ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
               : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
           )}
         >
@@ -131,7 +131,7 @@ export default function PersonasPage() {
                       className={cn(
                         'text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2',
                         selectedPack === pack.panel_id
-                          ? 'bg-neon-green/10 text-neon-green border-l-2 border-neon-green'
+                          ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
                           : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
                       )}
                     >
@@ -269,7 +269,7 @@ export default function PersonasPage() {
                   className={cn(
                     'rounded-xl border-2 bg-bg-card overflow-hidden transition-all',
                     isCompareSelected ? 'border-cyan/50 glow-cyan' :
-                    isExpanded ? 'border-neon-green/30' : 'border-border'
+                    isExpanded ? 'border-brand-primary/30' : 'border-border'
                   )}
                 >
                   <div
@@ -328,7 +328,7 @@ export default function PersonasPage() {
                           <ul className="space-y-1">
                             {persona.decisionRules.map((rule, i) => (
                               <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                                <span className="text-neon-green mt-0.5">▸</span>
+                                <span className="text-brand-primary mt-0.5">▸</span>
                                 {rule}
                               </li>
                             ))}

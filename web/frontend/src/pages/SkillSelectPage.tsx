@@ -66,7 +66,7 @@ export default function SkillSelectPage() {
 
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-neon-green/10 border border-neon-green/20">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
                     <img
                       src={skill.icon}
                       alt={skill.name}

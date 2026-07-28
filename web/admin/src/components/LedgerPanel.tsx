@@ -23,7 +23,7 @@ export function LedgerPanel() {
   return (
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Gauge className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+        <Gauge className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
         判断复利（全局）
         <span className="font-mono text-[10px] font-normal text-text-muted">跨全体用户聚合</span>
       </h2>
@@ -51,7 +51,7 @@ export function LedgerPanel() {
               <div key={entry.persona_id} className="flex items-center gap-3 py-2">
                 <span className="min-w-0 flex-1 truncate font-mono text-xs text-text-primary">{entry.persona_id}</span>
                 <span className="font-mono text-xs text-text-muted">样本 {entry.sample_size}</span>
-                <span className={`font-mono text-xs font-semibold ${entry.low_confidence ? 'text-warm-orange' : 'text-neon-green'}`}>
+                <span className={`font-mono text-xs font-semibold ${entry.low_confidence ? 'text-warm-orange' : 'text-brand-primary'}`}>
                   {formatRate(entry.hit_rate)}
                 </span>
               </div>

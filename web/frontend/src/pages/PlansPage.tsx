@@ -166,7 +166,7 @@ export default function PlansPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div>
                 <div className="text-xs text-text-muted mb-1">当前档位</div>
-                <div className="font-display font-bold text-neon-green">
+                <div className="font-display font-bold text-brand-primary">
                   {plans?.find((p) => p.id === currentPlanId)?.name ?? currentPlanId}
                 </div>
               </div>
@@ -250,14 +250,14 @@ export default function PlansPage() {
                   className={cn(
                     'flex flex-col rounded-xl border p-5 transition-colors',
                     isCurrent
-                      ? 'border-neon-green/50 bg-neon-green/[0.06]'
+                      ? 'border-brand-primary/50 bg-brand-primary/[0.06]'
                       : 'border-border bg-bg-card hover:bg-bg-card-hover',
                   )}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <h3 className="font-display text-lg font-bold text-text-primary">{plan.name}</h3>
                     {isCurrent && (
-                      <span className="rounded-full border border-neon-green/30 bg-neon-green/10 px-2 py-0.5 text-[11px] text-neon-green">
+                      <span className="rounded-full border border-brand-primary/30 bg-brand-primary/10 px-2 py-0.5 text-[11px] text-brand-primary">
                         当前档位
                       </span>
                     )}
@@ -272,7 +272,7 @@ export default function PlansPage() {
 
                   <ul className="mb-5 space-y-2 text-sm text-text-secondary">
                     <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-neon-green" strokeWidth={1.5} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
                       <span>
                         每天 <strong className="text-text-primary">{plan.reviews_per_day}</strong> 次评审
                         {!quotaEnabled && <span className="text-text-muted">（当前部署未启用限额）</span>}
@@ -280,13 +280,13 @@ export default function PlansPage() {
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-neon-green" strokeWidth={1.5} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
                       <span>
                         平台垫付成本上限 <strong className="text-text-primary">${plan.cost_usd_per_day}</strong> / 天
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-neon-green" strokeWidth={1.5} />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
                       <span>自带 Key（BYOK）不限次，不计额度</span>
                     </li>
                   </ul>
@@ -303,7 +303,7 @@ export default function PlansPage() {
                     ) : (
                       <a
                         href={upgradeMailto(plan)}
-                        className="flex items-center justify-center gap-2 rounded-lg border border-neon-green/30 bg-neon-green/10 px-4 py-2.5 text-sm font-medium text-neon-green transition-all hover:bg-neon-green/20 hover:border-neon-green/50"
+                        className="flex items-center justify-center gap-2 rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-4 py-2.5 text-sm font-medium text-brand-primary transition-all hover:bg-brand-primary/20 hover:border-brand-primary/50"
                       >
                         <Mail className="h-4 w-4" strokeWidth={1.5} />
                         联系升级
@@ -384,7 +384,7 @@ export default function PlansPage() {
           </div>
 
           {cdkSuccess && (
-            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-neon-green animate-fade-in">
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-brand-primary animate-fade-in">
               <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} />
               兑换成功 +{cdkSuccess.granted} 次，当前余额 {cdkSuccess.balance} 次
               {cdkSuccess.guest && <span className="text-xs text-text-muted">（已为你创建游客身份并自动登录）</span>}
@@ -401,7 +401,7 @@ export default function PlansPage() {
             没有码？发邮件说明用途，我给你发一个。
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
-              className="ml-1 text-neon-green underline underline-offset-2 hover:text-gold-cream"
+              className="ml-1 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
             >
               {CONTACT_EMAIL}
             </a>
@@ -413,7 +413,7 @@ export default function PlansPage() {
       <section className="mb-10 grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
-            <Mail className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+            <Mail className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
             人工开通 Pro / Team
           </h2>
           <p className="mb-3 text-sm text-text-secondary">
@@ -423,7 +423,7 @@ export default function PlansPage() {
           <div className="flex flex-wrap gap-3 text-sm">
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 升级咨询')}`}
-              className="flex items-center gap-1.5 text-neon-green underline underline-offset-2 hover:text-gold-cream"
+              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
             >
               {CONTACT_EMAIL}
             </a>

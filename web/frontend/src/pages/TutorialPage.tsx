@@ -64,7 +64,7 @@ const taskTypeTable = TASK_TYPES.map((tt) => {
 })
 
 const resultItems = [
-  { icon: ShieldCheck, label: '风险等级', desc: '绿/黄/橙/红 四级风险评估', color: 'text-neon-green' },
+  { icon: ShieldCheck, label: '风险等级', desc: '绿/黄/橙/红 四级风险评估', color: 'text-brand-primary' },
   { icon: Users, label: '立场分布', desc: '支持/中立/怀疑/反对 各角色立场', color: 'text-cyan' },
   { icon: AlertTriangle, label: '优先问题列表', desc: '按严重程度排序的关键问题', color: 'text-severity-warning' },
   { icon: Eye, label: '每个角色的详细视角', desc: '各角色的独立评审观点', color: 'text-text-primary' },
@@ -97,18 +97,18 @@ export default function TutorialPage() {
               return (
                 <div key={i} className="relative">
                   <div className="flex flex-col items-center text-center gap-3 p-4 rounded-lg bg-bg-secondary/30">
-                    <div className="w-10 h-10 rounded-full bg-neon-green/10 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
+                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
                     </div>
                     <div>
-                      <div className="text-xs text-neon-green font-mono mb-1">Step {i + 1}</div>
+                      <div className="text-xs text-brand-primary font-mono mb-1">Step {i + 1}</div>
                       <div className="text-sm font-medium text-text-primary">{s.label}</div>
                       <div className="text-xs text-text-secondary mt-1">{s.desc}</div>
                     </div>
                   </div>
                   {i < steps.length - 1 && (
                     <div className="hidden lg:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10">
-                      <ArrowRight className="w-4 h-4 text-neon-green/50" strokeWidth={1.25} />
+                      <ArrowRight className="w-4 h-4 text-brand-primary/50" strokeWidth={1.25} />
                     </div>
                   )}
                 </div>
@@ -128,21 +128,21 @@ export default function TutorialPage() {
             {uploadMethods.map((m, i) => {
               const Icon = m.icon
               return (
-                <div key={i} className={`flex gap-4 p-4 rounded-lg ${m.highlight ? 'bg-neon-green/5 border border-neon-green/20' : 'bg-bg-secondary/30'}`}>
-                  <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${m.highlight ? 'bg-neon-green/20' : 'bg-neon-green/10'}`}>
-                    <Icon className={`w-5 h-5 ${m.highlight ? 'text-neon-green' : 'text-neon-green/70'}`} strokeWidth={1.25} />
+                <div key={i} className={`flex gap-4 p-4 rounded-lg ${m.highlight ? 'bg-brand-primary/5 border border-brand-primary/20' : 'bg-bg-secondary/30'}`}>
+                  <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${m.highlight ? 'bg-brand-primary/20' : 'bg-brand-primary/10'}`}>
+                    <Icon className={`w-5 h-5 ${m.highlight ? 'text-brand-primary' : 'text-brand-primary/70'}`} strokeWidth={1.25} />
                   </div>
                   <div>
                     <div className="text-sm font-medium text-text-primary">
                       {m.title}
-                      {m.highlight && <span className="ml-2 text-xs text-neon-green">推荐</span>}
+                      {m.highlight && <span className="ml-2 text-xs text-brand-primary">推荐</span>}
                     </div>
                     <div className="text-sm text-text-secondary mt-0.5">{m.desc}</div>
                     {m.details && (
                       <ul className="mt-2 space-y-1">
                         {m.details.map((d, j) => (
                           <li key={j} className="text-xs text-text-secondary flex items-start gap-1.5">
-                            <span className="text-neon-green mt-0.5">•</span>
+                            <span className="text-brand-primary mt-0.5">•</span>
                             {d}
                           </li>
                         ))}
@@ -178,7 +178,7 @@ export default function TutorialPage() {
               { title: '本地化翻译文件', desc: '翻译样本、文化适配说明、UI 适配问题' },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-bg-secondary/30">
-                <FileText className="w-4 h-4 text-neon-green shrink-0 mt-0.5" strokeWidth={1.25} />
+                <FileText className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" strokeWidth={1.25} />
                 <div>
                   <div className="text-sm font-medium text-text-primary">{item.title}</div>
                   <div className="text-xs text-text-secondary mt-0.5">{item.desc}</div>
@@ -211,7 +211,7 @@ export default function TutorialPage() {
                     <td className="py-3 px-3">
                       <div className="flex flex-wrap gap-1">
                         {row.required.map((f) => (
-                          <span key={f} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-neon-green/10 text-neon-green">
+                          <span key={f} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-brand-primary/10 text-brand-primary">
                             {f}
                           </span>
                         ))}
@@ -259,7 +259,7 @@ export default function TutorialPage() {
         <div className="flex items-center justify-center py-4">
           <Link
             to="/review/new"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-neon-green text-bg-primary font-medium hover:bg-neon-green-dim glow-green transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-brand-primary text-bg-primary font-medium hover:bg-brand-primary-dim glow-green transition-all"
           >
             开始创建评审
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />

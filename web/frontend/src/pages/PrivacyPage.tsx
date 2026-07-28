@@ -20,10 +20,10 @@ const sections = [
   {
     icon: Database,
     title: '数据收集说明',
-    color: 'text-neon-green',
-    borderColor: 'border-neon-green/30',
-    bgColor: 'bg-neon-green/5',
-    iconBg: 'bg-neon-green/10',
+    color: 'text-brand-primary',
+    borderColor: 'border-brand-primary/30',
+    bgColor: 'bg-brand-primary/5',
+    iconBg: 'bg-brand-primary/10',
     items: [
       {
         type: 'collect',
@@ -88,10 +88,10 @@ const sections = [
   {
     icon: Lock,
     title: '数据安全措施',
-    color: 'text-neon-green',
-    borderColor: 'border-neon-green/30',
-    bgColor: 'bg-neon-green/5',
-    iconBg: 'bg-neon-green/10',
+    color: 'text-brand-primary',
+    borderColor: 'border-brand-primary/30',
+    bgColor: 'bg-brand-primary/5',
+    iconBg: 'bg-brand-primary/10',
     items: [
       {
         type: 'security',
@@ -109,10 +109,10 @@ const sections = [
   {
     icon: ShieldCheck,
     title: '你不必只听我们的承诺',
-    color: 'text-neon-green',
-    borderColor: 'border-neon-green/30',
-    bgColor: 'bg-neon-green/5',
-    iconBg: 'bg-neon-green/10',
+    color: 'text-brand-primary',
+    borderColor: 'border-brand-primary/30',
+    bgColor: 'bg-brand-primary/5',
+    iconBg: 'bg-brand-primary/10',
     items: [
       {
         type: 'verify',
@@ -146,19 +146,19 @@ const sections = [
       },
     ],
     providers: [
-      { name: 'Anthropic', icon: Bot, color: 'text-neon-green' },
+      { name: 'Anthropic', icon: Bot, color: 'text-brand-primary' },
       { name: 'OpenAI', icon: Cpu, color: 'text-cyan' },
       { name: 'DeepSeek', icon: Globe, color: 'text-warm-orange' },
-      { name: 'Ollama', icon: Server, color: 'text-neon-green' },
+      { name: 'Ollama', icon: Server, color: 'text-brand-primary' },
     ],
   },
   {
     icon: Trash2,
     title: '数据保留',
-    color: 'text-neon-green',
-    borderColor: 'border-neon-green/30',
-    bgColor: 'bg-neon-green/5',
-    iconBg: 'bg-neon-green/10',
+    color: 'text-brand-primary',
+    borderColor: 'border-brand-primary/30',
+    bgColor: 'bg-brand-primary/5',
+    iconBg: 'bg-brand-primary/10',
     items: [
       {
         type: 'retention',
@@ -177,14 +177,14 @@ const sections = [
 
 function ItemBadge({ type }: { type: string }) {
   const config: Record<string, { icon: React.ElementType; label: string; className: string }> = {
-    collect: { icon: CheckCircle2, label: '收集', className: 'bg-neon-green/10 text-neon-green' },
+    collect: { icon: CheckCircle2, label: '收集', className: 'bg-brand-primary/10 text-brand-primary' },
     'no-collect': { icon: XCircle, label: '不收集', className: 'bg-severity-critical/10 text-severity-critical' },
     key: { icon: Lock, label: '密钥', className: 'bg-cyan/10 text-cyan' },
     use: { icon: Eye, label: '用途', className: 'bg-cyan/10 text-cyan' },
-    security: { icon: ShieldCheck, label: '安全', className: 'bg-neon-green/10 text-neon-green' },
+    security: { icon: ShieldCheck, label: '安全', className: 'bg-brand-primary/10 text-brand-primary' },
     'third-party': { icon: Wifi, label: '第三方', className: 'bg-cyan/10 text-cyan' },
-    retention: { icon: Trash2, label: '保留', className: 'bg-neon-green/10 text-neon-green' },
-    verify: { icon: ShieldCheck, label: '可验证', className: 'bg-neon-green/10 text-neon-green' },
+    retention: { icon: Trash2, label: '保留', className: 'bg-brand-primary/10 text-brand-primary' },
+    verify: { icon: ShieldCheck, label: '可验证', className: 'bg-brand-primary/10 text-brand-primary' },
   }
   const c = config[type] || config.use
   const Icon = c.icon
@@ -216,7 +216,7 @@ export default function PrivacyPage() {
           我们重视您的数据隐私。本政策说明 AudienceLens 如何收集、使用和保护您的数据。
         </p>
         <div className="flex items-center gap-2 mt-4 text-xs text-text-muted">
-          <ShieldCheck className="w-4 h-4 text-neon-green" strokeWidth={1.25} />
+          <ShieldCheck className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
           <span>最后更新：2026 年 5 月</span>
         </div>
       </div>
@@ -252,7 +252,7 @@ export default function PrivacyPage() {
                     <ul className="space-y-2 ml-1">
                       {item.details.map((d, di) => (
                         <li key={di} className="flex items-start gap-2.5 text-sm text-text-secondary">
-                          <span className={cn('mt-1.5 w-1 h-1 rounded-full shrink-0', section.color === 'text-cyan' ? 'bg-cyan' : 'bg-neon-green')} />
+                          <span className={cn('mt-1.5 w-1 h-1 rounded-full shrink-0', section.color === 'text-cyan' ? 'bg-cyan' : 'bg-brand-primary')} />
                           {d}
                         </li>
                       ))}

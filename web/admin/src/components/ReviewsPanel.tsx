@@ -73,7 +73,7 @@ export function ReviewsPanel() {
           value={userId}
           onChange={(e) => { setOffset(0); setUserId(e.target.value) }}
           placeholder="按 user_id 过滤"
-          className="ml-auto w-32 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-neon-green"
+          className="ml-auto w-32 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
         />
         <select
           value={status}
@@ -96,7 +96,7 @@ export function ReviewsPanel() {
           <li
             key={r.id}
             onClick={() => void openDetail(r.id)}
-            className="cursor-pointer rounded-md border border-border bg-bg-primary/60 px-3 py-2 font-mono text-xs hover:border-neon-green/30 transition-colors"
+            className="cursor-pointer rounded-md border border-border bg-bg-primary/60 px-3 py-2 font-mono text-xs hover:border-brand-primary/30 transition-colors"
           >
             <div className="flex items-center gap-2">
               <StatusDot status={r.status} />

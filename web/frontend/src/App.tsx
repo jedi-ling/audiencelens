@@ -38,7 +38,7 @@ class ChunkErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
           <p className="text-sm">页面加载失败——可能是刚发布了新版本。</p>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-lg border border-neon-green/30 bg-neon-green/10 px-4 py-2 text-sm text-neon-green transition-all hover:bg-neon-green/20"
+            className="rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-4 py-2 text-sm text-brand-primary transition-all hover:bg-brand-primary/20"
           >
             刷新页面
           </button>

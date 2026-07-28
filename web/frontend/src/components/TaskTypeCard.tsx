@@ -17,25 +17,25 @@ export default function TaskTypeCard({ taskType, selected, onClick }: TaskTypeCa
         'flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all duration-200 cursor-pointer',
         'bg-bg-card hover:bg-bg-card-hover',
         selected
-          ? 'border-neon-green border-glow-green'
+          ? 'border-brand-primary border-glow-green'
           : 'border-border hover:border-border-hover hover:shadow-[0_0_12px_rgba(183,126,59,0.12)]'
       )}
     >
       <div className={cn(
         'w-10 h-10 flex items-center justify-center rounded-lg transition-colors',
-        selected ? 'bg-neon-green/15' : 'bg-bg-secondary/50'
+        selected ? 'bg-brand-primary/15' : 'bg-bg-secondary/50'
       )}>
         <Icon
           className={cn(
             'w-6 h-6 transition-colors',
-            selected ? 'text-neon-green' : 'text-text-secondary'
+            selected ? 'text-brand-primary' : 'text-text-secondary'
           )}
           strokeWidth={1.25}
         />
       </div>
       <span className={cn(
         'font-medium text-sm',
-        selected ? 'text-neon-green' : 'text-text-primary'
+        selected ? 'text-brand-primary' : 'text-text-primary'
       )}>
         {taskType.name}
       </span>

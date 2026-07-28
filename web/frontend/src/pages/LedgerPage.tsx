@@ -22,7 +22,7 @@ const VERDICT_LABELS: Record<Verdict, string> = {
 // 复用 App 自有的语义色 token（而非独立的 Tailwind 调色板），
 // 确保在暗色背景上有足够对比度，与全站视觉语言一致。
 const VERDICT_STYLES: Record<Verdict, string> = {
-  hit: 'bg-neon-green/10 text-neon-green border-neon-green/30',
+  hit: 'bg-brand-primary/10 text-brand-primary border-brand-primary/30',
   partial: 'bg-warm-orange/10 text-warm-orange border-warm-orange/30',
   miss: 'bg-severity-critical/10 text-severity-critical border-severity-critical/30',
   unknown: 'bg-bg-secondary text-text-muted border-border',
@@ -84,7 +84,7 @@ export default function LedgerPage() {
       )}
 
       {valueMetrics && (
-        <section className="mb-8 rounded-xl border border-neon-green/30 bg-bg-card p-6">
+        <section className="mb-8 rounded-xl border border-brand-primary/30 bg-bg-card p-6">
           <h2 className="mb-4 font-display text-sm font-semibold text-text-primary">产品价值验证</h2>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
             <Stat label="反馈覆盖" value={percent(valueMetrics.feedback_coverage)} />
@@ -119,7 +119,7 @@ export default function LedgerPage() {
               <ol className="space-y-2">
                 {valueMetrics.top_adopted_fixes.map((fix) => (
                   <li key={fix.title} className="flex justify-between gap-4 text-xs text-text-primary">
-                    <span>{fix.title}</span><span className="font-mono text-neon-green">×{fix.adoption_count}</span>
+                    <span>{fix.title}</span><span className="font-mono text-brand-primary">×{fix.adoption_count}</span>
                   </li>
                 ))}
               </ol>
@@ -160,7 +160,7 @@ export default function LedgerPage() {
                 <span className="w-40 truncate font-mono text-xs text-text-secondary">{p.persona_id}</span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg-secondary">
                   <div
-                    className="h-full rounded-full bg-neon-green"
+                    className="h-full rounded-full bg-brand-primary"
                     style={{ width: `${(p.hit_rate ?? 0) * 100}%` }}
                   />
                 </div>
@@ -186,7 +186,7 @@ export default function LedgerPage() {
               type="checkbox"
               checked={onlyUnverified}
               onChange={(e) => setOnlyUnverified(e.target.checked)}
-              className="accent-neon-green"
+              className="accent-brand-primary"
             />
             只看待验证
           </label>

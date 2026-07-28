@@ -1,7 +1,7 @@
 export function StatusDot({ status }: { status: string }) {
   const color =
     status === 'completed' || status === 'done'
-      ? 'bg-neon-green'
+      ? 'bg-brand-primary'
       : status === 'failed'
         ? 'bg-severity-critical'
         : status === 'running'

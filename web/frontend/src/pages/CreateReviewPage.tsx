@@ -15,7 +15,7 @@ type MaterialInputMode = 'text' | 'file' | 'directory'
 
 const modeConfig: Record<ReviewMode, { label: string; color: string; bg: string; border: string; icon: string }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', border: 'border-cyan/30', icon: '⚡' },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', border: 'border-neon-green/30', icon: '✅' },
+  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30', icon: '✅' },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30', icon: '🔬' },
 }
 
@@ -246,9 +246,9 @@ export default function CreateReviewPage() {
               className={cn(
                 'w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-mono font-bold shrink-0 transition-all',
                 s < step
-                  ? 'bg-neon-green text-bg-primary'
+                  ? 'bg-brand-primary text-bg-primary'
                   : s === step
-                    ? 'bg-neon-green/20 text-neon-green border-2 border-neon-green'
+                    ? 'bg-brand-primary/20 text-brand-primary border-2 border-brand-primary'
                     : 'bg-bg-card text-text-muted border border-border'
               )}
             >
@@ -269,7 +269,7 @@ export default function CreateReviewPage() {
             {s < 5 && (
               <div className={cn(
                 'flex-1 min-w-2 md:min-w-4 h-px',
-                s < step ? 'bg-gradient-to-r from-neon-green/60 to-neon-green' : 'bg-border'
+                s < step ? 'bg-gradient-to-r from-brand-primary/60 to-brand-primary' : 'bg-border'
               )} />
             )}
           </div>
@@ -358,14 +358,14 @@ export default function CreateReviewPage() {
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 rounded-lg font-display font-medium text-sm whitespace-nowrap transition-all duration-200',
                   selectedCategory === 'all'
-                    ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                    ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                     : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                 )}
               >
                 <span>全部</span>
                 <span className={cn(
                   'px-1.5 py-0.5 rounded text-xs font-mono',
-                  selectedCategory === 'all' ? 'bg-neon-green/20 text-neon-green' : 'bg-bg-secondary/50 text-text-muted'
+                  selectedCategory === 'all' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-secondary/50 text-text-muted'
                 )}>
                   {filteredTaskTypes.length}
                 </span>
@@ -382,7 +382,7 @@ export default function CreateReviewPage() {
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-lg font-display font-medium text-sm whitespace-nowrap transition-all duration-200',
                       selectedCategory === category.id
-                        ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                        ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                         : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                     )}
                   >
@@ -390,7 +390,7 @@ export default function CreateReviewPage() {
                     <span>{category.name}</span>
                     <span className={cn(
                       'px-1.5 py-0.5 rounded text-xs font-mono',
-                      selectedCategory === category.id ? 'bg-neon-green/20 text-neon-green' : 'bg-bg-secondary/50 text-text-muted'
+                      selectedCategory === category.id ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-secondary/50 text-text-muted'
                     )}>
                       {count}
                     </span>
@@ -472,7 +472,7 @@ export default function CreateReviewPage() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
                   materialInputMode === 'text'
-                    ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                    ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                     : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                 )}
               >
@@ -484,7 +484,7 @@ export default function CreateReviewPage() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
                   materialInputMode === 'file'
-                    ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                    ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                     : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                 )}
               >
@@ -496,7 +496,7 @@ export default function CreateReviewPage() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
                   materialInputMode === 'directory'
-                    ? 'bg-neon-green/10 text-neon-green border border-neon-green/30'
+                    ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
                     : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                 )}
               >
@@ -515,8 +515,8 @@ export default function CreateReviewPage() {
                   'relative rounded-xl border-2 border-dashed p-6 md:p-8 text-center cursor-pointer transition-all mb-6',
                   extracting && 'pointer-events-none',
                   dragOver
-                    ? 'border-neon-green bg-neon-green/5'
-                    : 'border-border hover:border-neon-green/30 hover:bg-bg-card'
+                    ? 'border-brand-primary bg-brand-primary/5'
+                    : 'border-border hover:border-brand-primary/30 hover:bg-bg-card'
                 )}
               >
                 <input
@@ -529,15 +529,15 @@ export default function CreateReviewPage() {
                 />
                 {extracting ? (
                   <div className="py-4">
-                    <Loader2 className="w-8 h-8 mx-auto mb-3 text-neon-green animate-spin" strokeWidth={1.25} />
-                    <p className="text-sm text-neon-green font-medium">AI 正在阅读文件并提取材料...</p>
+                    <Loader2 className="w-8 h-8 mx-auto mb-3 text-brand-primary animate-spin" strokeWidth={1.25} />
+                    <p className="text-sm text-brand-primary font-medium">AI 正在阅读文件并提取材料...</p>
                     <p className="text-xs text-text-muted mt-1">请稍候，通常需要 5-10 秒</p>
                   </div>
                 ) : (
                   <>
                     <Upload className="w-8 h-8 mx-auto mb-3 text-text-muted" strokeWidth={1.25} />
                     <p className="text-sm text-text-secondary">
-                      拖拽文件到此处，或<span className="text-neon-green">点击上传</span>
+                      拖拽文件到此处，或<span className="text-brand-primary">点击上传</span>
                     </p>
                     <p className="text-xs text-text-muted mt-1">
                       支持 .txt .md .json .pdf .docx（不支持旧版 .doc）· AI 自动提取结构化材料
@@ -548,7 +548,7 @@ export default function CreateReviewPage() {
                   <p className="text-xs text-severity-critical mt-2">{extractError}</p>
                 )}
                 {filledMaterialsCount > 0 && !extracting && (
-                  <p className="text-xs text-neon-green mt-2">
+                  <p className="text-xs text-brand-primary mt-2">
                     已提取 {filledMaterialsCount} 个字段 · 可在下方编辑修改
                   </p>
                 )}
@@ -563,7 +563,7 @@ export default function CreateReviewPage() {
                   value={directoryPath}
                   onChange={(e) => setDirectoryPath(e.target.value)}
                   placeholder="例如：/path/to/your/game/project 或 C:\Projects\MyGame"
-                  className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors font-mono text-sm"
+                  className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
                 />
                 <p className="text-xs text-text-muted mt-2">
                   输入项目目录路径，系统将自动扫描目录中的文件并提取评审材料
@@ -578,7 +578,7 @@ export default function CreateReviewPage() {
                   className="w-full flex items-center justify-between"
                 >
                   <span className="flex items-center gap-2 text-sm font-medium text-text-secondary">
-                    <Star className="w-4 h-4 text-neon-green" strokeWidth={1.25} />
+                    <Star className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
                     快速开始：导入示例数据
                   </span>
                   {examplesExpanded
@@ -592,7 +592,7 @@ export default function CreateReviewPage() {
                       <button
                         key={ex.id}
                         onClick={() => handleImportExample(ex)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-neon-green/10 text-neon-green hover:bg-neon-green/20 transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors"
                       >
                         {ex.title}
                       </button>
@@ -609,7 +609,7 @@ export default function CreateReviewPage() {
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 placeholder="例如：《星际漂流》概念设计文档"
-                className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors"
+                className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors"
               />
             </div>
 
@@ -617,7 +617,7 @@ export default function CreateReviewPage() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-3">
                 <h3 className="text-sm font-medium text-text-secondary">编辑材料详情</h3>
                 {filledMaterialsCount > 0 && (
-                  <span className="text-xs text-neon-green">AI 已提取 {filledMaterialsCount} 个字段，请检查并修改</span>
+                  <span className="text-xs text-brand-primary">AI 已提取 {filledMaterialsCount} 个字段，请检查并修改</span>
                 )}
               </div>
               {currentFields.map((field, idx) => {
@@ -634,7 +634,7 @@ export default function CreateReviewPage() {
                         onChange={(e) => updateField(field.key, e.target.value)}
                         placeholder={field.placeholder}
                         rows={5}
-                        className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors resize-y"
+                        className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors resize-y"
                       />
                     ) : field.required ? (
                       <textarea
@@ -642,7 +642,7 @@ export default function CreateReviewPage() {
                         onChange={(e) => updateField(field.key, e.target.value)}
                         placeholder={field.placeholder}
                         rows={3}
-                        className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors resize-y"
+                        className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors resize-y"
                       />
                     ) : (
                       <input
@@ -650,7 +650,7 @@ export default function CreateReviewPage() {
                         value={materialFields[field.key] ?? ''}
                         onChange={(e) => updateField(field.key, e.target.value)}
                         placeholder={field.placeholder}
-                        className="w-full px-4 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-neon-green transition-colors"
+                        className="w-full px-4 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors"
                       />
                     )}
                   </div>
@@ -693,14 +693,14 @@ export default function CreateReviewPage() {
                     'flex flex-col items-center gap-2 p-3 md:p-4 rounded-xl border-2 transition-all cursor-pointer',
                     'bg-bg-card hover:bg-bg-card-hover',
                     selectedPack === pack.panel_id
-                      ? 'border-neon-green border-glow-green'
+                      ? 'border-brand-primary border-glow-green'
                       : 'border-border hover:border-border-hover'
                   )}
                 >
                   <span className="text-2xl">{PACK_ICONS[pack.panel_id] ?? '📦'}</span>
                   <span className={cn(
                     'text-xs md:text-sm font-medium',
-                    selectedPack === pack.panel_id ? 'text-neon-green' : 'text-text-primary'
+                    selectedPack === pack.panel_id ? 'text-brand-primary' : 'text-text-primary'
                   )}>
                     {pack.name}
                   </span>
@@ -713,9 +713,9 @@ export default function CreateReviewPage() {
               const pack = packs.find((p) => p.panel_id === selectedPack)
               if (!pack) return null
               return (
-                <div className="mb-8 px-4 py-3 rounded-lg bg-neon-green/5 border border-neon-green/20">
+                <div className="mb-8 px-4 py-3 rounded-lg bg-brand-primary/5 border border-brand-primary/20">
                   <p className="text-sm text-text-secondary">
-                    <span className="text-neon-green font-medium">{pack.name}</span>：{pack.description}
+                    <span className="text-brand-primary font-medium">{pack.name}</span>：{pack.description}
                   </p>
                 </div>
               )
@@ -850,7 +850,7 @@ export default function CreateReviewPage() {
                   const Icon = tt.IconComponent
                   return (
                     <p className="text-text-primary flex items-center gap-2">
-                      <Icon className="w-5 h-5 text-neon-green" strokeWidth={1.25} />
+                      <Icon className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
                       {tt.name}
                     </p>
                   )
@@ -889,7 +889,7 @@ export default function CreateReviewPage() {
                 >
                   <h3 className="text-sm font-medium text-text-muted">
                     评审材料
-                    <span className="ml-2 text-neon-green">{filledMaterialsCount}</span>
+                    <span className="ml-2 text-brand-primary">{filledMaterialsCount}</span>
                     <span className="text-text-muted"> / {currentFields.length} 项已填写</span>
                   </h3>
                   {materialsExpanded
@@ -926,7 +926,7 @@ export default function CreateReviewPage() {
                   {selectedPersonas.map((p) => (
                     <span
                       key={p.id}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-neon-green/10 text-neon-green text-xs"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-brand-primary/10 text-brand-primary text-xs"
                     >
                       {p.name}
                       <button
@@ -987,7 +987,7 @@ export default function CreateReviewPage() {
                   const taskName = TASK_TYPES.find((t) => t.id === selectedTaskType)?.name ?? selectedTaskType
                   return (
                     <>
-                      <p className="font-display text-neon-green text-lg">
+                      <p className="font-display text-brand-primary text-lg">
                         ${finalCost.toFixed(2)}
                       </p>
                       <p className="text-xs text-text-muted mt-1">
@@ -1026,7 +1026,7 @@ export default function CreateReviewPage() {
             className={cn(
               'flex items-center gap-2 px-5 md:px-6 py-2.5 rounded-lg font-medium transition-all text-sm',
               canNext()
-                ? 'bg-neon-green text-bg-primary hover:bg-neon-green-dim hover:shadow-[0_0_20px_rgba(183,126,59,0.25)]'
+                ? 'bg-brand-primary text-bg-primary hover:bg-brand-primary-dim hover:shadow-[0_0_20px_rgba(183,126,59,0.25)]'
                 : 'bg-bg-card text-text-muted cursor-not-allowed'
             )}
           >
@@ -1042,7 +1042,7 @@ export default function CreateReviewPage() {
               onClick={handleLaunch}
               disabled={launching}
               className={cn(
-                'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-neon-green text-bg-primary font-bold hover:bg-neon-green-dim glow-green transition-all text-sm',
+                'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-brand-primary text-bg-primary font-bold hover:bg-brand-primary-dim glow-green transition-all text-sm',
                 launching && 'opacity-70 cursor-not-allowed'
               )}
             >
@@ -1062,12 +1062,12 @@ function PersonaSelectCard({ persona, selected, onToggle }: { persona: Persona; 
       className={cn(
         'flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
         'bg-bg-card hover:bg-bg-card-hover',
-        selected ? 'border-neon-green/50' : 'border-border'
+        selected ? 'border-brand-primary/50' : 'border-border'
       )}
     >
       <div className={cn(
         'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
-        selected ? 'bg-neon-green border-neon-green' : 'border-border'
+        selected ? 'bg-brand-primary border-brand-primary' : 'border-border'
       )}>
         {selected && <CheckCircle2 className="w-3 h-3 text-bg-primary" strokeWidth={1.25} />}
       </div>

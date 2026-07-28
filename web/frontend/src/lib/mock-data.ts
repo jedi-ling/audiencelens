@@ -134,7 +134,7 @@ const STEREOTYPE_RISK_LABELS: Record<StereotypeRisk, string> = {
 /** 三档配色：低=品牌金（正常），中=severity-medium，高=severity-critical。
  * 全部走语义 token，配色从暖金换古铜金时不需要动这里。 */
 const STEREOTYPE_RISK_BADGE_CLASSES: Record<StereotypeRisk, string> = {
-  low: 'bg-neon-green/10 text-neon-green',
+  low: 'bg-brand-primary/10 text-brand-primary',
   medium: 'bg-severity-medium/10 text-severity-medium',
   high: 'bg-severity-critical/10 text-severity-critical',
 }
@@ -538,7 +538,7 @@ export const REBUTTAL_STATUS_LABELS: Record<RebuttalStatus, string> = {
 }
 
 export const REBUTTAL_STATUS_CLASSES: Record<RebuttalStatus, string> = {
-  ok: 'bg-neon-green/10 text-neon-green',
+  ok: 'bg-brand-primary/10 text-brand-primary',
   partial: 'bg-severity-medium/10 text-severity-medium',
   failed: 'bg-severity-critical/10 text-severity-critical',
   skipped: 'bg-bg-secondary text-text-muted',
@@ -1073,9 +1073,9 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     task_types: ['concept_review', 'demo_first_play', 'devlog_review', 'update_announcement_review'],
     persona_count: 6,
     use_cases: ['新概念验证', 'Demo首玩测试', '版本更新体验评估', '核心循环验证'],
-    color: 'text-neon-green',
-    bg: 'bg-neon-green/10',
-    border: 'border-neon-green/30',
+    color: 'text-brand-primary',
+    bg: 'bg-brand-primary/10',
+    border: 'border-brand-primary/30',
   },
   {
     type: 'audience_panel',
@@ -1085,9 +1085,9 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     task_types: ['steam_page_review', 'kickstarter_review', 'product_feedback_review', 'pricing_page_review', 'onboarding_review'],
     persona_count: 8,
     use_cases: ['商店页优化', '众筹页评估', '广告效果预测', '落地页转化分析'],
-    color: 'text-neon-green',
-    bg: 'bg-neon-green/10',
-    border: 'border-neon-green/30',
+    color: 'text-brand-primary',
+    bg: 'bg-brand-primary/10',
+    border: 'border-brand-primary/30',
   },
   {
     type: 'red_team_audience',
@@ -1097,9 +1097,9 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     task_types: ['monetization_review', 'discord_community_review', 'localization_review', 'update_announcement_review'],
     persona_count: 5,
     use_cases: ['付费模型压力测试', '社区危机预演', '本地化文化风险', '公关危机模拟'],
-    color: 'text-neon-green',
-    bg: 'bg-neon-green/10',
-    border: 'border-neon-green/30',
+    color: 'text-brand-primary',
+    bg: 'bg-brand-primary/10',
+    border: 'border-brand-primary/30',
   },
   {
     type: 'persona_generate',
@@ -1109,9 +1109,9 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     task_types: ['concept_review', 'demo_first_play', 'steam_page_review', 'kickstarter_review', 'discord_community_review'],
     persona_count: 10,
     use_cases: ['特定人群定制', '边缘用户覆盖', '跨文化人格', '特殊需求用户'],
-    color: 'text-neon-green',
-    bg: 'bg-neon-green/10',
-    border: 'border-neon-green/30',
+    color: 'text-brand-primary',
+    bg: 'bg-brand-primary/10',
+    border: 'border-brand-primary/30',
   },
 ]
 

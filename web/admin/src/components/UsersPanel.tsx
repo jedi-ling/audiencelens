@@ -47,7 +47,7 @@ export function UsersPanel() {
     <section className="rounded-xl border border-border bg-bg-card p-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <Users className="h-4 w-4 text-neon-green" strokeWidth={1.5} />
+          <Users className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
           用户管理
           <span className="font-mono text-[10px] font-normal text-text-muted">改套餐/停用立即生效</span>
         </h2>
@@ -55,7 +55,7 @@ export function UsersPanel() {
           value={q}
           onChange={(e) => { setOffset(0); setQ(e.target.value) }}
           placeholder="按邮箱搜索"
-          className="ml-auto w-44 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-neon-green"
+          className="ml-auto w-44 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
         />
       </div>
 
@@ -90,7 +90,7 @@ export function UsersPanel() {
                     value={u.plan}
                     disabled={pending === u.id}
                     onChange={(e) => void update(u.id, { plan: e.target.value })}
-                    className="rounded-md border border-border bg-bg-secondary px-1.5 py-0.5 text-xs text-text-primary outline-none focus:border-neon-green"
+                    className="rounded-md border border-border bg-bg-secondary px-1.5 py-0.5 text-xs text-text-primary outline-none focus:border-brand-primary"
                   >
                     {PLAN_OPTIONS.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -114,8 +114,8 @@ export function UsersPanel() {
                     disabled={pending === u.id}
                     className={`rounded-md px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50 ${
                       u.is_active
-                        ? 'bg-neon-green/10 text-neon-green hover:bg-severity-critical/10 hover:text-severity-critical'
-                        : 'bg-severity-critical/10 text-severity-critical hover:bg-neon-green/10 hover:text-neon-green'
+                        ? 'bg-brand-primary/10 text-brand-primary hover:bg-severity-critical/10 hover:text-severity-critical'
+                        : 'bg-severity-critical/10 text-severity-critical hover:bg-brand-primary/10 hover:text-brand-primary'
                     }`}
                     title={u.is_active ? '点击停用' : '点击启用'}
                   >

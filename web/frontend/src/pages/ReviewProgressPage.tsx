@@ -25,14 +25,14 @@ type PhaseStatus = 'waiting' | 'running' | 'completed'
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: '等待中', color: 'text-text-muted', bg: 'bg-status-waiting' },
   running: { label: '运行中', color: 'text-cyan', bg: 'bg-status-running' },
-  completed: { label: '已完成', color: 'text-neon-green', bg: 'bg-status-completed' },
+  completed: { label: '已完成', color: 'text-brand-primary', bg: 'bg-status-completed' },
   failed: { label: '失败', color: 'text-severity-critical', bg: 'bg-status-failed' },
   cancelled: { label: '已取消', color: 'text-text-muted', bg: 'bg-status-waiting' },
 }
 
 const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
-  standard: { label: '标准', color: 'text-neon-green', bg: 'bg-neon-green/10', Icon: ListChecks },
+  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
@@ -367,7 +367,7 @@ export default function ReviewProgressPage() {
         {status === 'completed' && (
           <Link
             to={`/review/${id}/report`}
-            className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-neon-green/10 text-neon-green hover:bg-neon-green/20 transition-colors text-sm"
+            className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors text-sm"
           >
             <FileText className="w-4 h-4" strokeWidth={1.25} />
             <span className="hidden sm:inline">查看报告</span>
@@ -384,7 +384,7 @@ export default function ReviewProgressPage() {
         {/* 跑批时百分比会在某个人格思考时卡住十几秒，静止的条会被读成「卡死」→ 非终态挂流光 */}
         <div className={cn('h-2 overflow-hidden rounded-full bg-bg-card', !terminal && 'shimmer-bar')}>
           <div
-            className="h-full rounded-full bg-neon-green transition-all duration-700"
+            className="h-full rounded-full bg-brand-primary transition-all duration-700"
             style={{ width: `${overallProgress}%` }}
           />
         </div>
@@ -405,14 +405,14 @@ export default function ReviewProgressPage() {
 
       {/* 完成：报告入口横幅（v2 链路没有其它入口时尤其重要） */}
       {status === 'completed' && (
-        <div className="mb-6 rounded-xl border-2 border-neon-green/30 bg-bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="mb-6 rounded-xl border-2 border-brand-primary/30 bg-bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-2 flex-1">
-            <CheckCircle2 className="w-5 h-5 text-neon-green shrink-0" strokeWidth={1.25} />
+            <CheckCircle2 className="w-5 h-5 text-brand-primary shrink-0" strokeWidth={1.25} />
             <span className="text-sm text-text-primary font-medium">评审已完成，报告已生成</span>
           </div>
           <Link
             to={`/review/${id}/report`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-green text-bg-primary text-sm font-bold hover:bg-neon-green-dim transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-colors"
           >
             <FileText className="w-4 h-4" strokeWidth={1.25} />
             查看完整报告 →
@@ -498,7 +498,7 @@ export default function ReviewProgressPage() {
                   className={cn(
                     'rounded-xl border-2 p-3 md:p-4 transition-all',
                     'bg-bg-card',
-                    po.status === 'completed' ? 'border-neon-green/20' :
+                    po.status === 'completed' ? 'border-brand-primary/20' :
                     po.status === 'running' ? 'border-cyan/20' : 'border-border',
                     // 「一位人格交卷」是离散事件，给个落点脉冲
                     po.status === 'completed' && 'animate-pop-in',
@@ -511,7 +511,7 @@ export default function ReviewProgressPage() {
                         className={cn(
                           'flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold',
                           po.status === 'completed'
-                            ? 'border-neon-green/40 bg-neon-green/10 text-neon-green'
+                            ? 'border-brand-primary/40 bg-brand-primary/10 text-brand-primary'
                             : po.status === 'running'
                               ? 'border-cyan/40 bg-cyan/10 text-cyan'
                               : po.status === 'failed'
@@ -546,7 +546,7 @@ export default function ReviewProgressPage() {
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-700',
-                            po.status === 'completed' ? 'bg-neon-green' : 'bg-cyan'
+                            po.status === 'completed' ? 'bg-brand-primary' : 'bg-cyan'
                           )}
                           style={{ width: `${progress}%` }}
                         />
@@ -584,20 +584,20 @@ export default function ReviewProgressPage() {
               return (
                 <div
                   key={pid}
-                  className="animate-pop-in rounded-xl border-2 border-neon-green/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
+                  className="animate-pop-in rounded-xl border-2 border-brand-primary/20 bg-bg-card p-3 md:p-4 flex items-center gap-2.5"
                 >
                   {/* animate-ring-out 的 ::before 依赖这层 relative 定位 */}
                   <div className="animate-ring-out relative shrink-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-neon-green/40 bg-neon-green/10 text-xs font-semibold text-neon-green">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-primary/40 bg-brand-primary/10 text-xs font-semibold text-brand-primary">
                       {(persona?.name ?? pid).slice(0, 1)}
                     </div>
-                    <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-neon-green bg-bg-card rounded-full" strokeWidth={2} />
+                    <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-brand-primary bg-bg-card rounded-full" strokeWidth={2} />
                   </div>
                   <span className="font-medium text-text-primary text-sm truncate">
                     {persona?.name ?? pid}
                   </span>
                   {persona && <span className="text-xs text-text-muted shrink-0">{persona.archetype}</span>}
-                  <span className="ml-auto text-xs text-neon-green shrink-0">已完成</span>
+                  <span className="ml-auto text-xs text-brand-primary shrink-0">已完成</span>
                 </div>
               )
             })}
@@ -630,7 +630,7 @@ export default function ReviewProgressPage() {
               className={cn(
                 'ml-auto text-xs',
                 crossExamPhase === 'completed'
-                  ? 'text-neon-green'
+                  ? 'text-brand-primary'
                   : crossExamPhase === 'running'
                     ? 'text-cyan'
                     : 'text-text-muted',
@@ -660,7 +660,7 @@ export default function ReviewProgressPage() {
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <div className="flex items-center gap-2 mb-3">
             <BarChart3
-              className={cn('w-4 h-4 text-neon-green', !terminal && aggregationPhase === 'waiting' && 'animate-breathe')}
+              className={cn('w-4 h-4 text-brand-primary', !terminal && aggregationPhase === 'waiting' && 'animate-breathe')}
               strokeWidth={1.5}
             />
             <h3 className="text-sm font-medium text-text-primary">聚合分析</h3>
@@ -668,7 +668,7 @@ export default function ReviewProgressPage() {
               className={cn(
                 'ml-auto text-xs',
                 aggregationPhase === 'completed'
-                  ? 'text-neon-green'
+                  ? 'text-brand-primary'
                   : aggregationPhase === 'running'
                     ? 'text-cyan'
                     : 'text-text-muted',
@@ -685,7 +685,7 @@ export default function ReviewProgressPage() {
               )}
             >
               <div
-                className="h-full bg-neon-green rounded-full transition-all duration-700"
+                className="h-full bg-brand-primary rounded-full transition-all duration-700"
                 style={{ width: `${aggregationProgress}%` }}
               />
             </div>

@@ -5,8 +5,12 @@
  * 品牌主色由暖金 #D4A94E 改为古铜金 #B77E3B（Gilded Amber），
  * 暗调由 #b8923e 改为深古铜 #4C3217（Antique Bronze），背景改用带古铜暖调的近黑（Ebony Elegance 系）。
  * 次色薄荷 #4ECDC4 保留不动，作为古铜底色上的冷色对比点缀。
- * 语义 token 名（neon-green / cyan）保持不变，全站沿用即自动换色，无需逐组件改。
+ * 全站只认语义 token，不写死 hex——换色时改这里一处即可。
  * 字体走系统栈（含中文回退），不再依赖 Google Fonts CDN（国内加载慢/被墙）。
+ *
+ * 命名沿革：主色 token 曾叫 neon-green（更早的霓虹绿时期遗留），值早已是古铜金。
+ * 名实不符的代价是真实发生过的——一次 UI 审计据此判定"落地页金色 / app 内霓虹绿
+ * 品牌分裂"并列为头号问题，而两边其实是同一个色值。2026-07 统一改名 brand-primary。
  */
 @theme {
   --color-bg-primary: #0c0a08;
@@ -15,12 +19,12 @@
   --color-bg-card-hover: #241a11;
   --color-border: #2e2116;
   --color-border-hover: #443019;
-  /* 品牌主色：古铜金 Gilded Amber（token 名沿用 neon-green，全站引用不变） */
-  --color-neon-green: #B77E3B;
-  --color-neon-green-dim: #4C3217;
+  /* 品牌主色：古铜金 Gilded Amber */
+  --color-brand-primary: #B77E3B;
+  --color-brand-primary-dim: #4C3217;
   /* 金色系第二级：绸缎金 Satin Gold，用于暗底上的强调文字（标题/关键数值） */
   --color-gold-cream: #F9D67D;
-  /* 次色：薄荷（token 名沿用 cyan） */
+  /* 次色：薄荷 */
   --color-cyan: #4ECDC4;
   --color-cyan-dim: #3bb3ab;
   --color-warm-orange: #e0913c;
@@ -113,7 +117,7 @@ html, body {
 }
 
 .border-glow-green {
-  border-color: var(--color-neon-green);
+  border-color: var(--color-brand-primary);
   box-shadow: 0 0 10px rgba(183,126,59, 0.2), inset 0 0 10px rgba(183,126,59, 0.05);
 }
 
@@ -168,7 +172,7 @@ html, body {
 }
 
 .text-gradient-green {
-  background: linear-gradient(135deg, var(--color-neon-green), var(--color-neon-green-dim));
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-primary-dim));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -265,7 +269,7 @@ html, body {
 
 /* ---------- 赛博 HUD 工具类 ---------- */
 
-/* 终端面板四角的 L 形角标（对角两枚，霓虹绿） */
+/* 终端面板四角的 L 形角标（对角两枚，古铜金） */
 .hud-corners {
   position: relative;
 }
@@ -277,8 +281,8 @@ html, body {
   left: -1px;
   width: 14px;
   height: 14px;
-  border-top: 2px solid var(--color-neon-green);
-  border-left: 2px solid var(--color-neon-green);
+  border-top: 2px solid var(--color-brand-primary);
+  border-left: 2px solid var(--color-brand-primary);
   opacity: 0.7;
   pointer-events: none;
 }
@@ -290,8 +294,8 @@ html, body {
   right: -1px;
   width: 14px;
   height: 14px;
-  border-bottom: 2px solid var(--color-neon-green);
-  border-right: 2px solid var(--color-neon-green);
+  border-bottom: 2px solid var(--color-brand-primary);
+  border-right: 2px solid var(--color-brand-primary);
   opacity: 0.7;
   pointer-events: none;
 }
@@ -308,7 +312,7 @@ html, body {
 .terminal-cursor::after {
   content: '▊';
   margin-left: 4px;
-  color: var(--color-neon-green);
+  color: var(--color-brand-primary);
   animation: cursorBlink 1.1s steps(1) infinite;
 }
 
@@ -433,7 +437,7 @@ html, body {
 .mote {
   position: absolute;
   border-radius: 9999px;
-  background: var(--color-neon-green);
+  background: var(--color-brand-primary);
   animation: moteDrift var(--mote-dur, 18s) ease-in-out var(--mote-delay, 0s) infinite;
   will-change: transform, opacity;
 }
@@ -455,11 +459,24 @@ html, body {
    * .animate-pulse-glow 是无限循环的呼吸闪烁 —— 都属于必须能被关掉的那类 */
   .animate-fade-in,
   .animate-pulse-glow,
+  /* 落地页那四个此前也一直漏着（float / grid-pulse / hero-text / scanline）——
+   * 营销页恰恰是前庭敏感用户最先撞上的一屏，不该是覆盖率最低的地方 */
+  .animate-float,
+  .animate-grid-pulse,
+  .animate-hero-text,
+  .animate-scanline,
   .mote {
     animation: none;
   }
-  /* 关掉动画后这两个只会留下静止的残影（一圈不消失的环 / 一堆色点），直接隐藏 */
+  /* ⚠️ .animate-hero-text 自带 opacity:0（靠 forwards 动画补到 1）。
+   * 只写 animation:none 会让 hero 标题永远隐形——关掉动画不能等于关掉内容。 */
+  .animate-hero-text {
+    opacity: 1;
+  }
+  /* 关掉动画后这三个只会留下静止的残影（一圈不消失的环 / 一堆色点 /
+   * 一条不再移动的扫描线），直接隐藏 */
   .animate-ring-out::before,
+  .animate-scanline,
   .mote {
     display: none;
   }
