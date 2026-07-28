@@ -107,6 +107,22 @@ def _make_review(client, db, monkeypatch, title="导出验证"):
     return r.json()["review_id"]
 
 
+def _seed_persona_output(db, review_id, persona_id="P01"):
+    """造一条带内容的人格输出——伦理报告是按它逐条算出来的。"""
+    from app.models import PersonaOutput
+
+    po = PersonaOutput(
+        review_id=review_id,
+        persona_id=persona_id,
+        persona_name="林岚",
+        status="completed",
+        output_json={"key_points": ["因为她是女性，所以只关心故事"]},
+    )
+    db.add(po)
+    db.commit()
+    return po
+
+
 class TestAnonymousIsRejected:
     """匿名身份不是"某个人"，是所有人共用的桶——这两个接口必须拒绝它。
 
@@ -286,6 +302,31 @@ class TestDeleteAccount:
         tombstoned = db.query(UsageRecord).filter(UsageRecord.user_id.like("deleted-%")).count()
         assert tombstoned >= before
 
+    def test_ethics_reports_are_deleted_with_the_account(self, user_client, db, monkeypatch):
+        """伦理报告的 violations_json 里含用户内容摘录 —— 删号后必须一行不剩。
+
+        这条曾经是隐私政策的漏网之鱼：EthicsReport 没有归属列，写进去就
+        再也删不掉，账号删了摘录还留在库里。
+        """
+        from app.models import EthicsReport, PersonaOutput
+        from app.services.ethics_service import EthicsService
+
+        review_id = _make_review(user_client, db, monkeypatch)
+        _seed_persona_output(db, review_id, "P90")
+        EthicsService.get_ethics_reports_for_review(db, review_id)
+        assert db.query(EthicsReport).filter(EthicsReport.review_id == review_id).count() >= 1
+
+        r = user_client.post(
+            "/api/auth/me/delete",
+            json={"confirm": "删除我的账号", "password": user_client.password},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["detail"]["ethics_reports_deleted"] >= 1
+
+        db.expire_all()
+        assert db.query(EthicsReport).filter(EthicsReport.review_id == review_id).count() == 0
+        assert db.query(PersonaOutput).filter(PersonaOutput.review_id == review_id).count() == 0
+
     def test_does_not_touch_other_users_data(self, user_client, db, monkeypatch):
         """删自己不能顺手删别人——这是删除功能最危险的失败模式。"""
         from app.models import Review
@@ -308,3 +349,138 @@ class TestDeleteAccount:
         )
 
         assert db.query(Review).filter(Review.id == other_id).first() is not None
+
+
+class TestEthicsReadIsSideEffectFree:
+    """GET 只读接口不该有写副作用。
+
+    此前 GET /api/evaluations/{id}/ethics 每调一次就把该评审下每个人格
+    重新算一遍并 add+commit：前端每打开一次伦理页写 N 行，刷 10 次 10×N 行。
+    """
+
+    def test_repeated_get_does_not_grow_the_table(self, user_client, db, monkeypatch):
+        from app.models import EthicsReport
+
+        review_id = _make_review(user_client, db, monkeypatch)
+        _seed_persona_output(db, review_id, "P90")
+        _seed_persona_output(db, review_id, "P91")
+
+        def _rows():
+            db.expire_all()
+            return db.query(EthicsReport).filter(EthicsReport.review_id == review_id).count()
+
+        first = user_client.get(f"/api/evaluations/{review_id}/ethics")
+        assert first.status_code == 200, first.text
+        assert {"P90", "P91"} <= {x["persona_id"] for x in first.json()}
+        after_first = _rows()
+        assert after_first == len(first.json())
+
+        for _ in range(3):
+            r = user_client.get(f"/api/evaluations/{review_id}/ethics")
+            assert r.status_code == 200
+            # 结果本身也要稳定：同样两条，id 不变（不是每次新造一份）
+            assert [x["persona_id"] for x in r.json()] == [x["persona_id"] for x in first.json()]
+            assert [x["id"] for x in r.json()] == [x["id"] for x in first.json()]
+
+        assert _rows() == after_first, "只读接口仍在写库——幂等回归失效了"
+
+    def test_new_persona_output_still_gets_evaluated(self, user_client, db, monkeypatch):
+        """幂等不等于"算一次就再也不算"：后来才补上的人格输出仍要被评估。"""
+        from app.models import EthicsReport
+
+        review_id = _make_review(user_client, db, monkeypatch)
+        _seed_persona_output(db, review_id, "P90")
+        before = user_client.get(f"/api/evaluations/{review_id}/ethics").json()
+        assert "P91" not in {x["persona_id"] for x in before}
+
+        _seed_persona_output(db, review_id, "P91")
+        body = user_client.get(f"/api/evaluations/{review_id}/ethics").json()
+        assert {"P90", "P91"} <= {x["persona_id"] for x in body}
+        assert len(body) == len(before) + 1
+        db.expire_all()
+        assert (
+            db.query(EthicsReport).filter(EthicsReport.review_id == review_id).count() == len(body)
+        )
+
+    def test_legacy_rows_without_review_id_do_not_break_the_endpoint(
+        self, user_client, db, monkeypatch
+    ):
+        """老库里残留的无归属行（review_id 为空）不能让接口崩，也不能被误当成
+        某个评审的结果返回。"""
+        from app.models import EthicsReport
+
+        review_id = _make_review(user_client, db, monkeypatch)
+        _seed_persona_output(db, review_id, "P90")
+
+        legacy = EthicsReport(
+            review_id=None,
+            persona_id="P90",
+            passed=False,
+            score=0,
+            violations_json=[{"severity": "high", "rule": "legacy", "detail": "老数据"}],
+            stereotype_risk="high",
+        )
+        db.add(legacy)
+        db.commit()
+
+        r = user_client.get(f"/api/evaluations/{review_id}/ethics")
+        assert r.status_code == 200, r.text
+        assert legacy.id not in {x["id"] for x in r.json()}, "无归属的老行被当成了本评审的结果"
+        assert "P90" in {x["persona_id"] for x in r.json()}
+
+
+class TestEthicsMigration:
+    def test_migration_is_repeatable_and_purges_orphans(self, tmp_path):
+        """手写迁移必须重复执行安全；老库（无 review_id 列 + 孤儿行）能升级。"""
+        import sqlalchemy
+        from sqlalchemy import text
+
+        from app import db as db_module
+
+        db_file = tmp_path / "legacy.sqlite"
+        old_engine = sqlalchemy.create_engine(
+            f"sqlite:///{db_file}", connect_args={"check_same_thread": False}
+        )
+        with old_engine.connect() as conn:
+            # 老形态：ethics_reports 没有 review_id 列
+            conn.execute(text("CREATE TABLE reviews (id VARCHAR PRIMARY KEY)"))
+            conn.execute(
+                text(
+                    "CREATE TABLE ethics_reports ("
+                    "id VARCHAR PRIMARY KEY, persona_id VARCHAR, passed BOOLEAN, "
+                    "score INTEGER, violations_json TEXT, stereotype_risk VARCHAR, "
+                    "created_at DATETIME)"
+                )
+            )
+            for i in range(3):
+                conn.execute(
+                    text(
+                        "INSERT INTO ethics_reports (id, persona_id, violations_json) "
+                        "VALUES (:i, 'P01', '[]')"
+                    ),
+                    {"i": f"legacy-{i}"},
+                )
+            conn.commit()
+        old_engine.dispose()
+
+        engine = sqlalchemy.create_engine(
+            f"sqlite:///{db_file}", connect_args={"check_same_thread": False}
+        )
+        original = db_module.engine
+        db_module.engine = engine
+        try:
+            db_module._legacy_migrations()
+            with engine.connect() as conn:
+                cols = {
+                    r[1] for r in conn.execute(text("PRAGMA table_info(ethics_reports)")).fetchall()
+                }
+                assert "review_id" in cols
+                # 孤儿行含用户内容摘录却无法归属、无法按承诺删除——迁移时清掉
+                assert conn.execute(text("SELECT COUNT(*) FROM ethics_reports")).scalar() == 0
+
+            # 再跑一次不能炸（重复执行安全）
+            db_module._legacy_migrations()
+            db_module._legacy_migrations()
+        finally:
+            db_module.engine = original
+            engine.dispose()

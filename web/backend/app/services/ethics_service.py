@@ -96,8 +96,16 @@ class EthicsService:
         persona_id: str,
         output_data: Dict[str, Any],
         input_materials: Optional[Dict[str, Any]] = None,
+        review_id: Optional[str] = None,
     ) -> EthicsReportModel:
-        """评估 persona 输出的伦理合规性"""
+        """评估 persona 输出的伦理合规性并落库。
+
+        review_id 必填（签名上放在末尾只为兼容既有关键字调用顺序）：
+        violations_json 含用户内容摘录，没有归属就删不掉，与隐私政策冲突。
+        """
+        if not review_id:
+            raise ValueError("evaluate_persona_output 必须带 review_id：无归属的伦理报告删不掉")
+
         import json
         text = json.dumps(output_data, ensure_ascii=False)
 
@@ -140,6 +148,7 @@ class EthicsService:
 
         report = EthicsReportModel(
             id=str(uuid.uuid4()),
+            review_id=review_id,
             persona_id=persona_id,
             passed=passed,
             score=score,
@@ -196,17 +205,40 @@ class EthicsService:
 
     @classmethod
     def get_ethics_reports_for_review(cls, session: Session, review_id: str) -> List[EthicsReportModel]:
-        """获取某个评审下所有 persona 的伦理报告"""
+        """获取某个评审下所有 persona 的伦理报告：已有的直接读，缺的才算。
+
+        这里必须是幂等的。此前每次调用都无条件重跑 evaluate_persona_output，
+        而后者会 add+commit —— 一个 GET 只读接口于是每打开一次伦理页就往表里
+        写 N 行，刷 10 次就是 10×N 行的垃圾（且当时还没有 review_id，写完就
+        再也删不掉）。
+        """
         stmt = select(PersonaOutput).where(PersonaOutput.review_id == review_id)
         persona_outputs = list(session.scalars(stmt).all())
 
+        existing_stmt = select(EthicsReportModel).where(EthicsReportModel.review_id == review_id)
+        existing: Dict[str, EthicsReportModel] = {}
+        for r in session.scalars(existing_stmt).all():
+            # 同一 persona 若历史上留下多行（幂等修复之前的产物），保留最早的一条
+            existing.setdefault(r.persona_id, r)
+
         reports = []
+        seen: Set[str] = set()
         for po in persona_outputs:
-            if po.output_json:
+            if not po.output_json:
+                continue
+            # 一个人格在一次评审里只出一份伦理报告：同 persona 若有多条输出行
+            # （重试/补写留下的），不能让接口返回重复条目、更不能重复落库
+            if po.persona_id in seen:
+                continue
+            seen.add(po.persona_id)
+            report = existing.get(po.persona_id)
+            if report is None:
                 report = cls.evaluate_persona_output(
                     session=session,
                     persona_id=po.persona_id,
                     output_data=po.output_json,
+                    review_id=review_id,
                 )
-                reports.append(report)
+                existing[po.persona_id] = report
+            reports.append(report)
         return reports

@@ -932,11 +932,12 @@ class TestCrossExamIsWiredToTheModel:
         cross = result["report"]["cross_examination"]
         assert cross["mode"] == "multi_agent_rebuttal"
         assert cross["is_live_debate"] is True
-        # 双方各被重新调用一次，且每次都带着自己的身份卡（不是一次通用调用糊过去）
+        # 双方各被重新调用一次，且每次都带着自己的身份卡（不是一次通用调用糊过去）。
+        # 身份卡是匿名的，所以"哪一次是谁"只能靠论据编号认（A1=pro / B1=con）。
         assert len(fake.cross_exam_prompts) == 2
         assert all("[PERSONA CARD]" in p for p in fake.cross_exam_prompts)
-        assert sum(1 for p in fake.cross_exam_prompts if DUEL_PRO in p) == 1
-        assert sum(1 for p in fake.cross_exam_prompts if DUEL_CON in p) == 1
+        assert sum(1 for p in fake.cross_exam_prompts if "[你自己的论据 A1]" in p) == 1
+        assert sum(1 for p in fake.cross_exam_prompts if "[你自己的论据 B1]" in p) == 1
         assert cross["usage"]["calls"] == 2
 
     def test_full_mode_costs_more_calls_than_standard(self, monkeypatch):
@@ -950,9 +951,14 @@ class TestCrossExamIsWiredToTheModel:
         assert result_full["cost_summary"]["cross_exam"]["input_tokens"] == 2 * CROSS_EXAM_TOKENS[0]
         assert result_full["cost_summary"]["cross_exam"]["output_tokens"] == 2 * CROSS_EXAM_TOKENS[1]
 
-    def test_full_mode_rebuttal_prompt_never_leaks_the_opponent(self, monkeypatch):
-        """人格知道自己是谁（要保持自己的口吻），但不许知道对手是谁——
-        否则反驳会变成按身份结盟/让位，而不是对论据的检验。"""
+    def test_full_mode_rebuttal_prompt_carries_no_persona_identity_at_all(self, monkeypatch):
+        """反驳提示词里**双方**的 name/id 都不出现——自己的也不行。
+
+        对手匿名的理由是不让模型按身份结盟/让位；自己的 name/id 摘掉则是为了守住
+        "交叉质询提示词里不含人格名"这条可测的不变量（模板开头就是这么写的），
+        并与 v1 后端 _persona_identity_preamble 的口径一致。
+        身份卡的其余部分（archetype/关注点/决策规则）照旧带着，人格口吻不受影响。
+        """
         names = _persona_display_names()
         fake = _FakeProvider(
             cross_exam_reply=_rebutter_reply(),
@@ -960,26 +966,56 @@ class TestCrossExamIsWiredToTheModel:
         )
         _duel_panel(monkeypatch, fake, mode="full")
 
-        pro_prompt = next(p for p in fake.cross_exam_prompts if DUEL_PRO in p)
-        con_prompt = next(p for p in fake.cross_exam_prompts if DUEL_CON in p)
+        pro_prompt = next(p for p in fake.cross_exam_prompts if "[你自己的论据 A1]" in p)
+        con_prompt = next(p for p in fake.cross_exam_prompts if "[你自己的论据 B1]" in p)
 
-        assert names[DUEL_PRO] in pro_prompt          # 自己的身份卡在
-        assert names[DUEL_CON] not in pro_prompt      # 对手的名字一个字都没有
-        assert DUEL_CON not in pro_prompt
-        assert names[DUEL_PRO] not in con_prompt
-        assert DUEL_PRO not in con_prompt
+        for prompt in (pro_prompt, con_prompt):
+            for pid in (DUEL_PRO, DUEL_CON):
+                assert pid not in prompt
+                assert names[pid] not in prompt
+            # 身份卡本体仍在：摘的只是 id/name，不是整张卡
+            assert "[PERSONA CARD]" in prompt
+            assert "decision_rules" in prompt
+
         # 论据正文里原本嵌着人格名，渲染层把它洗成了匿名占位
         assert "某位评审" in pro_prompt
         assert "论据 B1" in pro_prompt
 
-    def test_no_mode_behaves_like_full(self, monkeypatch):
-        """CLI / MCP 走的就是 mode=None 这条路（run_panel 文档里的口径是"等价于 full"）。
-        它必须真的跑多智能体反驳，否则这两个入口的用户永远拿不到真反驳。"""
-        fake = _FakeProvider(cross_exam_reply=_rebutter_reply())
+    def test_persona_review_round_still_carries_full_identity_card(self, monkeypatch):
+        """防改过头：匿名化只作用于反驳轮，人格评审那一轮必须照旧带完整身份卡
+        （带 id 和 name），否则人格根本不知道自己是谁。"""
+        names = _persona_display_names()
+        fake = _FakeProvider(
+            cross_exam_reply=_rebutter_reply(),
+            display_names={DUEL_PRO: names[DUEL_PRO], DUEL_CON: names[DUEL_CON]},
+        )
+        _duel_panel(monkeypatch, fake, mode="full")
+
+        assert len(fake.persona_prompts) == 2
+        for pid in (DUEL_PRO, DUEL_CON):
+            own = next(p for p in fake.persona_prompts if pid in p)
+            assert names[pid] in own
+
+    def test_no_mode_defaults_to_the_cheaper_moderated_tier(self, monkeypatch):
+        """不传 mode（CLI / MCP）时必须走仲裁式一次调用，不是每人各一次的最贵档。
+
+        显式锁死这一条：默认值一旦被悄悄改回 multi_agent，没做过任何选择的
+        CLI/MCP 用户就会按涉事人格数付钱而不自知；而且两条链路的默认行为会再次
+        分叉（v1 后端默认也是 moderated）。"""
+        fake = _FakeProvider()
         result = _duel_panel(monkeypatch, fake)
 
-        assert result["report"]["cross_examination"]["mode"] == "multi_agent_rebuttal"
-        assert len(fake.cross_exam_prompts) == 2
+        assert result["report"]["cross_examination"]["mode"] == "moderated_rebuttal"
+        assert len(fake.cross_exam_prompts) == 1
+        assert result["cost_summary"]["cross_exam"]["calls"] == 1
+
+    def test_default_cross_exam_mode_matches_v1_backend(self):
+        """两条链路的默认档位必须是同一个常量值——它们分叉过一次，别再分叉。"""
+        assert runner_cli.DEFAULT_CROSS_EXAM_MODE == "moderated_rebuttal"
+        assert runner_cli.CROSS_EXAM_MODE_BY_REVIEW_MODE == {
+            "standard": "moderated_rebuttal",
+            "full": "multi_agent_rebuttal",
+        }
 
     def test_quick_mode_sends_no_rebuttal_call_at_all(self, monkeypatch):
         fake = _FakeProvider()

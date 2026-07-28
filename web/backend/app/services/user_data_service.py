@@ -5,7 +5,7 @@
 
 关于删除的边界（诚实划线，隐私政策里必须同样口径写清楚）：
     立即物理删除：评审内容、材料原文、报告、追问记录、人格输出、
-                  判断留档、反馈、BYOK 密钥、账号本身
+                  判断留档、反馈、伦理报告（含内容摘录）、BYOK 密钥、账号本身
     保留但切断关联：用量/计费流水、CDK 兑换与次数账
         —— 这些是财务事实源，法律与对账要求下不能说删就删；
            但会把 user_id 改写成不可回指的墓碑 id，从此无法关联到具体人，
@@ -156,9 +156,14 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
     stats: Dict[str, int] = {}
 
     # 评审——级联带走 persona_outputs / chat_messages / evaluation_results /
-    # judgments(+outcomes) / feedback(+adoptions)，见 models 里的 cascade 声明
+    # judgments(+outcomes) / feedback(+adoptions) / ethics_reports，
+    # 见 models 里的 cascade 声明。伦理报告走 cascade 而不是单独 delete()：
+    # 它的归属完全由 Review 决定（表里不冗余 user_id），挂在同一条删除路径上
+    # 才不会出现"加了新入口忘了同步删"的漂移。
     reviews = db.query(Review).filter(Review.user_id == user_id).all()
     stats["reviews_deleted"] = len(reviews)
+    # 单独报一个数字，让"含内容摘录的伦理报告也删了"这件事对用户可核对
+    stats["ethics_reports_deleted"] = sum(len(r.ethics_reports) for r in reviews)
     for r in reviews:
         db.delete(r)
 

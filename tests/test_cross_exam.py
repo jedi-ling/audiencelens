@@ -431,6 +431,24 @@ class TestDerivedSummaryBackwardCompat:
         with pytest.raises(ValueError):
             run_cross_exam_protocol(persona_outputs, [], mode="live_debate_deluxe")
 
+    def test_auto_mode_with_llm_picks_moderated_not_multi_agent(
+        self, duel_outputs, duel_controversy, sim
+    ):
+        """不显式传 mode 时，有 llm_call 也只发**一次**仲裁式调用。
+
+        锁死这一条是为了防止默认档位被悄悄改成 multi_agent：那一档的调用数随涉事
+        人格数上升，没做过选择的调用方会按最贵的路径付钱而不自知。
+        """
+        record = []
+        llm = make_llm(moderated_response(), record=record)
+        result = run_cross_exam_protocol(
+            duel_outputs, duel_controversy, llm_call=llm, similarity=sim
+        )
+
+        assert result["requested_mode"] == "moderated_rebuttal"
+        assert result["mode"] == "moderated_rebuttal"
+        assert len(record) == 1
+
 
 class TestModeratedRebuttal:
     def test_live_call_flips_mode_and_limitation(self, duel_outputs, duel_controversy, sim):

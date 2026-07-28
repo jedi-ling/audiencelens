@@ -18,6 +18,22 @@ def _cleanup_anonymous_key(db):
     from app.services import key_service
 
     key_service.delete_user_key(db, "anonymous")
+    # 追问现在会给 anonymous 记 UsageRecord（见 TestChatQuotaAndUsage）。整个会话共用
+    # 一个 sqlite 文件，不清就会污染别处"anonymous 用量为 0/未超额"的断言。
+    from app.models import UsageRecord
+
+    db.query(UsageRecord).filter(UsageRecord.user_id == "anonymous").delete()
+    db.commit()
+
+
+def _server_key(model=None):
+    """伪造一个 source="server" 的解析结果——追问配额只对平台 key 生效，
+    而测试里建评审用的是 BYOK key，必须显式换掉才测得到配额分支。"""
+    from app.services.key_service import ResolvedKey
+
+    return ResolvedKey(
+        key="sk-ant-platform", source="server", provider="anthropic", model=model, api_base=None
+    )
 
 
 def _fake_result():
@@ -316,3 +332,209 @@ class TestChatWithImages:
             json={"message": "混入脏数据", "images": ["javascript:alert(1)", "http://evil/x.png"]},
         )
         assert isinstance(captured[0], str)  # 全被过滤 → 退回纯文字
+
+
+class TestChatQuotaAndUsage:
+    """追问此前是条漏钱的路：只有限流、没有配额校验，token 拿到就丢（`_in_tok`）。
+    结果是配额耗尽的用户能对任意一条已完成评审狂发追问烧平台 key，而 UsageRecord
+    里一分钱都看不到——那道按累计成本触发的硬闸因此永远不会被触发。"""
+
+    @staticmethod
+    def _patch_llm(monkeypatch, tokens=(1000, 500), reply="回复"):
+        calls = []
+        import runner.llm_client
+
+        def fake(**kw):
+            calls.append(kw)
+            return (reply, tokens[0], tokens[1])
+
+        monkeypatch.setattr(runner.llm_client, "chat_completion", fake)
+        return calls
+
+    @staticmethod
+    def _chat_usage_rows(db, review_id):
+        from app.models import UsageRecord
+
+        return (
+            db.query(UsageRecord)
+            .filter(UsageRecord.review_id == review_id, UsageRecord.kind == "chat")
+            .all()
+        )
+
+    def test_token_and_cost_land_in_usage_record(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-usage-1")
+        self._patch_llm(monkeypatch, tokens=(1000, 500))
+
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "追问"})
+        assert r.status_code == 200
+
+        rows = self._chat_usage_rows(db, review_id)
+        assert len(rows) == 1
+        row = rows[0]
+        # 断的是数值真的记下来了，不是"有一行"
+        assert row.input_tokens == 1000
+        assert row.output_tokens == 500
+        assert row.cost_usd > 0  # estimate_cost 按 budget.yaml 的定价算出来的真实成本
+        assert row.key_source == "byok"
+        assert row.persona_count == 0
+
+    def test_cost_uses_engine_pricing_table(self, client, db, monkeypatch):
+        """成本口径必须与引擎侧同源（persona_agent.estimate_cost + budget.yaml），
+        不能在追问链路另写一套算法，否则计费报表两套数对不上。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-usage-2")
+        self._patch_llm(monkeypatch, tokens=(2000, 1000))
+
+        client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "追问"})
+
+        import yaml
+
+        from app.config import settings
+        from app.services import BUDGET_PATH
+        from runner.persona_agent import estimate_cost
+
+        with open(BUDGET_PATH, "r", encoding="utf-8") as f:
+            budget_config = yaml.safe_load(f)
+        expected = estimate_cost(2000, 1000, settings.intent_model, budget_config)
+        assert expected > 0
+        assert self._chat_usage_rows(db, review_id)[0].cost_usd == pytest.approx(expected)
+
+    def test_chat_does_not_consume_a_review_count(self, client, db, monkeypatch):
+        """追问只计成本、不计次数：一次追问比一次完整评审便宜一到两个数量级，
+        按次数扣会让"问两句就把当天评审额度问没了"，而追问恰恰是该鼓励的行为。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-usage-3")
+        self._patch_llm(monkeypatch)
+
+        from app.services import quota_service
+
+        before = quota_service.usage_summary(db, "anonymous")["reviews_used"]
+        for _ in range(3):
+            assert (
+                client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "再问"}).status_code
+                == 200
+            )
+        after = quota_service.usage_summary(db, "anonymous")
+        assert after["reviews_used"] == before  # 次数没动
+        assert after["cost_usd_total"] > 0  # 但钱记上了
+
+    def test_exhausted_quota_rejects_chat_without_calling_llm(self, client, db, monkeypatch):
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-quota-1")
+        calls = self._patch_llm(monkeypatch)
+
+        from app.config import settings
+        from app.services import key_service, quota_service
+
+        monkeypatch.setattr(settings, "quota_enabled", True)
+        monkeypatch.setattr(key_service, "resolve_key", lambda db, uid, provider="anthropic": _server_key())
+        # 一笔就烧穿 free 档 $1/天 的成本硬闸
+        quota_service.record_usage(db, "anonymous", kind="review", key_source="server", cost_usd=5.0)
+
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "还想问"})
+        assert r.status_code == 402
+        assert calls == []  # 拦在调模型之前，一分钱都没花
+
+    def test_byok_user_unaffected_by_exhausted_quota(self, client, db, monkeypatch):
+        """BYOK 花的是用户自己的钱，与 check_quota 一致地豁免——别把豁免改坏。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-quota-2")
+        self._patch_llm(monkeypatch)
+
+        from app.config import settings
+        from app.services import quota_service
+
+        monkeypatch.setattr(settings, "quota_enabled", True)
+        quota_service.record_usage(db, "anonymous", kind="review", key_source="server", cost_usd=5.0)
+
+        # resolve_key 不打桩：测试用户存的是自己的 key → source="byok"
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "我用自己的 key"})
+        assert r.status_code == 200
+
+    def test_credits_mode_blocks_at_zero_balance_but_never_consumes(self, client, db, monkeypatch):
+        """credits 模式下 quota_service.check_quota 会原子扣 1 次余额——对一次追问
+        收一次完整评审的价钱不合理。这里只校验"有没有余额"，放行也不扣。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-quota-3")
+        self._patch_llm(monkeypatch)
+
+        from app.config import settings
+        from app.models import CreditLedger
+        from app.services import cdk_service, key_service
+
+        monkeypatch.setattr(settings, "quota_enabled", True)
+        monkeypatch.setattr(settings, "quota_mode", "credits")
+        monkeypatch.setattr(key_service, "resolve_key", lambda db, uid, provider="anthropic": _server_key())
+
+        # 余额 0 → 402
+        assert (
+            client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "问"}).status_code == 402
+        )
+
+        db.add(CreditLedger(user_id="anonymous", delta=2, reason="cdk_redeem"))
+        db.commit()
+        assert (
+            client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "问"}).status_code == 200
+        )
+        assert cdk_service.credit_balance(db, "anonymous") == 2  # 放行了但没扣次数
+
+        db.query(CreditLedger).filter(CreditLedger.user_id == "anonymous").delete()
+        db.commit()
+
+    def test_credits_mode_still_has_a_cost_ceiling_for_chat(self, client, db, monkeypatch):
+        """"追问不扣次数"不能等于"追问不封顶"。
+
+        credits 模式下 usage_summary 的 cost_usd_limit 恒为 None（该模式没有每日
+        成本闸），如果只校验"余额 > 0"，那么持有 1 次余额的用户就能对平台 key
+        无限追问——发一张 CDK 等于送一条不封顶的补全通道。这里锁死兜底闸。
+        """
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-quota-4")
+        calls = self._patch_llm(monkeypatch)
+
+        from app.config import settings
+        from app.models import CreditLedger
+        from app.services import cdk_service, key_service, quota_service
+
+        monkeypatch.setattr(settings, "quota_enabled", True)
+        monkeypatch.setattr(settings, "quota_mode", "credits")
+        monkeypatch.setattr(key_service, "resolve_key", lambda db, uid, provider="anthropic": _server_key())
+
+        db.add(CreditLedger(user_id="anonymous", delta=1, reason="cdk_redeem"))
+        db.commit()
+        # 余额还在，但平台 key 上已经烧穿了套餐日成本上限
+        quota_service.record_usage(db, "anonymous", kind="chat", key_source="server", cost_usd=5.0)
+
+        n_before = len(calls)
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "继续刷"})
+        assert r.status_code == 402
+        assert len(calls) == n_before  # 拦在调模型之前
+        # 拦是因为成本，不是因为没余额——余额一次都没被扣
+        assert cdk_service.credit_balance(db, "anonymous") == 1
+
+        db.query(CreditLedger).filter(CreditLedger.user_id == "anonymous").delete()
+        db.commit()
+
+    def test_usage_write_failure_does_not_break_chat_but_is_logged(
+        self, client, db, monkeypatch
+    ):
+        """用户已经拿到回复了，记账失败不该把追问也弄失败；但绝不静默吞掉。"""
+        review_id = _make_completed_review(client, db, monkeypatch, key="sk-ant-usage-fail")
+        self._patch_llm(monkeypatch, reply="照样回你")
+
+        from app.services import quota_service
+
+        def boom(*a, **kw):
+            raise RuntimeError("usage_records 写入炸了")
+
+        monkeypatch.setattr(quota_service, "record_usage", boom)
+
+        # 直接盯 chat_service 用的那个 logger——app 的 audiencelens logger 不向 root
+        # 传播，caplog 抓不到（抓不到会让这条断言永远绿，等于没测）。
+        from app.services import chat_service
+
+        warnings = []
+        monkeypatch.setattr(
+            chat_service.logger, "warning", lambda msg, *a, **kw: warnings.append(msg % a)
+        )
+
+        r = client.post(f"/api/v2/reviews/{review_id}/chat", json={"message": "问"})
+        assert r.status_code == 200
+        assert r.json()["reply"]["content"] == "照样回你"
+        assert self._chat_usage_rows(db, review_id) == []
+        # 失败必须留痕：这个仓库正在系统性清除 `except Exception: pass`
+        assert any("记 usage 失败" in m for m in warnings)

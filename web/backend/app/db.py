@@ -128,11 +128,39 @@ def _legacy_migrations() -> None:
         if "email_verified_at" not in user_columns:
             patches.append("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
 
+    # ethics_reports 补归属列。老库里这张表没有 review_id，写进去的行
+    # 既查不回来也删不掉，而 violations_json 里含用户内容摘录——等于
+    # 隐私政策承诺的"删号即物理删除评审内容"有一个永久漏项。
+    orphan_purge = False
+    if "ethics_reports" in inspector.get_table_names():
+        er_columns = {c["name"] for c in inspector.get_columns("ethics_reports")}
+        if "review_id" not in er_columns:
+            # SQLite 的 ADD COLUMN 不能带 FK，这里只加普通列；
+            # 归属与级联删除由 ORM 侧的 relationship(cascade) 保证
+            patches.append("ALTER TABLE ethics_reports ADD COLUMN review_id VARCHAR")
+            patches.append(
+                "CREATE INDEX IF NOT EXISTS ix_ethics_reports_review_id ON ethics_reports (review_id)"
+            )
+            # 存量孤儿行：review_id 为空 = 无法回指到任何评审、任何用户，
+            # 也就无法在删号时被删掉。留着它们就是留着一堆无主的用户内容摘录，
+            # 与隐私承诺直接冲突；且它们是"只读接口反复 INSERT"这个 bug 的
+            # 产物（同一份内容被重复算了 N 遍），没有任何保留价值 —— 直接清掉。
+            orphan_purge = True
+
     if not patches:
         return
     with engine.connect() as conn:
         for sql in patches:
             conn.execute(text(sql))
+        if orphan_purge:
+            purged = conn.execute(text("DELETE FROM ethics_reports WHERE review_id IS NULL"))
+            if purged.rowcount:
+                import logging
+
+                logging.getLogger("audiencelens").warning(
+                    "迁移：清理 %d 行无归属的伦理报告（含用户内容摘录，无法归属即无法按承诺删除）",
+                    purged.rowcount,
+                )
         conn.commit()
 
 

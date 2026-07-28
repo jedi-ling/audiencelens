@@ -74,6 +74,8 @@ class Review(Base):
     evaluation_results = relationship("EvaluationResult", back_populates="review", cascade="all, delete-orphan")
     judgments = relationship("Judgment", back_populates="review", cascade="all, delete-orphan")
     feedback = relationship("ReviewFeedback", back_populates="review", uselist=False, cascade="all, delete-orphan")
+    # 伦理报告含用户内容摘录，必须随评审一起删——删号走的就是删 Review 这条路
+    ethics_reports = relationship("EthicsReport", back_populates="review", cascade="all, delete-orphan")
 
 
 class PersonaOutput(Base):
@@ -143,15 +145,32 @@ class EvaluationScorecard(Base):
 
 
 class EthicsReport(Base):
+    """某次评审中某个人格输出的伦理体检结果。
+
+    violations_json 里含用户内容的摘录，所以这张表必须是可归属、可删除的：
+    没有 review_id 的行既查不回来也删不掉，会永久滞留在库里，与隐私政策
+    「删号即物理删除评审内容」的承诺直接冲突。
+
+    为什么只挂 review_id 而不再冗余一个 user_id：归属的唯一事实源是
+    Review.user_id。再存一份 user_id 就有了第二个来源，两边一旦不同步
+    （改归属、匿名转注册）就会出现"删了人还留着他的摘录"这种最坏情况。
+    删除靠 Review 的 cascade 走，天然与评审归属保持一致。
+    """
+
     __tablename__ = "ethics_reports"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    # 老库里存在一批 review_id 为空的孤儿行（见 db.py 的迁移说明），
+    # 因此列本身可空；新写入一律必须带 review_id（见 ethics_service）
+    review_id = Column(String, ForeignKey("reviews.id"), index=True, nullable=True)
     persona_id = Column(String, nullable=False)
     passed = Column(Boolean, nullable=False, default=False)
     score = Column(Integer, nullable=False, default=0)
     violations_json = Column(JSON, nullable=True, default=list)
     stereotype_risk = Column(String, nullable=True, default="low")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    review = relationship("Review", back_populates="ethics_reports")
 
 
 # ============================================================================

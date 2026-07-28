@@ -75,13 +75,19 @@ REVIEW_MODE_CONFIG = {
 #   standard —— 一次仲裁式反驳：+1 次调用，主持人视角代双方各写一轮反驳。
 #   full     —— 真多智能体反驳：每位涉事人格带着匿名的对手论据被重新调用一次，
 #               成本随涉事人格数上升，所以只在 full 档开。
-# mode=None（CLI / MCP 等旧调用方）按 run_panel 文档里既有的口径"等价于 full"处理，
-# 与 calibration 对 None 的处理保持一致；否则这条链路上的用户永远拿不到真反驳，
-# 而 cli.py 渲染完提示词就丢掉正是本次要修的断线。
 CROSS_EXAM_MODE_BY_REVIEW_MODE = {
     "standard": MODE_MODERATED,
     "full": MODE_MULTI_AGENT,
 }
+
+# 不传档位（CLI / MCP 等调用方）时用哪一档反驳。
+#
+# 这里曾经是 MODE_MULTI_AGENT，也就是"不说话就按最贵的算"：涉事人格各被重新调用
+# 一次，成本随人数线性上升，而 CLI/MCP 用户根本没做过这个选择。v1 后端
+# （web/backend/app/services/__init__.py 的同名表）默认是 MODE_MODERATED，
+# 两条链路默认行为不一致本身也是本仓库反复清理的那类问题。
+# 现在统一到较省的仲裁式一档：想要多智能体反驳必须显式 mode="full"。
+DEFAULT_CROSS_EXAM_MODE = MODE_MODERATED
 
 # full 档给每位涉事人格重新发起反驳调用时，用这段把"你是谁"重新交代一遍。
 # 身份卡本体复用 persona_agent._minify_persona（与人格评审那一轮同一份卡、同一套裁剪），
@@ -92,6 +98,26 @@ REBUTTAL_PERSONA_HEADER = (
     "你必须严格按照下方 persona 卡发言，不得切换到「通用产品经理」或「AI 助手」口吻。\n\n"
     "[PERSONA CARD]\n{persona_card}\n"
 )
+
+# 反驳轮身份卡里要摘掉的字段。**只在反驳轮摘**：人格评审那一轮（render_prompt →
+# persona-prompt.md 的 [PERSONA CARD]）必须带完整身份卡，那里不受影响。
+#
+# 为什么反驳轮要摘：cross-exam-prompt.md 开头写着"两段都不得出现人格名字"，
+# 渲染层也确实把人格名从论据正文里洗掉了——但 cli.py 又在提示词最前面接了一张
+# 带 id/name 的卡，"提示词里不含人格名"这条可测的不变量当场就破了。
+# 自己的名字露出来虽谈不上"按身份结盟"，却给模型留了自称身份、顺势把对手也
+# 往身份上带的口子。v1 后端（_persona_identity_preamble）摘的就是这两个字段，
+# 这里保持同一口径。
+REBUTTAL_PERSONA_HIDDEN_FIELDS = ("id", "name")
+
+
+def _rebuttal_persona_card(persona: dict) -> str:
+    """反驳轮用的匿名身份卡：同一套 _minify_persona 裁剪，只是先摘掉 id/name。"""
+    anonymous = {
+        k: v for k, v in (persona or {}).items()
+        if k not in REBUTTAL_PERSONA_HIDDEN_FIELDS
+    }
+    return _minify_persona(anonymous)
 
 # 单一注册表：见 runner/task_types.py（这里 re-export 保持既有导入路径不破）
 try:
@@ -202,7 +228,8 @@ def run_cross_exam_stage(
 ) -> dict:
     """把交叉质询真的接到 LLM 上——以前这里只把提示词渲染出来，然后原地丢掉。
 
-    分档见 CROSS_EXAM_MODE_BY_REVIEW_MODE。没有 api_key（模拟模式）时**一次调用都不发**，
+    分档见 CROSS_EXAM_MODE_BY_REVIEW_MODE；mode 为空时走 DEFAULT_CROSS_EXAM_MODE
+    （仲裁式一次调用，与 v1 后端同一默认）。没有 api_key（模拟模式）时**一次调用都不发**，
     直接如实走派生摘要：先发一轮注定失败的调用再回落只会白记一条 failure，
     并且会让报告里出现"交叉质询失败"这种误导性说明（真实情况是根本没有 key）。
 
@@ -219,7 +246,7 @@ def run_cross_exam_stage(
             rules=rules,
         )
 
-    requested_mode = CROSS_EXAM_MODE_BY_REVIEW_MODE.get(mode or "", MODE_MULTI_AGENT)
+    requested_mode = CROSS_EXAM_MODE_BY_REVIEW_MODE.get(mode or "", DEFAULT_CROSS_EXAM_MODE)
     personas_by_id = {p.get("id", ""): p for p in personas or []}
     # 仲裁视角不属于任何人格，没有 model_hint 可依据：用预算配置的默认模型
     # （select_model 对空人格就是返回 default_model，不另写一套选型规则）。
@@ -245,7 +272,7 @@ def run_cross_exam_stage(
                     f"人格 {persona_id} 不在本次面板里，无法注入身份卡，跳过它的反驳调用"
                 )
             prompt = (
-                REBUTTAL_PERSONA_HEADER.format(persona_card=_minify_persona(persona))
+                REBUTTAL_PERSONA_HEADER.format(persona_card=_rebuttal_persona_card(persona))
                 + "\n"
                 + prompt
             )
@@ -464,12 +491,15 @@ def run_panel(
 
     mode：评审深度档位（quick/standard/full，见 REVIEW_MODE_CONFIG）——控制人数
     上限、是否交叉质证、是否校准检查。None（CLI/旧调用方）保持历史行为：不截人数、
-    交叉质证和校准都跑，等价于 full。此前 Web v2 链路的 mode 只落库不进引擎，
+    交叉质证和校准都跑；但交叉质询用的是较省的默认档位，见下方说明。此前 Web v2 链路的 mode 只落库不进引擎，
     "快速扫一眼"实际跑的是全量流程，人数和钱都没省——这个参数就是补那条断链的。
 
     交叉质询按档位分流（见 CROSS_EXAM_MODE_BY_REVIEW_MODE）：quick 不跑、
-    standard 一次仲裁式反驳（+1 次调用）、full 与 None 走多智能体反驳（每位涉事
-    人格各一次调用）。没有 api_key 的模拟模式下一次反驳调用都不发，如实标成派生摘要。"""
+    standard 一次仲裁式反驳（+1 次调用）、full 走多智能体反驳（每位涉事人格各一次
+    调用）。**mode=None 在这一项上不等价于 full**：它走 DEFAULT_CROSS_EXAM_MODE，
+    即较省的仲裁式一档，与 v1 后端默认一致——不能让没做选择的 CLI/MCP 用户默认
+    掉进最贵的路径。想要多智能体反驳必须显式传 mode="full"。
+    没有 api_key 的模拟模式下一次反驳调用都不发，如实标成派生摘要。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 

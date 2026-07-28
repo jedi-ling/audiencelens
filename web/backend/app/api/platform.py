@@ -889,7 +889,13 @@ async def post_review_chat(
     # 匿名用户能追问，但只给回复的体验版——完整内容已存进历史，登录后
     # 同一条 thread 直接展示完整版，不需要重问。真对话在同一个对话框里，
     # 不弹窗不跳转，只是回复本身打了个"登录看完整"的马赛克。
-    reply = chat_service.send_message(db, review, body.message, body.persona_id, images=body.images)
+    #
+    # plan 要一路传到 chat_service：追问的配额校验（成本硬闸 / CDK 余额）按套餐取限额，
+    # 不传就恒按 free 档判，付费用户会被误拦。校验本身在 send_message 里做——
+    # 那里才拿得到 resolve_key 的 key_source（BYOK 豁免的判定依据）。
+    reply = chat_service.send_message(
+        db, review, body.message, body.persona_id, images=body.images, plan=identity.plan
+    )
     return {"reply": _serialize_chat_message(reply, gate_assistant=identity.is_anonymous)}
 
 
