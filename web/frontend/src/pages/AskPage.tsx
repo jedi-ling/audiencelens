@@ -170,6 +170,8 @@ export default function AskPage() {
   const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // 正在等二次确认的那条（页面内确认，不用 window.confirm，理由见 askDeleteHistory）
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
   const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
@@ -295,11 +297,21 @@ export default function AskPage() {
     )
   }
 
-  /** 删除一条历史评审。
+  /** 点垃圾桶：只进入"待确认"状态，不真删。
    *
-   * 二次确认沿用 ReviewHistoryPage 的同一套模式（window.confirm），不另造交互——
-   * 触屏和键盘都能用，且两个入口的手感一致。文案里点名"报告 / 各角色意见 /
-   * 追问记录都会没"，因为这三样确实一起删且不可恢复。
+   * 二次确认曾经用 window.confirm，实测不可靠：Chrome 在同一页面连弹几次后会给出
+   * "阻止此页面创建更多对话框"的勾选框，用户勾上之后 confirm() 直接静默返回 false，
+   * 于是点删除永远没反应、也没有任何报错——表现就是"删不掉"。某些内嵌 WebView
+   * 也会整体屏蔽这类对话框。所以确认必须做在页面内，不依赖浏览器弹窗。
+   */
+  const askDeleteHistory = (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setHistoryError(null)
+    setConfirmingId((prev) => (prev === id ? null : id))
+  }
+
+  /** 确认后真正删除。
    *
    * 失败必须看得见：以前失败只写进 historyError，而 historyError 从来不清，
    * 一次失败会一直挂着、下一次成功也不消失。现在开始前先清、失败写明原因。
@@ -307,15 +319,7 @@ export default function AskPage() {
   const handleDeleteHistory = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
-    const target = reviewHistory?.find((r) => r.id === id)
-    const label =
-      target?.target_title || TASK_TYPES.find((t) => t.id === target?.task_type)?.name || '这条评审'
-    if (
-      !window.confirm(
-        `确定删除「${label}」吗？\n\n评审报告、各角色意见和全部追问记录都会一起删除，此操作无法撤销。`,
-      )
-    )
-      return
+    setConfirmingId(null)
     setDeletingId(id)
     setHistoryError(null)
     try {
@@ -629,11 +633,14 @@ export default function AskPage() {
         history={reviewHistory}
         error={historyError}
         deletingId={deletingId}
+        confirmingId={confirmingId}
         onNewConversation={startNewConversation}
         // 列表现在是瘦身数据（没有 artifact_bundle/report_json），还原对话需要
         // 完整内容——点开时按 id 单独拉一次，跟刷新页面走的是同一条路径。
         onOpenReview={(r) => void fetchReview(r.id).then(openReviewConversation).catch(() => {})}
-        onDelete={handleDeleteHistory}
+        onAskDelete={askDeleteHistory}
+        onConfirmDelete={handleDeleteHistory}
+        onCancelDelete={() => setConfirmingId(null)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col px-6 py-6">
@@ -1098,17 +1105,23 @@ function HistorySidebar({
   history,
   error,
   deletingId,
+  confirmingId,
   onNewConversation,
   onOpenReview,
-  onDelete,
+  onAskDelete,
+  onConfirmDelete,
+  onCancelDelete,
 }: {
   open: boolean
   history: ReviewListItem[] | null
   error: string | null
   deletingId: string | null
+  confirmingId: string | null
   onNewConversation: () => void
   onOpenReview: (review: ReviewListItem) => void
-  onDelete: (e: React.MouseEvent, id: string) => void
+  onAskDelete: (e: React.MouseEvent, id: string) => void
+  onConfirmDelete: (e: React.MouseEvent, id: string) => void
+  onCancelDelete: () => void
 }) {
   return (
     <aside
@@ -1157,6 +1170,45 @@ function HistorySidebar({
               const { projects, ungrouped } = groupHistoryByProject(history)
               const renderItem = (r: ReviewListItem) => {
                 const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
+                // 二次确认直接长在这一行里。整行不再可点（避免"想点取消结果打开了评审"）。
+                if (confirmingId === r.id) {
+                  return (
+                    <div
+                      key={r.id}
+                      role="alertdialog"
+                      aria-label={`确认删除「${label}」`}
+                      className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
+                    >
+                      <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
+                        删除「<span className="text-text-primary">{label}</span>」？
+                        <br />
+                        报告、各角色意见、全部追问记录一起没，无法撤销。
+                      </p>
+                      <div className="flex gap-1.5">
+                        <button
+                          autoFocus
+                          onClick={(e) => onConfirmDelete(e, r.id)}
+                          disabled={deletingId === r.id}
+                          className="flex items-center gap-1 rounded bg-severity-critical/85 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-severity-critical disabled:opacity-60"
+                        >
+                          {deletingId === r.id && (
+                            <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
+                          )}
+                          删除
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onCancelDelete()
+                          }}
+                          className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  )
+                }
                 return (
                   <div
                     key={r.id}
@@ -1169,17 +1221,12 @@ function HistorySidebar({
                         等于这台设备上根本删不掉；桌面端用户也压根发现不了。
                         p-1.5 + h-3.5 图标 ≈ 26px 命中区，配合行高够手指点。 */}
                     <button
-                      onClick={(e) => onDelete(e, r.id)}
-                      disabled={deletingId === r.id}
-                      className="shrink-0 rounded p-1.5 text-text-muted/70 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted disabled:opacity-50"
+                      onClick={(e) => onAskDelete(e, r.id)}
+                      className="shrink-0 rounded p-1.5 text-text-muted/70 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
                       aria-label={`删除「${label}」`}
                       title="删除这条评审（会二次确认）"
                     >
-                      {deletingId === r.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      )}
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                     </button>
                   </div>
                 )
