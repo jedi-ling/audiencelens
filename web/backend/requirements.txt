@@ -10,3 +10,10 @@ python-multipart
 pypdf
 python-docx
 cryptography
+# 引擎（仓库 src/runner，通过卷挂进容器）的直接依赖。后端 import runner.* 时
+# 一并加载，缺了就是 ModuleNotFoundError、容器起不来：
+#   jinja2     -> aggregator.py / cross_exam.py / persona_agent.py 渲染提示词与报告
+#   jsonschema -> validator.py 校验人格输出
+# 本机开发时 venv 里恰好装过，所以只有 Docker 镜像和 CI 会暴露这个缺口。
+jinja2
+jsonschema

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Base, PersonaOutput, Review, SkillType
+from app.services.json_safe import json_safe, json_safe_key
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 SRC_ROOT = os.path.join(PROJECT_ROOT, "src")
@@ -207,33 +208,11 @@ def _persona_identity_preamble(persona: dict) -> str:
     return "[你的身份]\n" + _minify_persona(anonymous) + "\n\n"
 
 
-def _json_safe_key(key):
-    if isinstance(key, tuple):
-        return "|".join(str(k) for k in key)
-    if key is None or isinstance(key, (str, int, float, bool)):
-        return key
-    return str(key)
-
-
-def _json_safe(value):
-    """把不能进 JSON 列的字典键递归转成字符串。
-
-    起因是一个真挂的路径：run_calibration_check 返回的
-    coverage.pairwise_distances 用 (id1, id2) **元组**做键 —— 在 CLI 里被 Python
-    直接消费没问题，但 review.calibration 是 JSON 列，序列化时元组键直接
-    TypeError("keys must be str, int, float, bool or None, not tuple")，
-    整条 UPDATE 失败，被 run_review 外层 except 接住 → 评审标成 failed。
-    也就是说 v1 的 full 档（唯一跑校准的档位）只要有 ≥2 位人格就 100% 失败，
-    用户拿到的错误还是一句与评审毫无关系的 "keys must be str"。
-
-    元组键按 "id1|id2" 落地。修在持久化侧而不是 calibration.py：那是引擎的返回值，
-    元组键对它的 Python 消费方（CLI）完全合理，能不能进 JSON 列是这里的责任。
-    """
-    if isinstance(value, dict):
-        return {_json_safe_key(k): _json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
-    return value
+# 实现搬到 app/services/json_safe.py：v2 的 review_service 也要用同一份口径，
+# 留在这里会让 v2 要么重复实现、要么从包 __init__ 反向 import。
+# 保留这两个别名，模块内既有调用点与测试不必改。
+_json_safe_key = json_safe_key
+_json_safe = json_safe
 
 
 def _degraded_cross_exam_block(

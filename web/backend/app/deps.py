@@ -114,6 +114,44 @@ async def optional_identity(
         return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
 
 
+def is_shared_anonymous(identity: Identity) -> bool:
+    """当前身份是不是那个**所有人共用**的匿名桶。
+
+    注意 is_anonymous 不足以判断：CDK 兑换出来的游客也走 optional_identity，
+    但他们持 token、有独立 user_id、is_anonymous=False，是真实且互相隔离的身份。
+    真正危险的只有 user_id == settings.anonymous_user_id 这一种。
+    """
+    return identity.is_anonymous and identity.user_id == settings.anonymous_user_id
+
+
+def require_isolated_identity(identity: Identity) -> None:
+    """个人数据接口的守卫：多租户形态下不接受共享匿名桶。
+
+    为什么需要它，而 config._validate_startup 里那道检查不够：
+    那道检查只在 AL_AUTH_ENABLED=false 时报错，措辞是「关闭认证时所有请求共用
+    同一个 anonymous 身份——访客能看到彼此的评审、彼此的用量和彼此填的 API Key」。
+    但同一句话对 **AL_AUTH_ENABLED=true 时的未登录访客**一字不差地成立：
+    optional_identity 在没有有效 token 时同样回落到 anonymous_user_id，
+    于是张三未登录跑的评审，李四打开网站就能列出来、连结论原文一起读到。
+    实测（不带任何令牌直接请求后端）确实能拿到别人的评审列表与全部判断记录。
+
+    两种形态都要保住，所以判定条件是 auth_enabled 而不是一刀切：
+      · AL_AUTH_ENABLED=false —— 单机开源形态，这台机器就一个人用，
+        anonymous 桶就是「我」，照常放行（否则自建用户全部用不了）。
+      · AL_AUTH_ENABLED=true  —— 多租户形态，anonymous 是公共空间，
+        任何「属于某个人」的读写都必须先有身份。
+
+    只用于个人数据（自己的 key / 自己的评审列表 / 自己的判断台账）。
+    发起评审这类「先体验后注册」的动作不挂它——匿名照样能跑，
+    跑完用 /auth/me/claim-reviews 认领到账号下。
+    """
+    if settings.auth_enabled and is_shared_anonymous(identity):
+        raise Unauthorized(
+            "这个接口返回的是「属于你自己的」数据，未登录时无法区分谁是谁"
+            "（未登录访客共用同一个匿名身份）。请先登录或注册。"
+        )
+
+
 def resolve_rate_limit(db: Session, scope: str, limit: Optional[int] = None) -> int:
     """本次限流用哪个上限。优先级：调用方显式 limit > scope 专属旋钮 > 通用每分钟上限。
 

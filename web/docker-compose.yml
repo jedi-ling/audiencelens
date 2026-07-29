@@ -16,11 +16,15 @@ services:
       dockerfile: Dockerfile
     ports:
       - "127.0.0.1:8000:8000"
+    # 挂载点必须与容器内的仓库镜像布局一致（见 backend/Dockerfile 的 WORKDIR 说明）：
+    # 容器里 <repo> = /app，所以 src 挂 /app/src、harness 挂 /app/audiencelens-v0.2-harness、
+    # 数据目录挂 backend_dir/data。以前 harness 挂在 / 是为了迁就一个算错了的
+    # PROJECT_ROOT，src 挂 /app/src 则两边都对不上——后端 import runner 直接失败。
     volumes:
       - ../src:/app/src:ro
       # 评委规则集（ethics/evaluation 服务启动时读取；缺失会降级为内置规则）
-      - ../audiencelens-v0.2-harness:/audiencelens-v0.2-harness:ro
-      - backend-data:/app/data
+      - ../audiencelens-v0.2-harness:/app/audiencelens-v0.2-harness:ro
+      - backend-data:/app/web/backend/data
     environment:
       - AL_ENV=${AL_ENV:-production}
       - AL_CORS_ORIGINS=${AL_CORS_ORIGINS:?必须设置正式域名（逗号分隔），例：AL_CORS_ORIGINS=https://example.com。见 .env.production.example}

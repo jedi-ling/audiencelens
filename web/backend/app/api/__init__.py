@@ -40,7 +40,14 @@ from app.schemas import (
     TaskTypeResponse,
 )
 from app.db import get_db
-from app.deps import Identity, optional_identity, rate_limit, resolve_llm_key
+from app.config import settings
+from app.deps import (
+    Identity,
+    is_shared_anonymous,
+    optional_identity,
+    rate_limit,
+    resolve_llm_key,
+)
 from app.services import MaterialExtractor, PersonaService, ReviewService, report_gating
 from app.services import quota_service
 from app.services.evaluation_service import EvaluationService
@@ -187,6 +194,16 @@ def list_reviews(
     跨域部署时需要在 CORS expose_headers 里带上它才读得到；前端读不到时会
     退化成"这一页装满了就说明还有更多"的判断，只是显示不出总数，不会漏数据。
     """
+    # 多租户形态下，共享匿名桶不是"某个人"——按 user_id="anonymous" 查出来的
+    # 是**全部未登录访客**的评审，等于把张三的评审标题列给李四看。实测确实拿得到。
+    # 这里返回空列表而不是 401：侧栏在轮询这个接口，报错会把整页打成错误态；
+    # 返回空 + X-Requires-Login 头，前端就能显示"登录后查看历史"而不是干瞪眼。
+    # 单机开源形态（auth_enabled=false）不受影响——那台机器上 anonymous 就是本人。
+    if settings.auth_enabled and is_shared_anonymous(identity):
+        response.headers["X-Total-Count"] = "0"
+        response.headers["X-Requires-Login"] = "1"
+        return []
+
     svc = ReviewService(session)
     items = svc.list_reviews(offset=offset, limit=limit, user_id=identity.user_id)
     response.headers["X-Total-Count"] = str(_count_reviews_for(session, identity.user_id))

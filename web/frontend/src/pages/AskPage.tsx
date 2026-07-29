@@ -13,12 +13,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins, LogIn } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AmbientMotes from '@/components/AmbientMotes'
 import { api, ApiError } from '@/lib/apiClient'
-import { fetchReviews, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
+import { fetchReviewsAll, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
 import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
@@ -172,6 +172,9 @@ export default function AskPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // 正在等二次确认的那条（页面内确认，不用 window.confirm，理由见 askDeleteHistory）
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  // 后端说这个列表要登录才有内容（多租户实例上的未登录访客）。
+  // 不加这个标记的话，用户看到的就是"历史莫名其妙空了"。
+  const [historyRequiresLogin, setHistoryRequiresLogin] = useState(false)
 
   // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
   const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
@@ -193,8 +196,9 @@ export default function AskPage() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const data = await fetchReviews()
-      setReviewHistory(data)
+      const { items, requiresLogin } = await fetchReviewsAll()
+      setReviewHistory(items)
+      setHistoryRequiresLogin(requiresLogin)
       setHistoryError(null)
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : '加载失败')
@@ -634,6 +638,7 @@ export default function AskPage() {
         error={historyError}
         deletingId={deletingId}
         confirmingId={confirmingId}
+        requiresLogin={historyRequiresLogin}
         onNewConversation={startNewConversation}
         // 列表现在是瘦身数据（没有 artifact_bundle/report_json），还原对话需要
         // 完整内容——点开时按 id 单独拉一次，跟刷新页面走的是同一条路径。
@@ -1106,6 +1111,7 @@ function HistorySidebar({
   error,
   deletingId,
   confirmingId,
+  requiresLogin,
   onNewConversation,
   onOpenReview,
   onAskDelete,
@@ -1117,6 +1123,7 @@ function HistorySidebar({
   error: string | null
   deletingId: string | null
   confirmingId: string | null
+  requiresLogin: boolean
   onNewConversation: () => void
   onOpenReview: (review: ReviewListItem) => void
   onAskDelete: (e: React.MouseEvent, id: string) => void
@@ -1161,10 +1168,30 @@ function HistorySidebar({
               加载中…
             </div>
           ) : history.length === 0 ? (
-            <div className="flex flex-col items-center gap-1.5 px-1 py-6 text-center text-xs text-text-muted">
-              <Inbox className="h-5 w-5" strokeWidth={1.25} />
-              还没有评审记录
-            </div>
+            requiresLogin ? (
+              // 空列表有两种完全不同的含义，必须分开说：
+              // "你还没做过评审" vs "这台实例上历史要登录才看得到"。
+              // 后者如果也显示成"还没有评审记录"，用户会以为自己的评审丢了。
+              <div className="flex flex-col items-center gap-2 px-1 py-6 text-center text-xs text-text-muted">
+                <LogIn className="h-5 w-5" strokeWidth={1.25} />
+                <span className="leading-relaxed">
+                  登录后可以看到自己的评审历史
+                  <br />
+                  <span className="text-text-muted/70">未登录时的评审不会归到任何账号下</span>
+                </span>
+                <Link
+                  to="/login"
+                  className="rounded border border-brand-primary/40 px-2.5 py-1 text-[11px] text-brand-primary transition-colors hover:bg-brand-primary/10"
+                >
+                  去登录
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5 px-1 py-6 text-center text-xs text-text-muted">
+                <Inbox className="h-5 w-5" strokeWidth={1.25} />
+                还没有评审记录
+              </div>
+            )
           ) : (
             (() => {
               const { projects, ungrouped } = groupHistoryByProject(history)

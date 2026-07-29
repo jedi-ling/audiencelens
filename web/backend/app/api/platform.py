@@ -18,7 +18,14 @@ from app.config import settings
 from app.core.errors import BadRequest, NotFound, Unauthorized
 from app.core.security import create_token, hash_password, verify_password
 from app.db import get_db
-from app.deps import Identity, optional_identity, rate_limit, resolve_llm_key
+from app.deps import (
+    Identity,
+    is_shared_anonymous,
+    optional_identity,
+    rate_limit,
+    require_isolated_identity,
+    resolve_llm_key,
+)
 from app.models import Review, User
 from app.services import (
     intent_service,
@@ -414,8 +421,23 @@ class TestKeyRequest(BaseModel):
 async def list_keys(
     identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
 ):
-    """回显当前 key 状态（仅掩码，绝不返回明文）。"""
+    """回显当前 key 状态（仅掩码，绝不返回明文）。
+
+    共享匿名桶在多租户形态下直接当作「没有 key」，而不是 401：
+    这个接口是设置页一进来就调的，报错会把整页打成错误态；返回空则页面
+    自然显示「还没配置 key」，配合下面 save_key 的 401 提示引导去登录。
+    要点是**不能把别人存的 key 回显出来**——连掩码和 provider 都不行，
+    那等于告诉访客「这里有一把可用的 key」，而它确实能被拿去花钱。
+    """
     from app.models import UserApiKey
+
+    if is_shared_anonymous(identity) and settings.auth_enabled:
+        return {
+            "key_mode": settings.key_mode,
+            "server_key_available": bool(settings.server_llm_key) and settings.is_managed,
+            "keys": [],
+            "requires_login": True,
+        }
 
     rows = (
         db.query(UserApiKey)
@@ -444,6 +466,9 @@ async def save_key(
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
+    # API Key 是最不该落进共享桶的东西：存进去等于把自己的付费凭据交给
+    # 所有未登录访客——他们能用它跑评审花钱，也能顺手删掉。
+    require_isolated_identity(identity)
     try:
         row = key_service.save_user_key(
             db, identity.user_id, body.api_key, body.provider, model=body.model, api_base=body.api_base
@@ -468,6 +493,9 @@ async def test_key(
     model = body.model
     api_base = body.api_base
     if not api_key:
+        # 「测已保存的那把」会解密并真的拿去调模型。共享匿名桶里的 key 是别人的，
+        # 不挡住等于让任何访客点一下按钮就花别人的钱。传了 api_key 的现填现测不受影响。
+        require_isolated_identity(identity)
         row = key_service.get_user_key_row(db, identity.user_id, body.provider)
         if not row:
             raise BadRequest("没有已保存的 key 可测，请先填写 api_key")
@@ -509,6 +537,8 @@ async def delete_key(
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
+    # 共享桶里的 key 不属于调用方，不能让任何访客顺手删掉别人的凭据。
+    require_isolated_identity(identity)
     n = key_service.delete_user_key(db, identity.user_id, provider)
     return {"deleted": n}
 
@@ -933,7 +963,13 @@ async def list_judgments(
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
-    """列出历史预测（可筛未验证的 —— 这就是"待回填"工作台）。"""
+    """列出历史预测（可筛未验证的 —— 这就是"待回填"工作台）。
+
+    这里返回的 claim 是各角色提出问题的**原文**，和报告正文同源。所以它既是
+    个人数据，也是报告门禁的一个侧门：/reviews/{id}/report 对匿名做了脱敏，
+    而这个接口没有，未登录访客曾能从这里把别人评审的结论一条条读出来。
+    """
+    require_isolated_identity(identity)
     return {
         "judgments": ledger_service.list_judgments(
             db, identity.user_id, review_id=review_id, only_unverified=only_unverified
@@ -961,6 +997,7 @@ async def hit_rate(
     db: Session = Depends(get_db),
 ):
     """历史命中率。样本不足时会如实标注 low_confidence。"""
+    require_isolated_identity(identity)
     return ledger_service.hit_rate(db, identity.user_id, persona_id)
 
 
@@ -969,6 +1006,7 @@ async def leaderboard(
     identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
 ):
     """各人格历史命中率排行——"谁的判断最值得听"。"""
+    require_isolated_identity(identity)
     return {"personas": ledger_service.persona_leaderboard(db, identity.user_id)}
 
 
@@ -990,5 +1028,10 @@ async def record_review_feedback(
 async def validation_metrics(
     identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
 ):
-    """采用率、决策影响、节省时间与付费意愿。"""
+    """采用率、决策影响、节省时间与付费意愿。
+
+    按 user_id 聚合，所以在共享匿名桶下算的是"所有未登录访客加起来"的数字——
+    既不是调用方自己的，也把别人做过多少次评审透了出去。
+    """
+    require_isolated_identity(identity)
     return validation_service.metrics(db, identity.user_id)

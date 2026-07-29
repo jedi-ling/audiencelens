@@ -25,6 +25,7 @@ from app.core.logging import logger
 from app.db import session_scope
 from app.models import PersonaOutput, Review
 from app.services import admin_settings_service, job_service, ledger_service, quota_service
+from app.services.json_safe import json_safe
 
 # 把仓库的 src/ 挂到 path，复用 CLI 那套引擎（引擎侧 tests/ 有独立测试套件；
 # 不在这里写死项数——数字会随开发漂移，写死了下一个读到的人就被骗一次）
@@ -163,7 +164,11 @@ def _execute_review(
         report = result.get("report") or {}
         review.report_json = report
         review.report_markdown = result.get("markdown") or ""
-        review.calibration = result.get("calibration")
+        # 必须过 json_safe：calibration.coverage.pairwise_distances 用 (id1, id2)
+        # 元组做键，直接进 JSON 列会 TypeError("keys must be str ... not tuple")，
+        # 整条 UPDATE 失败 → full 档评审 100% 标成 failed，且报错与评审内容毫无关系。
+        # v1（services/__init__.py）早就这么做了，v2 漏了——而前端走的正是 v2。
+        review.calibration = json_safe(result.get("calibration"))
         cost_summary = result.get("cost_summary") or {}
         cost = float(cost_summary.get("total_cost", 0.0))
         persona_count = int(cost_summary.get("persona_count", 0))

@@ -111,6 +111,13 @@ export interface ReviewsPage {
   limit: number
   /** 还有没有下一页。total 已知时按 total 算，未知时退化成"这一页装满了就可能还有" */
   hasMore: boolean
+  /** 后端说"这个列表要登录才有内容"（X-Requires-Login）。
+   *
+   *  多租户实例上，未登录访客共用同一个匿名身份，按它查出来的是**所有**
+   *  未登录访客的评审。后端因此对这种身份返回空列表 + 这个头，而不是
+   *  把别人的评审列给你看，也不是 401（侧栏在轮询，报错会把整页打成错误态）。
+   *  前端据此显示"登录后查看历史"，否则用户只会看到历史莫名其妙空了。 */
+  requiresLogin: boolean
 }
 
 export async function fetchReviewsPage(
@@ -126,7 +133,8 @@ export async function fetchReviewsPage(
   const total = Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 
   const hasMore = total === null ? items.length >= limit : offset + items.length < total
-  return { items, total, offset, limit, hasMore }
+  const requiresLogin = res.headers.get('X-Requires-Login') === '1'
+  return { items, total, offset, limit, hasMore, requiresLogin }
 }
 
 /**
@@ -135,15 +143,26 @@ export async function fetchReviewsPage(
  * report_json / persona_outputs），几百条也只有几百 KB。
  */
 export async function fetchReviews(): Promise<ReviewListItem[]> {
+  return (await fetchReviewsAll()).items
+}
+
+/** 同 fetchReviews，但把"要登录才有内容"这个信号一并带出来。
+ *  分开两个函数是为了不改动既有调用方的返回类型。 */
+export async function fetchReviewsAll(): Promise<{
+  items: ReviewListItem[]
+  requiresLogin: boolean
+}> {
   const all: ReviewListItem[] = []
   let offset = 0
+  let requiresLogin = false
   for (let page = 0; page < REVIEWS_MAX_PAGES; page++) {
     const res = await fetchReviewsPage(offset, REVIEWS_MAX_LIMIT)
+    if (res.requiresLogin) requiresLogin = true
     all.push(...res.items)
     if (!res.hasMore || res.items.length === 0) break
     offset += res.items.length
   }
-  return all
+  return { items: all, requiresLogin }
 }
 
 export async function fetchReview(id: string): Promise<Review> {
