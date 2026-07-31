@@ -5,9 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AudienceLens - 多代理合成用户评审系统</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!--
+      不引 Google Fonts。字体走 src/index.css 里的系统栈
+      （--font-sans/--font-display 已含 PingFang SC / 微软雅黑 等中文回退）。
+
+      这里曾有三行 fonts.googleapis.com / fonts.gstatic.com 的 preconnect +
+      stylesheet，而 index.css 的文件头注释同时写着「不再依赖 Google Fonts CDN
+      （国内加载慢/被墙）」—— 说的和做的正好相反。外链 stylesheet 是**渲染阻塞**的：
+      在访问不到 Google 的网络里，整页要一直白屏到这个请求超时为止，
+      而且付出这个代价换来的字体最终根本没被 CSS 引用。
+    -->
   </head>
   <body>
     <div id="root"></div>

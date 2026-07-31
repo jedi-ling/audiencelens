@@ -57,6 +57,13 @@ PERSONA_PROMPT_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "persona-pr
 CROSS_EXAM_PROMPT_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "cross-exam-prompt.md")
 REPORT_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "report-template.md")
 
+
+def load_budget_config() -> Dict[str, Any]:
+    """读定价/预算配置。任何要算钱的地方都从这里拿，别再各自 open 一遍——
+    路径写岔了就会静默拿到空 dict，而空 dict 意味着所有成本算成 0。"""
+    with open(BUDGET_PATH, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
 TASK_TYPES: Dict[str, Dict[str, Any]] = {
     "steam_page_review": {
         "name_zh": "Steam页评审",
@@ -675,17 +682,34 @@ class PersonaService:
         return cls._SKILL_PROMPT_HINTS.get(skill_type or "", "")
 
     @classmethod
-    def generate_personas(cls, domain: str, audience: str = "", goals: str = "", count: int = 4) -> List[dict]:
-        """根据领域、受众和目标生成 persona YAML 定义列表"""
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+    def generate_personas(
+        cls,
+        domain: str,
+        audience: str = "",
+        goals: str = "",
+        count: int = 4,
+        api_key: str = None,
+        provider: str = "anthropic",
+        model: str = None,
+        api_base: str = None,
+        usage: dict = None,
+    ) -> List[dict]:
+        """根据领域、受众和目标生成 persona YAML 定义列表。
+
+        api_key 由调用方（走 resolve_llm_key）传入。以前这里是
+        `os.environ.get("ANTHROPIC_API_KEY")` 直读环境变量，问题有三：
+          · 完全绕过 key_service —— BYOK 用户填的 key/provider/端点一概不生效，
+            配了第三方中转的人在这个功能上永远走不通；
+          · 平台垫付的 key 被无身份、无配额地使用，谁调谁花运营的钱；
+          · 用量记不到任何人头上，后台成本面板看不见这笔开销。
+        usage 是可选出参，调用方据此把真实 token 记进 UsageRecord。
+        """
         if not api_key:
             return cls._generate_personas_fallback(domain, audience, goals, count)
 
         try:
-            import anthropic
             import json
 
-            client = anthropic.Anthropic(api_key=api_key)
             prompt = f"""你是一个 persona 设计专家。请为以下场景生成 {count} 个差异化的 persona 定义。
 
 领域: {domain}
@@ -714,12 +738,22 @@ personas:
 
 确保每个 persona 有明显不同的行为特征和决策逻辑，避免刻板印象。"""
 
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+            # 统一走 runner.llm_client：与评审同一条出口，BYOK 的 provider/端点/模型
+            # 全部生效（以前是手搓 anthropic.Anthropic，等于把非官方端点用户排除在外）
+            effective_model = model or "claude-sonnet-4-20250514"
+            content, in_tok, out_tok = chat_completion(
+                model=effective_model,
+                prompt=prompt,
+                api_key=api_key,
+                provider=provider,
+                api_base=api_base,
                 max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
             )
-            content = response.content[0].text.strip()
+            content = (content or "").strip()
+            if usage is not None:
+                usage["input_tokens"] = usage.get("input_tokens", 0) + int(in_tok or 0)
+                usage["output_tokens"] = usage.get("output_tokens", 0) + int(out_tok or 0)
+                usage["model"] = effective_model
 
             yaml_str = content
             if "```yaml" in yaml_str:
@@ -1036,11 +1070,27 @@ class ReviewService:
                         provider=resolved.provider,
                         api_base=resolved.api_base,
                     )
-                    try:
-                        cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
-                    except Exception:
-                        cost = 0.0  # 第三方模型不在预算价目表里——记 0 不阻断
+                    # 价目表里没有的模型不会再静默记 0（那会让成本闸失效、后台恒显示 $0），
+                    # estimate_cost 现在按最贵一档估并打告警日志，见 persona_agent.resolve_model_pricing
+                    cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
                     output = normalize_persona_output(parse_persona_output(raw_output))
+
+                    # 解析失败必须当失败：否则这位人格顶着一份空意见被计成"评审成功"，
+                    # degradation 报 0 失败、立场分布被"观望"污染、还照常计费。
+                    # 与 v2（src/runner/cli.py 的 run_persona）同一口径。
+                    if isinstance(output, dict) and output.get("parse_error"):
+                        # 这次调用的 token 是真的花掉了，失败不等于免费——先把账记上再抛。
+                        # （其它失败如网络错误压根没产生用量，所以只有这条路径要补记。）
+                        po.cost_usd = cost
+                        po.input_tokens = input_tokens
+                        po.output_tokens = output_tokens
+                        total_cost += cost
+                        total_input_tokens += input_tokens
+                        total_output_tokens += output_tokens
+                        snippet = str(output.get("raw_output") or "")[:200]
+                        raise RuntimeError(
+                            f"模型返回无法解析为评审结果（可能被截断或不是 JSON）：{snippet}"
+                        )
 
                     validation = validate_output(output, persona, output_schema, artifact_texts)
 

@@ -179,13 +179,17 @@ def redeem(db: Session, code_str: str, user_id: str) -> dict:
 
     # used_count 的检查与自增必须是同一条语句——上面的预检只是快速失败，
     # 并发时两个请求都可能通过预检，靠这里的条件 UPDATE 保证不超发
+    # is_disabled 用绑定参数而不是字面量 0：0/1 是 SQLite 的布尔写法，
+    # PostgreSQL（部署文档指定的生产库）里 boolean 列跟整数不可比，
+    # 这条 UPDATE 会直接报错 —— 也就是切到 Postgres 后所有 CDK 兑换全挂。
+    # 交给 SQLAlchemy 按方言适配 False，两种库上都成立。
     claimed = db.execute(
         text(
             "UPDATE cdk_codes SET used_count = used_count + 1 "
-            "WHERE id = :cid AND is_disabled = 0 AND used_count < max_uses "
+            "WHERE id = :cid AND is_disabled = :disabled AND used_count < max_uses "
             "AND (expires_at IS NULL OR expires_at >= :now)"
         ),
-        {"cid": row.id, "now": datetime.utcnow()},
+        {"cid": row.id, "disabled": False, "now": datetime.utcnow()},
     )
     if claimed.rowcount != 1:
         db.rollback()

@@ -1,6 +1,7 @@
 import argparse
 import concurrent.futures
 import json
+import logging
 import os
 import threading
 from typing import Callable, List, Optional
@@ -406,6 +407,33 @@ def run_single_persona(
             )
             cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
             output = normalize_persona_output(parse_persona_output(raw_output))
+
+            # 解析失败 = 这位人格**没有**交出可用意见，必须当失败处理。
+            #
+            # parse_persona_output 三条解析路径全挂时返回 {"parse_error": True, "raw_output": ...}，
+            # normalize_persona_output 原样透传。以前这里不检查它，下面几行 setdefault
+            # 反而给它补上 persona_id / persona_name / primary_stance="观望"，
+            # 于是 run_panel 的 `if r["output"] is not None` 判定它成功 —— 后果是一串谎：
+            #   · degradation 里 failed_count=0，用户读到「8 位角色全部完成评审」；
+            #   · 它的 key_issues 是空的，release_risk 被结构性拉低（聚合器只数真实 issue）；
+            #   · "观望" 计进立场分布，污染共识与最终建议；
+            #   · cost_summary.persona_count 把它算成成功人格，照常计费。
+            # 触发面并不小：max_tokens 截断就足以让花括号不配对，人格 schema 又很大；
+            # 第三方 BYOK 模型不守 JSON 格式更是常态。
+            if isinstance(output, dict) and output.get("parse_error"):
+                snippet = str(output.get("raw_output") or "")[:200]
+                return {
+                    "persona_id": persona["id"],
+                    "output": None,
+                    "prompt": prompt,
+                    "model": model,
+                    # 成本照记：这次调用的钱是真花掉了，失败不等于免费
+                    "cost": cost,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "error": f"模型返回无法解析为评审结果（可能被截断或不是 JSON）：{snippet}",
+                }
+
             # 身份不靠模型回填：聚合器要 output 里带 persona_id/persona_name，但不同模型
             # 未必按 schema 原样吐回来（MiniMax 就把身份塞进了 persona:{name,archetype}，
             # 顶层没有 persona_id，聚合时 KeyError 整份报告作废）。用我们已知的 persona
@@ -653,12 +681,33 @@ def run_panel(
     failed_count = len(failed_personas)
     degraded = failed_count > 0
 
+    # ---- 单次评审成本上限（budget.yaml 的 max_cost_per_run_usd）----
+    #
+    # 这个配置项存在很久，但**从来没有任何代码读过它**——而 quota_service 的注释
+    # 和 docs/MAINTENANCE.md 都把它当作 credits 模式下的成本护栏在写。也就是说
+    # 「单次评审有封顶」一直是句空话，运营照着文档配置会以为自己有保护。
+    #
+    # 人格是并发跑的，跑到一半没法刹车（钱已经花了）。但交叉质询是人格评审**之后**
+    # 才发起的额外付费调用——预算已经超了就该停在这里，而不是继续加钱。
+    # 停了必须说出来：静默少跑一个环节，等于又造一份"看起来完整"的报告。
+    max_cost_per_run = float(budget_config.get("max_cost_per_run_usd") or 0.0)
+    persona_cost_so_far = sum(float(r.get("cost") or 0.0) for r in persona_results)
+    budget_exceeded = max_cost_per_run > 0 and persona_cost_so_far >= max_cost_per_run
+    budget_notice = ""
+    if budget_exceeded:
+        budget_notice = (
+            f"本次评审在人格环节已花费约 ${persona_cost_so_far:.2f}，达到单次上限 "
+            f"${max_cost_per_run:.2f}（budget.yaml 的 max_cost_per_run_usd），"
+            "交叉质询已跳过以免继续增加成本。"
+        )
+        logging.getLogger("audiencelens").warning(budget_notice)
+
     cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
     cross_exam_data = None
     # 交叉质询的用量单独记一份：它是人格评审之外新增的付费调用，必须并进 cost_summary
     cross_exam_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
     cross_exam_notice = ""
-    if cross_exam_enabled and persona_outputs and cross_exam_prompt_path:
+    if cross_exam_enabled and not budget_exceeded and persona_outputs and cross_exam_prompt_path:
         # filter_genuine_controversies 仍然守在最前面：没有真分歧时连争议点都不产出，
         # 更不会为了"看起来跑过辩论"而发一轮凭空造对立的反驳调用。
         controversy_points = filter_genuine_controversies(
@@ -711,6 +760,16 @@ def run_panel(
         ),
     }
 
+    # 预算刹车同样要进 report 本体：只放返回值顶层的话，重新打开历史报告就看不见
+    # "这次少跑了交叉质询"，那份报告又会被当成完整结论（和 degradation 同一个理由）。
+    report["budget"] = {
+        "max_cost_per_run_usd": max_cost_per_run,
+        "persona_cost_usd": round(persona_cost_so_far, 6),
+        "exceeded": budget_exceeded,
+        "skipped_stages": ["cross_examination"] if budget_exceeded else [],
+        "notice": budget_notice,
+    }
+
     calibration_enabled = mode_config["calibration"] if mode_config else True
     calibration = run_calibration_check(persona_outputs, artifact_texts) if calibration_enabled else None
 
@@ -721,6 +780,8 @@ def run_panel(
             markdown = f"> **{SIMULATION_WARNING}**\n\n{markdown}"
         if cross_exam_notice:
             markdown = f"> **⚠️ 交叉质询未完整完成：{cross_exam_notice}**\n\n{markdown}"
+        if budget_notice:
+            markdown = f"> **⚠️ {budget_notice}**\n\n{markdown}"
         # 报告模板不认识 degradation 字段（模板不在本次改动范围），横幅在这里补上，
         # 保证降级信息在渲染产物里也看得见，而不是只躺在 JSON 里
         if degraded:

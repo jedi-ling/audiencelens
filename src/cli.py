@@ -74,10 +74,15 @@ def run(skill, task_type, artifact, mode, output_dir, personas):
 
     try:
         artifact_bundle = runner_cli.load_artifact_bundle(artifact)
+        # mode 必须真的传下去。以前只在上面那行 _print 里露个脸就被丢掉，
+        # run_panel 收不到 mode 就走默认档：用户 --mode quick 想省钱，
+        # 实际跑的是全量面板 + 交叉质询 + 校准，钱按最贵的档花，
+        # 而终端还明明白白打着「模式: quick」。
         result = runner_cli.run_panel(
             task_type=task_type,
             artifact_bundle=artifact_bundle,
             personas_path=personas,
+            mode=mode,
         )
 
         output_path = Path(output_dir)

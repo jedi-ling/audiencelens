@@ -291,8 +291,17 @@ def parse_intent_llm(
     provider: str = "anthropic",
     model: Optional[str] = None,
     api_base: Optional[str] = None,
+    usage: Optional[dict] = None,
 ) -> Optional[IntentResult]:
     """LLM 档。任何异常返回 None，由调用方降级到启发式。
+
+    usage：可选的输出参数，调用方传一个 dict 进来就能拿到本次真实用量
+    （input_tokens / output_tokens / model）。以前这两个数字是
+    `raw, _in_tok, _out_tok = ...` —— 下划线前缀意味着**故意丢弃**。
+    而对话页每发一条消息就调一次这个接口，走的可能是平台垫付的 key：
+    不记账就等于这部分开销既不进 UsageRecord、也不受配额约束，
+    后台成本统计里永远看不见它。用出参而不是改返回类型，是为了不动
+    "解析失败返回 None 由调用方降级" 这条既有契约。
 
     走 runner.llm_client 统一出口——不再假定官方 Anthropic 端点。此前这里直接
     anthropic.Anthropic(api_key=api_key) 手搓调用，完全没用到用户 BYOK 配的
@@ -310,7 +319,7 @@ def parse_intent_llm(
         from runner.llm_client import chat_completion
 
         effective_model = model or settings.intent_model
-        raw, _in_tok, _out_tok = chat_completion(
+        raw, in_tok, out_tok = chat_completion(
             model=effective_model,
             prompt=_LLM_PROMPT.format(
                 task_types="\n".join(f"- {t}" for t in VALID_TASK_TYPES), text=text
@@ -320,6 +329,14 @@ def parse_intent_llm(
             api_base=api_base,
             max_tokens=512,
         )
+        # 用量在解析之前就记：这次调用的钱已经花了，后面 JSON 解析成不成功
+        # 都改变不了这个事实（解析失败会 return None 让调用方降级，
+        # 若把记账放在后面，恰恰是"失败但花了钱"的那次被漏掉）。
+        if usage is not None:
+            usage["input_tokens"] = usage.get("input_tokens", 0) + int(in_tok or 0)
+            usage["output_tokens"] = usage.get("output_tokens", 0) + int(out_tok or 0)
+            usage["model"] = effective_model
+
         raw = raw.strip()
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if not m:
@@ -367,10 +384,17 @@ def parse_intent(
     provider: str = "anthropic",
     model: Optional[str] = None,
     api_base: Optional[str] = None,
+    usage: Optional[dict] = None,
 ) -> IntentResult:
-    """对外入口：优先 LLM，失败自动降级启发式（永不因为解析失败而阻断用户）。"""
+    """对外入口：优先 LLM，失败自动降级启发式（永不因为解析失败而阻断用户）。
+
+    usage 透传给 LLM 档，调用方据此把真实开销记进 UsageRecord。
+    启发式档不发任何模型调用，不产生用量，usage 保持原样。
+    """
     if api_key and settings.intent_llm_enabled:
-        result = parse_intent_llm(text, api_key, provider=provider, model=model, api_base=api_base)
+        result = parse_intent_llm(
+            text, api_key, provider=provider, model=model, api_base=api_base, usage=usage
+        )
         if result is not None:
             return result
     return parse_intent_heuristic(text)

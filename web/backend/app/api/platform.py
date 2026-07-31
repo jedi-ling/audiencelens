@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.core.errors import BadRequest, NotFound, Unauthorized
+from app.core.logging import logger
 from app.core.security import create_token, hash_password, verify_password
 from app.db import get_db
 from app.deps import (
@@ -92,7 +93,7 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    _send_verify_email(db, user)  # 失败不抛，注册本身不受影响
+    await _send_verify_email(db, user)  # 失败不抛，注册本身不受影响
     token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
     return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
@@ -124,14 +125,37 @@ async def me(identity: Identity = Depends(optional_identity)):
 # 否则填错邮箱自己不知道，等到要找回密码时才发现联系不上，为时已晚。
 
 
-def _send_verify_email(db: Session, user: User) -> None:
-    from app.services import auth_token_service, mail_service
+async def _send_mail_off_loop(to: str, subject: str, body: str) -> None:
+    """把发信丢到线程池，绝不在事件循环里做同步 SMTP。
+
+    mail_service.send_mail 内部是同步 smtplib：建连、TLS 握手、认证、投递，
+    每一步都可能卡住几十秒（邮件服务商限流、DNS 慢、网络抖动，超时甚至更久）。
+    在 async 路由里直接调它，卡住的不是这一个请求，而是**整个事件循环**——
+    单 worker 进程下全站所有用户的请求一起排队等这封邮件，看起来就是"网站挂了"。
+    注册和忘记密码都是未登录就能打的接口，等于任何人都能触发这个停顿。
+
+    发信失败不外抛：注册/找回本身已经成功，不能因为发信失败把用户挡在门外
+    （原来的调用点也是这个语义，这里保持不变，只是补上日志——
+    以前失败是彻底静默的，运维根本不知道邮件没发出去）。
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services import mail_service
+
+    try:
+        await run_in_threadpool(mail_service.send_mail, to, subject, body)
+    except Exception as exc:  # noqa: BLE001 —— 发信失败不该影响主流程
+        logger.warning("发信失败 | 收件人=%s | 主题=%s | %s", to, subject, exc)
+
+
+async def _send_verify_email(db: Session, user: User) -> None:
+    from app.services import auth_token_service
 
     raw = auth_token_service.issue(
         db, user.id, auth_token_service.PURPOSE_VERIFY_EMAIL, settings.email_token_ttl_seconds
     )
     link = f"{settings.public_web_url}/verify-email?token={raw}"
-    mail_service.send_mail(
+    await _send_mail_off_loop(
         user.email,
         "验证你的 AudienceLens 邮箱",
         f"点击链接完成邮箱验证（{settings.email_token_ttl_seconds // 3600} 小时内有效）：\n{link}\n\n"
@@ -151,7 +175,7 @@ async def send_verify_email(
         raise NotFound("账号不存在")
     if user.email_verified_at:
         return {"sent": False, "detail": "邮箱已验证"}
-    _send_verify_email(db, user)
+    await _send_verify_email(db, user)
     return {"sent": True}
 
 
@@ -186,7 +210,7 @@ async def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get
     """无论邮箱是否注册过都返回同样的成功响应——否则这个接口就成了
     "这个邮箱有没有注册"的枚举器（与注册接口同一套防枚举口径）。"""
     _require_auth_enabled()
-    from app.services import auth_token_service, mail_service
+    from app.services import auth_token_service
 
     email = body.email.strip().lower()
     user = db.query(User).filter(User.email == email).first()
@@ -196,7 +220,7 @@ async def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get
             settings.reset_token_ttl_seconds,
         )
         link = f"{settings.public_web_url}/reset-password?token={raw}"
-        mail_service.send_mail(
+        await _send_mail_off_loop(
             user.email,
             "重置你的 AudienceLens 密码",
             f"点击链接重置密码（{settings.reset_token_ttl_seconds // 60} 分钟内有效，只能用一次）：\n{link}\n\n"
@@ -563,16 +587,55 @@ async def parse_intent(
     provider = "anthropic"
     model = None
     api_base = None
+    key_source = "byok"
     try:
         resolved = key_service.resolve_key(db, identity.user_id)
         api_key = resolved.key
         provider = resolved.provider
         model = resolved.model
         api_base = resolved.api_base
+        key_source = resolved.source
     except Exception:
         api_key = None  # 没 key 就走启发式，不阻断
 
-    result = intent_service.parse_intent(body.text, api_key, provider=provider, model=model, api_base=api_base)
+    # 用量必须记账。对话页每发一条消息就调一次这个接口，走平台垫付 key 时
+    # 它是一笔真实开销，以前既不进 UsageRecord 也不受任何配额约束——
+    # 后台成本面板看不见它，日成本硬闸也管不到它。
+    usage: dict = {}
+    result = intent_service.parse_intent(
+        body.text, api_key, provider=provider, model=model, api_base=api_base, usage=usage
+    )
+
+    in_tok = int(usage.get("input_tokens") or 0)
+    out_tok = int(usage.get("output_tokens") or 0)
+    if in_tok or out_tok:
+        cost = 0.0
+        try:
+            import sys
+
+            _src = os.path.join(settings.repo_root, "src")
+            if _src not in sys.path:
+                sys.path.insert(0, _src)
+            import yaml as _yaml
+            from runner.persona_agent import estimate_cost
+
+            with open(os.path.join(_src, "config", "budget.yaml"), encoding="utf-8") as fh:
+                budget_config = _yaml.safe_load(fh)
+            cost = estimate_cost(in_tok, out_tok, usage.get("model") or "", budget_config)
+        except Exception:
+            # 估价失败不该让意图解析本身失败——但 token 数照记，
+            # 不能因为算不出钱就连"用了多少"都丢掉。
+            cost = 0.0
+        quota_service.record_usage(
+            db,
+            identity.user_id,
+            kind="intent",
+            cost_usd=cost,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            key_source=key_source,
+        )
+
     return result.to_dict()
 
 

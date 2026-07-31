@@ -48,7 +48,14 @@ from app.deps import (
     rate_limit,
     resolve_llm_key,
 )
-from app.services import MaterialExtractor, PersonaService, ReviewService, report_gating
+from app.services import (
+    MaterialExtractor,
+    PersonaService,
+    ReviewService,
+    estimate_cost,
+    load_budget_config,
+    report_gating,
+)
 from app.services import quota_service
 from app.services.evaluation_service import EvaluationService
 from app.services.ethics_service import EthicsService
@@ -689,15 +696,72 @@ def get_skill_detail(skill_type: str):
     return detail
 
 
-@router.post("/generate-personas")
-def generate_personas(request: PersonaGenerateRequest):
-    """触发 persona 生成"""
+@router.post(
+    "/generate-personas",
+    dependencies=[Depends(rate_limit("generate_personas", 20, 3600))],
+)
+def generate_personas(
+    request: PersonaGenerateRequest,
+    session: Session = Depends(get_session),
+    identity: Identity = Depends(optional_identity),
+):
+    """触发 persona 生成。
+
+    这个接口以前是完全裸奔的：没有限流、没有身份、不查配额，服务层还直接
+    `os.environ.get("ANTHROPIC_API_KEY")` 拿平台垫付的 key 去调模型，用量也不记账。
+    也就是说任何人都能不停地打它，花的是运营的钱，而后台成本面板上一分都看不见。
+    现在与评审走同一套关卡：限流 → 身份 → 解析 key（BYOK 优先）→ 记账。
+
+    key 是**可选**解析、不用 Depends(resolve_llm_key)：没有 key 时服务层会走
+    _generate_personas_fallback（内置原型库，不发任何模型调用）。挂成硬依赖会让
+    无 key 的用户拿到 428，等于把这个本来就能离线用的功能直接关掉。
+    """
+    from app.services import key_service
+
+    key = provider = model = api_base = None
+    key_source = "byok"
+    try:
+        resolved = key_service.resolve_key(session, identity.user_id)
+        key, provider, model, api_base = (
+            resolved.key,
+            resolved.provider,
+            resolved.model,
+            resolved.api_base,
+        )
+        key_source = resolved.source
+    except Exception:
+        key = None  # 没 key 就走内置原型库，不阻断
+
+    usage: dict = {}
     personas = PersonaService.generate_personas(
         domain=request.domain,
         audience=request.audience,
         goals=request.goals,
         count=request.count,
+        api_key=key,
+        provider=provider or "anthropic",
+        model=model,
+        api_base=api_base,
+        usage=usage,
     )
+
+    in_tok = int(usage.get("input_tokens") or 0)
+    out_tok = int(usage.get("output_tokens") or 0)
+    if in_tok or out_tok:
+        cost = 0.0
+        try:
+            cost = estimate_cost(in_tok, out_tok, usage.get("model") or "", load_budget_config())
+        except Exception:
+            cost = 0.0  # 算不出钱也要把 token 记下来
+        quota_service.record_usage(
+            session,
+            identity.user_id,
+            kind="generate_personas",
+            cost_usd=cost,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            key_source=key_source,
+        )
     return {"personas": personas, "count": len(personas)}
 
 

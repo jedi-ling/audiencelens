@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 
@@ -800,22 +801,82 @@ def normalize_persona_output(output: dict) -> dict:
     return output
 
 
-def estimate_cost(
+_warned_unpriced_models = set()
+
+
+def resolve_model_pricing(model: str, budget_config: dict):
+    """查某个模型的单价，返回 (输入单价, 输出单价, 是否有登记价)。
+
+    为什么不能对没登记的模型按 0 算（原来的行为）：
+    budget.yaml 的 model_pricing 只列了 3 个 Anthropic 模型，而后台面板允许把
+    平台垫付密钥配成**任意** OpenAI 兼容模型（key_service 甚至强制这类必须填
+    模型名）。于是只要运营换了个模型，每次调用的成本都记成 0.0，后果是：
+      · quota_service 的 `if cost >= cost_limit` 永远不成立 —— 24 小时成本硬闸
+        彻底失效，平台垫付的钱没有任何上限；
+      · admin 成本面板与 usage_summary 恒显示 $0，运营看不出在烧钱。
+    而且它不报错、不告警，是一个纯静默的失效。
+
+    也不能改成抛异常：BYOK 用户填自己的第三方模型是正常用法，价格表里没有它
+    再正常不过，为此让评审跑不起来是本末倒置。
+
+    所以取中间路线：**没登记就按最贵的一档估，并如实告诉调用方这是估的**。
+    宁可高估——高估只会让成本闸提前触发（保守、安全），低估则等于没有闸。
+    运营想要准确数字，就去 budget.yaml 里补一条真实单价。
+    """
+    table = (budget_config or {}).get("model_pricing") or {}
+    priced = table.get(model)
+    if priced:
+        return (
+            float(priced.get("input_per_mtok", 0.0)),
+            float(priced.get("output_per_mtok", 0.0)),
+            True,
+        )
+
+    fallback = (budget_config or {}).get("unknown_model_pricing") or {}
+    if not fallback and table:
+        # 没配兜底价就取表里最贵的一档
+        fallback = max(table.values(), key=lambda p: float(p.get("output_per_mtok", 0.0) or 0.0))
+
+    if model not in _warned_unpriced_models:
+        _warned_unpriced_models.add(model)
+        logging.getLogger("audiencelens").warning(
+            "模型 %r 不在 budget.yaml 的 model_pricing 里，成本按最贵一档估算"
+            "（输入 %.2f / 输出 %.2f 每百万 token）。成本闸与后台统计据此计算，"
+            "数字会偏高；要准确请在 budget.yaml 补一条真实单价。",
+            model,
+            float(fallback.get("input_per_mtok", 0.0) or 0.0),
+            float(fallback.get("output_per_mtok", 0.0) or 0.0),
+        )
+
+    return (
+        float(fallback.get("input_per_mtok", 0.0) or 0.0),
+        float(fallback.get("output_per_mtok", 0.0) or 0.0),
+        False,
+    )
+
+
+def estimate_cost_detailed(
     input_tokens: int, output_tokens: int, model: str, budget_config: dict = None
-) -> float:
+):
+    """同 estimate_cost，但一并返回「这个价格是查表查到的还是估的」。
+
+    需要如实标注成本可信度的地方（后台面板、成本闸的告警文案）用这个。
+    """
     if budget_config is None:
-        with open(
-            "src/config/budget.yaml", "r", encoding="utf-8"
-        ) as f:
+        with open("src/config/budget.yaml", "r", encoding="utf-8") as f:
             budget_config = yaml.safe_load(f)
 
-    pricing = budget_config.get("model_pricing", {}).get(model, {})
-    input_price = pricing.get("input_per_mtok", 0.0)
-    output_price = pricing.get("output_per_mtok", 0.0)
-
+    input_price, output_price, priced = resolve_model_pricing(model, budget_config)
     cost = (input_tokens / 1_000_000) * input_price + (
         output_tokens / 1_000_000
     ) * output_price
+    return cost, priced
+
+
+def estimate_cost(
+    input_tokens: int, output_tokens: int, model: str, budget_config: dict = None
+) -> float:
+    cost, _priced = estimate_cost_detailed(input_tokens, output_tokens, model, budget_config)
     return cost
 
 

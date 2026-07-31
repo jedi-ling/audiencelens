@@ -5,6 +5,14 @@ max_cost_per_run_usd: 2.0
 default_model: claude-sonnet-4-20250514
 fallback_model: claude-haiku-4-5-20251001
 premium_model: claude-opus-4-20250514
+# 不在下面 model_pricing 里的模型按这个价估（比如 BYOK 用户或后台配的第三方
+# OpenAI 兼容模型）。**不能留空或按 0 算**：成本恒 0 会让 quota_service 的
+# 24 小时成本硬闸永远不触发、后台成本面板恒显示 $0，且完全静默。
+# 默认取最贵一档，宁可高估——高估只让闸提前触发，低估等于没有闸。
+# 想要准确数字就在 model_pricing 里给该模型补一条真实单价。
+unknown_model_pricing:
+  input_per_mtok: 15.0
+  output_per_mtok: 75.0
 model_pricing:
   claude-haiku-4-5-20251001:
     input_per_mtok: 1.0
