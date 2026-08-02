@@ -5,7 +5,8 @@
 
 关于删除的边界（诚实划线，隐私政策里必须同样口径写清楚）：
     立即物理删除：评审内容、材料原文、报告、追问记录、人格输出、
-                  判断留档、反馈、伦理报告（含内容摘录）、BYOK 密钥、账号本身
+                  判断留档、反馈、伦理报告（含内容摘录）、BYOK 密钥、
+                  认证令牌（邮箱验证/密码重置）、账号本身
     保留但切断关联：用量/计费流水、CDK 兑换与次数账
         —— 这些是财务事实源，法律与对账要求下不能说删就删；
            但会把 user_id 改写成不可回指的墓碑 id，从此无法关联到具体人，
@@ -20,6 +21,7 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from app.models import (
+    AuthToken,
     CdkRedemption,
     CreditLedger,
     Job,
@@ -164,6 +166,23 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
     stats["reviews_deleted"] = len(reviews)
     # 单独报一个数字，让"含内容摘录的伦理报告也删了"这件事对用户可核对
     stats["ethics_reports_deleted"] = sum(len(r.ethics_reports) for r in reviews)
+
+    # 删评审之前，先把用量流水指向这些评审的外键置空。
+    # 用量流水是财务事实源，不能跟着评审删（见上面的边界说明），但它的
+    # review_id 是真外键：评审没了还指着，PostgreSQL 会直接拒绝这次删除，
+    # 于是每个注册用户的删号请求 100% 报 500。以前这条路径在 SQLite 上
+    # 一直"正常"，只是因为 SQLite 默认根本不校验外键。
+    # 模型上已经改成 ondelete=SET NULL，但老库建表时没有那个子句，
+    # 所以这里显式再置空一次——升级上来的实例同样不能炸。
+    review_ids = [r.id for r in reviews]
+    stats["usage_records_detached"] = (
+        db.query(UsageRecord)
+        .filter(UsageRecord.review_id.in_(review_ids))
+        .update({"review_id": None}, synchronize_session=False)
+        if review_ids
+        else 0
+    )
+
     for r in reviews:
         db.delete(r)
 
@@ -189,6 +208,19 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
         db.query(CreditLedger)
         .filter(CreditLedger.user_id == user_id)
         .update({"user_id": tombstone}, synchronize_session=False)
+    )
+
+    # 认证令牌（邮箱验证 / 密码重置）：必须随账号物理删除。
+    # 两个理由，任何一个单独都足够：
+    #   1. 它对 users.id 是真外键。留下孤儿行后，下面那句删 users 在
+    #      PostgreSQL 上必然违反外键约束——即"删号对每个注册用户 100% 报 500"。
+    #      SQLite 默认关闭外键校验，所以本机怎么删都看着成功。
+    #   2. 未过期的 reset_password 令牌是能改密码的凭据，账号都删了还留着它，
+    #      与隐私页写的"账号本身立即物理删除"直接矛盾。
+    stats["auth_tokens_deleted"] = (
+        db.query(AuthToken)
+        .filter(AuthToken.user_id == user_id)
+        .delete(synchronize_session=False)
     )
 
     user = db.get(User, user_id)

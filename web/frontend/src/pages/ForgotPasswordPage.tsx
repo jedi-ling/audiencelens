@@ -17,8 +17,11 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const submit = async () => {
-    if (!email.trim()) return
+  /** 走 form 的 onSubmit：回车、点按钮、密码管理器填充后提交，三条路径同一个出口
+   *  （与 LoginPage / RegisterPage 同一口径）。 */
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || busy) return
     setBusy(true)
     setError(null)
     try {
@@ -39,7 +42,10 @@ export default function ForgotPasswordPage() {
         <p className="text-sm text-text-secondary">输入注册邮箱，我们会发一个重置链接给你</p>
       </div>
 
-      <div className="rounded-xl border border-border bg-bg-card p-6">
+      {/* 必须是真的 <form>：此前是「input + onKeyDown + 按钮 onClick」的拼装式提交，
+          代价是浏览器/密码管理器认不出这是账号相关表单（不自动填邮箱），
+          读屏软件也拿不到表单语义。这一页只有一个字段，更没有理由不用 form。 */}
+      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-6">
         {sent ? (
           <div className="text-center">
             <p className="text-sm text-text-primary">如果该邮箱已注册，重置链接已经发出。</p>
@@ -55,21 +61,30 @@ export default function ForgotPasswordPage() {
           </div>
         ) : (
           <>
-            <label className="block text-xs text-text-muted">注册邮箱</label>
+            <label htmlFor="forgot-email" className="block text-xs text-text-muted">
+              注册邮箱
+            </label>
             <input
+              id="forgot-email"
+              name="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void submit()}
               className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
               placeholder="you@example.com"
               autoFocus
             />
 
-            {error && <p className="mt-3 text-sm text-severity-critical">{error}</p>}
+            {/* role=alert：发送失败要立刻被读屏软件念出来，不能只是视觉上变红 */}
+            {error && (
+              <p role="alert" className="mt-3 text-sm text-severity-critical">
+                {error}
+              </p>
+            )}
 
             <button
-              onClick={() => void submit()}
+              type="submit"
               disabled={busy || !email.trim()}
               className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
@@ -77,7 +92,7 @@ export default function ForgotPasswordPage() {
             </button>
           </>
         )}
-      </div>
+      </form>
 
       <p className="mt-4 text-center text-sm text-text-muted">
         想起来了？

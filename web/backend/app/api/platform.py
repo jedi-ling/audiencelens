@@ -23,9 +23,11 @@ from app.deps import (
     Identity,
     is_shared_anonymous,
     optional_identity,
+    probe_identity,
     rate_limit,
     require_isolated_identity,
     resolve_llm_key,
+    revoke_user_sessions,
 )
 from app.models import Review, User
 from app.services import (
@@ -116,7 +118,10 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/auth/me")
-async def me(identity: Identity = Depends(optional_identity)):
+async def me(identity: Identity = Depends(probe_identity)):
+    """「我是谁」。用 probe_identity 而不是 optional_identity：
+    别的接口遇到失效令牌一律 401，唯独这一条要返回 200 + session_expired=true，
+    前端才有机会把烂 token 清掉并提示"登录已过期"（见 deps.probe_identity）。"""
     return identity.to_dict()
 
 
@@ -249,6 +254,12 @@ async def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_d
         raise BadRequest("重置链接无效或已过期，请重新申请")
     user.password_hash = hash_password(body.new_password)
     db.commit()
+    # 改完密码必须把已签发的 JWT 一并作废，否则"改密码"对已经发生的入侵毫无作用：
+    # 攻击者手上那把在改密码之前偷到的 token 是自签 JWT，只认签名和 exp，
+    # 密码换了它照样通行，最长能再用满一个 TTL（默认 7 天）——而用户以为自己
+    # 已经把人赶出去了。这也是"找回密码"这条路径存在的意义之一。
+    # 代价：本人在其他设备上的登录态同样失效，需要重新登录。这是应该的。
+    revoke_user_sessions(db, user.id)
     # 不自动登录：重置成功后让用户用新密码走一次正常登录，
     # 免得链接被中途截获的人直接拿到会话。
     return {"reset": True}

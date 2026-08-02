@@ -109,8 +109,9 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
               这里写清楚是因为它此前被描述成"封顶"，而当时那个配置项
               根本没有任何代码读取，等于一句完全的空话。
 
-    消耗发生在校验通过的瞬间（原子扣减，见 cdk_service.try_consume_credit）：
-    极端情况下评审入队失败会白扣 1 次，v1 接受这个代价换实现简单。
+    消耗发生在校验通过的瞬间（原子扣减，见 cdk_service.try_consume_credit）。
+    评审随后失败的，由 refund_review_credit 退还——次数是用户花钱买的，
+    不能被一次模型报错吞掉。
     """
     if not _quota_enabled(db) or key_source != "server":
         return
@@ -168,6 +169,37 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
             f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
             "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
         )
+
+
+def refund_review_credit(
+    db: Session, user_id: str, review_id: str, key_source: str = "server"
+) -> bool:
+    """评审失败后，把入口扣掉的那 1 次 CDK 次数退回去。返回"这次真的退了吗"。
+
+    以前没有这条路径：credits 模式在 check_quota 里原子扣 1 次，之后评审
+    因为模型报错、进程重启收尸等原因失败，次数就凭空消失了——用户花钱买的
+    次数，一次失败就没了，且账面上完全看不出来。
+
+    只在 (credits 模式 + 服务端垫付 key) 这一种组合下退，因为那是唯一
+    "入口一定扣了 1 次"的情形（见 check_quota）：
+      · BYOK 从来不扣次数，退了就是凭空发次数；
+      · plan 模式只有在日限用完时才垫 1 次，而扣减流水上没有 review_id
+        （check_quota 跑在评审落库之前，那时还没有 id 可写），事后无法判断
+        这一条评审到底垫没垫。宁可不退，也不能猜着退——猜错就是无中生有。
+        要覆盖 plan 模式得把 review_id 一路传到 check_quota，涉及
+        api/__init__.py 与 api/platform.py 两个调用点，不属于本次改动范围。
+
+    幂等由 cdk_service.refund_credit 以 review_id 为键保证；退还本身写进
+    credit_ledger（reason=review_refund），账面上可核对，不是隐形补偿。
+    """
+    if key_source != "server" or not _quota_enabled(db):
+        return False
+    if admin_settings_service.get(db, "quota_mode", settings.quota_mode) != "credits":
+        return False
+
+    from app.services import cdk_service
+
+    return cdk_service.refund_credit(db, user_id, review_id)
 
 
 def record_usage(

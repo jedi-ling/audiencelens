@@ -23,7 +23,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { api, claimPendingReviews, getToken, rememberPendingReview } from '@/lib/apiClient'
+import { ApiError, api, claimPendingReviews, getToken, rememberPendingReview } from '@/lib/apiClient'
 import type {
   Review,
   ReviewMode,
@@ -51,7 +51,7 @@ import {
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -95,6 +95,11 @@ interface RealDegradation {
 }
 
 interface RealReport {
+  /** 评审失败时 report_json 就是 {"error": ...}（v1 对外契约，见后端
+   *  api/__init__.py::_report_json_for 与 services/report_gating.py：这个键被
+   *  明确列为"不许裁掉的诚实声明"）。前端此前根本没读它——{"error":...} 是真值，
+   *  于是一份全员失败的评审照样走完整报告分支。 */
+  error?: unknown
   meta?: {
     task_type?: string
     target?: string
@@ -135,6 +140,11 @@ const RISK_CONFIG: Record<string, { label: string; color: string; bg: string; bo
   high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
   critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
 }
+
+/** release_risk 缺失/取值不认识时的显示。以前这里是 `?? RISK_CONFIG.medium`：
+ *  报告里根本没有 executive_summary，页面照样打出"发布风险评估：中风险"——
+ *  一个纯属编造的等级，而用户会拿它做发布决策。缺就显示「—」并说明缺了什么。 */
+const UNKNOWN_RISK = { label: '—', color: 'text-text-muted', bg: 'bg-bg-card', border: 'border-border' }
 
 const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
   strong: '充分',
@@ -208,6 +218,157 @@ function DegradationNotice({ degradation }: { degradation?: RealDegradation | nu
           {failedLabels.length > 0 && (
             <p className="mt-1.5 text-sm text-text-primary">未完成的人格：{failedLabels.join('、')}</p>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------- 失败态：评审跑挂了 / 报告加载不出来 ----------
+
+/**
+ * 把 report_json.error 收敛成一句能给人看的原因。
+ *
+ * 后端写进来的通常是 error_message 字符串（api/__init__.py::_report_json_for），
+ * 但老数据/别的链路可能塞 dict，所以非字符串一律 JSON 序列化后原样展示——
+ * 宁可给一串难看的 JSON，也不能因为"形状不认识"就把失败原因吞掉。
+ */
+function failureDetail(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw.trim() || null
+  if (raw === null || raw === undefined) return null
+  try {
+    return JSON.stringify(raw)
+  } catch {
+    return String(raw)
+  }
+}
+
+/**
+ * 判定"这份报告其实是一次失败的评审"。
+ *
+ * 两个信号任一成立即算失败：
+ *   · review.status === 'failed'  —— 评审记录自己说的
+ *   · report.error 非空           —— v1 契约：失败评审的 report_json 就是 {"error": ...}
+ * 返回 null 表示不是失败；返回对象时 reason 可能为 null（失败了但没回传原因，
+ * 这本身也要如实说，不能默默按成功渲染）。
+ *
+ * 历史病灶：空态判断只有 `if (!review || !report)`，而 {"error": ...} 是真值，
+ * 于是失败评审直接落进完整报告分支——summary 为 undefined，风险等级被兜底成
+ * "中风险"，共识/存疑点显示 0/0，看起来像"跑完了、没发现问题"。
+ */
+function reviewFailure(review: Review | null, report: RealReport | null): { reason: string | null } | null {
+  const reason = failureDetail(report?.error)
+  if (reason) return { reason }
+  if (review?.status === 'failed') return { reason: null }
+  return null
+}
+
+/** 评审失败：绝不渲染任何结论，只讲清楚"没有结论"和为什么。 */
+function ReviewFailedNotice({
+  reviewId,
+  review,
+  reason,
+}: {
+  reviewId?: string
+  review: Review | null
+  reason: string | null
+}) {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
+      <div className="rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-5 md:p-6">
+        <div className="flex items-start gap-3">
+          <AlertOctagon className="mt-0.5 h-6 w-6 shrink-0 text-severity-critical" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-severity-critical md:text-xl">本次评审失败，没有生成报告</h1>
+            <p className="mt-2 text-sm text-text-primary">
+              这不是一份"没发现问题"的报告——评审没跑完，任何风险等级、共识点、立场分布都不存在。
+              请不要据此做发布决策。
+            </p>
+            {review?.target_title && (
+              <p className="mt-2 text-sm text-text-secondary">评审对象：{review.target_title}</p>
+            )}
+            <div className="mt-4 rounded-lg border border-severity-critical/40 bg-bg-card p-3">
+              <p className="text-xs text-text-muted">失败原因（后端原文）</p>
+              {reason ? (
+                <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-text-primary">{reason}</p>
+              ) : (
+                <p className="mt-1 text-xs text-text-primary">
+                  后端没有回传失败原因。评审详情页的角色执行记录里可能有更具体的报错。
+                </p>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {reviewId && (
+                <Link
+                  to={`/review/${reviewId}`}
+                  className="rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
+                >
+                  查看评审详情
+                </Link>
+              )}
+              <Link
+                to="/review/new"
+                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+              >
+                重新发起评审
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 报告加载失败（网络断了 / 403 / 500 / 后端没起来）。
+ *
+ * 以前这一档和"报告还没生成"共用一句"报告尚未生成"：用户看不出是自己等得不够久，
+ * 还是请求根本没通，也没有任何重试入口。这两件事必须分开说。
+ */
+function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?: string; onRetry: () => void }) {
+  const status = error instanceof ApiError ? error.status : null
+  const needLogin = error instanceof ApiError && (error.status === 401 || error.status === 403)
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
+      <div className="rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-5 md:p-6">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-warm-orange" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-warm-orange md:text-xl">报告加载失败</h1>
+            <p className="mt-2 text-sm text-text-primary">
+              没能把这份报告取回来，所以下面什么都不显示——这不代表评审没有结果。
+            </p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-secondary">
+              {error.message}
+              {status !== null && status > 0 && <span className="ml-1 font-mono text-xs text-text-muted">HTTP {status}</span>}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+                重试
+              </button>
+              {needLogin && (
+                <Link
+                  to="/login"
+                  className="rounded-lg border border-brand-primary/30 bg-bg-card px-4 py-2 text-sm text-brand-primary hover:bg-brand-primary/10 transition-colors"
+                >
+                  登录 / 注册
+                </Link>
+              )}
+              {reviewId && (
+                <Link
+                  to={`/review/${reviewId}`}
+                  className="rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
+                >
+                  查看评审详情
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -668,6 +829,11 @@ export default function ReportPage() {
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null)
   const [reportHtml, setReportHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // 加载失败必须留痕：以前 catch 里什么都不存，网络错误/403/500 全落到
+  // "报告尚未生成"那一句上，用户既不知道原因也没法重试。
+  const [loadError, setLoadError] = useState<Error | null>(null)
+  // 重试就是把加载 effect 重跑一遍（数据全在 effect 里取，没有别的入口）
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [expandedIssues, setExpandedIssues] = useState<Set<number>>(new Set())
   const [showHtmlReport, setShowHtmlReport] = useState(false)
   const [evaluationScorecard, setEvaluationScorecard] = useState<EvaluationScorecard | null>(null)
@@ -675,6 +841,7 @@ export default function ReportPage() {
   const [ethicsReports, setEthicsReports] = useState<EthicsReportView[]>([])
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
   const [evaluating, setEvaluating] = useState(false)
+  const [evaluationError, setEvaluationError] = useState<string | null>(null)
   const [feedbackSent, setFeedbackSent] = useState(false)
   const [feedbackUseful, setFeedbackUseful] = useState<boolean | null>(null)
   const [decisionChanged, setDecisionChanged] = useState(false)
@@ -716,17 +883,29 @@ export default function ReportPage() {
     }
 
     const run = async () => {
+      setLoading(true)
+      setLoadError(null)
       try {
         await loadData()
-      } catch {
+      } catch (firstError) {
         // 已登录却打不开：很可能就是"这条评审是登录前匿名跑的，还挂在 anonymous
         // 名下"。认领一次再重试；这里是兜底路径（正常路径在登录时就认领了），
         // 覆盖"在别的标签页登录""事后再打开这个链接"这类情况。
+        let recovered = false
         try {
           const claimed = await claimPendingReviews()
-          if (claimed.includes(id)) await loadData()
+          if (claimed.includes(id)) {
+            await loadData()
+            recovered = true
+          }
         } catch {
-          // 认领失败（未登录/限流/后端不支持）：保持空态，不额外打断用户
+          // 认领这条兜底路径自己也失败了（未登录/限流/后端不支持）。它的失败原因
+          // 对用户没有意义——真正该看到的是下面那个"第一次加载为什么失败"。
+        }
+        // 兜底没救回来就把最初的错误如实抛给用户。此前这里什么都不做，
+        // 于是 403/500/断网全都伪装成了"报告尚未生成"。
+        if (!recovered && alive) {
+          setLoadError(firstError instanceof Error ? firstError : new Error(String(firstError)))
         }
       } finally {
         if (alive) setLoading(false)
@@ -737,7 +916,7 @@ export default function ReportPage() {
     return () => {
       alive = false
     }
-  }, [id])
+  }, [id, reloadNonce])
 
   useEffect(() => {
     if (!id) return
@@ -775,6 +954,17 @@ export default function ReportPage() {
     )
   }
 
+  if (loadError) {
+    return <ReportLoadError error={loadError} reviewId={id} onRetry={() => setReloadNonce((n) => n + 1)} />
+  }
+
+  // 失败态优先于一切渲染分支（含体验版）：失败的评审没有"部分内容"可展示，
+  // 匿名裁剪也会把 {"error": ...} 原样透出（report_gating 专门留了这个分支）。
+  const failure = reviewFailure(review, report)
+  if (failure) {
+    return <ReviewFailedNotice reviewId={id} review={review} reason={failure.reason} />
+  }
+
   if (report?.is_gated) {
     return <GatedReportTeaser review={review} gated={report} />
   }
@@ -783,13 +973,16 @@ export default function ReportPage() {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
         <p className="text-text-secondary">报告尚未生成</p>
+        <p className="mt-2 text-sm text-text-muted">评审可能还在跑，也可能还没开始——去详情页看实时进度。</p>
         <Link to={`/review/${id}`} className="text-cyan hover:text-cyan-dim mt-4 inline-block">查看进度</Link>
       </div>
     )
   }
 
   const summary = report.executive_summary
-  const risk = RISK_CONFIG[summary?.release_risk ?? ''] ?? RISK_CONFIG.medium
+  // 认不出的等级（含缺失）走 UNKNOWN_RISK 显示「—」，不再兜底成中风险
+  const risk = RISK_CONFIG[summary?.release_risk ?? ''] ?? null
+  const riskView = risk ?? UNKNOWN_RISK
   const reviewMode = (review.mode ?? 'standard') as ReviewMode
   const modeBadge = MODE_BADGE[reviewMode] ?? MODE_BADGE.standard
   const priorityFixes = report.priority_fixes ?? []
@@ -928,13 +1121,21 @@ export default function ReportPage() {
       )}
 
       {/* ---------- 执行摘要 / 发布风险 ---------- */}
-      <div className={cn('rounded-xl border-2 p-4 md:p-6 mb-6', risk.bg, risk.border)}>
+      <div className={cn('rounded-xl border-2 p-4 md:p-6 mb-6', riskView.bg, riskView.border)}>
         <div className="flex items-center gap-3 mb-3">
-          <AlertTriangle className={cn('w-5 h-5 md:w-6 md:h-6', risk.color)} strokeWidth={1.25} />
-          <h2 className={cn('text-base md:text-lg font-bold font-display', risk.color)}>
-            发布风险评估：{risk.label}
+          <AlertTriangle className={cn('w-5 h-5 md:w-6 md:h-6', riskView.color)} strokeWidth={1.25} />
+          <h2 className={cn('text-base md:text-lg font-bold font-display', riskView.color)}>
+            发布风险评估：{riskView.label}
           </h2>
         </div>
+        {/* 缺等级要说是"报告没给"，不是"评估结果是中风险" */}
+        {!risk && (
+          <p className="mb-3 text-xs text-text-muted">
+            这份报告没有给出发布风险等级
+            {summary?.release_risk ? `（收到的取值「${summary.release_risk}」不在已知档位里）` : '（执行摘要里没有 release_risk）'}
+            ，这里不替它推断。
+          </p>
+        )}
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div>
             <dt className="text-xs text-text-muted">评审团主流立场</dt>
@@ -948,8 +1149,12 @@ export default function ReportPage() {
           </div>
           <div>
             <dt className="text-xs text-text-muted">共识点 / 存疑点</dt>
+            {/* 报告压根没有 consensus 区块时显示「—」：0/0 会被读成"跑过了、没找到共识问题"，
+                和"这一节根本没产出"是两回事 */}
             <dd className="mt-1 font-medium text-text-primary">
-              {(report.consensus?.agreed_points?.length ?? 0)} / {(report.consensus?.questioned_points?.length ?? 0)}
+              {report.consensus
+                ? `${report.consensus.agreed_points?.length ?? 0} / ${report.consensus.questioned_points?.length ?? 0}`
+                : '—'}
             </dd>
           </div>
         </dl>
@@ -1495,16 +1700,19 @@ export default function ReportPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
           onClick={async () => {
             if (!id) return
             setEvaluating(true)
+            setEvaluationError(null)
             try {
               const result = await runEvaluation(id)
               setEvaluationScorecard(result)
-            } catch {
-              // 评估请求失败：保留页面现有内容，仅结束加载态
+            } catch (error) {
+              // 以前这里是个空 catch：点完只看到转圈结束，既没有结果也没有原因，
+              // 用户只能反复点。失败必须说出口。
+              setEvaluationError(error instanceof Error ? error.message : '运行质量评估失败')
             } finally {
               setEvaluating(false)
             }
@@ -1528,6 +1736,12 @@ export default function ReportPage() {
             <FlaskConical className="w-4 h-4" strokeWidth={1.25} />
             查看完整评估
           </Link>
+        )}
+        {evaluationError && (
+          <p className="flex items-start gap-1.5 text-sm text-severity-critical">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
+            <span className="whitespace-pre-wrap break-words">运行评估失败：{evaluationError}</span>
+          </p>
         )}
       </div>
 

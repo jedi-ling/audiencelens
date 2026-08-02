@@ -4,7 +4,7 @@ authors:
   - name: 熵呓工作室
     affiliation: 熵呓工作室
 abstract: |
-  Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation offer a promising alternative by generating synthetic user interviews at scale, but they also make it cheap to produce plausible-sounding "user feedback" that is grounded in nothing. We present AudienceLens, an open-source prototype for synthetic audience review whose implemented contributions are constraint mechanisms rather than simulation fidelity: (1) three-level evidence provenance — every claim is labelled `direct`, `inferred`, or `gap`, and a validator rejects any persona output whose inferred share exceeds 40%; (2) structural identity-behavior decoupling — demographic fields (gender, age, region) are removed from the persona payload before it reaches the model, so demographic-causal reasoning is unavailable rather than merely discouraged; (3) an 8-dimension Harness rubric whose thresholds live in a single configuration file read at runtime and ship with an explicit "prototype threshold, not empirically validated" annotation; (4) a **single-round** cross-examination protocol that does issue live rebuttal calls, in two tiers — one moderated rebuttal call in `standard` mode, per-persona re-invocation in `full` mode — with opponent identity withheld (arguments are addressed only by anonymous IDs), stance changes adjudicated **in code** by comparing pre- and post-rebuttal (stance, confidence) against a threshold $\theta_{\text{change}} = 0.15$ that is now read from configuration, and mode labelling that falls back to `derived_summary` and records the reason when a rebuttal call fails. We still specify, but have not implemented, the full three-round protocol with early termination, persuasion scoring, consensus-evolution tracking, and tipping-point detection. The release ships 66 behavior-driven personas across 10 packs and 14 task types. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation.
+  Traditional user research suffers from high cost, slow turnaround, and poor reproducibility. Recent advances in LLM-based persona simulation offer a promising alternative by generating synthetic user interviews at scale, but they also make it cheap to produce plausible-sounding "user feedback" that is grounded in nothing. We present AudienceLens, an open-source prototype for synthetic audience review whose implemented contributions are constraint mechanisms rather than simulation fidelity: (1) three-level evidence provenance — every claim is labelled `direct`, `inferred`, or `gap`, and a validator rejects any persona output whose inferred share exceeds 40%; (2) structural identity-behavior decoupling — demographic fields (gender, age, region) are removed from the persona payload before it reaches the model, so demographic-causal reasoning is unavailable rather than merely discouraged; (3) an 8-dimension Harness rubric whose thresholds live in a single configuration file read at runtime and ship with an explicit "prototype threshold, not empirically validated" annotation; (4) a **single-round** cross-examination protocol that does issue live rebuttal calls, in two tiers — one moderated rebuttal call in `standard` mode, per-persona re-invocation in `full` mode — with opponent identity withheld (arguments are addressed only by anonymous IDs), stance changes adjudicated **in code** by comparing pre- and post-rebuttal (stance, confidence) against a threshold $\theta_{\text{change}} = 0.15$ that is now read from configuration, and mode labelling that falls back to `derived_summary` and records the reason when a rebuttal call fails. We still specify, but have not implemented, the full three-round protocol with early termination, persuasion scoring, consensus-evolution tracking, and tipping-point detection. The release ships 72 behavior-driven personas across 11 packs and 14 task types. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation.
 keywords: [multi-agent systems, synthetic audience, cross-examination, persona simulation, LLM evaluation, AI ethics]
 ---
 
@@ -25,7 +25,7 @@ We additionally **specify, but have not implemented**, the remainder of the prot
 
 A fourth mechanism sits between these two categories and we state its boundary precisely. **The cross-examination protocol now executes a live rebuttal round.** In `standard` mode the system issues one moderated rebuttal call covering all controversy points; in `full` mode each persona involved in a controversy is re-invoked separately with its own identity card and the opponent's argument stripped of any attribution. Stance changes are decided by code — the stance text must actually differ *and* the confidence delta must reach $\theta_{\text{change}} = 0.15$, read from configuration — and a model claiming to have changed its mind is not sufficient. What remains unimplemented is the *rest* of the specification: the second and third rounds, early termination on convergence, panel-wide persuasion scoring, consensus-evolution classification, and tipping-point detection. The runtime distinguishes the three states it can be in (`derived_summary`, `moderated_rebuttal`, `multi_agent_rebuttal`) and falls back to the first, with the failure recorded, whenever a rebuttal call fails or its output cannot be parsed.
 
-The release ships 66 behavior-driven personas across 10 YAML packs and 14 task types. We propose the identity-behavior decoupling principle and describe AI Act–informed design considerations. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation. Empirical validation with real users remains future work for *all* components, implemented and specified alike.
+The release ships 72 behavior-driven personas across 11 YAML packs and 14 task types. We propose the identity-behavior decoupling principle and describe AI Act–informed design considerations. We discuss limitations including the absence of real-world parity studies, and outline a roadmap covering both the unimplemented mechanisms and their empirical validation. Empirical validation with real users remains future work for *all* components, implemented and specified alike.
 
 ## 1. Introduction
 
@@ -45,7 +45,7 @@ We present **AudienceLens**, an open-source prototype for synthetic audience rev
 
 3. **An 8-dimension Harness evaluation rubric** with thresholds declared in a single runtime-read configuration file (`src/harness/thresholds.yaml`) that ships with a machine-readable "prototype threshold, not empirically validated" annotation. We describe it as a *post-hoc scorecard, not a gate*: it is disabled by default, runs after a review completes, and does not filter, block, or re-run any persona output.
 
-4. **An open-source implementation** (MIT) with CLI, Python API, MCP server, web, and Docker entry points, shipping 66 behavior-driven personas across 10 YAML packs and 14 task types, with presets for six model providers.
+4. **An open-source implementation** (MIT) with CLI, Python API, MCP server, web, and Docker entry points, shipping 72 behavior-driven personas across 11 YAML packs and 14 task types, with presets for six model providers.
 
 **Design contribution, partially implemented.**
 
@@ -105,14 +105,15 @@ The Nielsen Norman Group's persona methodology has long advocated for behavior-f
 
 ### 3.1 System Architecture
 
-The persona pool comprises **66 personas across 10 YAML packages**, serving **14 task types**. All counts below can be verified against `src/personas/` and the single authoritative registry `VALID_TASK_TYPES` in `src/runner/task_types.py`:
+The persona pool comprises **72 personas across 11 YAML packages**, serving **14 task types**. All counts below can be verified against `src/personas/` and the single authoritative registry `VALID_TASK_TYPES` in `src/runner/task_types.py`:
 
 | Persona domain | Packages | Personas | Task types served |
 |---|---|---|---|
-| Game | 8 (`game-core` 16, `mobile-f2p` 7, `competitive-esport` 5, `family-casual` 5, `indie-creative` 5, `accessibility` 4, `educational-serious` 4, `vr-immersive` 4) | 50 | 10 (`steam_page_review`, `demo_first_play`, `concept_review`, `monetization_review`, `looking_for_party_post`, `update_announcement_review`, `devlog_review`, `kickstarter_review`, `localization_review`, `discord_community_review`) |
+| Game | 8 (`game-core` 17, `mobile-f2p` 7, `competitive-esport` 5, `family-casual` 5, `indie-creative` 5, `accessibility` 4, `educational-serious` 4, `vr-immersive` 4) | 51 | 10 (`steam_page_review`, `demo_first_play`, `concept_review`, `monetization_review`, `looking_for_party_post`, `update_announcement_review`, `devlog_review`, `kickstarter_review`, `localization_review`, `discord_community_review`) |
+| Launch / compliance | 1 (`launch-compliance` 5) | 5 | cross-domain (store submission, age rating, privacy compliance, device compatibility, refund/churn) |
 | General product | 1 (`general-consumer` 8) | 8 | 3 (`product_feedback_review`, `pricing_page_review`, `onboarding_review`) |
 | Startup / pitch | 1 (`startup-panel` 8) | 8 | 1 (`pitch_review`) |
-| **Total** | **10** | **66** | **14** |
+| **Total** | **11** | **72** | **14** |
 
 Three review skills (`synthetic-playtest`, `audience-panel`, `red-team-audience`) and one meta-skill (`persona-generate`) are defined as skill-pack front-ends over this pool. Two clarifications are needed here, because earlier descriptions of this system were inaccurate on both points. First, **`red-team-audience` has no persona pack of its own**: no red-team personas ship in `src/personas/`, and "red team" exists only as a skill-level framing over the existing pool, not as a distinct set of persona definitions. Second, `persona-generate` is an LLM-driven authoring workflow specified in a skill Markdown file, not a code path; the personas it produces are new YAML packs, not runtime entities.
 
@@ -189,7 +190,7 @@ Each persona also includes `decision_rules`—explicit conditional statements th
 
 | Package | Count | Domain | Key Behaviors |
 |---------|-------|--------|---------------|
-| game-core | 16 | Game | Core exploration, system analysis |
+| game-core | 17 | Game | Core exploration, system analysis |
 | mobile-f2p | 7 | Game | Monetization sensitivity, session design |
 | indie-creative | 5 | Game | Innovation focus, aesthetic judgment |
 | competitive-esport | 5 | Game | Skill ceiling, balance, fairness |
@@ -199,9 +200,10 @@ Each persona also includes `decision_rules`—explicit conditional statements th
 | accessibility | 4 | Game | Keyboard/screen/cognitive access |
 | general-consumer | 8 | Product | Everyday product/app evaluation, pricing, onboarding |
 | startup-panel | 8 | Startup | Business plan, pitch deck, market and funding scrutiny |
-| **Total** | **66** | | |
+| launch-compliance | 5 | Launch gate | Store submission, age rating, privacy law, device compatibility, refund/churn |
+| **Total** | **72** | | |
 
-Each persona is defined by a complete behavior_profile, motivations, decision_rules, quit_triggers, and continue_triggers. The 66-persona count reflects coverage across domains, not redundancy; Jaccard distance analysis (Section 5.2) measures actual differentiation. This is the complete inventory as of the v0.3.0 release: there is no red-team persona pack, and the product-facing pool is 16 personas in two packs, not the six finer-grained packs described in earlier drafts of this work.
+Each persona is defined by a complete behavior_profile, motivations, decision_rules, quit_triggers, and continue_triggers. The 72-persona count reflects coverage across domains, not redundancy; Jaccard distance analysis (Section 5.2) measures actual differentiation. This is the complete inventory as of the v0.3.0 release: there is no red-team persona pack, and the product-facing pool is 16 personas in two packs, not the six finer-grained packs described in earlier drafts of this work.
 
 ### 3.3 Cross-Examination Protocol (Rounds 1–2 implemented; Round 3 and the multi-round structure specified only)
 
@@ -335,7 +337,7 @@ AudienceLens follows the CCGS (Claude Code Group Standard) repository structure,
 
 Two corrections to earlier descriptions of this layout: there is no `.claude/rules/` directory — evaluation thresholds live in `src/harness/thresholds.yaml` and aggregation parameters in `src/config/aggregation-rules.yaml` — and `.claude/skills/` currently holds one skill, not four; the full set of four skill definitions exists only under `.trae/skills/`. Skill-pack coverage across the two assistants is therefore asymmetric.
 
-Each persona agent is defined as a standalone Markdown file (e.g., `P01-indie-core-operator.md`) that the skill dispatcher loads and injects into the LLM context when that persona is selected for a review panel. Note that the 50 agent Markdown files mirror the game pool only; the canonical persona definitions used by the Python engine are the 10 YAML packs under `src/personas/`.
+Each persona agent is defined as a standalone Markdown file (e.g., `P01-indie-core-operator.md`) that the skill dispatcher loads and injects into the LLM context when that persona is selected for a review panel. Note that the 50 agent Markdown files mirror the game pool only; the canonical persona definitions used by the Python engine are the 11 YAML packs under `src/personas/`.
 
 ### 4.3 Ethics Service
 
@@ -446,7 +448,7 @@ where $K_i$ is the set of key issue titles from persona $p_i$. The mean Jaccard 
 
 ### 5.2 Persona Differentiation Analysis
 
-To assess whether the 66 personas produce genuinely different perspectives, the system computes a Jaccard distance over the `key_issues` titles across persona pairs in a panel (Section 5.1). The 50 game personas span 8 packs with distinct behavioral profiles; the target mean Jaccard distance on `key_issues` is $\geq 0.5$ (deep differentiation) for personas from different packs and $\geq 0.3$ (basic differentiation) for personas within the same pack.
+To assess whether the 72 personas produce genuinely different perspectives, the system computes a Jaccard distance over the `key_issues` titles across persona pairs in a panel (Section 5.1). The 51 game personas span 8 packs with distinct behavioral profiles; the target mean Jaccard distance on `key_issues` is $\geq 0.5$ (deep differentiation) for personas from different packs and $\geq 0.3$ (basic differentiation) for personas within the same pack.
 
 These targets are design intentions. We have not run this analysis over the shipped persona set and report no measured differentiation figures.
 
@@ -594,7 +596,7 @@ What the system still does not do is equally important, and implementing one rou
 
 The remaining limitations are the familiar ones and we do not minimise them: no parity study against real user research, no multi-modal evaluation, no measured persona differentiation over the shipped pool, and thresholds set by engineering judgment rather than experiment. We think a narrow claim that survives a reader running `grep` over the repository is worth more than a broad one that does not — and that principle applies to what we have just built as firmly as it applied to what we had not.
 
-AudienceLens is open-source under the MIT license, with CLI, Python, MCP, web, and Docker entry points, and ships 66 behavior-driven personas across 10 packs and 14 task types. We invite the research community to use, evaluate, and extend the system — including by implementing the protocol specified here — and we welcome collaborations for real-world validation studies.
+AudienceLens is open-source under the MIT license, with CLI, Python, MCP, web, and Docker entry points, and ships 72 behavior-driven personas across 11 packs and 14 task types. We invite the research community to use, evaluate, and extend the system — including by implementing the protocol specified here — and we welcome collaborations for real-world validation studies.
 
 ## References
 

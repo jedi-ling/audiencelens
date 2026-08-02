@@ -504,24 +504,34 @@ export default function AskPage() {
   const handleFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
     setUploading(true)
+    // 以前这里每轮循环都读闭包里的 attachments.length 来判上限——那是本次渲染的
+    // 快照，循环内不会变：一次多选或拖入 N 张图时每一轮读到的都是同一个旧长度，
+    // 8 张上限被整批绕过（实测一次拖 20 张全都进来）。附件是全量驻留内存的
+    // data URI，绕过上限就是把页面拖垮。
+    // 现在两道闸：slots 在本批内自减（决定"还收不收、要不要提示"，同步可靠，
+    // 也省掉注定要被丢弃的那次上传），setAttachments 用函数式更新在 prev 上再判
+    // 一次（并发调用时的硬闸，满了就原样返回，绝不静默塞进去）。
+    let slots = MAX_ATTACHMENTS - attachments.length
+    let overflowed = false
     try {
       for (const file of Array.from(files)) {
+        if (slots <= 0) {
+          overflowed = true
+          break
+        }
         try {
-          if (attachments.length >= MAX_ATTACHMENTS) {
-            appendMessage({
-              id: nextId(),
-              role: 'assistant',
-              kind: 'error',
-              text: `最多附带 ${MAX_ATTACHMENTS} 张图片——先移除几张再继续上传`,
-            })
-            break
-          }
           const result = await api.upload(file)
           if (result.kind === 'image') {
-            setAttachments((prev) => [
-              ...prev,
-              { id: nextId(), filename: result.filename, image_data: result.image_data },
-            ])
+            slots -= 1
+            const attachmentId = nextId() // 在 updater 外取 id：updater 保持无副作用
+            setAttachments((prev) =>
+              prev.length >= MAX_ATTACHMENTS
+                ? prev
+                : [
+                    ...prev,
+                    { id: attachmentId, filename: result.filename, image_data: result.image_data },
+                  ]
+            )
           } else {
             // 文本类附件：抽取的文字直接并入输入框，走原有的意图解析文字通道
             setInput((prev) => (prev ? `${prev}\n\n${result.text}` : result.text))
@@ -534,6 +544,14 @@ export default function AskPage() {
             text: `「${file.name}」上传失败：${e instanceof Error ? e.message : '未知错误'}`,
           })
         }
+      }
+      if (overflowed) {
+        appendMessage({
+          id: nextId(),
+          role: 'assistant',
+          kind: 'error',
+          text: `最多附带 ${MAX_ATTACHMENTS} 张图片——先移除几张再继续上传`,
+        })
       }
     } finally {
       setUploading(false)

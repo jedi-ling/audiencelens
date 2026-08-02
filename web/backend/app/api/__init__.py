@@ -6,7 +6,6 @@ from typing import List, Optional
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -35,6 +34,7 @@ from app.schemas import (
     ReviewResponse,
     ReviewResult,
     ReviewSession,
+    RubricDimensionResponse,
     RubricResponse,
     SkillTypeResponse,
     TaskTypeResponse,
@@ -56,10 +56,9 @@ from app.services import (
     load_budget_config,
     report_gating,
 )
-from app.services import quota_service
+from app.services import intent_service, quota_service, review_service
 from app.services.evaluation_service import EvaluationService
 from app.services.ethics_service import EthicsService
-from app.websocket import manager
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -87,19 +86,41 @@ def get_session() -> Session:
 )
 def create_review(
     data: ReviewCreate,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     identity: Identity = Depends(optional_identity),
     resolved=Depends(resolve_llm_key),  # 无 key → 428，绝不静默跑模拟数据
 ):
-    """发起评审（v1 同步链路）。
+    """发起评审。请求/响应形状保持 v1 契约不变，**执行走的是 v2 那条引擎**。
 
-    三道闸必须和 v2（platform.py::create_review_v2）**完全一致**：限流 → key → 配额。
-    此前这里三道全无，而 run_review 内部照样 resolve_key（managed 形态下拿到的是
-    平台 key）——于是配额用尽的用户只要把请求换到这个端点就能无限跑，平台垫钱；
-    credits 模式下 CDK 余额为 0 也照跑不误，CDK 等于纯装饰。
-    安全和计费只加固新链路、把旧链路留成后门，是这个仓库最大的洞源。
+    三道闸和 v2（platform.py::create_review_v2）完全一致：限流 → key → 配额。
+    此前这里三道全无，而旧的 ReviewService.run_review 内部照样 resolve_key
+    （managed 形态下拿到的是平台 key）——配额用尽的用户只要把请求换到这个端点
+    就能无限跑，平台垫钱。安全和计费只加固新链路、把旧链路留成后门，
+    是这个仓库最大的洞源。
+
+    为什么不再有第二套执行实现：这个端点原本在后台跑
+    ReviewService.run_review——一份跟 src/runner/cli.py::run_panel 平行的
+    评审实现。本轮审计里「v2 修了 v1 没修」这一种形状反复出现（calibration
+    落库、BYOK、降级契约、交叉质询过滤…），根因就是同一件事两套代码。
+    现在这里只负责落库 + 入队，执行统一交给 review_service.enqueue_review
+    → runner.cli.run_panel，与 POST /api/v2/reviews 是同一条路径。
+    随之自动消失的 v1 专属缺陷（都不必再单独修一遍）：
+      · 只读 materials[].description，{type,text} 形态材料渲染成空字符串；
+      · 交叉质询缺 filter_genuine_controversies，凭空造争议还多花一次调用；
+      · report_markdown / report_html 不带降级横幅；
+      · 不写 Judgment（判断复利闭环对这个端点创建的评审永远为空）；
+      · 不校验 task_type（未知类型随机抓人格照跑照扣钱，见下面这道校验）。
+
+    对外契约有意保留的差异：仍返回 200 + 完整 Review 实体（v2 是 202 +
+    {review_id, job_id}）。这是公开 API，可能有外部调用方按 `id` 字段读；
+    进度照旧从 GET /api/reviews/{id} 或 WS /ws/review/{id} 拿。
     """
+    # 未知 task_type 必须在入口就拒。此前这里不校验，run_panel 那道
+    # ValueError 要等到后台任务里才抛——用户拿到的是一条 failed 评审，
+    # 而不是一个能立刻看懂的 400。v2 在同一位置用同一份注册表校验。
+    if data.task_type not in intent_service.VALID_TASK_TYPES:
+        raise HTTPException(status_code=400, detail=f"未知任务类型：{data.task_type}")
+
     quota_service.check_quota(
         session, identity.user_id, key_source=resolved.source, plan=identity.plan
     )
@@ -116,16 +137,17 @@ def create_review(
         project_key=data.project_key,
     )
 
-    def _run():
-        from app.main import engine
-        bg_session = Session(engine)
-        try:
-            bg_svc = ReviewService(bg_session)
-            bg_svc.run_review(review.id, ws_manager=manager)
-        finally:
-            bg_session.close()
-
-    background_tasks.add_task(_run)
+    # key 显式透传，绝不写进程全局 os.environ——多 worker 并发跑不同用户的
+    # 评审时环境变量注入会在用户间串 key（安全 + 计费问题）。
+    review_service.enqueue_review(
+        review.id,
+        api_key=resolved.key,
+        key_source=resolved.source,
+        user_id=identity.user_id,
+        provider=resolved.provider,
+        model=resolved.model,
+        api_base=resolved.api_base,
+    )
     return review
 
 
@@ -137,6 +159,27 @@ def _check_review_owner(review: Review, identity: Identity) -> None:
     同一个共享桶），不是这次修复要解决的问题——这里堵的是"登录用户能看别人账号"的洞。"""
     if review.user_id and review.user_id != identity.user_id:
         raise HTTPException(status_code=404, detail="Review not found")
+
+
+def _report_json_for(review: Review) -> Optional[dict]:
+    """v1 读路径统一从这里取 report_json —— 失败的评审必须能读到失败原因。
+
+    v1 的对外契约一直是"失败评审的 report_json 就是 {"error": ...}"
+    （report_gating.gate_report_for_anonymous 专门为这个形状留了透出分支：
+    坏消息不许被登录墙裁掉）。旧的 v1 引擎在 except 里同时写 error_message
+    和 report_json={"error": ...}，所以这个契约自然成立。
+    收敛到 v2 引擎后原因只写进 error_message 列，而 ReviewResponse /
+    ReportResponse 都没有这一列——不做这层转译，v1 的失败评审就会变成
+    "status=failed，但为什么失败一个字都看不到"。那正是本仓库要根除的
+    "失败被伪装成没有内容"。
+
+    只在 report_json 本身为空时才兜；引擎真写了报告就原样给。
+    """
+    if review.report_json:
+        return review.report_json
+    if review.status == "failed" and review.error_message:
+        return {"error": review.error_message}
+    return review.report_json
 
 
 def _review_response_for(review: Review, identity: Identity) -> ReviewResponse:
@@ -155,6 +198,7 @@ def _review_response_for(review: Review, identity: Identity) -> ReviewResponse:
     artifact_bundle 不裁：那是用户自己上传的材料，本来就是他的东西。
     """
     resp = ReviewResponse.model_validate(review)
+    resp = resp.model_copy(update={"report_json": _report_json_for(review)})
     if not identity.is_anonymous:
         return resp
     return resp.model_copy(
@@ -257,7 +301,7 @@ def get_report(
     if review is None:
         raise HTTPException(status_code=404, detail="Review not found")
     _check_review_owner(review, identity)
-    report_json = review.report_json
+    report_json = _report_json_for(review)
     report_markdown = review.report_markdown
     if identity.is_anonymous:
         report_json = report_gating.gate_report_for_anonymous(report_json)
@@ -286,7 +330,7 @@ def get_review_result(
     # 先定下"这个身份能看到的 json"，再拿它去渲染 HTML——顺序反了就会
     # 渲染出一份完整报告的 HTML 发给匿名用户（此前正是如此：这个端点
     # 把原始 json + markdown + 渲染好的整份 HTML 一起返回，一个字没裁）。
-    report_json = review.report_json
+    report_json = _report_json_for(review)
     report_md = review.report_markdown
     if identity.is_anonymous:
         report_json = report_gating.gate_report_for_anonymous(report_json)
@@ -767,7 +811,12 @@ def generate_personas(
 
 @router.get("/rubric", response_model=RubricResponse)
 def get_rubric():
-    """获取评估评分标准"""
+    """获取评估评分标准。
+
+    RubricDimensionResponse 曾经不在文件顶部那份 from app.schemas import (...) 里，
+    而 load_rubrics 一定返回非空 dimensions（内置 RUBRIC_SCORES 兜底），
+    所以循环体必定执行 → NameError → 这个端点 100% 500。
+    """
     rubric = EvaluationService.get_rubric()
     dimensions = []
     for dim_name, scores in rubric.get("dimensions", {}).items():

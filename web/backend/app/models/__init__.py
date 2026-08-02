@@ -72,6 +72,11 @@ class Review(Base):
     persona_outputs = relationship("PersonaOutput", back_populates="review", cascade="all, delete-orphan")
     chat_messages = relationship("ReviewChatMessage", back_populates="review", cascade="all, delete-orphan")
     evaluation_results = relationship("EvaluationResult", back_populates="review", cascade="all, delete-orphan")
+    # 评分卡也是派生内容，必须跟着评审走。它此前没有任何 relationship，
+    # 于是删评审时被漏下——见 EvaluationScorecard 的说明。
+    evaluation_scorecard = relationship(
+        "EvaluationScorecard", back_populates="review", uselist=False, cascade="all, delete-orphan"
+    )
     judgments = relationship("Judgment", back_populates="review", cascade="all, delete-orphan")
     feedback = relationship("ReviewFeedback", back_populates="review", uselist=False, cascade="all, delete-orphan")
     # 伦理报告含用户内容摘录，必须随评审一起删——删号走的就是删 Review 这条路
@@ -134,14 +139,29 @@ class EvaluationResult(Base):
 
 
 class EvaluationScorecard(Base):
+    """评审的质量评分卡（由 evaluation_service 从报告算出，属于派生内容）。
+
+    这张表以前是删除路径上的一个哑弹：review_id 是真外键，却既没有 ondelete、
+    Review 上也没有 relationship，于是没有任何一条路径会清理它。SQLite 默认
+    不校验外键，所以"删评审/删账号"在本机永远看着正常；PostgreSQL（部署文档
+    指定的生产库）上同一句删除会因外键约束直接 500。
+    它是派生内容不是财务事实，所以正确做法是随评审删除——两侧都声明：
+    relationship 保证 ORM 删除路径清理干净（老库建表时没有 ondelete 子句），
+    ondelete 保证绕过 ORM 的裸 SQL 删除也不留孤儿。
+    """
+
     __tablename__ = "evaluation_scorecards"
 
-    review_id = Column(String, ForeignKey("reviews.id"), primary_key=True)
+    review_id = Column(
+        String, ForeignKey("reviews.id", ondelete="CASCADE"), primary_key=True
+    )
     overall_score = Column(Integer, nullable=False, default=0)
     passed = Column(Boolean, nullable=False, default=False)
     results_json = Column(JSON, nullable=True)
     critical_failures_json = Column(JSON, nullable=True, default=list)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    review = relationship("Review", back_populates="evaluation_scorecard")
 
 
 class EthicsReport(Base):
@@ -211,7 +231,13 @@ class AuthToken(Base):
     __tablename__ = "auth_tokens"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
+    # ondelete CASCADE 是兜底：删号的正路是 user_data_service 显式删掉这些行
+    # （令牌本身能重置密码，"账号立即物理删除"必须包含它）。但只要有任何一条
+    # 路径漏了，PostgreSQL 上删 users 行就会因外键约束 500——SQLite 默认不校验
+    # 外键，这种漏项在本机永远测不出来，所以库这一层也要挡住。
+    user_id = Column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     # verify_email | reset_password
     purpose = Column(String, index=True, nullable=False)
     token_hash = Column(String, index=True, nullable=False)
@@ -226,7 +252,11 @@ class UserApiKey(Base):
     __tablename__ = "user_api_keys"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
+    # 同 AuthToken：ORM 侧已有 User.api_keys 的 delete-orphan，但绕过 ORM 的
+    # 批量删除（含测试清理、后台脚本）会跳过它，在 Postgres 上就是外键报错。
+    user_id = Column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
     provider = Column(String, default="anthropic", nullable=False)  # anthropic | openai_compatible
     # openai_compatible 档专用：具体模型名 + 自定义端点（DeepSeek/Kimi/通义千问/智谱GLM/Ollama…）。
     # provider=anthropic 时通常留空，走人格分级选型（见 select_model）；显式填了则覆盖分级。
@@ -245,13 +275,23 @@ class UsageRecord(Base):
     """用量流水（埋线：配额与计费的唯一事实源）。
 
     每次评审结束写一条；计费只需按 user_id + 时间窗聚合，无需改动评审链路。
+
+    与 Review 的关系是**弱引用**：评审可以删（用户有权删自己的内容），
+    但账必须留下——这是财务事实源，绝不能跟着评审级联消失。
     """
 
     __tablename__ = "usage_records"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, index=True, nullable=False, default="anonymous")
-    review_id = Column(String, ForeignKey("reviews.id"), nullable=True)
+    # 以前这里是裸 ForeignKey：既没 ondelete 也没有任何清理逻辑。
+    # "评审删了账要在"这条承诺只在 SQLite 默认关闭外键校验时侥幸成立，
+    # 换成 PostgreSQL（部署文档指定的生产库）后，删评审 / 删账号会直接撞上
+    # 外键约束报 500。SET NULL 才是这条承诺真正的落地方式：账留下，
+    # 指针失效（下面这行仍能回答"某次消耗了多少 token / 多少钱"）。
+    # 注意老库建表时没有这个子句，所以删除路径仍显式置空一遍，
+    # 见 user_data_service.delete_user_data。
+    review_id = Column(String, ForeignKey("reviews.id", ondelete="SET NULL"), nullable=True)
     kind = Column(String, default="review", nullable=False)  # review | intent | evaluation
     persona_count = Column(Integer, default=0, nullable=False)
     cost_usd = Column(Float, default=0.0, nullable=False)

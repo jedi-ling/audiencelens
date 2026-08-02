@@ -5,9 +5,12 @@
 每一关都可通过 app/config.py 的开关独立启停。
 """
 
+import hashlib
 import hmac
+import os
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, Header, Request
@@ -45,15 +48,47 @@ _admin_auth_lock = threading.Lock()
 _admin_auth_failures: dict = {}  # client_key -> [失败次数, 窗口起点]
 
 
+class SessionExpired(Unauthorized):
+    """带了令牌、但它已失效（过期 / 签名不对 / 密码改过 / 账号停用）。
+
+    和「压根没登录」必须是两种东西。此前二者都被 optional_identity 悄悄
+    抹成同一个匿名身份，用户看到的是：新发起的评审归属变成 anonymous、
+    报告被匿名门禁裁剪、历史列表空了——而全程没有任何一条错误提示，
+    表现得像"我的东西自己不见了"。
+    code 单独给一个值，前端可以据此清掉本地 token 并提示"登录已过期"，
+    而不用去猜一个笼统的 401 是"没登录"还是"登录烂了"。
+    """
+
+    code = "session_expired"
+    message = "登录已过期，请重新登录"
+
+
+# 密码重置后作废旧 JWT 用的标记行：写进 auth_tokens 表，purpose 取这个值。
+#
+# 为什么用一行"假令牌"而不是给 users 加一列 password_changed_at：
+# 自签 JWT 一旦发出去就无法撤回（只认签名和 exp），改密码不留痕的话，
+# 攻击者手上那把在改密码前偷到的 token 最长还能再用 7 天——"改密码"
+# 这个动作对已经发生的入侵完全无效。要撤回就必须有服务端状态。
+# 加列需要改 app/models（本轮不归我改，见交接说明），而 auth_tokens 本来
+# 就是"认证令牌的服务端状态"表，语义最近：这行不是给谁用的令牌
+# （token_hash 是随机值的摘要，没有任何人持有对应原文，也不会被 consume
+# 命中——consume 按 purpose 过滤），它只承载一个事实：created_at 之前
+# 签发的 JWT 全部作废。
+SESSION_REVOKE_PURPOSE = "session_revoke"
+
+
 class Identity:
     """统一身份对象：匿名与登录用户走同一套下游逻辑。"""
 
     def __init__(self, user_id: str, email: Optional[str] = None, plan: str = "free",
-                 is_anonymous: bool = True):
+                 is_anonymous: bool = True, session_expired: bool = False):
         self.user_id = user_id
         self.email = email
         self.plan = plan
         self.is_anonymous = is_anonymous
+        # 只有 probe_identity（/auth/me）会把它置真：那条路不 401，
+        # 但必须如实告诉前端"你带来的令牌被拒了"，否则又回到静默降级。
+        self.session_expired = session_expired
 
     def to_dict(self) -> dict:
         return {
@@ -61,6 +96,7 @@ class Identity:
             "email": self.email,
             "plan": self.plan,
             "is_anonymous": self.is_anonymous,
+            "session_expired": self.session_expired,
         }
 
 
@@ -69,6 +105,67 @@ def _client_key(request: Request, identity_id: str = None) -> str:
         return f"user:{identity_id}"
     client = request.client.host if request.client else "unknown"
     return f"ip:{client}"
+
+
+def bearer_token(authorization: Optional[str]) -> Optional[str]:
+    """从 Authorization 头里取出 Bearer 令牌；没带 / 不是 Bearer / 空串都返回 None。
+
+    「没带令牌」和「带了个坏令牌」的分界线就在这里，下游全靠它区分两种情况。
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    return authorization.split(" ", 1)[1].strip() or None
+
+
+def sessions_revoked_at(db: Session, user_id: str) -> Optional[int]:
+    """该用户"此刻之前签发的 JWT 全部作废"的时间点（epoch 整秒）；没有则 None。
+
+    见 SESSION_REVOKE_PURPOSE 的说明。代价老实说：每个带令牌的请求多一次
+    索引查询（auth_tokens.user_id / purpose 都有索引），换 JWT 可撤回。
+
+    为什么向下取整到秒：JWT 的 iat 只有整秒精度。若拿带微秒的时间点去比，
+    "重置于 10.4 秒、重置完立刻登录拿到 iat=10 的新令牌"会被判成
+    10 < 10.4 即刻作废——用户改完密码根本登不进去。代价是与重置发生在
+    同一秒内签发的令牌逃过一劫（≤1 秒的窗口），比登不进去可接受得多。
+    """
+    from app.models import AuthToken
+
+    row = (
+        db.query(AuthToken)
+        .filter(AuthToken.user_id == user_id, AuthToken.purpose == SESSION_REVOKE_PURPOSE)
+        .order_by(AuthToken.created_at.desc())
+        .first()
+    )
+    if row is None or row.created_at is None:
+        return None
+    created_at = row.created_at
+    if created_at.tzinfo is None:  # SQLite 取回来是 naive，补上 UTC 再比（同 auth_token_service）
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    return int(created_at.timestamp())
+
+
+def revoke_user_sessions(db: Session, user_id: str) -> None:
+    """作废该用户当前已签发的全部 JWT。改密码后必须调，否则旧令牌还能用满 TTL。
+
+    这里自己 commit：调用方（密码重置）刚把新的 password_hash 写进同一个 session，
+    两件事必须一起落库——"密码改了但旧会话还活着"这个中间态一秒都不该存在。
+    """
+    from app.models import AuthToken
+
+    now = datetime.now(timezone.utc)
+    db.add(
+        AuthToken(
+            user_id=user_id,
+            purpose=SESSION_REVOKE_PURPOSE,
+            # 随机摘要：没有任何人持有对应原文，这行永远不会被当成可用令牌
+            token_hash=hashlib.sha256(os.urandom(32)).hexdigest(),
+            # 标记行不该被任何"清理过期令牌"的逻辑当垃圾扫掉——它一旦消失，
+            # 被作废的旧 JWT 就会重新变得有效。给一个远期时间，语义上也成立：
+            # 作废声明的有效期至少要覆盖 JWT 自己的 TTL。
+            expires_at=now + timedelta(seconds=max(settings.jwt_ttl_seconds, 86400) * 10),
+        )
+    )
+    db.commit()
 
 
 async def current_identity(
@@ -84,18 +181,24 @@ async def current_identity(
     if not settings.auth_enabled:
         return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
 
-    if not authorization or not authorization.lower().startswith("bearer "):
+    token = bearer_token(authorization)
+    if token is None:
         raise Unauthorized()
 
-    token = authorization.split(" ", 1)[1].strip()
     try:
         payload = decode_token(token, settings.jwt_secret)
     except ValueError as exc:
-        raise Unauthorized(str(exc))
+        raise SessionExpired(str(exc))
 
     user = db.get(User, payload.get("sub"))
     if not user or not user.is_active:
-        raise Unauthorized("用户不存在或已停用")
+        raise SessionExpired("用户不存在或已停用")
+
+    # 改过密码就作废改密码之前签发的令牌——JWT 无状态，不查这一下的话
+    # 被偷走的旧令牌在改完密码后还能继续用满 TTL（默认 7 天）。
+    revoked_at = sessions_revoked_at(db, user.id)
+    if revoked_at is not None and int(payload.get("iat") or 0) < revoked_at:
+        raise SessionExpired("密码已修改，请用新密码重新登录")
 
     return Identity(
         user_id=user.id, email=user.email, plan=user.plan, is_anonymous=False
@@ -107,11 +210,42 @@ async def optional_identity(
     authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Identity:
-    """不强制登录的只读接口用（列人格、任务类型等）。"""
+    """不强制登录的接口用（列人格、任务类型、发起体验评审等）。
+
+    两种"没有身份"必须区别对待，这是本函数存在的全部要点：
+      · 压根没带令牌 → 匿名。"不登录也能试用"这条产品线全靠它，不能动。
+      · 带了令牌但它无效 → 401 session_expired，绝不悄悄降级成匿名。
+        以前这里对所有 Unauthorized 一律 except 掉回落匿名，后果不是"少了个提示"：
+        token 一过期，用户新发起的评审归属直接落到共享匿名桶（认领不回来的那种
+        错主人）、报告被匿名门禁裁剪、/history 空白、/keys 显示没配 key——
+        每一项单看都像"数据没了"，而后端从头到尾返回 200。
+    """
+    if bearer_token(authorization) is None:
+        return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+    return await current_identity(request, authorization, db)
+
+
+async def probe_identity(
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Identity:
+    """「我是谁」探测口（/auth/me 专用）：唯一允许令牌失效还返回 200 的地方。
+
+    为什么要开这个例外：前端启动时得先问一句"我现在是谁"，才能决定是清掉
+    过期 token 并提示重新登录、还是按匿名继续。如果这一问也 401，前端只能
+    看到一个失败的请求，既拿不到"你现在是匿名"也拿不到"你的令牌过期了"，
+    烂 token 会一直躺在 localStorage 里，每个后续请求继续 401。
+    失败在这里不是被吞掉，而是被如实翻译成 session_expired=true 带回前端。
+    """
+    if bearer_token(authorization) is None:
+        return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
     try:
         return await current_identity(request, authorization, db)
     except Unauthorized:
-        return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+        return Identity(
+            user_id=settings.anonymous_user_id, is_anonymous=True, session_expired=True
+        )
 
 
 def is_shared_anonymous(identity: Identity) -> bool:

@@ -9,6 +9,7 @@
      redeem 接口必须配严格限流（见 platform.py），否则可被暴力枚举。
 """
 
+import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -219,12 +220,38 @@ def credit_balance(db: Session, user_id: str) -> int:
     return int(total or 0)
 
 
+def _credit_lock_key(user_id: str) -> int:
+    """把 user_id 映射成 pg_advisory_lock 需要的 64 位有符号整数。"""
+    digest = hashlib.blake2b(f"al:credits:{user_id}".encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "big", signed=True)
+
+
+def _serialize_credit_writes(db: Session, user_id: str) -> None:
+    """把同一用户的次数扣减/退还串行化到本事务结束。
+
+    这里以前只有一条 `INSERT ... SELECT ... WHERE (子查询)`，注释还写着
+    "检查与扣减在同一条语句里，并发不可能双花"。那句话在 SQLite 上碰巧成立
+    （单条写语句全程持库级写锁），但生产库是 PostgreSQL：READ COMMITTED 下
+    子查询看到的是**语句开始时**的快照，两个并发请求都能读到余额 1，
+    于是各插一条 -1 —— 余额被扣成负数，用户白跑一次评审。
+    事务级 advisory lock 是代价最小的正解：不动"流水求和才是事实源"这个模型
+    （改成可变计数器就会与流水漂移），锁随 commit/rollback 自动释放，
+    也不会在 SQLite 上引入任何行为变化（那边直接跳过）。
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _credit_lock_key(user_id)})
+
+
 def try_consume_credit(db: Session, user_id: str, ref_id: Optional[str] = None) -> bool:
     """原子地"查余额并扣一次"：余额 > 0 才插入 -1 流水，返回是否扣成功。
 
-    检查与扣减在同一条 INSERT...SELECT...WHERE 里完成——两个并发请求
-    不可能都在余额 1 时通过（分开的 check-then-consume 会把余额扣成负数）。
+    原子性由两层共同保证（见 _serialize_credit_writes）：
+      · PostgreSQL：先取该用户的事务级 advisory lock，同一时刻只有一个请求
+        能进到这段临界区，后到的那个会在前一个提交后才读余额；
+      · SQLite：单条 INSERT...SELECT 本身就在写锁保护下完成。
     """
+    _serialize_credit_writes(db, user_id)
     result = db.execute(
         text(
             "INSERT INTO credit_ledger (id, user_id, delta, reason, ref_id, created_at) "
@@ -234,6 +261,41 @@ def try_consume_credit(db: Session, user_id: str, ref_id: Optional[str] = None) 
         {
             "id": str(uuid.uuid4()),
             "uid": user_id,
+            "ref": ref_id,
+            "now": datetime.utcnow(),
+        },
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def refund_credit(db: Session, user_id: str, ref_id: str, reason: str = "review_refund") -> bool:
+    """把一次已扣的评审次数退回去；返回"这次真的退了吗"。
+
+    幂等键是 (user_id, reason, ref_id)：同一条评审无论失败几次、收尸补跑几次，
+    都只会多出一行 +1。判重与插入必须在同一条语句里，否则并发退款会退两次——
+    与扣减同一套并发防线（PostgreSQL 上再加事务级 advisory lock）。
+
+    ref_id 强制必填：没有幂等键的退还根本无法保证只退一次，宁可让调用方报错，
+    也不能悄悄插一行"看起来退成功了"的凭空发次数。
+    """
+    if not ref_id:
+        raise ValueError("退还评审次数必须带 ref_id（幂等键），否则无法保证只退一次")
+
+    _serialize_credit_writes(db, user_id)
+    result = db.execute(
+        text(
+            "INSERT INTO credit_ledger (id, user_id, delta, reason, ref_id, created_at) "
+            "SELECT :id, :uid, 1, :reason, :ref, :now "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM credit_ledger "
+            "  WHERE user_id = :uid AND reason = :reason AND ref_id = :ref"
+            ")"
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "uid": user_id,
+            "reason": reason,
             "ref": ref_id,
             "now": datetime.utcnow(),
         },

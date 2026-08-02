@@ -17,9 +17,14 @@ const navItems = [
   { path: '/settings', label: '设置' },
 ]
 
-const secondaryNavItems = [
-  { path: '/evaluations', label: '评估报告' },
-]
+// 这里曾有一条 { path: '/evaluations', label: '评估报告' } 的次级导航。
+// 路由表里只有 /evaluations/:id，没有 /evaluations——点它会被 <Route path="*">
+// 兜底静默 Navigate 回首页，用户以为自己点错了。
+// 为什么是删掉而不是补一个列表页：评估是"某一次评审"的附属产物，后端只有
+// GET /api/evaluations/{review_id}（按评审取），没有任何"列出我的全部评估"
+// 的接口；凭空造个列表页只能拿空数组渲染成"你还没有评估"，那正是本仓最忌讳的
+// "空数据装成正常结果"。真正的入口在报告页（ReportPage 的「查看评估」按钮），
+// 那里才有 review id。要恢复导航项，得先有列表接口。
 
 export default function Layout() {
   const location = useLocation()
@@ -109,26 +114,6 @@ export default function Layout() {
                 )
               })}
             </nav>
-
-            <div className="hidden md:flex items-center gap-0.5 shrink-0 ml-1 pl-2 border-l border-border">
-              {secondaryNavItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path)
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      'relative flex items-center px-2 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all',
-                      isActive
-                        ? 'text-cyan'
-                        : 'text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
 
             {!isCreatePage && (
               <Link
@@ -261,31 +246,10 @@ export default function Layout() {
               </Link>
             )}
 
-            <div className="mt-4 pt-3 border-t border-border">
-              {secondaryNavItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path)
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMenuOpen(false)}
-                    className={cn(
-                      'flex items-center px-4 py-3 rounded-lg text-sm transition-all mb-1',
-                      isActive
-                        ? 'bg-cyan/10 text-cyan border-l-2 border-cyan'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-card'
-                    )}
-                  >
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-
             <Link
               to="/privacy"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 mt-2 rounded-lg text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card transition-all"
+              className="mt-4 flex items-center gap-3 border-t border-border px-4 py-3 pt-5 rounded-lg text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card transition-all"
             >
               <span>隐私政策</span>
             </Link>

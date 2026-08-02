@@ -57,17 +57,26 @@ curl http://localhost:8001/api/health
 **跑测试**：
 
 ```bash
-python -m pytest tests/ -q                      # 核心引擎 251 项
-cd web/backend && python -m pytest tests/ -q    # 平台链路 134 项（含后台管理 54 项、认证与报告分级 9 项、通用产品 12 项、创业评审团 7 项）
+python -m pytest tests/ -q                      # 核心引擎
+cd web/backend && python -m pytest tests/ -q    # 平台链路
 cd web/frontend && npx tsc --noEmit             # 用户产品前端类型检查
 cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 ```
+
+**这里不写具体条数，以上面命令的实际输出为准。** 曾经写过「核心引擎 1648 passed」，
+而同一天实测是 1649——测试数每加一条就过期一次，而且没有任何东西会提醒。
+仓库里同一个数字一度有四个互相矛盾的版本（CI 步骤名、README 徽章、本文件、落地页），
+任何人按其中一个去核对都会认为项目在虚报。宁可不写。
 
 ---
 
 ## 2. 环境变量全表
 
 所有开关的唯一来源是 [`web/backend/app/config.py`](../web/backend/app/config.py)。
+
+> 这张表以前漏掉了整个邮件段与 `AL_ENCRYPTION_KEY`——恰好是两处**配不对就直接拒绝启动**的开关，
+> 于是"照着全表配完却起不来"。`tests/test_public_claims.py::test_maintenance_env_table_is_complete`
+> 现在会拿 `config.py` 里读到的变量名逐个比对本节，漏一个就测试失败。
 
 ### 基础
 
@@ -77,6 +86,7 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 | `AL_DEBUG` | 非 production 为 true | 错误响应里是否带 detail |
 | `AL_CORS_ORIGINS` | `localhost:5173,localhost:3000` | 逗号分隔；**同时用于 WS origin 白名单** |
 | `AL_DATABASE_URL` | `sqlite:///data/reviews.db` | 换 Postgres 直接改这里 |
+| `AL_SKIP_DOTENV` | 空 | 设任意非空值则不加载 `web/.env`（CI / 容器里想完全靠显式环境变量时用） |
 
 ### 身份认证
 
@@ -85,9 +95,11 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 | `AL_AUTH_ENABLED` | `false` | false = `/auth/register`\`/login` 关闭；true = 开放注册登录 |
 | `AL_JWT_SECRET` | `dev-insecure-...` | **生产必须改**；同时用于加密用户 key |
 | `AL_JWT_TTL_SECONDS` | `604800`（7天） | 令牌有效期 |
+| `AL_ENCRYPTION_KEY` | 空 → 回落 `AL_JWT_SECRET` | **落库 API Key 的加密主密钥**；类生产下未设会告警 |
 
-> ⚠️ `AL_JWT_SECRET` 同时是**用户 API Key 的加密主密钥**。改它会导致已存的
-> 用户 key 解密失败（系统会当作"无 key"让用户重填，不会崩）。轮换前请通知用户。
+> ⚠️ 不设 `AL_ENCRYPTION_KEY` 时，落库加密密钥回落到 `AL_JWT_SECRET`——此后轮换 JWT 密钥
+> 会让所有已存的用户 API Key 解不开（系统当作"无 key"让用户重填，不会崩，但用户要重配）。
+> 把两者**分开设置**，轮换登录态才不会牵连密钥库。
 
 **这不是"全匿名 vs 强制登录"的二选一开关**——打开 `AL_AUTH_ENABLED` 只是让注册/登录
 接口可用，评审、Key 管理、意图解析这些路由用的是 `optional_identity`（`app/deps.py`），
@@ -158,15 +170,51 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 > 总并发 ≈ `AL_QUEUE_WORKERS × AUDIENCELENS_MAX_CONCURRENCY`。
 > 默认 2×6=12 个并发 LLM 调用。调高前请确认你的 API 速率限制扛得住。
 
+### 邮件（注册验证 / 密码重置）
+
+**开了账号体系就必须配这一段**：`AL_AUTH_ENABLED=true` 且类生产环境下，邮件后端不是 `smtp`
+会**直接拒绝启动**（`AL_MAIL_BACKEND=smtp` 但没填 `AL_SMTP_HOST` 同样拒绝启动）。
+原因写在 config.py 的自检里：console 档的完整邮件（含令牌）会落到服务器磁盘上的 outbox 文件，
+能读该文件的人就能接管任意账号，而用户永远收不到验证/重置链接。
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `AL_MAIL_BACKEND` | `console` | `smtp` 才会真发信；`console` 只写日志与 outbox 文件 |
+| `AL_MAIL_FROM` | `AudienceLens <noreply@localhost>` | 保持默认会被服务商拒收（`@localhost`），类生产下告警 |
+| `AL_SMTP_HOST` | 空 | `AL_MAIL_BACKEND=smtp` 时必填，否则拒绝启动 |
+| `AL_SMTP_PORT` | `587` | 587/25 用 STARTTLS，465 用隐式 SSL；配错组合类生产下告警 |
+| `AL_SMTP_USER` | 空 | |
+| `AL_SMTP_PASSWORD` | 空 | 别写进任何进版本库的文件（本仓库出过一次） |
+| `AL_SMTP_USE_SSL` | `false` | 465 端口必须设 `true`，587/25 必须留 `false` |
+| `AL_SMTP_TIMEOUT_SECONDS` | `15.0` | 不设超时 = socket 全局默认（通常永不超时），一台连不上的 SMTP 能把工作线程永久挂住 |
+| `AL_MAIL_OUTBOX_DIR` | `web/backend/data/outbox` | `console` 档的本地投递目录（0600 文件，含令牌） |
+| `AL_PUBLIC_WEB_URL` | `http://localhost:5199` | 邮件里链接的落点；**同时参与"是否像生产环境"的判定** |
+| `AL_EMAIL_TOKEN_TTL_SECONDS` | `86400`（24h） | 邮箱验证令牌有效期 |
+| `AL_RESET_TOKEN_TTL_SECONDS` | `3600`（1h） | 密码重置令牌有效期 |
+
+### 危险默认值的逃生舱
+
+两个都是"明知故犯"开关：类生产环境下不设就**拒绝启动**，设了则放行并持续告警。
+留逃生舱是因为单人自建、内网试跑确实可能就是要这么跑，但必须是一次显式动作。
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `AL_ALLOW_SHARED_ANONYMOUS` | `false` | 允许类生产下 `AL_AUTH_ENABLED=false`——所有访客共用 anonymous 身份，彼此可见对方的评审、用量与 API Key |
+| `AL_ALLOW_CONSOLE_MAIL` | `false` | 允许类生产 + 开了账号体系时不真发邮件——用户激活不了、找不回密码 |
+
 ### 其他
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AL_UPLOAD_MAX_BYTES` | `10485760`（10MB） | |
-| `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | |
+| `AL_UPLOAD_DIR` | `web/backend/data/uploads` | 上传落盘目录 |
+| `AL_UPLOAD_MAX_BYTES` | `10485760`（10MB） | 文本类材料上限 |
+| `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | 这是"抽取成文字材料"的格式白名单 |
+| `AL_UPLOAD_ALLOWED_IMAGE_EXT` | `.png,.jpg,.jpeg,.webp,.gif` | 图片走独立分支：原样转 data URI 进多模态请求，不抽文字 |
+| `AL_UPLOAD_MAX_IMAGE_BYTES` | `8388608`（8MB） | 图片单独的大小上限 |
 | `AL_INTENT_LLM_ENABLED` | `true` | 关掉则意图解析只用启发式（零成本） |
+| `AL_INTENT_MODEL` | `claude-haiku-4-5-20251001` | 意图解析用的模型 |
 | `AL_LEDGER_ENABLED` | `true` | 关掉则不记录判断（不建议——这是护城河） |
-| `AL_ADMIN_TOKEN` | 空（后台面板关闭） | 设置后 `web/admin` 与 `/api/admin/*` 生效，见 §2.5 |
+| `AL_ADMIN_TOKEN` | 空（后台面板关闭） | 设置后 `web/admin` 与 `/api/admin/*` 生效，见 §2.5；含非 ASCII 或短于 16 字符会拒绝启动 |
 
 ### 后台管理面板（独立应用，不嵌在用户产品里）
 

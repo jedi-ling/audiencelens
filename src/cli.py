@@ -39,6 +39,44 @@ else:
 
 PROJECT_ROOT = Path(__file__).parent
 
+# 技能 → 注入给每个人格的提示语。
+#
+# 为什么在这里再写一份：Web 链路的权威副本在
+# web/backend/app/services/__init__.py（PersonaService._SKILL_PROMPT_HINTS + apply_skill_hint），
+# 但 src/ 是可以脱离 web/ 单独发包的引擎（PyPI 的 audiencelens），不能反向依赖后端。
+# 以前这里干脆什么都不做——`--skill` 收下就丢，终端还打着"技能: red-team-audience"，
+# 于是 CLI 跑出来的是普通评审，Web 上同名技能跑出来是红队视角，两条链路结果不一样。
+# 键用 CLI 的连字符写法，值与后端下划线写法的那份逐字一致；
+# tests/test_public_claims.py 会比对两份，漂移就测试失败。
+SKILL_PROMPT_HINTS = {
+    "red-team-audience": (
+        "本次评审请采用红队/对抗性视角：优先挖掘产品的弱点、风险和「劝退点」，"
+        "而不是常规的体验反馈——目标是帮团队在正式上线前找出最容易被喷、被弃、被吐槽的地方。"
+    ),
+    "audience-panel": (
+        "本次评审请以非游戏、大众消费产品的视角来看——不要套用硬核玩家的评判标准，"
+        "关注普通用户/消费者会不会用、看不看得懂、愿不愿意留下。"
+    ),
+    # synthetic-playtest 没有提示语：它就是默认的评审口径，加一句"请正常评审"只会浪费上下文。
+}
+
+
+def apply_skill_hint(artifact_bundle: dict, skill: str) -> dict:
+    """把技能提示语当成一条材料塞进 bundle 最前面，与 Web 链路同一种做法。
+
+    不改 persona-prompt 模板、不新开参数，是因为 render_prompt 本来就读
+    artifact_bundle["materials"]，插一条进去每个人格都会看到，成本最低且不引入新分支。
+    没有对应提示语时原样返回（返回的是同一个对象，调用方不要依赖"总是拷贝"）。
+    """
+    hint = SKILL_PROMPT_HINTS.get(skill or "", "")
+    if not hint:
+        return artifact_bundle
+    bundle = dict(artifact_bundle or {})
+    materials = list(bundle.get("materials") or [])
+    materials.insert(0, {"type": "text", "text": f"[评审技能：{skill}] {hint}"})
+    bundle["materials"] = materials
+    return bundle
+
 
 def _clean(msg: str) -> str:
     """去掉 rich 标记"""
@@ -74,6 +112,9 @@ def run(skill, task_type, artifact, mode, output_dir, personas):
 
     try:
         artifact_bundle = runner_cli.load_artifact_bundle(artifact)
+        # skill 同理：以前也只在上面那行 _print 里露个脸。选了 red-team-audience
+        # 却跑出一份普通评审，用户没有任何办法看出技能没生效。
+        artifact_bundle = apply_skill_hint(artifact_bundle, skill)
         # mode 必须真的传下去。以前只在上面那行 _print 里露个脸就被丢掉，
         # run_panel 收不到 mode 就走默认档：用户 --mode quick 想省钱，
         # 实际跑的是全量面板 + 交叉质询 + 校准，钱按最贵的档花，

@@ -9,7 +9,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/apiClient'
+import { Link } from 'react-router'
+import { ApiError, api } from '@/lib/apiClient'
 import type { HitRate, Judgment, LeaderboardEntry, ValidationMetrics, Verdict } from '@/lib/types'
 
 const VERDICT_LABELS: Record<Verdict, string> = {
@@ -35,7 +36,11 @@ export default function LedgerPage() {
   const [valueMetrics, setValueMetrics] = useState<ValidationMetrics | null>(null)
   const [onlyUnverified, setOnlyUnverified] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+  // 回填是本页唯一的写操作，失败必须逐条看得见：以前 verify() 全程没有 try/catch，
+  // 请求被拒之后按钮跟没点过一样，用户会以为"填了"。
+  const [verifyingId, setVerifyingId] = useState<string | null>(null)
+  const [verifyError, setVerifyError] = useState<{ id: string; error: Error } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -52,7 +57,7 @@ export default function LedgerPage() {
       setBoard(b.personas)
       setValueMetrics(v)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(e instanceof Error ? e : new Error(String(e)))
     } finally {
       setLoading(false)
     }
@@ -63,8 +68,17 @@ export default function LedgerPage() {
   }, [load])
 
   const verify = async (id: string, verdict: Verdict) => {
-    await api.verifyJudgment(id, verdict)
-    await load()
+    setVerifyError(null)
+    setVerifyingId(id)
+    try {
+      await api.verifyJudgment(id, verdict)
+      await load()
+    } catch (e) {
+      // 挂在这条预测上而不是页面顶部：清单可能很长，顶部一条提示看不出是哪条没填上
+      setVerifyError({ id, error: e instanceof Error ? e : new Error(String(e)) })
+    } finally {
+      setVerifyingId(null)
+    }
   }
 
   return (
@@ -79,7 +93,30 @@ export default function LedgerPage() {
 
       {error && (
         <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
-          {error}
+          <p className="font-medium">判断复利数据加载失败</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-text-secondary">{error.message}</p>
+          {needsLogin(error) && (
+            <p className="mt-1 text-text-secondary">
+              这一页放的是「属于你自己的」预测台账，未登录时后端无法区分谁是谁，所以拒绝返回。
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => void load()}
+              disabled={loading}
+              className="rounded-md border border-border bg-bg-card px-3 py-1.5 text-xs text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary disabled:opacity-50"
+            >
+              {loading ? '重试中…' : '重试'}
+            </button>
+            {needsLogin(error) && (
+              <Link
+                to="/login"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-bg-primary hover:bg-brand-primary-dim"
+              >
+                登录 / 注册
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
@@ -194,6 +231,10 @@ export default function LedgerPage() {
 
         {loading ? (
           <p className="p-6 text-sm text-text-secondary">加载中…</p>
+        ) : error ? (
+          // 加载失败时这里曾照样打出"还没有预测记录"——把一次失败说成了"你没有数据"，
+          // 正是本仓库要根除的那种伪装。原因和重试按钮在上方横幅里。
+          <p className="p-6 text-sm text-text-secondary">没能加载到预测记录，原因见上方。</p>
         ) : judgments.length === 0 ? (
           <p className="p-6 text-sm text-text-secondary">
             还没有预测记录。跑一次评审，系统会自动把结论留档。
@@ -225,15 +266,35 @@ export default function LedgerPage() {
                       {(['hit', 'partial', 'miss'] as Verdict[]).map((v) => (
                         <button
                           key={v}
-                          className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-80 ${VERDICT_STYLES[v]}`}
+                          disabled={verifyingId !== null}
+                          className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40 ${VERDICT_STYLES[v]}`}
                           onClick={() => void verify(j.id, v)}
                         >
-                          {VERDICT_LABELS[v]}
+                          {verifyingId === j.id ? '提交中…' : VERDICT_LABELS[v]}
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
+
+                {/* 回填失败：这条记录的状态没有变，必须当场说清楚，
+                    否则用户会以为已经填过了（按钮回弹得跟成功一模一样）。 */}
+                {verifyError?.id === j.id && (
+                  <div className="mt-3 rounded-md border border-severity-critical/40 bg-severity-critical/10 px-3 py-2 text-xs text-text-primary">
+                    <p className="font-medium">回填失败，这条预测仍是「待验证」</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-text-secondary">
+                      {verifyError.error.message}
+                    </p>
+                    {needsLogin(verifyError.error) && (
+                      <Link
+                        to="/login"
+                        className="mt-2 inline-block rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-bg-primary hover:bg-brand-primary-dim"
+                      >
+                        登录 / 注册后再回填
+                      </Link>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -250,6 +311,17 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <div className="mt-1 text-xs text-text-muted">{label}</div>
     </div>
   )
+}
+
+/**
+ * 这个错误该不该把用户引到登录页。
+ *
+ * /ledger/* 现在对未登录访客一律 401（后端 deps.require_isolated_identity：
+ * 未登录访客共用同一个匿名身份，无法区分谁的台账是谁的）。也就是说"被拒"在
+ * 多租户形态下是常态路径而不是异常，提示必须给得出下一步动作。
+ */
+function needsLogin(error: Error): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403)
 }
 
 function percent(value: number | null): string {

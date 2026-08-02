@@ -4,7 +4,7 @@ authors:
   - name: 熵呓工作室
     affiliation: 熵呓工作室
 abstract: |
-  传统用户研究面临成本高、周期长、可重复性差等问题。近年来基于大语言模型（LLM）的人物模拟技术取得了重要进展，为大规模生成合成用户访谈提供了有前景的替代方案；但它同样让"听上去很像、实则没有任何依据"的合成用户反馈变得极其廉价。我们提出 AudienceLens——一个用于合成受众评审的开源原型，其**已实现**的贡献是约束机制而非模拟保真度：（1）三级证据溯源——每条主张都标注 `direct` / `inferred` / `gap`，校验器会驳回推断证据占比超过 40% 的人格输出；（2）结构性的身份-行为解耦——人口统计字段（性别、年龄、地区）在人格载荷送入模型之前即被剔除，因此人口统计因果推理对模型而言是"不可得"，而非"被劝阻"；（3）8 维 Harness 评估量表，其阈值集中声明在单一配置文件中、由代码在运行时读取，并自带"原型阈值，未经实证验证"标注。（4）**单轮**交叉质询协议——它确实会发出真实的反驳调用，分两档：`standard` 档一次仲裁式反驳调用，`full` 档逐人格重新调用；对手身份被隐去（论据只用匿名编号指代）；改票由**代码**判定，比较反驳前后的（立场、置信度）并与阈值 $\theta_{\text{change}} = 0.15$ 比较，该阈值现在真的从配置文件读取；反驳调用失败时回落为 `derived_summary` 并如实记录原因。我们**仍然只给出规范、尚未实现**的部分是：完整的三轮协议与提前终止、说服力评分、共识演化追踪与临界点检测。本次发布包含 10 个人格包共 66 个行为驱动人物、14 种任务类型。我们讨论了包括缺乏真实世界对等性研究在内的局限性，并给出同时覆盖"补齐未实现机制"与"实证验证"的路线图。
+  传统用户研究面临成本高、周期长、可重复性差等问题。近年来基于大语言模型（LLM）的人物模拟技术取得了重要进展，为大规模生成合成用户访谈提供了有前景的替代方案；但它同样让"听上去很像、实则没有任何依据"的合成用户反馈变得极其廉价。我们提出 AudienceLens——一个用于合成受众评审的开源原型，其**已实现**的贡献是约束机制而非模拟保真度：（1）三级证据溯源——每条主张都标注 `direct` / `inferred` / `gap`，校验器会驳回推断证据占比超过 40% 的人格输出；（2）结构性的身份-行为解耦——人口统计字段（性别、年龄、地区）在人格载荷送入模型之前即被剔除，因此人口统计因果推理对模型而言是"不可得"，而非"被劝阻"；（3）8 维 Harness 评估量表，其阈值集中声明在单一配置文件中、由代码在运行时读取，并自带"原型阈值，未经实证验证"标注。（4）**单轮**交叉质询协议——它确实会发出真实的反驳调用，分两档：`standard` 档一次仲裁式反驳调用，`full` 档逐人格重新调用；对手身份被隐去（论据只用匿名编号指代）；改票由**代码**判定，比较反驳前后的（立场、置信度）并与阈值 $\theta_{\text{change}} = 0.15$ 比较，该阈值现在真的从配置文件读取；反驳调用失败时回落为 `derived_summary` 并如实记录原因。我们**仍然只给出规范、尚未实现**的部分是：完整的三轮协议与提前终止、说服力评分、共识演化追踪与临界点检测。本次发布包含 11 个人格包共 72 个行为驱动人物、14 种任务类型。我们讨论了包括缺乏真实世界对等性研究在内的局限性，并给出同时覆盖"补齐未实现机制"与"实证验证"的路线图。
 keywords: [多智能体系统, 合成受众, 交叉质询, 人物模拟, LLM评估, AI伦理]
 ---
 
@@ -25,7 +25,7 @@ keywords: [多智能体系统, 合成受众, 交叉质询, 人物模拟, LLM评�
 
 有一项机制介于"已实现"与"仅有规范"之间，我们把它的边界说准确。**交叉质询协议现在会执行一轮真实的反驳。** `standard` 档发出一次仲裁式反驳调用覆盖全部争议点；`full` 档把每位涉事人格单独重新调用一次，人格拿到自己的身份卡，而对手的论据被剥掉全部署名信息。改票由代码判定——立场文字必须真的不同，**且**置信度增量必须达到从配置读取的 $\theta_{\text{change}} = 0.15$——模型声称自己被说服了并不足以构成一次改票。仍未实现的是规范的*其余*部分：第二、三轮，收敛后提前终止，全员说服力评分，共识演化分类，临界点检测。运行时用三个状态如实区分自己处在哪一种（`derived_summary`、`moderated_rebuttal`、`multi_agent_rebuttal`），并在反驳调用失败或输出无法解析时回落到第一种、同时记录失败原因。
 
-本次发布包含 10 个 YAML 人格包共 66 个行为驱动人物、14 种任务类型。我们提出身份-行为解耦原则，并阐述以欧盟《人工智能法案》为参考的设计考量。我们讨论了包括缺乏真实世界对等性研究在内的局限性，并给出同时覆盖"补齐未实现机制"与"实证验证"的路线图。与真实用户的实证验证对*全部*组件（无论已实现还是仅有规范）都仍属于未来工作。
+本次发布包含 11 个 YAML 人格包共 72 个行为驱动人物、14 种任务类型。我们提出身份-行为解耦原则，并阐述以欧盟《人工智能法案》为参考的设计考量。我们讨论了包括缺乏真实世界对等性研究在内的局限性，并给出同时覆盖"补齐未实现机制"与"实证验证"的路线图。与真实用户的实证验证对*全部*组件（无论已实现还是仅有规范）都仍属于未来工作。
 
 ## 1. 引言
 
@@ -45,7 +45,7 @@ keywords: [多智能体系统, 合成受众, 交叉质询, 人物模拟, LLM评�
 
 3. **8 维 Harness 评估量表**，阈值集中声明在运行时读取的单一配置文件（`src/harness/thresholds.yaml`）中，且该文件自带机器可读的"原型阈值，未经实证验证"标注。我们将其描述为*事后打分卡而非门控*：默认关闭，在评审完成之后运行，不过滤、不拦截、不重跑任何人格输出。
 
-4. **开源实现**（MIT），具备 CLI、Python API、MCP 服务、Web 与 Docker 多个入口，内置 10 个 YAML 人格包共 66 个行为驱动人物、14 种任务类型，并预置六家模型供应商配置。
+4. **开源实现**（MIT），具备 CLI、Python API、MCP 服务、Web 与 Docker 多个入口，内置 11 个 YAML 人格包共 72 个行为驱动人物、14 种任务类型，并预置六家模型供应商配置。
 
 **设计贡献：已部分实现。**
 
@@ -105,14 +105,15 @@ Nielsen Norman Group 的人物方法论一直倡导行为优先的人物设计�
 
 ### 3.1 系统架构
 
-人物池包含 **10 个 YAML 包共 66 个人物**，服务 **14 种任务类型**。下表全部数字均可对照 `src/personas/` 目录与唯一权威注册表 `src/runner/task_types.py` 中的 `VALID_TASK_TYPES` 核验：
+人物池包含 **11 个 YAML 包共 72 个人物**，服务 **14 种任务类型**。下表全部数字均可对照 `src/personas/` 目录与唯一权威注册表 `src/runner/task_types.py` 中的 `VALID_TASK_TYPES` 核验：
 
 | 人格领域 | 包 | 人物数 | 服务的任务类型 |
 |---|---|---|---|
-| 游戏 | 8（`game-core` 16、`mobile-f2p` 7、`competitive-esport` 5、`family-casual` 5、`indie-creative` 5、`accessibility` 4、`educational-serious` 4、`vr-immersive` 4） | 50 | 10（`steam_page_review`、`demo_first_play`、`concept_review`、`monetization_review`、`looking_for_party_post`、`update_announcement_review`、`devlog_review`、`kickstarter_review`、`localization_review`、`discord_community_review`） |
+| 游戏 | 8（`game-core` 17、`mobile-f2p` 7、`competitive-esport` 5、`family-casual` 5、`indie-creative` 5、`accessibility` 4、`educational-serious` 4、`vr-immersive` 4） | 51 | 10（`steam_page_review`、`demo_first_play`、`concept_review`、`monetization_review`、`looking_for_party_post`、`update_announcement_review`、`devlog_review`、`kickstarter_review`、`localization_review`、`discord_community_review`） |
+| 上线 / 合规 | 1（`launch-compliance` 5） | 5 | 跨领域（平台送审、分级、隐私合规、机型适配、退款流失） |
 | 通用产品 | 1（`general-consumer` 8） | 8 | 3（`product_feedback_review`、`pricing_page_review`、`onboarding_review`） |
 | 创业 / 路演 | 1（`startup-panel` 8） | 8 | 1（`pitch_review`） |
-| **合计** | **10** | **66** | **14** |
+| **合计** | **11** | **72** | **14** |
 
 三个评审技能（`synthetic-playtest`、`audience-panel`、`red-team-audience`）与一个元技能（`persona-generate`）作为该人物池之上的技能包前端。这里需要澄清两点，因为本系统此前的描述在这两点上都不准确。第一，**`red-team-audience` 没有自己的人格包**：`src/personas/` 中不存在任何红队人格，"红队"只是覆盖在既有人物池之上的技能层框定方式，而非一组独立的人格定义。第二，`persona-generate` 是写在技能 Markdown 里、由 LLM 驱动的人格创作流程，不是代码路径；它产出的是新的 YAML 人格包，而非运行时实体。
 
@@ -189,7 +190,7 @@ OCEAN 与 `behavior_profile` 之间的映射如下：openness_to_experience 映�
 
 | 包 | 数量 | 领域 | 关键行为 |
 |----|------|------|----------|
-| game-core | 16 | 游戏 | 核心探索、系统分析 |
+| game-core | 17 | 游戏 | 核心探索、系统分析 |
 | mobile-f2p | 7 | 游戏 | 商业化敏感度、会话设计 |
 | indie-creative | 5 | 游戏 | 创新关注、审美判断 |
 | competitive-esport | 5 | 游戏 | 技能上限、平衡性、公平性 |
@@ -199,9 +200,10 @@ OCEAN 与 `behavior_profile` 之间的映射如下：openness_to_experience 映�
 | accessibility | 4 | 游戏 | 键盘/屏幕/认知无障碍 |
 | general-consumer | 8 | 产品 | 日常产品/应用评估、定价、上手流程 |
 | startup-panel | 8 | 创业 | 商业计划、路演材料、市场与融资质询 |
-| **合计** | **66** | | |
+| launch-compliance | 5 | 上线门槛 | 平台送审、分级、隐私法务、机型适配、退款流失 |
+| **合计** | **72** | | |
 
-每个人物由完整的 behavior_profile、motivations、decision_rules、quit_triggers 和 continue_triggers 定义。66 个人物的数量反映了跨领域的覆盖度，而非冗余；Jaccard 距离分析（第 5.2 节）衡量实际的差异化程度。这是 v0.3.0 版本的完整清单：不存在红队人格包，面向产品的人物池是两个包共 16 人，而非此前草稿中描述的六个更细分的包。
+每个人物由完整的 behavior_profile、motivations、decision_rules、quit_triggers 和 continue_triggers 定义。72 个人物的数量反映了跨领域的覆盖度，而非冗余；Jaccard 距离分析（第 5.2 节）衡量实际的差异化程度。这是 v0.3.0 版本的完整清单：不存在红队人格包，面向产品的人物池是两个包共 16 人，而非此前草稿中描述的六个更细分的包。
 
 ### 3.3 交叉质询协议（Cross-Examination Protocol）——第 1–2 轮已实现；第 3 轮与多轮结构仅有规范
 
@@ -335,7 +337,7 @@ AudienceLens 遵循 CCGS（Claude Code Group Standard）仓库结构，将多智
 
 对此前描述的两处更正：不存在 `.claude/rules/` 目录——评估阈值位于 `src/harness/thresholds.yaml`，聚合参数位于 `src/config/aggregation-rules.yaml`；且 `.claude/skills/` 目前只有 1 个技能而非 4 个，完整的四个技能定义只存在于 `.trae/skills/` 下。因此两个助手之间的技能包覆盖是不对称的。
 
-每个人物智能体定义为一个独立的 Markdown 文件（例如，`P01-indie-core-operator.md`），技能调度器在该人物被选中参与评审面板时加载并将其注入 LLM 上下文。注意这 50 个 agent Markdown 文件只镜像了游戏池；Python 引擎使用的权威人格定义是 `src/personas/` 下的 10 个 YAML 包。
+每个人物智能体定义为一个独立的 Markdown 文件（例如，`P01-indie-core-operator.md`），技能调度器在该人物被选中参与评审面板时加载并将其注入 LLM 上下文。注意这 50 个 agent Markdown 文件只镜像了游戏池；Python 引擎使用的权威人格定义是 `src/personas/` 下的 11 个 YAML 包。
 
 ### 4.3 伦理服务（Ethics Service）
 
@@ -446,7 +448,7 @@ $$d_J(p_i, p_j) = 1 - \frac{|K_i \cap K_j|}{|K_i \cup K_j|}$$
 
 ### 5.2 人物差异化分析
 
-为评估这 66 个人物是否产生真正不同的视角，系统对面板内人物对的 `key_issues` 标题集计算 Jaccard 距离（第 5.1 节）。50 个游戏人物分布在 8 个包中，具有不同的行为画像；目标是：来自不同包的人物在 `key_issues` 上的平均 Jaccard 距离 $\geq 0.5$（深度差异化），同一包内的人物 $\geq 0.3$（基本差异化）。
+为评估这 72 个人物是否产生真正不同的视角，系统对面板内人物对的 `key_issues` 标题集计算 Jaccard 距离（第 5.1 节）。51 个游戏人物分布在 8 个包中，具有不同的行为画像；目标是：来自不同包的人物在 `key_issues` 上的平均 Jaccard 距离 $\geq 0.5$（深度差异化），同一包内的人物 $\geq 0.3$（基本差异化）。
 
 这些目标是设计意图。我们尚未在随包发布的人格集合上跑过该分析，因此不报告任何实测差异化数值。
 
@@ -594,7 +596,7 @@ AudienceLens 未持有 SOC 2 认证，这可能限制其在需要数据处理合
 
 其余局限是常见的那些，我们不淡化：没有针对真实用户研究的对等研究，不支持多模态评估，未在随包人格集合上实测差异化，若干阈值出自工程判断而非实验。我们认为，一个能经受读者对仓库执行一次 `grep` 的窄声称，比一个经受不住的宽声称更有价值——这条原则适用于我们刚刚建成的东西，与它适用于我们尚未建成的东西一样严格。
 
-AudienceLens 以 MIT 协议开源，提供 CLI、Python、MCP、Web 与 Docker 入口，内置 10 个人格包共 66 个行为驱动人物、14 种任务类型。我们邀请研究社区使用、评估和扩展该系统——包括去实现本文给出的协议规范——并欢迎真实世界验证研究的合作。
+AudienceLens 以 MIT 协议开源，提供 CLI、Python、MCP、Web 与 Docker 入口，内置 11 个人格包共 72 个行为驱动人物、14 种任务类型。我们邀请研究社区使用、评估和扩展该系统——包括去实现本文给出的协议规范——并欢迎真实世界验证研究的合作。
 
 ## 参考文献
 

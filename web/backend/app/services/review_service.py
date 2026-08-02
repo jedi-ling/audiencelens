@@ -11,6 +11,7 @@
       → 落库 report + persona_outputs
       → 写 Judgment（判断复利闭环）
       → 写 UsageRecord（计费事实源）
+      → 失败时退还入口扣掉的 CDK 次数（quota_service.refund_review_credit，幂等）
 
 绝不返回模拟数据：无 key 时在入口就 428 拒绝（LLMKeyMissing），
 不让用户拿到没有评审价值的占位内容。
@@ -249,6 +250,27 @@ def _execute_review(
                 review.error_message = str(exc)[:2000]
                 review.completed_at = datetime.now(timezone.utc)
                 db.commit()
+
+            # 退还入口扣掉的评审次数（credits 模式）。次数是用户花钱买的，
+            # 不该被一次模型报错吞掉；以 review_id 为幂等键，同一条评审
+            # 失败/重试多次也只退一次（见 cdk_service.refund_credit）。
+            # 单独包一层 try 的理由：退还失败不能顶替掉原始异常——job 里
+            # 必须记着"评审为什么挂"，而不是"退款时又挂了"。但它绝不静默：
+            # 留 ERROR 级堆栈 + 明确说清"用户次数被吞、需人工补"，
+            # 钱的事情出问题必须在日志里看得见。
+            try:
+                refunded = quota_service.refund_review_credit(
+                    db, user_id, review_id, key_source=key_source
+                )
+                if refunded:
+                    logger.info("review %s 失败，已退还 1 次评审次数给 %s", review_id, user_id)
+            except Exception:
+                db.rollback()
+                logger.exception(
+                    "review %s 失败后退还评审次数也失败——用户 %s 的 1 次次数被吞了，需人工补偿",
+                    review_id,
+                    user_id,
+                )
         finally:
             _broadcast(review_id, "review.failed", {"review_id": review_id, "error": str(exc)})
         raise
