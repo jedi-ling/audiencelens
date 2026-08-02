@@ -17,3 +17,11 @@ cryptography
 # 本机开发时 venv 里恰好装过，所以只有 Docker 镜像和 CI 会暴露这个缺口。
 jinja2
 jsonschema
+
+# PostgreSQL 驱动。docs/MAINTENANCE.md 与 .env 模板都写着「换 Postgres 时只需改
+# AL_DATABASE_URL」——但驱动不在这里的话，那条路第 0 步就断：
+#   create_engine("postgresql://...") → ModuleNotFoundError: No module named 'psycopg2'
+# 而且它发生在启动期，报错跟数据库配置看起来毫无关系。
+# 默认库仍是 SQLite，装上它只是让文档写的那条迁移路径真的走得通。
+# 用 -binary 版：自带预编译库，容器里不需要 libpq-dev 与编译工具链。
+psycopg2-binary

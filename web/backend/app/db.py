@@ -124,7 +124,12 @@ def _legacy_migrations() -> None:
     if "users" in inspector.get_table_names():
         user_columns = {c["name"] for c in inspector.get_columns("users")}
         if "is_guest" not in user_columns:
-            patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT 0 NOT NULL")
+            # DEFAULT false，不是 DEFAULT 0：PostgreSQL 的 boolean 与整数不可隐式互转，
+            #   ERROR: column "is_guest" is of type boolean but default expression is of type integer
+            # 也就是说老库升级到带 is_guest 的版本时，这条迁移在 Postgres 上必挂。
+            # 新建库不会走到这里（create_all 建表时列就齐了），所以本机 SQLite 永远测不出来。
+            # `false` 关键字 SQLite 3.23+（2018）起支持，两边都成立。
+            patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT false NOT NULL")
         if "email_verified_at" not in user_columns:
             patches.append("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
 

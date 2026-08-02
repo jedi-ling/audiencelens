@@ -57,7 +57,10 @@ jobs:
           python-version: "3.11"
       - name: Install deps
         run: pip install -r requirements.txt pytest pytest-asyncio
-      - name: Core engine tests (267)
+      # 步骤名不写条数：写死的数字每加一条测试就过期一次，而且没人会因此变红。
+      # 仓库里同一个数字一度有四个互相矛盾的版本（这里、README 徽章、
+      # MAINTENANCE.md、落地页），任何人按其中一个去核对都会以为项目在虚报。
+      - name: Core engine tests
         run: python -m pytest tests/ -q
 
   backend:
@@ -69,8 +72,51 @@ jobs:
           python-version: "3.11"
       - name: Install deps
         run: pip install -r web/backend/requirements.txt pytest pytest-asyncio
-      - name: Backend tests (173)
+      - name: Backend tests
         working-directory: web/backend
+        run: python -m pytest tests/ -q
+
+  # 同一套后端测试再跑一遍，这次连的是**真 PostgreSQL**。
+  #
+  # 为什么必须单开这个作业：生产库是 Postgres（见 web/DEPLOY.md），而开发和
+  # 上面那个 backend 作业用的都是 SQLite。两者的差异恰好会掩盖最贵的一类缺陷：
+  #   · SQLite 默认 PRAGMA foreign_keys=OFF —— 外键违约静默通过，
+  #     到了 Postgres 就是删账号/删评审 500；
+  #   · SQLite 布尔当整数存 —— `is_disabled = 0`、`DEFAULT 0` 这类写法在
+  #     Postgres 上直接报类型错误；
+  #   · SQLite 单条写语句全程持库级写锁 —— 掩盖了 READ COMMITTED 下
+  #     "查余额 + 扣减" 的竞态（CDK 次数会被扣成负数）。
+  # 这几条都真实发生过，且本机怎么跑都是绿的。
+  #
+  # 注意：本地开发机通常没有 Postgres，所以这个作业的首次运行很可能红——
+  # 红出来的是真问题，不要为了让它绿而放宽断言或加跳过。
+  backend-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: al
+          POSTGRES_PASSWORD: al
+          POSTGRES_DB: audiencelens_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U al"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r web/backend/requirements.txt pytest pytest-asyncio
+      - name: Backend tests on PostgreSQL
+        working-directory: web/backend
+        env:
+          # conftest 用 setdefault 读它，所以外部设了就走 Postgres
+          AL_DATABASE_URL: postgresql+psycopg2://al:al@localhost:5432/audiencelens_test
         run: python -m pytest tests/ -q
 
   frontend:
