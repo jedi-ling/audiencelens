@@ -402,3 +402,125 @@ class TestConcurrencySerialization:
         assert cdk_service.try_consume_credit(db, uid) is True
         assert cdk_service.try_consume_credit(db, uid) is False
         assert cdk_service.credit_balance(db, uid) == 0
+
+
+# ---------------------------------------------------------------------------
+# 进程重启收尸（spec 3.2）：_reap_orphans 标 failed 之外必须连计费一起收
+# ---------------------------------------------------------------------------
+
+
+class TestReapOrphansRefunds:
+    """重启时 queued/running 的评审被标 failed，但退款逻辑此前只存在于
+    review_service 的进程内异常分支——进程被重启的那一刻它根本没机会跑。
+    于是用户花钱买的次数凭空消失。这里验证收尸真的退款，且幂等、不误退。"""
+
+    def _seed_orphan(self, db, uid, key_source):
+        """建一条"扣过钱的孤儿"：pending review + queued job（payload 记录谁付的钱）。"""
+        from app.models import Job
+
+        review = Review(
+            user_id=uid,
+            task_type="concept_review",
+            artifact_bundle={"title": "x"},
+            status="pending",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        db.add(
+            Job(
+                kind="review",
+                ref_id=review.id,
+                user_id=uid,
+                status="queued",
+                payload={"key_source": key_source},
+            )
+        )
+        db.commit()
+        return review.id
+
+    def test_server_key_orphan_is_refunded(self, db, credits_mode, clean_ledger):
+        """credits 模式 + server key：入口扣了 1 次，进程重启后必须退回来。"""
+        from app import db as app_db
+        from app.models import Job
+        from app.services import cdk_service, quota_service
+
+        uid = "refund-orphan-srv"
+        db.add(CreditLedger(user_id=uid, delta=1, reason="cdk_redeem"))
+        db.commit()
+        review_id = self._seed_orphan(db, uid, "server")
+
+        # 模拟发起时的入口扣减（真实链路里由 create_review 的 check_quota 做）
+        quota_service.check_quota(db, uid, key_source="server", plan="free")
+        assert cdk_service.credit_balance(db, uid) == 0
+
+        app_db._reap_orphans()
+
+        db.expire_all()
+        assert db.get(Review, review_id).status == "failed"
+        job = db.query(Job).filter(Job.ref_id == review_id).one()
+        assert job.status == "failed"
+        assert cdk_service.credit_balance(db, uid) == 1, "扣了次数但任务孤儿——重启后次数没退回来"
+
+    def test_reap_is_idempotent(self, db, credits_mode, clean_ledger):
+        """同一批孤儿只会被收尸一次；重复启动不能再退一遍（凭空发次数）。"""
+        from app import db as app_db
+        from app.services import cdk_service, quota_service
+
+        uid = "refund-orphan-idem"
+        db.add(CreditLedger(user_id=uid, delta=1, reason="cdk_redeem"))
+        db.commit()
+        review_id = self._seed_orphan(db, uid, "server")
+        quota_service.check_quota(db, uid, key_source="server", plan="free")
+
+        app_db._reap_orphans()
+        assert cdk_service.credit_balance(db, uid) == 1
+        # 第二次启动：评审已经是 failed，不在收尸范围，退款也不该再发生
+        app_db._reap_orphans()
+        assert cdk_service.credit_balance(db, uid) == 1
+
+    def test_byok_orphan_is_not_refunded(self, db, credits_mode, clean_ledger):
+        """BYOK 从来不扣次数，退了就是凭空发次数。"""
+        from app import db as app_db
+        from app.services import cdk_service
+
+        uid = "refund-orphan-byok"
+        db.add(CreditLedger(user_id=uid, delta=2, reason="cdk_redeem"))
+        db.commit()
+        self._seed_orphan(db, uid, "byok")
+
+        app_db._reap_orphans()
+
+        assert cdk_service.credit_balance(db, uid) == 2
+
+    def test_plan_mode_orphan_releases_the_reserved_slot(self, db, monkeypatch, clean_ledger):
+        """plan 模式的日名额是入口占位（review_pending）。评审没跑成，占位
+        必须在收尸时还回去，否则用户被自己失败的评审挡到 TTL 过期。"""
+        from app import db as app_db
+        from app.models import UsageRecord
+        from app.services import quota_service
+
+        monkeypatch.setattr(settings, "quota_enabled", True)
+        monkeypatch.setattr(settings, "quota_mode", "plan")
+        monkeypatch.setattr(settings, "quota_free_reviews_per_day", 1)
+        uid = "refund-orphan-plan"
+        review_id = self._seed_orphan(db, uid, "server")
+        quota_service.check_quota(db, uid, key_source="server", plan="free")
+        assert (
+            db.query(UsageRecord)
+            .filter(UsageRecord.user_id == uid, UsageRecord.kind == "review_pending")
+            .count()
+            == 1
+        )
+
+        app_db._reap_orphans()
+
+        db.expire_all()
+        assert (
+            db.query(UsageRecord)
+            .filter(UsageRecord.user_id == uid, UsageRecord.kind == "review_pending")
+            .count()
+            == 0
+        ), "收尸没有释放日配额占位——用户被自己失败的评审挡在门外"
+        # 占位释放后名额恢复，还能再发起一次
+        quota_service.check_quota(db, uid, key_source="server", plan="free")

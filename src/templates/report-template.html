@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -277,7 +277,7 @@
   </div>
 
   <!-- Validation Badge -->
-  {% if validation %}
+  {% if validation and validation.harness_score is defined %}
   <div class="summary-hud">
     <div class="hud-card harness">
       <div class="hud-label">Harness 评分</div>

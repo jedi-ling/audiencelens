@@ -863,7 +863,11 @@ def estimate_cost_detailed(
     需要如实标注成本可信度的地方（后台面板、成本闸的告警文案）用这个。
     """
     if budget_config is None:
-        with open("src/config/budget.yaml", "r", encoding="utf-8") as f:
+        # 相对路径 "src/config/budget.yaml" 只对"恰好在仓库根目录启动"的进程有效——
+        # 从别的 cwd 调 estimate_cost_detailed（后台面板、调度脚本、测试）就 FileNotFoundError。
+        # 基于 __file__ 推导：src/runner/persona_agent.py → 仓库根 → src/config/budget.yaml。
+        _base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        with open(os.path.join(_base, "src", "config", "budget.yaml"), "r", encoding="utf-8") as f:
             budget_config = yaml.safe_load(f)
 
     input_price, output_price, priced = resolve_model_pricing(model, budget_config)

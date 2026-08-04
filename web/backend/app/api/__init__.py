@@ -588,10 +588,23 @@ async def extract_materials(
     if safe_name != filename:
         raise HTTPException(status_code=400, detail="文件名包含非法路径字符")
 
-    content = await file.read()
-
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=400, detail=f"文件大小超过限制（最大 {MAX_UPLOAD_SIZE // (1024 * 1024)}MB）")
+    # 分块读取：先整段 read() 再查大小，等于把一个超限文件整个吸进内存后才
+    # 拒绝——大小检查形同虚设，一个超大请求体就能打爆进程内存。读满即中断，
+    # 与 v2 /api/uploads 的 _read_capped 同一套做法。
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"文件大小超过限制（最大 {MAX_UPLOAD_SIZE // (1024 * 1024)}MB）",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
 
     safe_filename = str(uuid.uuid4()) + ext
     text = _extract_text_from_file(content, ext)

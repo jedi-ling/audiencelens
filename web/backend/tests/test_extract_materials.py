@@ -146,3 +146,30 @@ class TestPlainTextUnaffected:
             files={"file": ("virus.exe", b"MZ", "application/octet-stream")},
         )
         assert r.status_code == 400
+
+
+class TestOversizeRejected:
+    def test_oversize_file_rejected_while_reading(self, client):
+        """超过上限的文件必须被拒（spec 3.6）：先整段 read() 再查大小会把
+        超限请求体整个吸进内存，大小检查形同虚设——这里读满即中断。"""
+        from app.api import MAX_UPLOAD_SIZE
+
+        big = b"x" * (MAX_UPLOAD_SIZE + 1)
+        r = client.post(
+            "/api/extract-materials",
+            data={"task_type": "concept_review"},
+            files={"file": ("huge.txt", big, "text/plain")},
+        )
+        assert r.status_code == 413
+        assert "超过限制" in r.json()["detail"]
+
+    def test_just_under_limit_still_works(self, client):
+        from app.api import MAX_UPLOAD_SIZE
+
+        ok = ("内容" * 100).encode("utf-8")  # 远小于上限
+        r = client.post(
+            "/api/extract-materials",
+            data={"task_type": "concept_review"},
+            files={"file": ("notes.txt", ok, "text/plain")},
+        )
+        assert r.status_code == 200

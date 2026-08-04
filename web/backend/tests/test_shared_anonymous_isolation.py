@@ -32,11 +32,14 @@ def _register(client, email):
 
 # 未登录访客不该读到的个人数据接口。共同点：都按 user_id 过滤，
 # 而共享桶里 user_id 对所有人相等，过滤等于没过滤。
+# /api/usage 曾漏挂 require_isolated_identity——未登录访客能读到全站未登录
+# 用户加起来的用量与成本（spec 3.6）。
 PRIVATE_READ_ENDPOINTS = [
     "/api/ledger/judgments",
     "/api/ledger/hit-rate",
     "/api/ledger/leaderboard",
     "/api/validation/metrics",
+    "/api/usage",
 ]
 
 

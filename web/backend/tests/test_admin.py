@@ -131,6 +131,49 @@ class TestSettingsOverride:
         assert r.json()["cleared"] is False
 
 
+class TestBoolSettingParsing:
+    """bool 档写入解析（spec 3.6）：面板提交 "0"/"false" 时，直接 bool("0")
+    会得 True——"关闭"被存成"开启"，读取时永远读到 True。写入必须与读取
+    路径 `raw == "1"` 的口径严格互逆。"""
+
+    def test_falsy_strings_store_as_false(self, db):
+        from app.services import admin_settings_service
+
+        for raw in ("0", "false", "no", "off", "False", " 0 "):
+            r = admin_settings_service.set_override(db, "quota_enabled", raw)
+            assert r["value"] is False, f"{raw!r} 被存成了 True"
+            assert admin_settings_service.get(db, "quota_enabled", True) is False
+        admin_settings_service.clear_override(db, "quota_enabled")
+
+    def test_truthy_strings_store_as_true(self, db):
+        from app.services import admin_settings_service
+
+        for raw in ("1", "true", "yes", "on"):
+            r = admin_settings_service.set_override(db, "quota_enabled", raw)
+            assert r["value"] is True, f"{raw!r} 被存成了 False"
+            assert admin_settings_service.get(db, "quota_enabled", False) is True
+        admin_settings_service.clear_override(db, "quota_enabled")
+
+    def test_python_bool_still_works(self, db):
+        from app.services import admin_settings_service
+
+        assert admin_settings_service.set_override(db, "quota_enabled", False)["value"] is False
+        assert admin_settings_service.set_override(db, "quota_enabled", True)["value"] is True
+        admin_settings_service.clear_override(db, "quota_enabled")
+
+    def test_via_http_endpoint(self, client, monkeypatch):
+        """面板走 HTTP 传字符串同样成立——不能只修 service 层。"""
+        _enable_admin(monkeypatch)
+        r = client.put(
+            "/api/admin/settings", json={"key": "quota_enabled", "value": "0"}, headers=_headers()
+        )
+        assert r.status_code == 200
+        assert r.json()["value"] is False
+        rows = client.get("/api/admin/settings", headers=_headers()).json()["settings"]
+        row = next(x for x in rows if x["key"] == "quota_enabled")
+        assert row["effective_value"] is False
+
+
 class TestPlatformServerKey:
     def test_initially_not_configured(self, client, monkeypatch):
         _enable_admin(monkeypatch)

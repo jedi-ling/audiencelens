@@ -23,13 +23,13 @@ mcp = FastMCP("audiencelens")
 
 @mcp.tool()
 def list_task_types() -> dict:
-    """列出所有支持的评审任务类型（Steam 页面 / Demo 首玩 / 概念 / 付费 等 10 种）及说明。"""
+    """列出所有支持的评审任务类型（Steam 页面 / Demo 首玩 / 概念 / 付费 / 通用产品 / 创业评审等 14 种）及说明。"""
     return mcp_tools.list_task_types()
 
 
 @mcp.tool()
 def list_persona_packs() -> dict:
-    """列出所有可用的人格包（游戏核心 / 竞技 / 家庭休闲 / 手游 F2P / VR / 无障碍 等 8 个）。"""
+    """列出所有可用的人格包（游戏核心 / 竞技 / 家庭休闲 / 手游 F2P / VR / 无障碍 / 上线合规 等 11 个）。"""
     return mcp_tools.list_persona_packs()
 
 

@@ -515,6 +515,8 @@ def run_single_persona(
     provider: str = "anthropic",
     model_override: Optional[str] = None,
     api_base: Optional[str] = None,
+    retry_settings: dict = None,
+    output_schema: dict = None,
 ) -> dict:
     """api_key 显式传入优先于环境变量——多用户服务端并发跑评审时，
     绝不能靠进程全局的 os.environ 注入 key（会在用户间串 key）。
@@ -523,6 +525,18 @@ def run_single_persona(
     Ollama…），不再只认 Anthropic，见 src/runner/llm_client.py。
     model_override：非 Anthropic 服务商没有"haiku/sonnet/opus"分级概念，必须传一个具体
     模型名；显式传了就优先于人格的 model_hint 分级（用户在 BYOK 里选了具体模型即是本意）。
+
+    retry_settings：budget.yaml 的 retry 段读取结果（_retry_settings）。None = 不重试，
+    与旧行为完全一致（所有既有调用方不受影响）；给出时在**这一层**统一执行最多
+    max_retries 次重试，重试预算只有这一套，覆盖四类失败：
+      transport_error —— chat_completion 抛出的可重试异常（限流/超时/5xx）
+      schema_failure  —— 模型返回无法解析，或输出缺 BLOCKING_SCHEMA_FIELDS 关键字段
+      role_drift      —— validate_output 的角色一致性不过（must_comment_on 覆盖过低等）
+      hallucination   —— validate_output 的证据依据不过（direct 证据在材料里找不到出处）
+    哪几类真的重试由 retry_on 决定。校验结果随返回 dict 带出（validation 键），
+    run_panel 直接复用，不重复校验。
+    output_schema：非 None 时在返回前做三层校验（配合 retry 判定 role_drift /
+    hallucination / schema_failure）；不传则保持"run_panel 统一校验"的旧路径。
     """
     budget_config = config.get("budget", {})
     persona_prompt_path = config.get("persona_prompt_path", "")
@@ -534,7 +548,39 @@ def run_single_persona(
     if api_key is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
 
-    if api_key:
+    if not api_key:
+        output = _build_simulated_output(persona, task_type)
+        return {
+            "persona_id": persona["id"],
+            "output": output,
+            "prompt": prompt,
+            "model": model,
+            "cost": 0.0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "error": None,
+            "retries": 0,
+            "retry_reasons": [],
+        }
+
+    retry = retry_settings or {
+        "max_retries": 0,
+        "retry_on": [],
+        "backoff_base_seconds": 1.0,
+        "unknown_retry_on": [],
+    }
+    max_attempts = int(retry.get("max_retries", 0)) + 1
+    retry_on = set(retry.get("retry_on") or [])
+    backoff = float(retry.get("backoff_base_seconds") or 1.0)
+    retry_reasons = []
+
+    # 重试过的人格的账要照实记：每次失败重试都真花了钱，最终返回值里的
+    # cost/tokens 是**所有尝试的累计**，不能只记最后一次（那是计费漏洞）。
+    total_cost = 0.0
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    for attempt in range(max_attempts):
         try:
             raw_output, input_tokens, output_tokens = chat_completion(
                 model=model,
@@ -544,6 +590,9 @@ def run_single_persona(
                 api_base=api_base,
             )
             cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
+            total_cost += cost
+            total_input_tokens += input_tokens
+            total_output_tokens += output_tokens
             output = normalize_persona_output(parse_persona_output(raw_output))
 
             # 解析失败 = 这位人格**没有**交出可用意见，必须当失败处理。
@@ -559,6 +608,10 @@ def run_single_persona(
             # 触发面并不小：max_tokens 截断就足以让花括号不配对，人格 schema 又很大；
             # 第三方 BYOK 模型不守 JSON 格式更是常态。
             if isinstance(output, dict) and output.get("parse_error"):
+                if RETRY_SCHEMA in retry_on and attempt < max_attempts - 1:
+                    retry_reasons.append(RETRY_SCHEMA)
+                    _backoff_sleep(attempt, backoff)
+                    continue
                 snippet = str(output.get("raw_output") or "")[:200]
                 return {
                     "persona_id": persona["id"],
@@ -566,10 +619,12 @@ def run_single_persona(
                     "prompt": prompt,
                     "model": model,
                     # 成本照记：这次调用的钱是真花掉了，失败不等于免费
-                    "cost": cost,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
+                    "cost": total_cost,
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
                     "error": f"模型返回无法解析为评审结果（可能被截断或不是 JSON）：{snippet}",
+                    "retries": attempt,
+                    "retry_reasons": retry_reasons,
                 }
 
             # 身份不靠模型回填：聚合器要 output 里带 persona_id/persona_name，但不同模型
@@ -582,40 +637,52 @@ def run_single_persona(
                 # 聚合器对 primary_stance 是硬取值——模型偶尔漏这个字段就会让整份
                 # 报告 KeyError 作废。缺了就按"观望"兜底（各任务 stance_enum 的通用中立项）。
                 output.setdefault("primary_stance", "观望")
+
+            validation = None
+            if output_schema is not None:
+                validation = validate_output(output, persona, output_schema, artifact_texts)
+                reason = _validation_failure_reason(validation)
+                if reason is not None and reason in retry_on and attempt < max_attempts - 1:
+                    retry_reasons.append(reason)
+                    _backoff_sleep(attempt, backoff)
+                    continue
+
             return {
                 "persona_id": persona["id"],
                 "output": output,
                 "prompt": prompt,
                 "model": model,
-                "cost": cost,
+                "cost": total_cost,
                 # 真实 token 计数（来自各 provider 的 usage 字段），供上层汇总/落库
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
                 "error": None,
+                "validation": validation,
+                "retries": attempt,
+                "retry_reasons": retry_reasons,
             }
         except Exception as e:
+            # 传输层错误按"是否可重试"分类（限流/超时/5xx vs 401/余额不足这类死错），
+            # retry_on 里开了 transport_error 且次数没用完才重试；死错一次就返回，
+            # 不把"key 配错了"这种该立刻报的错误拖成 N 次重试后才报。
+            retryable = is_retryable_error(e)
+            if retryable and RETRY_TRANSPORT in retry_on and attempt < max_attempts - 1:
+                retry_reasons.append(RETRY_TRANSPORT)
+                _backoff_sleep(attempt, backoff)
+                continue
             return {
                 "persona_id": persona["id"],
                 "output": None,
                 "prompt": prompt,
                 "model": model,
-                "cost": 0.0,
-                "input_tokens": 0,
-                "output_tokens": 0,
+                "cost": total_cost,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
                 "error": str(e),
+                "error_retryable": retryable,
+                "retries": attempt,
+                "retry_reasons": retry_reasons,
             }
-    else:
-        output = _build_simulated_output(persona, task_type)
-        return {
-            "persona_id": persona["id"],
-            "output": output,
-            "prompt": prompt,
-            "model": model,
-            "cost": 0.0,
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "error": None,
-        }
 
 
 def run_panel(
@@ -705,11 +772,18 @@ def run_panel(
     rules = load_aggregation_rules(rules_path)
     output_schema = load_schema(output_schema_path)
 
+    # budget.yaml 的 retry 段在这里读一次，随人格调用传下去（2.3）：
+    # 配置缺失时 _retry_settings 退回"不重试"，不会改变任何既有调用方的行为。
+    retry_settings = _retry_settings(budget_config)
+
     # 材料形态统一：对话链路（/ask）发的是 {type:'text', text:内容}，Wizard 发的是
     # {type:字段名, description:内容}。引擎的模板/证据抽取全按 description 读——不统一
     # 的话对话评审的正文（在 text 键里）根本到不了人格手上，人格拿到空材料。
     # 这里把 text 补进 description（已有 description 的 Wizard 材料原样不动），
     # 图片材料（image_data）不碰，交给 render_prompt 走多模态。
+    # 动手前先深拷贝：往下会改写 material dict（补 description），就地改调用方
+    # 传进来的 bundle 会污染它的对象——调用方可能还要拿原 bundle 干别的事。
+    artifact_bundle = copy.deepcopy(artifact_bundle)
     _materials = artifact_bundle.get("materials", []) or []
     for _m in _materials:
         if _m.get("type") != "image" and not _m.get("description") and _m.get("text"):
@@ -765,6 +839,8 @@ def run_panel(
             provider=provider,
             model_override=model_override,
             api_base=api_base,
+            retry_settings=retry_settings,
+            output_schema=output_schema,
         )
         if progress_callback is not None:
             with progress_lock:
@@ -789,14 +865,41 @@ def run_panel(
     failed_personas = []
     for r in persona_results:
         if r["output"] is not None:
-            validation = validate_output(
-                r["output"],
-                next((p for p in valid_personas if p["id"] == r["persona_id"]), {}),
-                output_schema,
-                artifact_texts,
-            )
-            r["validation"] = validation
-            persona_outputs.append(r["output"])
+            # run_single_persona 传入 output_schema 时已做过校验（含重试判定），
+            # 结果随返回 dict 带出，这里直接复用；旧调用方没传 schema 时照旧补校验。
+            validation = r.get("validation")
+            if validation is None:
+                validation = validate_output(
+                    r["output"],
+                    next((p for p in valid_personas if p["id"] == r["persona_id"]), {}),
+                    output_schema,
+                    artifact_texts,
+                )
+                r["validation"] = validation
+
+            # 模拟占位输出（meta.is_simulated）不参与门控：它们存在的唯一意义是让
+            # 没有 LLM 的环境里流水线还能跑通——把它们拦在门外，模拟模式就永远报
+            # "全员失败"，既测不了流水线，也违背 AGENTS.md 对模拟模式的定位。
+            # 真实模式（有 key）下模型吐的正常输出不带这个标记，门控照常生效。
+            if simulated or (r["output"].get("meta") or {}).get("is_simulated"):
+                persona_outputs.append(r["output"])
+                continue
+
+            # 三层校验结果真正参与门控（2.2）：schema 关键字段不合格 / 角色漂移 /
+            # 幻觉率超标的输出**不计入**聚合报告，计入 failed_personas 与 degradation。
+            # 以前 validate_output 的结果只写进 r["validation"] 就原地归档，输出照样
+            # 进聚合——"校验"是一道谁都能绕过去的假门。
+            failure_reason = _validation_failure_reason(validation)
+            if failure_reason is None:
+                persona_outputs.append(r["output"])
+            else:
+                failed_personas.append({
+                    "persona_id": r["persona_id"],
+                    "error": _validation_error_message(validation, failure_reason),
+                    "model": r.get("model", ""),
+                    "failure_reason": failure_reason,
+                    "retries": r.get("retries", 0),
+                })
         else:
             # 失败的人格必须被记下来并透出去：以前这里直接 continue，
             # 每个人格的 error 从头到尾没有一条带出 run_panel。
@@ -896,6 +999,18 @@ def run_panel(
             if degraded
             else ""
         ),
+    }
+
+    # 校验/重试口径进 report 本体：只放在返回值顶层的话，重新打开历史报告就看不到
+    # "这次配了哪些重试、有人因为校验没过被拦下来"了（与 degradation 同一个理由）。
+    # gated_out 与 degradation.failed_personas 里的 failure_reason 一一对应，这里
+    # 单独列一份便于按原因统计。
+    report["validation"] = {
+        "retry": retry_settings,
+        "gated_out": [
+            {"persona_id": f["persona_id"], "failure_reason": f["failure_reason"]}
+            for f in failed_personas if f.get("failure_reason")
+        ],
     }
 
     # 预算刹车同样要进 report 本体：只放返回值顶层的话，重新打开历史报告就看不见
@@ -1048,7 +1163,11 @@ def main():
         args.output_dir, f"{args.task_type}_report.json"
     )
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(result["report"], f, ensure_ascii=False, indent=2)
+        # allow_nan=False：报告里出现 NaN/Infinity 会写出非法 JSON，任何下游
+        # （web 后端、harness-evaluate、用户的 JSON 解析器）都会炸或读不到。
+        # 报告是纯聚合产物（比率都有除零保护），出现 NaN 说明上游算错了，
+        # 当场抛出来比落一份坏文件强。
+        json.dump(result["report"], f, ensure_ascii=False, indent=2, allow_nan=False)
 
     md_path = os.path.join(
         args.output_dir, f"{args.task_type}_report.md"

@@ -97,6 +97,20 @@ def _cast(key: str, raw: str):
     return spec["cast"](raw)
 
 
+def _coerce_bool(value) -> bool:
+    """bool 档写入的解析，与读取路径 _cast 的 `raw == "1"` 口径对称。
+
+    `bool("0") == True` 是个经典坑：面板提交的字符串 "0"/"false"/"no"/"off"
+    直接走 bool() 会把"关闭"存成"开启"，读取时永远读到 True。
+    只有这些字面量算真，其余一律假——与读取侧（存 "1" 才为 True）严格互逆。
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def _to_raw(key: str, value) -> str:
     spec = ADJUSTABLE[key]
     if spec["cast"] is bool:
@@ -132,7 +146,10 @@ def set_override(db: Session, key: str, value) -> dict:
         raise BadRequest(f"未知或不可调整的配置项：{key}")
     spec = ADJUSTABLE[key]
     try:
-        typed = spec["cast"](value)
+        if spec["cast"] is bool:
+            typed = _coerce_bool(value)
+        else:
+            typed = spec["cast"](value)
     except (ValueError, TypeError):
         raise BadRequest(f"{key} 类型应为 {spec['cast'].__name__}")
     _validate(key, typed)

@@ -64,8 +64,10 @@ class TestExpiredTokenIsDistinguishableFromAnonymous:
         assert body["is_anonymous"] is True
         assert body["session_expired"] is False  # 从来没带过令牌，谈不上"过期"
 
-        # 匿名照样能打非个人数据接口（用量摘要是匿名桶自己的）
-        assert client.get("/api/usage").status_code == 200
+        # 匿名照样能打公开接口。注意不能用 /api/usage 当这个探测口：
+        # 用量是"属于你自己的数据"，多租户下未登录访客共用匿名桶，会 401
+        # （spec 3.6，见 test_shared_anonymous_isolation.py）
+        assert client.get("/api/plans").status_code == 200
 
     def test_expired_token_is_reported_not_silently_downgraded(self, client, monkeypatch):
         expired = create_token("whoever", settings.jwt_secret, -1)

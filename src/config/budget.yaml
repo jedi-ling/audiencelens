@@ -23,9 +23,13 @@ model_pricing:
   claude-opus-4-20250514:
     input_per_mtok: 15.0
     output_per_mtok: 75.0
-# 人格评审的重试。**这一段的每个键都有真实读取点**（src/runner/cli.py 的
-# _retry_settings / run_single_persona，以及 llm_client.chat_completion 的
-# max_retries/backoff）——在这里加旋钮之前，先确认代码里真有人读。
+# 人格评审的重试。**这一段的每个键都有真实读取点**：src/runner/cli.py 的
+# _retry_settings 读取并解析它，run_single_persona 拿到解析结果后在同一层统一
+# 执行最多 max_retries 次重试（重试预算只有这一套，覆盖 transport_error /
+# schema_failure / role_drift / hallucination 四类，哪几类重试由 retry_on 决定）。
+# llm_client.chat_completion 的 max_retries/backoff 参数保留给独立调用方，引擎
+# 链路不叠它——传输层重试由 run_single_persona 的循环统一计数，避免两套预算。
+# 在这里加旋钮之前，先确认代码里真有人读。
 #
 # 历史：这一段曾经声称"每位人格最多重试 3 次，遇到 schema_failure / role_drift /
 # hallucination 就重试"，还有一行 alert_on: [low_disagreement, time_drift]，

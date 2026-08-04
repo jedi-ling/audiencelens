@@ -292,3 +292,58 @@ class TestClaimMovesRelatedRecords:
         assert row.user_id == "anonymous"
         db.delete(row)
         db.commit()
+
+
+class TestConcurrentClaim:
+    """两个身份同时认领同一条匿名评审（spec 3.6）：改条件 UPDATE
+    （WHERE user_id = 原匿名值）并按 rowcount 判定成功——后到者的 UPDATE
+    匹配不到行，绝不出现"两个都 claimed"或后到者覆盖先到者的归属。"""
+
+    def test_exactly_one_winner(self, client, db, monkeypatch):
+        import threading
+
+        from app.models import Review
+
+        _enable_auth(monkeypatch)
+        review_id = _anonymous_review(db)
+        token_a = _register(client, "race-a@example.com")
+        token_b = _register(client, "race-b@example.com")
+
+        claimed_counts = []
+
+        def do_claim(token):
+            r = client.post(
+                "/api/auth/me/claim-reviews",
+                json={"review_ids": [review_id]},
+                headers=_headers(token),
+            )
+            claimed_counts.append(r.json()["claimed_count"])
+
+        threads = [
+            threading.Thread(target=do_claim, args=(t,))
+            for t in (token_a, token_b)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert sorted(claimed_counts) == [0, 1], f"并发认领结果异常：{claimed_counts}"
+
+        db.expire_all()
+        row = db.get(Review, review_id)
+        assert row.user_id not in (None, "anonymous"), "评审没被任何身份认领走"
+        # 赢家的评审不再属于匿名桶：输家（另一个身份）打不开它
+        winner = row.user_id
+        loser_token = token_a if winner != _user_id_of(db, token_a) else token_b
+        assert client.get(
+            f"/api/reviews/{review_id}", headers=_headers(loser_token)
+        ).status_code == 404
+
+
+def _user_id_of(db, token):
+    """从 JWT 里解出 user_id（测试辅助，不依赖登录接口）。"""
+    from app.core.security import decode_token
+    from app.config import settings as _s
+
+    return decode_token(token, _s.jwt_secret)["sub"]

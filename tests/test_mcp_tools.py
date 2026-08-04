@@ -96,3 +96,31 @@ class TestRunReviewGuards:
         )
         assert "report" in result
         assert result["simulated"] is True
+
+    def test_mode_passed_through_to_run_panel(self, monkeypatch):
+        """MCP 校验完 mode 的合法性就必须真的传给 run_panel——以前校验完就丢了，
+        run_panel 收到 None 走全量流程：quick 模式实际按最贵的档在跑（2.4）。
+        参照 web/backend/tests/test_chat_features.py::test_mode_passed_through_to_run_panel
+        的写法：拦截 run_panel 断言它收到的参数。"""
+        captured = {}
+
+        def fake_run_panel(**kwargs):
+            captured.update(kwargs)
+            return {
+                "report": {},
+                "calibration": None,
+                "cost_summary": {},
+                "simulated": True,
+            }
+
+        monkeypatch.setattr(mcp_tools.runner_cli, "run_panel", fake_run_panel)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        result = mcp_tools.run_synthetic_review(
+            "concept_review", "某游戏核心循环材料", mode="quick", allow_simulation=True
+        )
+        assert "error" not in result, result
+        assert captured.get("mode") == "quick", (
+            "mode 没有传到 run_panel —— MCP 客户端选 quick 想省钱，实际按全量档在跑"
+        )
+        assert captured.get("task_type") == "concept_review"

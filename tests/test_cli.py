@@ -517,7 +517,12 @@ def _llm_json(
     """一份能通过 parse/normalize 的最小合法人格输出，用来伪造 LLM 返回。
 
     persona_name / why_it_matters 可覆盖：交叉质询的匿名化测试要让论据正文里
-    真的嵌着人格名，才能验证它到了提示词里已被洗掉。"""
+    真的嵌着人格名，才能验证它到了提示词里已被洗掉。
+
+    evidence content 必须是 _rich_bundle 材料文本的子串（"核心循环说明 的占位材料"）：
+    校验接入门控（2.2）之后，direct 证据在材料里找不到出处的输出会被拦下、
+    进不了 persona_outputs——这些测试测的是交叉质询/降级口径，不是幻觉检测，
+    伪造输出必须本身就是"合法"的才能测别的。"""
     return json.dumps(
         {
             "persona_id": persona_id,
@@ -527,7 +532,7 @@ def _llm_json(
             "primary_stance": "观望",
             "confidence": 0.6,
             "evidence_sufficiency": 0.7,
-            "evidence": [{"content": "核心循环写得比较清楚", "inference_level": "direct"}],
+            "evidence": [{"content": "核心循环说明", "inference_level": "direct"}],
             "scores": {"base": {"clarity": 3, "trust": 3}, "task_specific": {"overall": 3}},
             "key_issues": [
                 {

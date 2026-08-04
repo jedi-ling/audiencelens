@@ -241,3 +241,32 @@ class TestWebSocketOwnership:
             with client.websocket_connect("/ws/review/no-such-id"):
                 pass
         assert exc.value.code == 4404
+
+
+class TestConcurrentRegisterSameEmail:
+    """并发注册同邮箱（spec 3.6）：预检只挡顺序请求，并发时两个请求都能通过
+    预检，靠 users.email 唯一约束兜底。不捕获 IntegrityError 就是 500——
+    而"这个邮箱注册过"是一个业务结果，应该和预检拦截返回同一个 400。"""
+
+    def test_duplicate_email_never_500s(self, client, monkeypatch):
+        _enable_auth(monkeypatch)
+        import threading
+
+        results = []
+
+        def do_register():
+            r = client.post(
+                "/api/auth/register",
+                json={"email": "race@example.com", "password": "password123"},
+            )
+            results.append(r.status_code)
+
+        threads = [threading.Thread(target=do_register) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert 200 in results, f"两个并发注册都失败了：{results}"
+        assert 500 not in results, f"并发注册同邮箱出现 500：{results}"
+        assert all(code in (200, 400) for code in results), results
