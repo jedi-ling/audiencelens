@@ -58,8 +58,8 @@ Behavior must be grounded in motivation, domain knowledge, patience, platform ha
 Open source edition = full control.  
 Shuoji hosted edition = lower friction, managed model calls, visual reports, report history, version comparison, private/public sharing, advanced player panels.
 
-Platform feature name: **朔纪 AI 玩家评审团**  
-Powered by AudienceLens · 朔纪团队出品
+Platform feature name: **熵呓 AI 玩家评审团**  
+Powered by AudienceLens · 熵呓工作室出品
 
 ## Disclaimer
 

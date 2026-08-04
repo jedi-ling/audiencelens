@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
-[![Tests](https://img.shields.io/badge/Tests-750+-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-1655-success.svg)](tests/)
 
 **基于合成人格的多代理交叉质询评审系统 · Python CLI + FastAPI + React**
 
@@ -359,10 +359,9 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**756 automated tests pass, 1 skipped** — 453 engine (`tests/`) + 303 platform
-(`web/backend/tests/`), measured 2026-07. The counts move with development; run the
-two commands above rather than trusting this number. The 1 skipped test is skipped,
-not passing — it is counted separately on purpose.
+**1655 tests collected** — covering the engine (`tests/`), platform
+(`web/backend/tests/`), and admin frontend. The counts move with development; run the
+commands above rather than trusting this number.
 
 ---
 
@@ -725,7 +724,7 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**756 项自动化测试通过、1 项 skipped** —— 引擎 453（`tests/`）+ 平台 303（`web/backend/tests/`），2026-07 实测。这个数字会随开发变动，请以上面两条命令的实际输出为准。那 1 项是 **skipped，不是通过**，所以单独列出、不并进"全绿"。
+**1655 项测试 collected** —— 覆盖引擎（`tests/`）+ 平台（`web/backend/tests/`）+ admin 前端，2026-08 实测。这个数字会随开发变动，请以上面命令的实际输出为准。
 
 ---
 
@@ -759,4 +758,4 @@ MIT License — 详见 [LICENSE](LICENSE)
 
 ---
 
-## 朔纪团队出品
+## Made by 熵呓工作室

@@ -26,6 +26,6 @@ The Shuoji hosted version is for creators who want one-click reviews without env
 
 Platform feature name:
 
-**朔纪 AI 玩家评审团**
+**熵呓 AI 玩家评审团**
 
-Powered by AudienceLens · 朔纪团队出品
+Powered by AudienceLens · 熵呓工作室出品

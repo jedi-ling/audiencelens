@@ -1,6 +1,6 @@
 # AudienceLens 路线图
 
-> 最后更新：2026-08-03（✅ 条目均已对照仓库代码与 git 历史核实，标注实际完成 commit；🔲 条目经核实未实现）
+> 最后更新：2026-08-03（✅ 条目均已对照仓库代码与 git 历史核实，标注实际完成 commit；🔲 条目经核实未实现；部分条目经二次勘误修正）
 
 ## v0.1 — Skill Pack
 
@@ -27,7 +27,7 @@
 
 ## v0.2.1 — Enhanced Cross-Examination
 
-- ✅ 75 个 Persona（50 游戏 + 20 产品 + 5 红队）
+- ✅ 72 个 Persona（11 个 YAML Pack，51 游戏向 + 5 上线合规 + 8 通用消费 + 8 创业评审；红队人格包不存在，"red team" 是技能提示）
 - ✅ 交叉质询增强版（结构化论证 + 立场更新机制 + 收敛判定）
 - ✅ 跨技能质询适配（synthetic-playtest / audience-panel / red-team-audience）
 - ✅ 一致性验证工具（tools/parity_check.py）
@@ -57,11 +57,11 @@ MCP server 整体已落地（commit 882f8f8）：`audiencelens-mcp` 入口 + Fas
 
 ## v1.0 — Hosted Integration
 
-- 🔲 朔纪平台集成（代码中仅保留"朔纪团队出品"署名，无平台对接实现）
+- 🔲 平台集成（代码中无平台对接实现；署名已统一为"熵呓工作室"）
 - ✅ 积分系统（web/backend：plan_service 套餐 + cdk_service CDK 兑换 + ledger_service 账本 + quota_service 配额计费，前端 PlansPage / LedgerPage；CDK 兑换实际已在 commit 9ced26e 完成，套餐实际已在 commit a838286 完成）
 - ✅ 可视化报告（web/frontend ReportPage / ReviewProgressPage / EvaluationPage；评审卡片美化与完整报告弹窗化实际已在 commit 70610ef / 3113e45 完成）
 - 🔲 版本对比（前端无版本对比功能，ReportPage 中"对比"仅指配色对比度）
-- ✅ 真实玩家反馈对照（tools/benchmark_compare.py 合成评审 vs 真人研究参考样本对照 + benchmark-suite 跨案例基准，实际已在 commit 10a18ec 完成）
+- 🟡 真实玩家反馈对照（工具链已就绪：tools/benchmark_compare.py 三方盲测；但真人对照数据为 0，尚未跑出任何实证结果）
 - ✅ 无障碍专项 persona pack（4-6个）（src/personas/accessibility.yaml，4 个：P17 色弱 / P18 认知负担 / P19 运动障碍 / P20 听觉障碍，实际已在 commit 1c16db9 完成）
 - 🔲 Big-Five 替代 MBTI（persona-schema.json 仍为 mbti 字段，仅有伦理使用说明 mbti_usage，无 Big-Five 字段）
 - ✅ 动态面板生成算法（src/runner/panel_selector.py：select_panel + 行为距离 compute_behavioral_distance + 多样性保证 ensure_diversity + 亲和度打分 _pick_by_affinity，实际已在 commit 1c16db9 完成、9a90599 升级）
