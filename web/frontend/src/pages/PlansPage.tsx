@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, Check, CheckCircle2, Info, KeyRound, Loader2, Mail, Ticket, XCircle } from 'lucide-react'
-import { api, setToken } from '@/lib/apiClient'
+import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import { useSessionStore } from '@/store/session-store'
 import type { Plan, UsageSummary } from '@/lib/types'
@@ -89,6 +89,11 @@ export default function PlansPage() {
         // 匿名兑换时后端会签发游客身份 token。不存下来，这次充的次数就跟着
         // 请求一起丢了（下一次请求又变回全站共享的 anonymous 桶）。
         setToken(result.token)
+        // 身份从共享的 "anonymous" 变成独立游客 id，之前匿名跑的评审在所有读取
+        // 路由上立刻 404（后端按 user_id 精确比对归属）。不认领的话，用户兑换完
+        // 回头找刚才那份报告会发现"评审不存在"——与登录/注册路径同一处理。
+        // 认领失败不该反噬兑换本身，所以吞掉异常但只吞这一处。
+        await claimPendingReviews().catch(() => {})
         await bootstrap() // 顶栏和全站 identity 要跟上新身份
       }
       setCdkSuccess({

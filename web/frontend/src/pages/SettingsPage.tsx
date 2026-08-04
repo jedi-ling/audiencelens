@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
-import { api, setToken } from '@/lib/apiClient'
+import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
 import { useSessionStore } from '@/store/session-store'
 import type { KeyStatus, UsageSummary, TestConnectionResult } from '@/lib/types'
 import { OPENAI_COMPATIBLE_PRESETS } from '@/lib/types'
@@ -220,7 +220,14 @@ export default function SettingsPage() {
     try {
       const result = await api.redeemCdk(cdkCode.trim())
       // 匿名兑换会拿到游客身份 token——必须存下来，次数才跟着这个浏览器走
-      if (result.token) setToken(result.token)
+      if (result.token) {
+        setToken(result.token)
+        // 换身份 = 之前匿名跑的评审全部 404。后端归属校验是 user_id 精确比对，
+        // 这个浏览器刚从 "anonymous" 变成独立游客 id，不认领的话用户上一秒还能
+        // 打开的报告下一秒就"不存在"了。与登录/注册路径（session-store）同一处理。
+        // 认领失败不该反噬兑换本身：兑换已经成功，这里只是补救。
+        await claimPendingReviews().catch(() => {})
+      }
       setCdkSuccess({
         granted: result.credits_granted,
         balance: result.balance,

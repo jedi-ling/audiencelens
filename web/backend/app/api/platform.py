@@ -3,19 +3,23 @@
 这些是"预埋线"的对外出口。原有 /api 业务路由（personas、task-types 等）不受影响。
 """
 
+import ipaddress
 import os
 import re
+import socket
 import uuid
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from datetime import datetime, timezone
 
 from app.config import settings
-from app.core.errors import BadRequest, NotFound, Unauthorized
+from app.core.errors import AppError, BadRequest, NotFound, Unauthorized
 from app.core.logging import logger
 from app.core.security import create_token, hash_password, verify_password
 from app.db import get_db
@@ -29,7 +33,7 @@ from app.deps import (
     resolve_llm_key,
     revoke_user_sessions,
 )
-from app.models import Review, User
+from app.models import Job, Review, User
 from app.services import (
     intent_service,
     job_service,
@@ -93,7 +97,14 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
         display_name=body.display_name or email.split("@")[0],
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 上面的预检只挡顺序请求；并发注册同邮箱时两个请求都能通过预检，
+        # 靠 users.email 的唯一约束兜底。不捕获的话这里就是 500——
+        # 而"这个邮箱注册过"是一个业务结果，应该和预检拦截返回同一个 400。
+        db.rollback()
+        raise BadRequest("该邮箱不可用，请更换邮箱；若已有账号请直接登录")
     db.refresh(user)
     await _send_verify_email(db, user)  # 失败不抛，注册本身不受影响
     token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
@@ -367,8 +378,19 @@ async def claim_reviews(
     for review in rows:
         if review.user_id and review.user_id != anon:
             continue  # 已属于某个真实账号 —— 拒绝，不做转移
-        review.user_id = identity.user_id
-        claimed.append(review.id)
+        # 条件 UPDATE：只有"此刻仍归属匿名桶/无主"的行才改挂。并发认领时
+        # 后到者的 UPDATE 匹配不到行（rowcount=0），绝不覆盖先到者的归属——
+        # 无条件赋值是"谁先读谁赢"（读到旧值覆盖新值），这里是"谁先写谁赢"。
+        updated = (
+            db.query(Review)
+            .filter(
+                Review.id == review.id,
+                or_(Review.user_id.is_(None), Review.user_id == anon),
+            )
+            .update({"user_id": identity.user_id}, synchronize_session=False)
+        )
+        if updated == 1:
+            claimed.append(review.id)
 
     if claimed:
         for model in (Judgment, ReviewFeedback):
@@ -435,6 +457,105 @@ async def delete_my_account(
 
 
 # ============================== BYOK Key（埋线）==============================
+
+# ---------- api_base 的 SSRF 防线 ----------
+#
+# api_base 是**请求方完全可控**的字符串，会被原样拼成 URL 由服务器发出去
+# （src/runner/llm_client.py：`url = api_base.rstrip("/") + "/chat/completions"`），
+# 失败时的报错还会把目标响应正文的前 300 字符回显给调用方。也就是说：
+# 不设防的话，任何人都能把这台后端当成打内网的跳板，并读回响应片段——
+# 云上最典型的目标是 169.254.169.254（实例元数据，能读出临时凭证）。
+#
+# 判定边界（写清楚，免得下一个人以为可以放宽）：
+#   拒绝  非 http/https 的协议；解析不出主机名/端口非法的地址；
+#         主机名解析出的**任何**一个 IP 落在环回 / 私有网段 / 链路本地
+#         （含 169.254.169.254）/ 组播 / 保留段 / 0.0.0.0 上。
+#         IPv4-mapped IPv6（::ffff:127.0.0.1 这种绕法）由 is_private 一并覆盖。
+#   放行  公网地址。BYOK 用户自建的 Ollama/中转只要挂在公网 IP 或公网域名上
+#         就完全不受影响——这条防线拦的是"指回内网"，不是"不是大厂域名"。
+#
+# 什么时候允许私网地址：只有「单机自建形态」——AL_AUTH_ENABLED=false（这台
+# 机器就一个使用者，不存在"别人的访客"）且 looks_like_production=False
+# （CORS/公开地址都还指着 localhost，没在对公网提供服务）。这一档下
+# http://localhost:11434/v1（llm_client 里的 Ollama 预设）必须继续可用，
+# 否则等于把自建用户的本地模型这条路直接砍掉。任何一个条件不成立，
+# 就按多租户对待，私网一律拒绝。
+#
+# 已知残留风险（不假装它不存在）：这里解析一次、httpx 发请求时再解析一次，
+# 中间存在 DNS rebinding 的时间窗。堵死它需要把校验通过的 IP 钉进 httpx 的
+# transport，涉及 src/runner/llm_client.py（不属于本次改动范围）。
+_ALLOWED_API_BASE_SCHEMES = ("http", "https")
+
+
+def _private_api_base_allowed() -> bool:
+    """当前形态下允不允许把请求指向私网/环回地址。"""
+    return not settings.auth_enabled and not settings.looks_like_production
+
+
+def _is_internal_ip(ip) -> bool:
+    return (
+        ip.is_loopback
+        or ip.is_private          # 含 10/8、172.16/12、192.168/16、fc00::/7、::ffff:0:0/96
+        or ip.is_link_local       # 含 169.254.0.0/16（云元数据地址就在这里）
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified      # 0.0.0.0 / ::
+    )
+
+
+def assert_api_base_is_safe(api_base: Optional[str]) -> None:
+    """api_base 指向内网就抛 BadRequest。**必须在发请求之前调**。
+
+    事后过滤响应没有意义：请求一旦发出去，探测这件事本身就已经完成了
+    （端口开没开、响应多快、返回什么状态码，全都是情报）。
+    """
+    raw = (api_base or "").strip()
+    if not raw:
+        return  # 留空 = 用服务商官方地址，没有可被操纵的目标
+
+    parsed = urlparse(raw)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in _ALLOWED_API_BASE_SCHEMES:
+        raise BadRequest("api_base 必须以 http:// 或 https:// 开头")
+    host = (parsed.hostname or "").strip()
+    if not host:
+        raise BadRequest("api_base 里解析不出主机名")
+    try:
+        port = parsed.port or (443 if scheme == "https" else 80)
+    except ValueError:
+        raise BadRequest("api_base 的端口不合法")
+
+    if _private_api_base_allowed():
+        return
+
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        # 解析不了的主机名本来也发不出请求，在这里挡掉顺带避免把 DNS 失败
+        # 变成一次真实外发尝试。
+        raise BadRequest(f"api_base 的主机名无法解析：{host}")
+
+    for info in infos:
+        addr = str(info[4][0]).split("%")[0]  # 去掉 IPv6 的 zone id（fe80::1%eth0）
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            raise BadRequest(f"api_base 解析出的地址无法识别：{addr}")
+        if _is_internal_ip(ip):
+            raise BadRequest(
+                f"api_base 指向内网地址（{host} → {addr}），已拒绝。"
+                "服务端不会替调用方访问环回/私有/链路本地地址；"
+                "自建端点请填写公网可达的地址。"
+            )
+
+
+async def _assert_api_base_is_safe_off_loop(api_base: Optional[str]) -> None:
+    """在线程池里做校验：getaddrinfo 是同步阻塞调用，没有超时参数，
+    一个慢 DNS 就能把整个事件循环卡住（全站所有请求一起等）。"""
+    from starlette.concurrency import run_in_threadpool
+
+    await run_in_threadpool(assert_api_base_is_safe, api_base)
+
 
 class SaveKeyRequest(BaseModel):
     api_key: str
@@ -504,6 +625,10 @@ async def save_key(
     # API Key 是最不该落进共享桶的东西：存进去等于把自己的付费凭据交给
     # 所有未登录访客——他们能用它跑评审花钱，也能顺手删掉。
     require_isolated_identity(identity)
+    # 存下来的 api_base 之后每次评审/意图解析/追问都会被服务器拿去发请求
+    # （key_service.resolve_key 一路透传到 llm_client）。只在 /keys/test 上设防
+    # 等于只堵了一个入口——存进来再由评审链路发出去是同一个 SSRF，必须一起挡。
+    await _assert_api_base_is_safe_off_loop(body.api_base)
     try:
         row = key_service.save_user_key(
             db, identity.user_id, body.api_key, body.provider, model=body.model, api_base=body.api_base
@@ -524,13 +649,22 @@ async def test_key(
 
     不传 api_key 时测"当前已保存"的那把 key，方便"保存后再测一次"的场景。
     """
+    # 身份要求提到最前面，不再只在「测已保存的那把」分支里要。
+    # 理由：这个端点会让**服务器**按调用方给的地址发一次真实请求，并把结果
+    # （含失败时目标响应正文的前 300 字符）回显。自带 api_key 一样能驱动它，
+    # 所以此前"带了 key 就不需要任何身份"等于给未认证访客开了一个出网探针。
+    # 代价可控：单机开源形态（AL_AUTH_ENABLED=false）下这一句是空操作，
+    # 只有多租户形态才要求先登录——那正是"未登录访客"真实存在的形态。
+    require_isolated_identity(identity)
+    # 拒绝必须发生在发请求之前，见 assert_api_base_is_safe 的说明
+    await _assert_api_base_is_safe_off_loop(body.api_base)
+
     api_key = body.api_key
     model = body.model
     api_base = body.api_base
     if not api_key:
         # 「测已保存的那把」会解密并真的拿去调模型。共享匿名桶里的 key 是别人的，
         # 不挡住等于让任何访客点一下按钮就花别人的钱。传了 api_key 的现填现测不受影响。
-        require_isolated_identity(identity)
         row = key_service.get_user_key_row(db, identity.user_id, body.provider)
         if not row:
             raise BadRequest("没有已保存的 key 可测，请先填写 api_key")
@@ -545,6 +679,11 @@ async def test_key(
 
     if body.provider == "openai_compatible" and not (model or "").strip():
         raise BadRequest("非 Anthropic 服务商必须指定模型名")
+
+    # 再校验一次**最终生效**的那个地址：上面走「测已保存的那把」分支时
+    # api_base 来自库里，可能是在单机形态下存进去的私网地址，而这台实例
+    # 现在已经是多租户/对公网服务了。第一道只看请求体，这道才是最后闸门。
+    await _assert_api_base_is_safe_off_loop(api_base)
 
     effective_model = model or settings.intent_model  # anthropic 档没填模型时用一个已知可用的默认值
 
@@ -799,10 +938,27 @@ async def plans(db: Session = Depends(get_db)):
 async def usage(
     identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
 ):
+    # 用量是"属于你自己"的数据：多租户形态下未登录访客共用同一个匿名桶，
+    # 直接返回会让访客看到**全站所有未登录用户加起来**的用量与成本。
+    # 与 list_judgments / validation_metrics 同一道隔离口径。
+    require_isolated_identity(identity)
     return quota_service.usage_summary(db, identity.user_id, plan=identity.plan)
 
 
 # ============================== 异步评审（v2 链路）==============================
+
+def _valid_persona_packs() -> set:
+    """合法 persona_pack = src/personas/ 下真实存在且非空的人格包。
+
+    与前端 list_packs 同源（PersonaService 直读 src/personas/*.yaml）。
+    拼错的包名此前被静默回落 game-core：用户选 A 包，跑的是 B 包，
+    报告人格与所见不符——这是功能缺陷不是容错，必须在入口显式 400。
+    """
+    from app.services import PersonaService
+
+    packs = PersonaService.load_all_personas()
+    return {pid for pid, personas in packs.items() if personas}
+
 
 class CreateReviewRequest(BaseModel):
     task_type: str
@@ -842,6 +998,11 @@ async def create_review_v2(
         raise BadRequest(f"未知任务类型：{body.task_type}")
     if body.mode not in intent_service.VALID_MODES:
         raise BadRequest(f"未知模式：{body.mode}")
+    # persona_pack 拼错此前静默回落 game-core——用户选 A 包，跑的是 B 包。
+    # 报告的每一条人格都来自 B 包，而用户以为看到的是 A 包的视角。
+    persona_pack = (body.persona_pack or "game-core").strip()
+    if persona_pack not in _valid_persona_packs():
+        raise BadRequest(f"未知人格包：{persona_pack}")
 
     quota_service.check_quota(
         db, identity.user_id, key_source=resolved.source, plan=identity.plan
@@ -859,7 +1020,7 @@ async def create_review_v2(
         task_type=body.task_type,
         target_title=(body.artifact or {}).get("title"),
         artifact_bundle=bundle,
-        persona_pack=body.persona_pack,
+        persona_pack=persona_pack,
         selected_personas=body.selected_personas,
         skill_type=body.skill_type,
         project_key=body.project_key,
@@ -871,15 +1032,50 @@ async def create_review_v2(
     db.commit()
     db.refresh(review)
 
-    job_id = review_service.enqueue_review(
-        review.id,
-        api_key=resolved.key,
-        key_source=resolved.source,
-        user_id=identity.user_id,
-        provider=resolved.provider,
-        model=resolved.model,
-        api_base=resolved.api_base,
-    )
+    try:
+        job_id = review_service.enqueue_review(
+            review.id,
+            api_key=resolved.key,
+            key_source=resolved.source,
+            user_id=identity.user_id,
+            provider=resolved.provider,
+            model=resolved.model,
+            api_base=resolved.api_base,
+        )
+    except Exception as exc:
+        # 落库与入队要么都成、要么都补偿：check_quota 已经扣过配额
+        # （credits 扣 1 次 / plan 占 1 个名额），入队失败不补偿的话，
+        # 就是"review 永久 pending + 用户次数凭空消失"。与后台收尸
+        # （db._settle_reaped_reviews）共用同一套幂等退款原语。
+        try:
+            db.delete(review)
+            db.commit()
+        except Exception:
+            db.rollback()
+            try:
+                review = db.get(Review, review.id)
+                if review:
+                    review.status = "failed"
+                    review.error_message = "评审任务入队失败，已执行计费补偿，请重新发起"
+                    db.commit()
+            except Exception:
+                db.rollback()
+        try:
+            quota_service.refund_review_credit(
+                db, identity.user_id, review.id, key_source=resolved.source
+            )
+            quota_service.release_review_slot(
+                db, identity.user_id, key_source=resolved.source
+            )
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "review %s 入队失败后的计费补偿也失败——用户 %s 的额度可能被吞，需人工核对",
+                review.id,
+                identity.user_id,
+            )
+        # 补偿完成后再报错：5xx 返回给调用方，但钱不能跟着一起丢
+        raise AppError("评审任务入队失败，请稍后重试") from exc
 
     return {
         "review_id": review.id,
@@ -1004,7 +1200,30 @@ async def post_review_chat(
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str):
+async def get_job(
+    job_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """任务状态与进度。归属校验与评审端点同一口径。
+
+    这里以前连 identity 参数都没有，是全后端唯一既无身份也无归属校验的数据接口：
+    知道（或撞对）一个 job_id 就能读到它的 ref_id（= review_id，拿去打评审接口的
+    钥匙）和 error_message（含上游报错原文）。job_id 是 uuid4 不可枚举，
+    但"不可枚举"是运气不是鉴权——review 的 id 同样是 uuid4，那边照样做归属校验。
+
+    仍用 optional_identity 而不是强制登录：匿名也能发起评审（"先体验后注册"），
+    发起后就得能查自己那条任务的进度。归属比对沿用 v2 评审端点那句
+    `(row.user_id or "anonymous") != identity.user_id`——老数据 user_id 为空时
+    归入匿名桶，与 Job.user_id 的默认值一致。
+
+    没有下线这个端点：前端 apiClient 里有 getJob（当前无调用点，但它是公开
+    契约的一部分，docs/ARCHITECTURE.md 也列着），后端测试也用它轮询任务状态。
+    """
+    row = db.get(Job, job_id)
+    # 不存在与不属于你返回同一个 404：与评审端点一致，不向调用方确认某个 id 是否存在
+    if not row or (row.user_id or "anonymous") != identity.user_id:
+        raise NotFound("任务不存在")
     job = job_service.get_job(job_id)
     if not job:
         raise NotFound("任务不存在")

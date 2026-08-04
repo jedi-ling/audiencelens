@@ -16,18 +16,24 @@ AudienceLens — 全栈合成观众评审系统（CLI + FastAPI + React 19）。
 ## 变更校验
 
 ```bash
-# 核心引擎测试（2026-07 实测 394 项）
+# 核心引擎测试
 python -m pytest tests/ -q
 
-# 平台链路测试（2026-07 实测 294 passed + 1 skipped）
+# 平台链路测试
 (cd web/backend && python -m pytest tests/ -q)
 
 # 前端构建（TypeScript 编译 + Vite 打包）
 (cd web/frontend && npm run build)
 
-# 后台面板单测（10 项，Vitest）
+# 后台面板单测（Vitest）
 (cd web/admin && npm run test)
 ```
+
+> 这里刻意不写「应该有几项」。原先三条命令后面各挂着一个实测条数，几周内全部过期，
+> 而没有任何东西会提醒——照着过期基线判断"测试是不是全过了"比不写基线更危险。
+> 判据只有一条：**上面四条命令各自退出码为 0**。
+> 同理，对外材料里的测试数由 `tests/test_public_claims.py` 卡着：每份材料最多写一处，
+> 且必须带统计日期。
 
 ## 伦理
 

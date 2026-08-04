@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
-[![Tests](https://img.shields.io/badge/Tests-1655-success.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-passing-success.svg)](tests/)
 
 **基于合成人格的多代理交叉质询评审系统 · Python CLI + FastAPI + React**
 
@@ -138,10 +138,10 @@ The single source of truth is `src/runner/task_types.py::VALID_TASK_TYPES`; anyt
 
 | Layer | Tech Stack | Key Features |
 |---|---|---|
-| **Backend** | FastAPI + SQLite + WebSocket | 83 route handlers (`grep -c '^@router\.' app/api/*.py`, 2026-07), 6 emitted WebSocket event types, 18 service modules |
-| **Frontend** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 18 pages + landing page, 7 components, 3 Zustand stores |
-| **Services** | 18 modules in `app/services/` (key / quota / job / intent / ledger / CDK / chat / mail / plan / admin-settings / audit-log / auth-token / ethics / evaluation / report-gating / review / user-data / validation), plus `PersonaService` / `ReviewService` / `MaterialExtractor` defined in `services/__init__.py` | Anthropic native SDK + OpenAI-compatible HTTP (OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama presets), stereotype detection, ethics compliance |
-| **Real-time** | WebSocket (6 event types emitted) | Live review progress, persona-by-persona results |
+| **Backend** | FastAPI + SQLite + WebSocket | 85 route handlers (`grep -c '^@router\.' app/api/*.py`), 5 emitted WebSocket event types, 19 service modules |
+| **Frontend** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 20 page components (landing page included), 7 components, 3 Zustand stores |
+| **Services** | 19 modules in `app/services/` (key / quota / job / intent / ledger / CDK / chat / mail / plan / admin-settings / audit-log / auth-token / ethics / evaluation / report-gating / review / user-data / validation / json-safe), plus `PersonaService` / `ReviewService` / `MaterialExtractor` defined in `services/__init__.py` | Anthropic native SDK + OpenAI-compatible HTTP (OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama presets), stereotype detection, ethics compliance |
+| **Real-time** | WebSocket (5 event types emitted) | Live review progress, persona-by-persona results |
 | **Deployment** | Docker Compose | Frontend (Nginx) + Backend (Uvicorn) |
 
 **3 Review Modes** (`MODE_CONFIG` in `src/runner/cli.py`):
@@ -263,7 +263,7 @@ Exposed tools:
 
 | Tool | Purpose |
 |---|---|
-| `list_task_types` | Discover the 10 review task types |
+| `list_task_types` | Discover the 14 review task types |
 | `list_persona_packs` / `list_personas` | Inspect available persona panels |
 | `run_synthetic_review` | Run a full review; `artifact` accepts a file path, JSON string, or raw text |
 
@@ -329,14 +329,14 @@ audiencelens/
 ├── web/
 │   ├── backend/                       # FastAPI backend
 │   │   └── app/
-│   │       ├── api/                   #   83 route handlers (v1 + platform + admin)
-│   │       ├── services/              #   18 service modules
+│   │       ├── api/                   #   85 route handlers (v1 + platform + admin)
+│   │       ├── services/              #   19 service modules
 │   │       ├── models/                #   SQLAlchemy models
 │   │       ├── schemas/               #   Pydantic schemas
-│   │       └── websocket/             #   6 WebSocket event types
+│   │       └── websocket/             #   5 WebSocket event types
 │   └── frontend/                      # React frontend
 │       └── src/
-│           ├── pages/                 #   18 pages + landing page
+│           ├── pages/                 #   20 page components (landing page included)
 │           ├── components/            #   7 components
 │           └── store/                 #   3 Zustand stores
 ├── tests/                             # Engine test suite (see Testing)
@@ -359,9 +359,13 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**1655 tests collected** — covering the engine (`tests/`), platform
-(`web/backend/tests/`), and admin frontend. The counts move with development; run the
-commands above rather than trusting this number.
+Three suites: the engine (`tests/`), the platform (`web/backend/tests/`), and the admin
+frontend (`web/admin`, Vitest). **No test count is written here on purpose.** The number
+that used to sit here was only the engine suite's collected count passed off as the
+repo-wide total — and it went stale on the next commit anyway. A number nobody
+re-measures is worse than no number: run the commands above and read the real one.
+`tests/test_public_claims.py` now fails if a hardcoded, undated test count reappears in
+this file.
 
 ---
 
@@ -519,10 +523,10 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 
 | 层 | 技术栈 | 核心功能 |
 |---|---|---|
-| **后端** | FastAPI + SQLite + WebSocket | 83 个路由处理函数（`grep -c '^@router\.' app/api/*.py`，2026-07 实测）、6 种实际发出的 WebSocket 事件、18 个服务模块 |
-| **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 18 个页面 + 落地页、7 个组件、3 个 Zustand Store |
-| **服务** | `app/services/` 下 18 个模块（密钥 / 配额 / 任务 / 意图 / 留档 / CDK / 对话 / 邮件 / 套餐 / 后台设置 / 审计日志 / 认证令牌 / 伦理 / 评估 / 报告门禁 / 评审 / 用户数据 / 校验），外加定义在 `services/__init__.py` 里的 `PersonaService` / `ReviewService` / `MaterialExtractor` | Anthropic 原生 SDK + OpenAI 兼容 HTTP（OpenAI / DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 预设）、刻板印象检测、伦理合规 |
-| **实时** | WebSocket（实际发出 6 种事件） | 实时评审进度、逐人格结果展示 |
+| **后端** | FastAPI + SQLite + WebSocket | 85 个路由处理函数（`grep -c '^@router\.' app/api/*.py`）、5 种实际发出的 WebSocket 事件、19 个服务模块 |
+| **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 20 个页面组件（含落地页）、7 个组件、3 个 Zustand Store |
+| **服务** | `app/services/` 下 19 个模块（密钥 / 配额 / 任务 / 意图 / 留档 / CDK / 对话 / 邮件 / 套餐 / 后台设置 / 审计日志 / 认证令牌 / 伦理 / 评估 / 报告门禁 / 评审 / 用户数据 / 校验 / JSON 安全序列化），外加定义在 `services/__init__.py` 里的 `PersonaService` / `ReviewService` / `MaterialExtractor` | Anthropic 原生 SDK + OpenAI 兼容 HTTP（OpenAI / DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 预设）、刻板印象检测、伦理合规 |
+| **实时** | WebSocket（实际发出 5 种事件） | 实时评审进度、逐人格结果展示 |
 | **部署** | Docker Compose | 前端(Nginx) + 后端(Uvicorn) |
 
 **3 种评审模式**（`src/runner/cli.py` 的 `MODE_CONFIG`）：
@@ -592,7 +596,7 @@ audiencelens run synthetic-playtest steam_page_review examples/steam-page-sample
 **质量与实验命令：**
 
 ```bash
-# 刻板印象检测评测：30条标注集（离线正则层）
+# 刻板印象检测评测：50 条标注集（离线正则层）
 audiencelens stereotype-eval
 # 加上 LLM 复审层（需 ANTHROPIC_API_KEY）
 audiencelens stereotype-eval --llm
@@ -628,7 +632,7 @@ pip install -e ".[mcp]"
 
 | 工具 | 作用 |
 |---|---|
-| `list_task_types` | 列出 10 种评审任务类型 |
+| `list_task_types` | 列出 14 种评审任务类型 |
 | `list_persona_packs` / `list_personas` | 查看可用的人格面板 |
 | `run_synthetic_review` | 运行完整评审；`artifact` 支持文件路径 / JSON 字符串 / 纯文本 |
 
@@ -694,14 +698,14 @@ audiencelens/
 ├── web/
 │   ├── backend/                       # FastAPI 后端
 │   │   └── app/
-│   │       ├── api/                   #   83个路由处理函数（v1 + 平台 + 后台）
-│   │       ├── services/              #   18个服务模块
+│   │       ├── api/                   #   85个路由处理函数（v1 + 平台 + 后台）
+│   │       ├── services/              #   19个服务模块
 │   │       ├── models/                #   SQLAlchemy模型
 │   │       ├── schemas/               #   Pydantic模型
-│   │       └── websocket/             #   6种WebSocket事件
+│   │       └── websocket/             #   5种WebSocket事件
 │   └── frontend/                      # React 前端
 │       └── src/
-│           ├── pages/                 #   18个页面 + 落地页
+│           ├── pages/                 #   20个页面组件（含落地页）
 │           ├── components/            #   7个组件
 │           └── store/                 #   3个Zustand Store
 ├── tests/                             # 引擎测试套件（见「测试」一节）
@@ -724,7 +728,10 @@ python -m pytest tests/ -q
 cd web/backend && python -m pytest tests/ -q
 ```
 
-**1655 项测试 collected** —— 覆盖引擎（`tests/`）+ 平台（`web/backend/tests/`）+ admin 前端，2026-08 实测。这个数字会随开发变动，请以上面命令的实际输出为准。
+三套测试：引擎（`tests/`）+ 平台（`web/backend/tests/`）+ admin 前端（`web/admin`，Vitest）。
+**这里故意不写测试总数。** 原先摆在这里的那个数其实只是引擎单套件的收集数，被当成了全仓总数；
+而且下一次提交就会过期。没人会去重测的数字比不写更糟——请直接跑上面的命令读真实输出。
+现在 `tests/test_public_claims.py` 会在本文件重新出现「写死且不带统计日期的测试数」时直接失败。
 
 ---
 

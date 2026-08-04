@@ -9,14 +9,20 @@
 对外材料里的数字用正则捞出来逐个比对，对不上就红。落地页正文写着
 「每一项都能在开源仓库里核对」——那这条核对就该是自动的。
 
-三类检查，缺一不可：
-  1. test_public_materials_persona_counts_match_repo —— 材料里的数字 == 仓库真实数字
-  2. test_每类断言在材料里至少出现一次 —— 防"正则一条都没匹配上却全绿"（改写措辞就静默失效）
-  3. test_maintenance_env_table_is_complete —— MAINTENANCE.md 自称「全表」就得是全表
+五类检查，缺一不可：
+  1. test_public_materials_counts_match_repo —— 材料里的数字 == 仓库现算出来的数字
+  2. test_key_materials_still_state_the_counts —— 防"正则一条都没匹配上却全绿"（改写措辞就静默失效）
+  3. test_landing_avatar_overflow_matches_persona_count —— 落地页头像行的「+N」这种**隐式**人格计数
+  4. test_test_counts_are_stated_once_and_dated —— 测试数不许写死、不许同页两个值打架
+  5. test_maintenance_env_table_is_complete —— MAINTENANCE.md 自称「全表」就得是全表
 
 新增一份对外材料时不需要改这个文件：GLOB 会自动扫到。
 新增一种数字写法（比如"共 72 名评审员"）时，需要往下面的 PATTERNS 里补一条正则——
 补不补得上，看 2 类检查会不会因为该文件一条都没匹配到而失败。
+
+为什么第 3 条要单独写一个测试：落地页头像行写的是 `+63`，意思是"另外还有 63 个人格"，
+真实声称值是 3（画出来的头像）+ 63 = 66。它长得根本不像一个总数，任何"捞数字"的正则
+都捞不到它，所以 72 人格上线后它一直错着没人发现。对付隐式计数只能是"按它的构成算回去"。
 """
 
 import glob
@@ -28,6 +34,11 @@ import yaml
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PERSONA_DIR = os.path.join(REPO_ROOT, "src", "personas")
+BACKEND_API_DIR = os.path.join(REPO_ROOT, "web", "backend", "app", "api")
+BACKEND_SERVICES_DIR = os.path.join(REPO_ROOT, "web", "backend", "app", "services")
+BACKEND_WS_INIT = os.path.join(REPO_ROOT, "web", "backend", "app", "websocket", "__init__.py")
+FRONTEND_PAGES_DIR = os.path.join(REPO_ROOT, "web", "frontend", "src", "pages")
+STEREOTYPE_CASES = os.path.join(REPO_ROOT, "tools", "stereotype_eval_cases.yaml")
 
 
 # --------------------------------------------------------------------------
@@ -47,15 +58,78 @@ def _load_packs():
     return packs
 
 
+def _read(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _count_route_handlers():
+    """README 写的核对命令就是 `grep -c '^@router\\.' app/api/*.py`，这里用同一口径。"""
+    if not os.path.isdir(BACKEND_API_DIR):
+        return None
+    total = 0
+    for path in sorted(glob.glob(os.path.join(BACKEND_API_DIR, "*.py"))):
+        total += len(re.findall(r"^@router\.", _read(path), re.M))
+    return total
+
+
+def _count_ws_events():
+    """只认 `WS_EVENTS` 这张常量表——它同时是运行期真正发出的事件名白名单。"""
+    if not os.path.isfile(BACKEND_WS_INIT):
+        return None
+    m = re.search(r"^WS_EVENTS\s*=\s*\((.*?)\)", _read(BACKEND_WS_INIT), re.S | re.M)
+    assert m, "web/backend/app/websocket/__init__.py 里找不到 WS_EVENTS 元组，先确认它没被改名"
+    return len(re.findall(r"[\"']([\w.]+)[\"']", m.group(1)))
+
+
+def _count_page_components():
+    """页面组件 = pages/ 下（含子目录）所有 .tsx。落地页 LandingPage.tsx 也算一个页面，
+    所以对外只写"N 个页面组件（含落地页）"这一种口径——以前写"18 个页面 + 落地页"，
+    到底算不算落地页永远说不清，两个数就永远对不上。"""
+    if not os.path.isdir(FRONTEND_PAGES_DIR):
+        return None
+    return len(glob.glob(os.path.join(FRONTEND_PAGES_DIR, "**", "*.tsx"), recursive=True))
+
+
+def _count_service_modules():
+    """services/ 下除 __init__.py 外的所有 .py。
+
+    注意口径：json_safe.py 是序列化工具而不是"业务服务"，但它确实是 services/ 下的一个模块。
+    以前文档按"业务服务"数写 18、目录里实有 19，差的就是它——与其留一条"哪些不算"的
+    人肉规则（下次加工具文件又会漂），不如把口径统一成"目录里的模块数"，现算即可。
+    """
+    if not os.path.isdir(BACKEND_SERVICES_DIR):
+        return None
+    return len([
+        p for p in glob.glob(os.path.join(BACKEND_SERVICES_DIR, "*.py"))
+        if os.path.basename(p) != "__init__.py"
+    ])
+
+
+def _count_stereotype_cases():
+    if not os.path.isfile(STEREOTYPE_CASES):
+        return None
+    return len(yaml.safe_load(_read(STEREOTYPE_CASES))["cases"])
+
+
 def repo_truth():
-    """(人格总数, Pack 数, 任务类型数)。"""
+    """每个 metric 的真实值，全部现算。值为 None = 这份检出里没有对应源码，跳过该 metric。"""
     from runner.task_types import VALID_TASK_TYPES
 
     packs = _load_packs()
     persona_ids = [pid for ids in packs.values() for pid in ids]
     # 同一个 id 出现在两个包里 = 总数会被重复计，先卡死这条
     assert len(persona_ids) == len(set(persona_ids)), "人格 id 跨包重复，总数不可信"
-    return len(persona_ids), len(packs), len(VALID_TASK_TYPES)
+    return {
+        "persona": len(persona_ids),
+        "pack": len(packs),
+        "task_type": len(VALID_TASK_TYPES),
+        "route": _count_route_handlers(),
+        "ws_event": _count_ws_events(),
+        "page": _count_page_components(),
+        "service": _count_service_modules(),
+        "stereotype_case": _count_stereotype_cases(),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -81,6 +155,12 @@ EXEMPT_FILES = {
     # 路线图按版本记「那一版当时交付了什么」，v0.1 那节的 50 人格 / 8 包是历史事实，
     # 改成今天的 72/11 反而是把历史记错。
     "docs/project/roadmap.md",
+    # PDF 审计报告的**全部内容就是引用 PDF 里写错的数字**（"4 份 PDF 全部写
+    # '66 个人格 / 10 个 YAML Pack'"）。引用错误值是它的职责所在，跟着仓库改
+    # 反而会把这份证据毁掉——它就不再能证明 PDF 错在哪了。
+    # 注意这跟 FROZEN_BODY_FILES 不是一回事：那些是"已发出的稿子正文冻结"，
+    # 这份是"内容本身即错误值的引用"。
+    "REMOVED/business-plan/pdf-audit-report.md",
 }
 
 
@@ -235,8 +315,13 @@ def _scan(path, metric):
 
 @pytest.mark.parametrize("metric", sorted(PATTERNS))
 def test_public_materials_counts_match_repo(metric):
-    personas, packs, task_types = repo_truth()
-    expected = {"persona": personas, "pack": packs, "task_type": task_types}[metric]
+    # repo_truth() 现在返回 {metric: 真实值} 的 dict（新增了路由/事件/页面/服务/标注集
+    # 五个现算指标），不再是早先的 (personas, packs, task_types) 三元组。
+    truth = repo_truth()
+    expected = truth.get(metric)
+    if expected is None:
+        # 这份检出里没有对应源码（例如只 clone 了 docs），跳过而不是假装通过
+        pytest.skip(f"仓库里没有可现算「{metric}」的源码，跳过")
 
     bad = []
     for path in material_files():

@@ -14,10 +14,11 @@ free 档的日限额/日成本上限由后台面板的 quota_free_* 设置项驱
   调用方（api/reviews.py）无需改动。
 """
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -25,9 +26,63 @@ from app.core.errors import QuotaExceeded
 from app.models import UsageRecord
 from app.services import admin_settings_service, plan_service
 
+# ---------------------------------------------------------------------------
+# 日配额的"预留"（reservation）
+#
+# 为什么需要它：日次数闸原本读的是 UsageRecord，而 UsageRecord 只在评审**完成后**
+# 才写入（review_service 的成功分支）。检查与写入之间隔着整整一次评审，中间没有
+# 任何占位——同一用户并发发起 N 个请求时全部读到 count=0，于是全部放行。
+# 免费档 5 次/天配合 20 次/小时的限流，实测能把日限刷到 4 倍，烧的是平台垫付的钱。
+#
+# 修法是"发起即占位、完成即结算"：check_quota 在放行的同一条语句里插一条
+# kind=review_pending 的占位记录，评审完成时 record_usage 把这条占位**原地改写**
+# 成真实用量（不是再插一条，否则一次评审计两次）。
+#
+# 占位绝不能变成"永久占坑"（那正是本仓库另一个缺陷的形状：扣了不退）。三道保险：
+#   1. 评审失败 → review_service 调 release_review_slot 立刻释放；
+#   2. 进程重启被收尸 → db._reap_orphans 调 release_review_slot 释放（见那边）；
+#   3. 上面两条都没跑到（进程被 kill -9 之类）→ 超过 RESERVATION_TTL_SECONDS 的
+#      占位不再计入任何配额判断，并在下次启动收尸时被删掉。
+# 也就是说最坏情况下一个占位只挡人 1 小时，而不是挡满 24 小时的统计窗口。
+# ---------------------------------------------------------------------------
+
+RESERVATION_KIND = "review_pending"
+
+# 一条占位最多能挡多久。取值依据：单次评审（full 档、并发度低）实测在分钟量级，
+# 1 小时留足冗余；同时它也是"漏释放"的最大代价上限，不能取得太长。
+RESERVATION_TTL_SECONDS = 3600
+
 
 def _day_ago() -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=1)
+
+
+def _reservation_cutoff() -> datetime:
+    """早于这个时间点的占位一律当作已作废（不计数、可清理）。"""
+    return datetime.now(timezone.utc) - timedelta(seconds=RESERVATION_TTL_SECONDS)
+
+
+def _naive_utc(moment: datetime) -> datetime:
+    """裸 SQL 绑定参数用的 UTC naive 时间。
+
+    ORM 查询里 SQLAlchemy 会按列类型把 aware datetime 规范化，裸 text() 不会：
+    sqlite3 的默认适配器会把 aware datetime 写成 "...+00:00"，和库里已存的
+    "YYYY-MM-DD HH:MM:SS.ffffff" 做字符串比较必然错位——时间闸会静默失灵。
+    """
+    if moment.tzinfo is None:
+        return moment
+    return moment.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _counts_toward_daily_reviews():
+    """哪些行占用"今天已经跑了几次评审"这个名额：已结算的 + 仍然有效的占位。"""
+    return or_(
+        UsageRecord.kind == "review",
+        and_(
+            UsageRecord.kind == RESERVATION_KIND,
+            UsageRecord.created_at >= _reservation_cutoff(),
+        ),
+    )
 
 
 def _quota_enabled(db: Session) -> bool:
@@ -47,7 +102,9 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         func.coalesce(func.sum(UsageRecord.cost_usd), 0.0),
     ).filter(
         UsageRecord.user_id == user_id,
-        UsageRecord.kind == "review",
+        # 与 check_quota 用同一个谓词：正在跑的评审（占位）也算"已经用掉一次"。
+        # 否则用量页会显示 3/5 而配额闸按 5/5 拒绝，用户看到的是一个说谎的数字。
+        _counts_toward_daily_reviews(),
         UsageRecord.created_at >= since,
     )
     count, cost = q.one()
@@ -112,6 +169,17 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     消耗发生在校验通过的瞬间（原子扣减，见 cdk_service.try_consume_credit）。
     评审随后失败的，由 refund_review_credit 退还——次数是用户花钱买的，
     不能被一次模型报错吞掉。
+
+    plan 模式的日次数闸同样在放行的瞬间就**占位**（_reserve_review_slot），
+    不再等评审跑完才写 UsageRecord —— 否则检查与写入之间的几分钟里，
+    并发请求全部读到旧的计数，日限形同虚设（详见文件头的说明）。
+    占位的释放路径：release_review_slot（失败/收尸）+ TTL 兜底。
+
+    ⚠️ 日**成本**闸没有对应的预留，也做不出来：一次评审要花多少钱，
+    发起时无从得知（取决于人格数、材料长度、上游返回多少 token）。
+    它仍然是"按此刻已知的花销判断"，并发时最多同时放行到次数上限那么多个请求。
+    次数闸收紧之后，成本的并发溢出被压在 (日次数上限 × 单次成本) 这个量级，
+    不再是"限流上限 × 单次成本"。这是取舍，写在这里免得下一个人以为它是硬闸。
     """
     if not _quota_enabled(db) or key_source != "server":
         return
@@ -151,24 +219,148 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
             "可升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
         )
 
-    count = (
-        db.query(func.count(UsageRecord.id))
+    # 次数闸：查与占位必须是同一条语句，否则并发全部读到同一个旧计数一起放行
+    if _reserve_review_slot(db, user_id, reviews_limit, since):
+        return
+
+    # 日限满了：CDK 次数在这里垫一次。垫出来的这一次不占日名额（它本来就是
+    # "超出日限之后的加量"），所以不再插占位记录。
+    if cdk_service.try_consume_credit(db, user_id):
+        return
+    raise QuotaExceeded(
+        f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
+        "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 预留的三个动作：占位 / 结算 / 释放
+# ---------------------------------------------------------------------------
+
+
+def _reserve_review_slot(
+    db: Session, user_id: str, reviews_limit: int, since: datetime
+) -> bool:
+    """名额没满就占一个，返回"占到了吗"。检查与占位在同一条 SQL 里完成。
+
+    并发正确性与 cdk_service.try_consume_credit 同一套防线（那边是次数余额，
+    这边是日名额，形状完全一样）：
+      · PostgreSQL：先取该用户在 quota 命名空间上的事务级 advisory lock，
+        READ COMMITTED 下子查询读的是语句开始时的快照，不加锁挡不住并发；
+      · SQLite：单条 INSERT...SELECT 全程在写锁保护下完成。
+    """
+    from app.services import cdk_service
+
+    cdk_service.serialize_user_writes(db, user_id, "quota")
+    result = db.execute(
+        text(
+            "INSERT INTO usage_records "
+            "(id, user_id, review_id, kind, persona_count, cost_usd, "
+            " input_tokens, output_tokens, key_source, created_at) "
+            "SELECT :id, :uid, NULL, :res_kind, 0, 0.0, 0, 0, 'server', :now "
+            "WHERE (SELECT COUNT(*) FROM usage_records "
+            "       WHERE user_id = :uid AND key_source = 'server' "
+            "         AND created_at >= :since "
+            "         AND (kind = 'review' "
+            "              OR (kind = :res_kind AND created_at >= :cutoff))) < :cap"
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "uid": user_id,
+            "res_kind": RESERVATION_KIND,
+            "now": _naive_utc(datetime.now(timezone.utc)),
+            "since": _naive_utc(since),
+            "cutoff": _naive_utc(_reservation_cutoff()),
+            "cap": int(reviews_limit),
+        },
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def _oldest_reservation(db: Session, user_id: str) -> Optional[UsageRecord]:
+    """该用户最早的一条未结算占位。
+
+    占位之间是**可互换**的（每条就是"一个名额"，不带 review_id —— check_quota
+    跑在评审落库之前，那时还没有 id 可写）。所以结算/释放取最早的一条即可：
+    并发跑两条评审、先完成的那条结算掉更早的占位，对计数没有任何差别，
+    唯一的痕迹是这条用量记录的 created_at 是"发起时刻"而不是"完成时刻"——
+    而按发起时刻计入 24h 窗口本来就更贴近"这次请求算今天的"。
+    """
+    return (
+        db.query(UsageRecord)
         .filter(
             UsageRecord.user_id == user_id,
-            UsageRecord.kind == "review",
+            UsageRecord.kind == RESERVATION_KIND,
             UsageRecord.key_source == "server",
-            UsageRecord.created_at >= since,
         )
-        .scalar()
-        or 0
+        .order_by(UsageRecord.created_at.asc())
+        .first()
     )
-    if count >= reviews_limit:
-        if cdk_service.try_consume_credit(db, user_id):
-            return
-        raise QuotaExceeded(
-            f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
-            "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
+
+
+def _settle_reservation(db: Session, user_id: str, values: dict) -> Optional[UsageRecord]:
+    """把最早的一条占位原地改写成真实用量；没有占位可结算时返回 None。
+
+    条件 UPDATE（`WHERE kind = 占位`）保证两个并发结算不会改同一行：
+    第二个 rowcount=0，退回去走"插一条新的"，计数仍然正确。
+    """
+    row = _oldest_reservation(db, user_id)
+    if row is None:
+        return None
+    updated = (
+        db.query(UsageRecord)
+        .filter(UsageRecord.id == row.id, UsageRecord.kind == RESERVATION_KIND)
+        .update(values, synchronize_session=False)
+    )
+    if updated != 1:
+        return None
+    db.commit()
+    db.refresh(row)  # 上面是批量 UPDATE，内存里的 row 还是占位时的旧值
+    return row
+
+
+def release_review_slot(db: Session, user_id: str, key_source: str = "server") -> bool:
+    """释放一个占位（评审失败 / 被收尸时调）。返回"这次真的释放了吗"。
+
+    必须存在这条路径：占位是在评审**发起**时写的，评审没跑成的话它就成了
+    永久占坑——用户被自己失败的评审挡在门外，直到 24h 窗口滑过去。
+    这正是本仓库"扣了不退"那个缺陷的同型陷阱，不能再犯第二次。
+
+    没有可释放的占位时返回 False 而不是报错：credits 模式、BYOK、配额关闭
+    这三种情形下 check_quota 压根不占位，调用方不必先判断自己该不该调。
+    """
+    if key_source != "server":
+        return False
+    row = _oldest_reservation(db, user_id)
+    if row is None:
+        return False
+    deleted = (
+        db.query(UsageRecord)
+        .filter(UsageRecord.id == row.id, UsageRecord.kind == RESERVATION_KIND)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return deleted == 1
+
+
+def sweep_stale_reservations(db: Session) -> int:
+    """删掉超过 TTL 仍未结算/释放的占位，返回删了几条。
+
+    兜底用：进程被 kill -9 时 release_review_slot 没机会跑。TTL 之外的占位
+    早已不参与任何配额判断（见 _counts_toward_daily_reviews），这里只是不让
+    它们在用量表里当垃圾长期堆着。启动收尸时调一次（见 app/db.py）。
+    """
+    n = (
+        db.query(UsageRecord)
+        .filter(
+            UsageRecord.kind == RESERVATION_KIND,
+            UsageRecord.created_at < _reservation_cutoff(),
         )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return int(n or 0)
 
 
 def refund_review_credit(
@@ -214,7 +406,29 @@ def record_usage(
     output_tokens: int = 0,
     key_source: str = "byok",
 ) -> UsageRecord:
-    """评审结束后调用。无论配额是否开启都记录——这是日后计费/token 报表的事实源。"""
+    """评审结束后调用。无论配额是否开启都记录——这是日后计费/token 报表的事实源。
+
+    平台垫付的评审（kind=review + key_source=server）优先**改写**入口留下的占位，
+    而不是插一条新记录：占位已经占掉了一个日名额，再插一条就等于一次评审计两次。
+    找不到占位就照旧插入——BYOK、配额关闭、credits 模式、以及占位已过 TTL 被清掉
+    的情形都走这一条，语义与改动前完全一致。
+    """
+    if kind == "review" and key_source == "server":
+        settled = _settle_reservation(
+            db,
+            user_id,
+            {
+                "kind": "review",
+                "review_id": review_id,
+                "persona_count": int(persona_count or 0),
+                "cost_usd": float(cost_usd or 0.0),
+                "input_tokens": int(input_tokens or 0),
+                "output_tokens": int(output_tokens or 0),
+            },
+        )
+        if settled is not None:
+            return settled
+
     row = UsageRecord(
         user_id=user_id,
         review_id=review_id,

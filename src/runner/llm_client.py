@@ -12,9 +12,27 @@ DeepSeek/Kimi/通义千问/智谱GLM/Ollama 等都遵循这个协议，不需要
 两条 provider 路径各自把这份内容块转换成自己认的格式。
 """
 
+import random
+import time
 from typing import List, Optional, Tuple, Union
 
 PromptContent = Union[str, List[dict]]
+
+# 哪些 HTTP 状态值得重试。判断依据只有一条：**再发一次有可能成功吗**。
+#   429 / 5xx / 408 —— 限流、服务端抖动、网关超时，重试有意义；
+#   401/403（key 错、无权限）、400/422（请求本身不合法）、404（模型名不存在）、
+#   402（余额不足）—— 再发一百次也是同样的错，重试只会把成本和延迟按倍数放大，
+#   还会把"key 配错了"这种要立刻告诉用户的错误拖成一分钟后才报。
+RETRYABLE_HTTP_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+
+# 连接/超时类异常的类名关键字。这里按类名而不是 isinstance 判断，是因为
+# anthropic SDK 只在 _anthropic_chat 内部 import（模块顶层不依赖它），
+# 顶层写 except anthropic.APIConnectionError 会把这个"可选依赖"变成硬依赖。
+_TRANSIENT_EXC_NAMES = (
+    "Timeout", "TimedOut", "ConnectError", "ConnectionError",
+    "APIConnectionError", "ReadError", "WriteError", "RemoteProtocolError",
+    "PoolTimeout", "InternalServerError", "RateLimitError", "OverloadedError",
+)
 
 # 各服务商在官网文档里给出的 OpenAI 兼容 base_url——设置页/BYOK 面板的下拉预设复用这份
 # （前端 web/frontend/src/lib/types.ts、web/admin/src/lib/types.ts 各有一份手抄副本，
@@ -40,7 +58,36 @@ VISION_CAPABLE_PREFIXES = (
 
 
 class LLMCallError(Exception):
-    pass
+    """LLM 调用失败。
+
+    retryable 明确区分"再试一次可能成功"（限流/超时/5xx）与"再试也是白花钱"
+    （key 错、余额不足、模型名不存在）。没有这个区分就只有两种糟糕选择：
+    一律不重试（一次网络抖动就废掉一位人格），或一律重试（把 401 重试 3 次，
+    延迟和账单一起翻倍）。
+    """
+
+    def __init__(self, message: str, status_code: Optional[int] = None, retryable: bool = False):
+        super().__init__(message)
+        self.status_code = status_code
+        self.retryable = retryable
+
+
+def is_retryable_error(exc: BaseException) -> bool:
+    """判断一个异常是否值得重试。
+
+    三条依据依次尝试：LLMCallError 自带的 retryable 标记 → 异常对象上的
+    status_code（anthropic SDK 的 APIStatusError 有这个属性）→ 类名关键字
+    （连接/超时类）。都不命中就当成死错，不重试。
+    """
+    if isinstance(exc, LLMCallError):
+        return exc.retryable
+
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status in RETRYABLE_HTTP_STATUS
+
+    name = type(exc).__name__
+    return any(k in name for k in _TRANSIENT_EXC_NAMES)
 
 
 def supports_vision(model: str) -> bool:
@@ -127,10 +174,15 @@ def _openai_compatible_chat(
             timeout=120.0,
         )
     except httpx.HTTPError as e:
-        raise LLMCallError(f"请求 {url} 失败: {e}") from e
+        # 连接失败/超时属于瞬时故障，标成可重试
+        raise LLMCallError(f"请求 {url} 失败: {e}", retryable=True) from e
 
     if resp.status_code != 200:
-        raise LLMCallError(f"HTTP {resp.status_code} from {url}: {resp.text[:300]}")
+        raise LLMCallError(
+            f"HTTP {resp.status_code} from {url}: {resp.text[:300]}",
+            status_code=resp.status_code,
+            retryable=resp.status_code in RETRYABLE_HTTP_STATUS,
+        )
 
     data = resp.json()
     try:
@@ -151,17 +203,48 @@ def chat_completion(
     api_base: Optional[str] = None,
     max_tokens: int = 4096,
     temperature: float = 0.7,
+    max_retries: int = 0,
+    backoff_base_seconds: float = 1.0,
+    sleep: Optional[callable] = None,
 ) -> Tuple[str, int, int]:
     """返回 (回复文本, input_tokens, output_tokens)。provider='anthropic' 走官方 SDK，
-    其余一律按 OpenAI 兼容协议处理（api_base 必填，否则默认 OpenAI 官方地址）。"""
+    其余一律按 OpenAI 兼容协议处理（api_base 必填，否则默认 OpenAI 官方地址）。
+
+    max_retries：**只对可重试错误**（限流/超时/5xx，见 is_retryable_error）重试，
+    指数退避 + 抖动。默认 0 = 不重试，保持所有既有调用方的行为不变；
+    引擎链路由 runner/cli.py 从 budget.yaml 的 retry 段读出来显式传进来——
+    那一段配置以前全仓零读取点，是标准的"假旋钮"。
+    退避里不重试 401/余额不足这类死错：那只会把成本和延迟按倍数放大，
+    并且把"key 配错了"这种要立刻告诉用户的事拖慢好几秒才报出来。
+    """
     if not isinstance(prompt, str) and not supports_vision(model):
         # 模型不认图，把内容块降级成纯文字，别让评审因为模型选错而整体失败
         prompt = "\n\n".join(b.get("text", "") for b in prompt if b.get("type") == "text")
 
-    if provider == "anthropic":
-        return _anthropic_chat(model, prompt, api_key, max_tokens, temperature, api_base=api_base)
-    effective_base = api_base or OPENAI_COMPATIBLE_PRESETS["openai"]["api_base"]
-    return _openai_compatible_chat(model, prompt, api_key, effective_base, max_tokens, temperature)
+    sleep = sleep or time.sleep
+    attempts = max(0, int(max_retries)) + 1
+    last_exc = None
+
+    for attempt in range(attempts):
+        try:
+            if provider == "anthropic":
+                return _anthropic_chat(
+                    model, prompt, api_key, max_tokens, temperature, api_base=api_base
+                )
+            effective_base = api_base or OPENAI_COMPATIBLE_PRESETS["openai"]["api_base"]
+            return _openai_compatible_chat(
+                model, prompt, api_key, effective_base, max_tokens, temperature
+            )
+        except Exception as e:  # 分类后要么重试要么原样抛，不吞
+            last_exc = e
+            if attempt >= attempts - 1 or not is_retryable_error(e):
+                raise
+            # 指数退避 + 抖动：并发跑 6 个人格时若一起撞上 429，
+            # 固定间隔会让它们继续同步重试、继续一起被限流。
+            delay = backoff_base_seconds * (2 ** attempt)
+            sleep(delay + random.uniform(0, backoff_base_seconds))
+
+    raise last_exc  # 理论上到不了这里（循环里要么 return 要么 raise）
 
 
 def test_connection(

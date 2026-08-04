@@ -8,15 +8,45 @@ import { usePersonaStore } from '@/store/persona-store'
 import { useReviewStore } from '@/store/review-store'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
-import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, FolderOpen, AlignLeft, FileText, Shield, FlaskConical } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle } from 'lucide-react'
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5
-type MaterialInputMode = 'text' | 'file' | 'directory'
+/**
+ * 材料只有两种来源：手填文本、上传文件。
+ *
+ * 这里曾经有第三种 'directory'（"目录路径"）：把用户敲进来的本地路径塞进
+ * artifact_bundle.directory_path 落库，UI 还写着"系统将自动扫描目录中的文件
+ * 并提取评审材料"。实际上 directory_path 在 web/backend 与 src/runner 里
+ * 零消费点（grep 全仓只有这一处写入），一行都没人读——收集了却没人用，
+ * 等于骗用户填。
+ *
+ * 而且它在浏览器形态下**根本不可能成立**：评审跑在服务器上，服务器访问不到
+ * 用户机器上的路径；真要支持"整个项目一起评"，只能是前端把目录里的文件读出来
+ * 逐个上传（走已有的 /api/uploads + 抽取链路），而不是传一个字符串路径过去。
+ * 所以这个模式整体下线，等真做出目录上传再回来。
+ */
+type MaterialInputMode = 'text' | 'file'
 
 const modeConfig: Record<ReviewMode, { label: string; color: string; bg: string; border: string; icon: string }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', border: 'border-cyan/30', icon: '⚡' },
   standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30', icon: '✅' },
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30', icon: '🔬' },
+}
+
+/**
+ * SKILLS[].icon 存的是**图片路径**（'/skills/skill-game.png'），不是 emoji。
+ * 这三处以前写成 <span className="text-2xl">{skill.icon}</span>，页面上直接
+ * 显示出那串路径文本。渲染方式与 SkillSelectPage 统一成 <img>。
+ */
+function SkillIcon({ skill, className }: { skill: (typeof SKILLS)[number]; className?: string }) {
+  return (
+    <img
+      src={skill.icon}
+      alt={skill.name}
+      className={cn('object-contain', className)}
+      loading="lazy"
+    />
+  )
 }
 
 export default function CreateReviewPage() {
@@ -36,7 +66,6 @@ export default function CreateReviewPage() {
   const [target, setTarget] = useState('')
   const [materialFields, setMaterialFields] = useState<Record<string, string>>({})
   const [materialInputMode, setMaterialInputMode] = useState<MaterialInputMode>('text')
-  const [directoryPath, setDirectoryPath] = useState('')
   const [selectedPack, setSelectedPack] = useState<string | null>(null)
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(new Set())
   const [launching, setLaunching] = useState(false)
@@ -89,6 +118,34 @@ export default function CreateReviewPage() {
 
   const requiredFields = currentFields.filter((f) => f.required)
 
+  const currentModeConfig = REVIEW_MODES.find((m) => m.mode === selectedMode)
+  const selectedPersonas = personas.filter((p) => selectedPersonaIds.has(p.id))
+
+  /* ---------------- 「选了谁」必须等于「跑了谁」 ----------------
+   *
+   * 后端 PersonaService.select_panel_by_mode 是这么干的：先按 persona_pack
+   * 取出该包的人格列表，再在**这个列表内**按 id 过滤 selected_personas，
+   * 最后 selected[:max_count] 截断。于是过去有两种组合会被静默改写：
+   *
+   *   1. 跨包混选：第 3 步未选包时列表展示全部包的人格，提交时 persona_pack
+   *      被兜底成 game-core，别的包的人格一个都匹配不上 → 整批丢弃 → 引擎回落
+   *      自动选人。而第 5 步确认页仍然显示着用户挑的人名，报告里却是另一批人。
+   *   2. 超过模式上限：截断取的是**包内顺序**的前 N 个，不是用户勾选顺序，
+   *      被丢掉的是谁完全不可预期。
+   *
+   * 两种都在提交前拦住并说清楚原因，而不是让用户事后从报告里发现人对不上。
+   */
+  const selectedPackIds = Array.from(new Set(selectedPersonas.map((p) => p.pack ?? 'game-core')))
+  /** 真正提交的包：显式选了就用它，否则由所选人格反推（只有全部同包时才推得出） */
+  const effectivePack = selectedPack ?? (selectedPackIds.length === 1 ? selectedPackIds[0] : null)
+  /** 选中的人格横跨多个包，或与显式选定的包不一致——两者都会被后端过滤掉一部分 */
+  const packConflict =
+    selectedPersonaIds.size > 0 &&
+    (selectedPackIds.length > 1 || (selectedPack !== null && selectedPackIds[0] !== selectedPack))
+  const modeMax = currentModeConfig?.persona_count_range[1] ?? 8
+  const overModeMax = selectedPersonaIds.size > modeMax
+  const packName = (id: string) => packs.find((p) => p.panel_id === id)?.name ?? id
+
   const stepLabels: Record<Step, string> = {
     0: '选择技能',
     1: '选择任务类型',
@@ -103,10 +160,10 @@ export default function CreateReviewPage() {
     if (step === 1) return selectedTaskType !== null
     if (step === 2) {
       if (target.trim() === '') return false
-      if (materialInputMode === 'directory' && directoryPath.trim() === '') return false
       return requiredFields.every((f) => (materialFields[f.key] ?? '').trim() !== '')
     }
-    if (step === 3) return selectedPersonaIds.size > 0
+    // 会被后端静默改写的组合一律不放行——原因就在按钮上方的横幅里写着
+    if (step === 3) return selectedPersonaIds.size > 0 && !packConflict && !overModeMax && effectivePack !== null
     if (step === 4) return true
     return true
   }
@@ -121,6 +178,13 @@ export default function CreateReviewPage() {
 
   const handleLaunch = async () => {
     if (!selectedTaskType) return
+    // 第 3 步已经拦过一道，这里是最后一道闸：宁可不发请求，也不能发一个
+    // "跑出来跟确认页不一样"的评审出去
+    if (!effectivePack || packConflict || overModeMax) {
+      setLaunchError('所选角色与角色包/评审模式不一致，请返回第 3 步调整后再启动')
+      setStep(3)
+      return
+    }
     setLaunching(true)
     setLaunchError(null)
     try {
@@ -135,16 +199,14 @@ export default function CreateReviewPage() {
         materials,
       }
 
-      if (materialInputMode === 'directory' && directoryPath.trim()) {
-        artifactBundle.directory_path = directoryPath.trim()
-      }
-
       // 走 v2 异步链路（Job 队列 + WS 进度）。此前走 v1 同步接口：阻塞线程池、
       // 无视 BYOK key、无 key 时把模拟数据当真实报告入库——三个坑一次躲掉。
       const reviewId = await createNewReview({
         task_type: selectedTaskType,
+        // effectivePack 而不是 selectedPack：未显式选包时由所选人格反推，
+        // 保证后端按这个包过滤时一个人都不会被丢掉
+        persona_pack: effectivePack,
         artifact_bundle: artifactBundle,
-        persona_pack: selectedPack ?? undefined,
         selected_personas: Array.from(selectedPersonaIds),
         mode: selectedMode,
         skill_type: selectedSkillType ?? undefined,
@@ -231,11 +293,7 @@ export default function CreateReviewPage() {
     ? personas.filter((p) => p.pack === selectedPack)
     : personas
 
-  const selectedPersonas = personas.filter((p) => selectedPersonaIds.has(p.id))
-
   const filledMaterialsCount = Object.entries(materialFields).filter(([, v]) => v.trim() !== '').length
-
-  const currentModeConfig = REVIEW_MODES.find((m) => m.mode === selectedMode)
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
@@ -296,7 +354,9 @@ export default function CreateReviewPage() {
                   )}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <span className="text-2xl">{skill.icon}</span>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand-primary/20 bg-brand-primary/10">
+                      <SkillIcon skill={skill} className="h-6 w-6" />
+                    </span>
                     <div>
                       <h3 className={cn('font-bold font-display', skill.color)}>{skill.name}</h3>
                       <span className="text-xs text-text-muted font-mono">{skill.type}</span>
@@ -323,7 +383,7 @@ export default function CreateReviewPage() {
               return (
                 <div className={cn('mt-6 rounded-xl border p-4', skill.border, skill.bg)}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{skill.icon}</span>
+                    <SkillIcon skill={skill} className="h-5 w-5" />
                     <span className={cn('font-medium text-sm', skill.color)}>{skill.name}</span>
                   </div>
                   <p className="text-sm text-text-secondary">{skill.description_zh}</p>
@@ -464,7 +524,7 @@ export default function CreateReviewPage() {
         {step === 2 && (
           <div>
             <h2 className="text-xl font-semibold text-text-primary mb-2">上传评审材料</h2>
-            <p className="text-sm text-text-secondary mb-6">通过文本输入、文件上传或目录路径提供评审材料</p>
+            <p className="text-sm text-text-secondary mb-6">手动填写文本，或上传文件让 AI 自动提取材料</p>
 
             <div className="flex items-center gap-2 mb-6">
               <button
@@ -491,18 +551,9 @@ export default function CreateReviewPage() {
                 <FileText className="w-4 h-4" strokeWidth={1.25} />
                 文件上传
               </button>
-              <button
-                onClick={() => setMaterialInputMode('directory')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  materialInputMode === 'directory'
-                    ? 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30'
-                    : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
-                )}
-              >
-                <FolderOpen className="w-4 h-4" strokeWidth={1.25} />
-                目录路径
-              </button>
+              {/* 这里曾经有第三个「目录路径」按钮，已下线——原因见文件顶部
+                  MaterialInputMode 的注释（服务器扫不到客户端路径，且收上来的
+                  directory_path 全仓无人读取）。 */}
             </div>
 
             {materialInputMode === 'file' && (
@@ -552,22 +603,6 @@ export default function CreateReviewPage() {
                     已提取 {filledMaterialsCount} 个字段 · 可在下方编辑修改
                   </p>
                 )}
-              </div>
-            )}
-
-            {materialInputMode === 'directory' && (
-              <div className="mb-6 rounded-xl border border-border bg-bg-card p-4">
-                <label className="block text-sm font-medium text-text-secondary mb-2">项目目录路径</label>
-                <input
-                  type="text"
-                  value={directoryPath}
-                  onChange={(e) => setDirectoryPath(e.target.value)}
-                  placeholder="例如：/path/to/your/game/project 或 C:\Projects\MyGame"
-                  className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
-                />
-                <p className="text-xs text-text-muted mt-2">
-                  输入项目目录路径，系统将自动扫描目录中的文件并提取评审材料
-                </p>
               </div>
             )}
 
@@ -683,11 +718,21 @@ export default function CreateReviewPage() {
                 <button
                   key={pack.panel_id}
                   onClick={() => {
-                    setSelectedPack(selectedPack === pack.panel_id ? null : pack.panel_id)
-                    if (selectedPack !== pack.panel_id) {
-                      const packPersonas = personas.filter((p) => p.pack === pack.panel_id)
-                      setSelectedPersonaIds(new Set(packPersonas.map((p) => p.id)))
+                    if (selectedPack === pack.panel_id) {
+                      // 取消选包时必须一起清空人格：以前只清 selectedPack，
+                      // 整包角色仍留在 selectedPersonaIds 里，用户以为"取消了"，
+                      // 实际带着一整包人继续往下走。
+                      setSelectedPack(null)
+                      setSelectedPersonaIds(new Set())
+                      return
                     }
+                    setSelectedPack(pack.panel_id)
+                    // 只勾到模式上限为止：后端 select_panel_by_mode 无论如何都会
+                    // selected[:max_count] 截断，整包全勾只会让界面显示一批实际
+                    // 不会上场的人。截断顺序与后端一致（包内原顺序），用户看到的
+                    // 就是真正会跑的那几位，想换人再手动改。
+                    const packPersonas = personas.filter((p) => p.pack === pack.panel_id)
+                    setSelectedPersonaIds(new Set(packPersonas.slice(0, modeMax).map((p) => p.id)))
                   }}
                   className={cn(
                     'flex flex-col items-center gap-2 p-3 md:p-4 rounded-xl border-2 transition-all cursor-pointer',
@@ -724,9 +769,41 @@ export default function CreateReviewPage() {
             <h3 className="text-lg font-semibold text-text-primary mb-4">
               角色列表
               <span className="text-sm font-normal text-text-muted ml-2">
-                已选择 {selectedPersonaIds.size} 个
+                已选择 {selectedPersonaIds.size} / 上限 {modeMax} 个
               </span>
             </h3>
+
+            {/* 会被后端静默改写的组合，在这里就说清楚，而不是等报告出来人对不上 */}
+            {packConflict && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-severity-critical/40 bg-severity-critical/5 p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-severity-critical" strokeWidth={1.5} />
+                <div className="text-xs text-text-secondary leading-relaxed">
+                  <p className="text-severity-critical font-medium mb-1">
+                    不能跨角色包混选（当前混了 {selectedPackIds.length} 个包：
+                    {selectedPackIds.map(packName).join('、')}）
+                  </p>
+                  <p>
+                    一次评审只会在同一个角色包内执行：别的包里的角色会被整批丢弃，
+                    最终跑的人跟你在这里选的对不上。请只保留同一个包内的角色，
+                    或直接点上面的包一键选人。
+                  </p>
+                </div>
+              </div>
+            )}
+            {!packConflict && overModeMax && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
+                <div className="text-xs text-text-secondary leading-relaxed">
+                  <p className="text-warm-orange font-medium mb-1">
+                    超出「{modeConfig[selectedMode].label}模式」的角色上限（{modeMax} 位）
+                  </p>
+                  <p>
+                    超出的部分会被后端按包内顺序截掉，被丢掉的是谁无法预期。
+                    请取消 {selectedPersonaIds.size - modeMax} 位，或回第 1 步（任务类型）换成人数上限更高的模式。
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredPersonas.map((persona) => (
@@ -734,6 +811,8 @@ export default function CreateReviewPage() {
                   key={persona.id}
                   persona={persona}
                   selected={selectedPersonaIds.has(persona.id)}
+                  // 未选包时列表是全部包混在一起的，不标出归属就没法自己避开跨包混选
+                  packLabel={selectedPack ? null : packName(persona.pack ?? 'game-core')}
                   onToggle={() => togglePersona(persona.id)}
                 />
               ))}
@@ -835,7 +914,7 @@ export default function CreateReviewPage() {
                   <div className={cn('rounded-xl border p-4 md:p-5', skill.border, skill.bg)}>
                     <h3 className="text-sm font-medium text-text-muted mb-2">评审技能</h3>
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{skill.icon}</span>
+                      <SkillIcon skill={skill} className="h-5 w-5" />
                       <span className={cn('font-medium text-sm', skill.color)}>{skill.name}</span>
                     </div>
                   </div>
@@ -874,13 +953,6 @@ export default function CreateReviewPage() {
                 <h3 className="text-sm font-medium text-text-muted mb-2">评审目标</h3>
                 <p className="text-text-primary">{target || '未填写'}</p>
               </div>
-
-              {materialInputMode === 'directory' && directoryPath.trim() && (
-                <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                  <h3 className="text-sm font-medium text-text-muted mb-2">目录路径</h3>
-                  <p className="text-text-primary font-mono text-sm">{directoryPath}</p>
-                </div>
-              )}
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
                 <button
@@ -921,7 +993,14 @@ export default function CreateReviewPage() {
               </div>
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">已选角色 ({selectedPersonas.length})</h3>
+                {/* 把真正提交的角色包一起摆出来：报告里出现的就是这个包里的这几位，
+                    不再有"确认页显示 A、报告里跑的是 B"的落差 */}
+                <h3 className="text-sm font-medium text-text-muted mb-2">
+                  已选角色 ({selectedPersonas.length})
+                  {effectivePack && (
+                    <span className="ml-2 font-normal text-text-muted/80">· 角色包：{packName(effectivePack)}</span>
+                  )}
+                </h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedPersonas.map((p) => (
                     <span
@@ -1055,7 +1134,18 @@ export default function CreateReviewPage() {
   )
 }
 
-function PersonaSelectCard({ persona, selected, onToggle }: { persona: Persona; selected: boolean; onToggle: () => void }) {
+function PersonaSelectCard({
+  persona,
+  selected,
+  packLabel,
+  onToggle,
+}: {
+  persona: Persona
+  selected: boolean
+  /** 未选包、列表混着全部包时显示归属包名；选了包就是冗余信息，传 null */
+  packLabel: string | null
+  onToggle: () => void
+}) {
   return (
     <div
       onClick={onToggle}
@@ -1075,6 +1165,11 @@ function PersonaSelectCard({ persona, selected, onToggle }: { persona: Persona; 
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text-primary">{persona.name}</span>
           <span className="text-xs text-text-muted">{persona.archetype}</span>
+          {packLabel && (
+            <span className="shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] text-text-muted">
+              {packLabel}
+            </span>
+          )}
         </div>
         <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{persona.identity_summary}</p>
       </div>

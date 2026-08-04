@@ -10,8 +10,9 @@
       → WS 广播 progress/persona/completed 事件
       → 落库 report + persona_outputs
       → 写 Judgment（判断复利闭环）
-      → 写 UsageRecord（计费事实源）
+      → 写 UsageRecord（计费事实源；平台垫付时是把入口占位改写成真实用量）
       → 失败时退还入口扣掉的 CDK 次数（quota_service.refund_review_credit，幂等）
+        并释放入口占的日配额名额（quota_service.release_review_slot）
 
 绝不返回模拟数据：无 key 时在入口就 428 拒绝（LLMKeyMissing），
 不让用户拿到没有评审价值的占位内容。
@@ -264,10 +265,17 @@ def _execute_review(
                 )
                 if refunded:
                     logger.info("review %s 失败，已退还 1 次评审次数给 %s", review_id, user_id)
+                # plan 模式的日名额是在入口占位的（quota_service._reserve_review_slot）。
+                # 评审没跑成，这个占位必须立刻还回去——否则用户被自己失败的评审
+                # 挡在门外，最长挡满一个 TTL。与上面的次数退还是两种资源，
+                # 各自独立，不能只做一半（credits 模式没有占位，这里自然是空操作）。
+                if quota_service.release_review_slot(db, user_id, key_source=key_source):
+                    logger.info("review %s 失败，已释放 %s 的 1 个日配额占位", review_id, user_id)
             except Exception:
                 db.rollback()
                 logger.exception(
-                    "review %s 失败后退还评审次数也失败——用户 %s 的 1 次次数被吞了，需人工补偿",
+                    "review %s 失败后退还评审次数/释放配额占位也失败——"
+                    "用户 %s 的额度被吞了，需人工补偿",
                     review_id,
                     user_id,
                 )

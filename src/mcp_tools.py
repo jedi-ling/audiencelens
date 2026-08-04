@@ -42,18 +42,32 @@ assert set(TASK_TYPE_DESCRIPTIONS) == set(VALID_TASK_TYPES), (
     f"仅注册表有 {set(VALID_TASK_TYPES) - set(TASK_TYPE_DESCRIPTIONS)}"
 )
 
-PERSONA_PACKS = [
-    "game-core",
-    "competitive-esport",
-    "family-casual",
-    "indie-creative",
-    "mobile-f2p",
-    "vr-immersive",
-    "accessibility",
-    "educational-serious",
-    "general-consumer",
-    "startup-panel",
-]
+def _discover_persona_packs():
+    """人格包清单从 src/personas/ 现算，不写死。
+
+    写死过一次的代价：这里曾是一份手写的 10 项列表，而 src/personas/ 下已经有 11 个
+    YAML（新增的 launch-compliance 没人补进来）——于是 MCP 客户端**根本选不到**
+    那个包，run_synthetic_review 会直接以"未知人格包"拒绝。加包的人不会想到
+    还要来改这个列表，所以下次一定还会漏。现算就不会。
+
+    排序固定（sorted）：这个列表会出现在 MCP 工具的参数说明里，顺序抖动会让
+    客户端缓存的 schema 无谓失效。
+    """
+    import glob
+
+    paths = glob.glob(os.path.join(_SRC_DIR, "personas", "*.yaml"))
+    packs = sorted(os.path.splitext(os.path.basename(p))[0] for p in paths)
+    # 兜底：真出现空目录（打包漏文件之类）时不要静默返回空列表——那会让所有
+    # 调用都以"未知人格包"失败，而错误信息指向的方向完全是错的。
+    if not packs:
+        raise RuntimeError(
+            f"{os.path.join(_SRC_DIR, 'personas')} 下一个人格包 YAML 都没有，"
+            "MCP 无法提供评审能力——先确认部署是否漏带了 src/personas/。"
+        )
+    return packs
+
+
+PERSONA_PACKS = _discover_persona_packs()
 
 VALID_MODES = ("quick", "standard", "full")
 
@@ -171,10 +185,17 @@ def run_synthetic_review(
         return {"error": f"材料解析失败: {e}"}
 
     personas_path = os.path.join(_SRC_DIR, "personas", f"{personas_pack}.yaml")
+    # mode 必须真的传下去。以前上面校验完 mode 合法性就把它丢了，run_panel 收到 None
+    # 走全量流程：不截人数、交叉质询和校准全跑。也就是 MCP 客户端选 quick 想省钱，
+    # 实际按最贵的档在花，而且没有任何地方看得出来。
+    # 同型的 bug 在 src/cli.py 修过一次（那边注释写着"以前只在 _print 里露个脸就被丢掉"），
+    # 当时没意识到 MCP 这条通道有一份一模一样的断链——这正是本仓库最常见的
+    # "一条链路修了、另一条没修"。
     result = runner_cli.run_panel(
         task_type=task_type,
         artifact_bundle=bundle,
         personas_path=personas_path,
+        mode=mode,
     )
 
     return {

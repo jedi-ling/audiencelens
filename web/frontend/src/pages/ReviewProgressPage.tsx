@@ -12,7 +12,7 @@
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchReview } from '@/lib/api'
-import { api } from '@/lib/apiClient'
+import { api, claimPendingReviews } from '@/lib/apiClient'
 import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { cn } from '@/lib/utils'
@@ -61,6 +61,9 @@ export default function ReviewProgressPage() {
   // v2 精简数据（含 error_message / report）
   const [detail, setDetail] = useState<ReviewDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  /** 首次加载失败的真实原因。只在两条链路都拿不到数据时用于区分
+   *  「这条评审不存在」和「没能加载出来」——以前两者都渲染成「未找到评审记录」 */
+  const [loadError, setLoadError] = useState<Error | null>(null)
   const [crossExamPhase, setCrossExamPhase] = useState<PhaseStatus>('waiting')
   const [aggregationPhase, setAggregationPhase] = useState<PhaseStatus>('waiting')
 
@@ -94,20 +97,22 @@ export default function ReviewProgressPage() {
 
   const loadReview = useCallback(async () => {
     if (!id) return
-    // v1 优先：数据更全；v2 创建的评审同库同表，v1 端点通常也能取到
-    try {
-      const data = await fetchReview(id)
-      setReview(data)
-      sourceRef.current = 'v1'
-      if (data.status === 'completed') {
-        setCrossExamPhase('completed')
-        setAggregationPhase('completed')
+
+    // v1 优先：数据更全；v2 创建的评审同库同表，v1 端点通常也能取到。
+    // v2 这一步的异常**不吞**——外层要靠它决定是否走认领重试。
+    const attempt = async () => {
+      try {
+        const data = await fetchReview(id)
+        setReview(data)
+        sourceRef.current = 'v1'
+        if (data.status === 'completed') {
+          setCrossExamPhase('completed')
+          setAggregationPhase('completed')
+        }
+        return
+      } catch {
+        // 回落 v2
       }
-      return
-    } catch {
-      // 回落 v2
-    }
-    try {
       const d = await api.getReview(id)
       setDetail(d)
       sourceRef.current = 'v2'
@@ -115,8 +120,30 @@ export default function ReviewProgressPage() {
         setCrossExamPhase('completed')
         setAggregationPhase('completed')
       }
-    } catch {
-      // 两条链路都取不到 → 渲染「未找到」
+    }
+
+    try {
+      await attempt()
+      setLoadError(null)
+    } catch (firstError) {
+      // 两条链路都取不到，最常见的原因是"这条评审是匿名跑的，还挂在共享的
+      // anonymous 桶里"，而这个浏览器刚拿到独立身份（登录 / 注册 / 兑换 CDK
+      // 拿游客 token）——后端按 user_id 精确比对归属，于是立刻 404。
+      // 认领一次再重试，写法与 ReportPage 的兜底一致；只修 ReportPage 不修这里
+      // 的话，用户从"发起评审→进度页"这条最主要的路径上照样看到"未找到评审记录"。
+      let recovered = false
+      try {
+        const claimed = await claimPendingReviews()
+        if (claimed.includes(id)) {
+          await attempt()
+          recovered = true
+        }
+      } catch {
+        // 认领这条兜底路径自己也失败了（未登录 / 限流 / 后端不支持）。它的失败
+        // 原因对用户没有意义——该看到的是下面这个"第一次为什么加载不出来"。
+      }
+      if (recovered) setLoadError(null)
+      else setLoadError(firstError instanceof Error ? firstError : new Error(String(firstError)))
     }
   }, [id])
 
@@ -404,10 +431,30 @@ export default function ReviewProgressPage() {
   }
 
   if (!review && !detail) {
+    // 「加载失败」和「真的没有这条评审」必须分开说：以前一律显示"未找到评审记录"，
+    // 断网 / 500 / 403 全被伪装成"这条评审不存在"，用户会以为数据没了。
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-        <p className="text-text-secondary">未找到评审记录</p>
-        <Link to="/history" className="text-cyan hover:text-cyan-dim mt-4 inline-block">返回评审历史</Link>
+        {loadError ? (
+          <>
+            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-3" strokeWidth={1.25} />
+            <p className="text-text-secondary mb-1">没能加载这条评审</p>
+            <p className="text-text-muted text-xs mb-1 break-all">{loadError.message}</p>
+            <p className="text-text-muted text-xs mb-5">这不代表评审被删除了，评审仍在后台继续运行</p>
+            <button
+              onClick={() => {
+                setLoading(true)
+                void loadReview().finally(() => setLoading(false))
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-text-primary transition-colors"
+            >
+              重试
+            </button>
+          </>
+        ) : (
+          <p className="text-text-secondary">未找到评审记录</p>
+        )}
+        <Link to="/history" className="text-cyan hover:text-cyan-dim mt-4 block">返回评审历史</Link>
       </div>
     )
   }

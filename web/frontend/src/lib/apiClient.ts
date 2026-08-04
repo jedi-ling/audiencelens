@@ -42,6 +42,36 @@ const PENDING_REVIEWS_KEY = 'al.pending_reviews'
 /** 本地待认领清单的条数上限——localStorage 不是数据库，超出丢最旧的 */
 const PENDING_REVIEWS_MAX = 20
 
+/* ------------------------------------------------------------------ *
+ * 评估（8 维记分卡）的返回形状
+ *
+ * 这两个类型此前不存在：runEvaluation/getEvaluation 只声明了
+ * { review_id, overall_score, passed }，而后端 EvaluationScorecardResponse
+ * 一直还返回 results[] 与 critical_failures。类型撒谎的代价不是眼下报错——
+ * 是后续把页面从 lib/api 的 v1 函数迁到这里的人，照类型判断"拿不到明细"，
+ * 于是要么重复请求、要么干脆不渲染维度详情。字段对齐 web/backend
+ * app/schemas/__init__.py 的 EvaluationResultResponse。
+ * ------------------------------------------------------------------ */
+
+export interface EvaluationDimensionResult {
+  id: string
+  review_id: string
+  dimension: string
+  score: number
+  passed: boolean
+  details: string
+  /** ISO8601（后端 datetime 序列化结果） */
+  evaluated_at: string
+}
+
+export interface EvaluationScorecardPayload {
+  review_id: string
+  overall_score: number
+  passed: boolean
+  results: EvaluationDimensionResult[]
+  critical_failures: string[]
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -310,15 +340,10 @@ export const api = {
 
   /** 手动对已完成评审运行 8 维质量评估（创建时没开 enable_evaluation 的补跑入口） */
   runEvaluation: (reviewId: string) =>
-    request<{ review_id: string; overall_score: number; passed: boolean }>(
-      `/api/evaluations/${reviewId}`,
-      { method: 'POST' },
-    ),
+    request<EvaluationScorecardPayload>(`/api/evaluations/${reviewId}`, { method: 'POST' }),
 
   getEvaluation: (reviewId: string) =>
-    request<{ review_id: string; overall_score: number; passed: boolean }>(
-      `/api/evaluations/${reviewId}`,
-    ),
+    request<EvaluationScorecardPayload>(`/api/evaluations/${reviewId}`),
 
   getReview: (id: string) => request<ReviewDetail>(`/api/v2/reviews/${id}`),
 

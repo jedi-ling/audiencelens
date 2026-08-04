@@ -41,7 +41,14 @@ def init_db() -> None:
 def _reap_orphans() -> None:
     """进程重启后，上一个进程遗留的 queued/running 任务永远不会有人接手
     （队列在内存里）——不收尸的话对应评审就一直"进行中"转圈到天荒地老。
-    启动时统一标记 failed，用户端能看到明确的失败提示并重新发起。"""
+    启动时统一标记 failed，用户端能看到明确的失败提示并重新发起。
+
+    标 failed 只是**用户看得见**的那一半。另一半是钱：这些评审在发起时就已经
+    扣了 CDK 次数 / 占了日配额名额（见 quota_service.check_quota），而退还逻辑
+    此前只存在于 review_service 的进程内异常分支——进程被重启的那一刻，
+    那段代码根本没有机会跑。后果是用户花钱买的次数凭空消失，且账面上完全
+    看不出来。所以收尸必须连计费一起收，见 _settle_reaped_reviews。
+    """
     from datetime import datetime, timezone
 
     from sqlalchemy import text
@@ -49,6 +56,14 @@ def _reap_orphans() -> None:
     msg = "服务重启，任务中断——请重新发起评审"
     now = datetime.now(timezone.utc)
     with engine.connect() as conn:
+        # 先把待收尸的评审捞出来：UPDATE 之后就分不清"这条是刚被我收尸的"
+        # 还是"上一次启动就已经是 failed 的"了，而退款必须只针对前者。
+        orphans = [
+            (row[0], row[1])
+            for row in conn.execute(
+                text("SELECT id, user_id FROM reviews WHERE status IN ('pending','running')")
+            ).fetchall()
+        ]
         jobs = conn.execute(
             text(
                 "UPDATE jobs SET status='failed', error_message=:msg, finished_at=:now "
@@ -72,6 +87,76 @@ def _reap_orphans() -> None:
             jobs.rowcount,
             reviews.rowcount,
         )
+    _settle_reaped_reviews(orphans)
+
+
+def _settle_reaped_reviews(orphans) -> None:
+    """被收尸的评审在计费侧也要收干净：退次数、还名额、清过期占位。
+
+    为什么用 ORM 会话而不是上面那条裸连接：判定"这条评审当时花的是谁的钱"
+    要读 jobs.payload（JSON 列），跨 SQLite/PostgreSQL 的裸 SQL 写法不一样；
+    而退还本身要复用 quota_service 那两个幂等原语（它们以 review_id 为幂等键
+    写 credit_ledger，可核对），不能在这里另写一份——同一件事两套实现正是
+    本仓库反复出现"v2 修了 v1 没修"的根因。
+
+    延迟导入 app.services：本模块被 app.services 间接依赖，模块级 import 会
+    形成环；而 _reap_orphans 只在 init_db()（进程启动、模块早已加载完）里跑，
+    这时导入是安全的。
+
+    失败绝不静默：每条评审单独兜异常并打 ERROR 级堆栈，说清"谁的额度可能被吞"，
+    然后继续处理下一条——不能让一条坏数据把整批退款连坐掉，也不能让它拦住启动。
+    """
+    import logging
+
+    log = logging.getLogger("audiencelens")
+
+    # 注意：即使这次一条孤儿都没有，下面的过期占位清理也照跑——上一个进程
+    # 可能是被 kill -9 掉的，那时评审已经结束、占位却没人释放。
+    from app.models import Job
+    from app.services import quota_service
+
+    db: Session = SessionLocal()
+    refunded = released = stale = 0
+    try:
+        for review_id, user_id in orphans:
+            uid = user_id or "anonymous"
+            try:
+                job = (
+                    db.query(Job)
+                    .filter(Job.kind == "review", Job.ref_id == review_id)
+                    .order_by(Job.created_at.desc())
+                    .first()
+                )
+                # 谁付的钱在入队时就记在 job.payload 里了（review_service.enqueue_review）。
+                # 读不到就当 BYOK：BYOK 从来不扣次数也不占名额，退了才是凭空发额度。
+                key_source = ((job.payload or {}).get("key_source") if job else None) or "byok"
+                if key_source != "server":
+                    continue
+                if quota_service.refund_review_credit(db, uid, review_id, key_source="server"):
+                    refunded += 1
+                if quota_service.release_review_slot(db, uid, key_source="server"):
+                    released += 1
+            except Exception:
+                db.rollback()
+                log.exception(
+                    "启动收尸：评审 %s 的计费回收失败——用户 %s 的次数/配额可能被吞，需人工核对",
+                    review_id,
+                    uid,
+                )
+        try:
+            stale = quota_service.sweep_stale_reservations(db)
+        except Exception:
+            db.rollback()
+            log.exception("启动收尸：清理过期配额占位失败")
+        if refunded or released or stale:
+            log.warning(
+                "启动收尸：退还 %d 次 CDK、释放 %d 个日配额占位、清理 %d 条过期占位",
+                refunded,
+                released,
+                stale,
+            )
+    finally:
+        db.close()
 
 
 def _legacy_migrations() -> None:

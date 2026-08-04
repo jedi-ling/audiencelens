@@ -21,7 +21,13 @@ interface ReviewState {
   createNewReview: (data: {
     task_type: string
     artifact_bundle: Record<string, unknown>
-    persona_pack?: string
+    /** 必填，且必须是 selected_personas 真正所属的那个包。
+     *  以前这里是可选的、下面还有个 `?? 'game-core'` 兜底：Wizard 未选包时
+     *  允许跨包挑人，提交时却被兜底成 game-core，后端
+     *  PersonaService.select_panel_by_mode 只在该包内按 id 过滤，
+     *  用户选的 VR / 无障碍等人格被整包丢弃且零提示。兜底删掉后，
+     *  "选了谁"与"跑了谁"必须由调用方保证一致。 */
+    persona_pack: string
     selected_personas?: string[]
     mode?: string
     skill_type?: SkillType
@@ -75,7 +81,8 @@ export const useReviewStore = create<ReviewState>((set) => ({
         materials: (data.artifact_bundle.materials ?? []) as Array<{ type: string; description: string }>,
       },
       mode: (data.mode ?? 'standard') as ReviewMode,
-      persona_pack: (data.persona_pack ?? 'game-core') as PersonaPack,
+      // 不再兜底成 'game-core'：那个兜底正是"用户选的人格被静默丢弃"的成因。
+      persona_pack: data.persona_pack as PersonaPack,
       selected_personas: data.selected_personas?.length ? data.selected_personas : undefined,
       skill_type: data.skill_type ?? null,
       enable_evaluation: data.enable_evaluation ?? false,

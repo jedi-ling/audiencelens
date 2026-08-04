@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router'
 import { useState, useEffect } from 'react'
 import { fetchReview, fetchEvaluation, fetchEthicsReport } from '@/lib/api'
+import { ApiError } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import type { Review, EvaluationScorecard, EthicsReportView } from '@/lib/mock-data'
 import {
@@ -12,8 +13,27 @@ import {
   stereotypeRiskLabel,
   toEthicsReportView,
 } from '@/lib/mock-data'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, AlertCircle, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
 import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+
+/** 「还没生成」和「加载失败」必须分开：前者是正常状态，后者是故障。
+ *  后端 GET /api/evaluations/{id} 在没有记分卡时返回 404，其余状态码都是真故障。 */
+function isNotGenerated(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404
+}
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+/** created_at / completed_at 在库里都可能是 null（评审还没跑完、旧数据缺列）。
+ *  以前直接 new Date(null) → 1970-01-01，页面上煞有介事地显示一个假时间。
+ *  取不到就明说取不到。 */
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('zh-CN')
+}
 
 export default function EvaluationPage() {
   const { id } = useParams()
@@ -22,28 +42,51 @@ export default function EvaluationPage() {
   // 存收敛后的视图：违规项与风险档位在进 state 前就已经过类型守卫
   const [ethicsData, setEthicsData] = useState<EthicsReportView[]>([])
   const [loading, setLoading] = useState(true)
+  /* 三个来源各自记错。
+   *
+   * 以前是 Promise.all([...]) + catch{ignore}：任意一个失败就整块没有数据，
+   * 页面统一渲染成「评估报告尚未生成」。最常见的表现是——评估明明已经跑完，
+   * 只是伦理报告接口抖了一下，用户看到的却是"没生成，请先运行评估"，
+   * 于是又去重跑一次评估。现在各自降级，且失败原因如实显示。 */
+  const [reviewError, setReviewError] = useState<unknown>(null)
+  const [scorecardError, setScorecardError] = useState<unknown>(null)
+  const [ethicsError, setEthicsError] = useState<unknown>(null)
   const [expandedDimensions, setExpandedDimensions] = useState<Set<string>>(new Set())
+  /** 失败后手动重试的扳机：自增一次就重新拉一遍三份数据 */
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   useEffect(() => {
     if (!id) return
+    let alive = true
     const loadData = async () => {
-      try {
-        const [reviewData, scorecardData, ethicsResult] = await Promise.all([
-          fetchReview(id),
-          fetchEvaluation(id),
-          fetchEthicsReport(id),
-        ])
-        setReview(reviewData)
-        setScorecard(scorecardData)
-        setEthicsData(ethicsResult.map(toEthicsReportView))
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false)
-      }
+      const [reviewRes, scorecardRes, ethicsRes] = await Promise.allSettled([
+        fetchReview(id),
+        fetchEvaluation(id),
+        fetchEthicsReport(id),
+      ])
+      if (!alive) return
+      if (reviewRes.status === 'fulfilled') setReview(reviewRes.value)
+      else setReviewError(reviewRes.reason)
+      if (scorecardRes.status === 'fulfilled') setScorecard(scorecardRes.value)
+      else setScorecardError(scorecardRes.reason)
+      // 伦理报告缺失是常态（没跑过伦理检查），不该拦住整页；只在真故障时提示
+      if (ethicsRes.status === 'fulfilled') setEthicsData(ethicsRes.value.map(toEthicsReportView))
+      else setEthicsError(ethicsRes.reason)
+      setLoading(false)
     }
-    loadData()
-  }, [id])
+    void loadData()
+    return () => {
+      alive = false
+    }
+  }, [id, reloadNonce])
+
+  const handleRetry = () => {
+    setLoading(true)
+    setReviewError(null)
+    setScorecardError(null)
+    setEthicsError(null)
+    setReloadNonce((n) => n + 1)
+  }
 
   if (loading) {
     return (
@@ -55,11 +98,33 @@ export default function EvaluationPage() {
   }
 
   if (!review || !scorecard) {
+    // 只有"确实还没跑过评估"才说尚未生成；其余一律如实报故障，
+    // 免得用户对着一个 500 反复点"重新运行评估"。
+    const blocking = !scorecard ? scorecardError : reviewError
+    const notGenerated = !scorecard && isNotGenerated(scorecardError)
     return (
       <div className="max-w-6xl mx-auto px-4 py-16 text-center">
-        <FlaskConical className="w-10 h-10 text-text-muted mx-auto mb-4" strokeWidth={1.25} />
-        <p className="text-text-secondary mb-2">评估报告尚未生成</p>
-        <p className="text-text-muted text-sm mb-6">请先在评审报告页运行评估</p>
+        {notGenerated ? (
+          <>
+            <FlaskConical className="w-10 h-10 text-text-muted mx-auto mb-4" strokeWidth={1.25} />
+            <p className="text-text-secondary mb-2">评估报告尚未生成</p>
+            <p className="text-text-muted text-sm mb-6">请先在评审报告页运行评估</p>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-4" strokeWidth={1.25} />
+            <p className="text-text-secondary mb-2">没能加载评估报告</p>
+            <p className="text-text-muted text-sm mb-1 break-all">{errMessage(blocking)}</p>
+            <p className="text-text-muted text-sm mb-6">这不代表评估没跑过——接口可能临时抖动，点下面重试</p>
+            <button
+              onClick={handleRetry}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-all mb-6"
+            >
+              <Loader2 className="w-4 h-4" strokeWidth={1.25} />
+              重试
+            </button>
+          </>
+        )}
         <Link
           to={`/review/${id}/report`}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-all text-sm"
@@ -245,6 +310,18 @@ export default function EvaluationPage() {
         </div>
       </div>
 
+      {/* 伦理报告拉失败不该悄悄消失成"这次没有伦理问题"——空数据当正常值渲染
+          正是最容易骗人的一种。404（本来就没跑伦理检查）不算故障，不提示。 */}
+      {ethicsError !== null && !isNotGenerated(ethicsError) && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
+          <p className="text-xs text-text-secondary break-all">
+            伦理摘要没能加载（{errMessage(ethicsError)}）——不代表没有伦理问题，只是这一块没取到。
+            上面的 8 维评分不受影响。
+          </p>
+        </div>
+      )}
+
       {ethicsData.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
@@ -334,18 +411,22 @@ export default function EvaluationPage() {
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-text-secondary">评审创建</span>
-            <span className="text-text-muted font-mono text-xs">{new Date(review.created_at).toLocaleString('zh-CN')}</span>
+            <span className="text-text-muted font-mono text-xs">{formatTime(review.created_at)}</span>
           </div>
           {review.completed_at && (
             <div className="flex items-center gap-2">
               <span className="text-text-secondary">评审完成</span>
-              <span className="text-text-muted font-mono text-xs">{new Date(review.completed_at).toLocaleString('zh-CN')}</span>
+              <span className="text-text-muted font-mono text-xs">{formatTime(review.completed_at)}</span>
             </div>
           )}
           {skill && (
             <div className="flex items-center gap-2">
               <span className="text-text-secondary">使用技能</span>
-              <span className={cn('text-xs', skill.color)}>{skill.icon} {skill.name}</span>
+              {/* SKILLS[].icon 是图片路径不是 emoji，直接当文本渲染会显示出路径 */}
+              <span className={cn('flex items-center gap-1.5 text-xs', skill.color)}>
+                <img src={skill.icon} alt="" className="h-4 w-4 object-contain" loading="lazy" />
+                {skill.name}
+              </span>
             </div>
           )}
         </div>

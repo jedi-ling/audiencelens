@@ -920,13 +920,16 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (!id) return
+    // 依赖里不能有 reportMarkdown：setReportMarkdown 会再触发一次本 effect，
+    // 白白多打一次 /result。加载 HTML/MD 只跟评审 id 有关，跑一次即可；
+    // 里面 !reportMarkdown 的守卫是为了不覆盖上方 loadData 已取到的 markdown。
     fetchReviewResult(id)
       .then((result) => {
         if (result.report_html) setReportHtml(result.report_html)
         if (result.report_md && !reportMarkdown) setReportMarkdown(result.report_md)
       })
       .catch(() => {})
-  }, [id, reportMarkdown])
+  }, [id])
 
   useEffect(() => {
     if (!id) return

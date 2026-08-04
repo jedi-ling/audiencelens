@@ -96,6 +96,8 @@ export default function ReviewHistoryPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  /** 正在等二次确认的那条。页面内确认，不用 window.confirm——理由见 askDelete */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const loadFirstPage = useCallback(async () => {
     try {
@@ -138,10 +140,24 @@ export default function ReviewHistoryPage() {
     }
   }
 
+  /** 点垃圾桶：只进入"待确认"状态，不真删。
+   *
+   * 二次确认曾经用 window.confirm，实测不可靠：Chrome 在同一页面连弹几次后会给出
+   * "阻止此页面创建更多对话框"的勾选框，用户勾上之后 confirm() 直接静默返回 false，
+   * 于是点删除永远没反应、也没有任何报错——表现就是"删不掉"。某些内嵌 WebView
+   * 也会整体屏蔽这类对话框。AskPage 已经因此改成页面内确认，这里统一成同一种写法。
+   */
+  const askDelete = (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setError(null)
+    setConfirmingId((prev) => (prev === id ? null : id))
+  }
+
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!window.confirm('确定删除这条评审记录吗？此操作无法撤销。')) return
+    setConfirmingId(null)
     setDeletingId(id)
     try {
       await deleteReview(id)
@@ -226,6 +242,48 @@ export default function ReviewHistoryPage() {
             const sc = statusConfig[r.status] ?? statusConfig.pending
             const mb = modeBadgeConfig[r.mode] ?? modeBadgeConfig.standard
             const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
+            const label = r.target_title || taskTypeName(r.task_type)
+
+            // 二次确认直接长在这一行里。整行不再可点（避免"想点取消结果打开了评审"）。
+            if (confirmingId === r.id) {
+              return (
+                <div
+                  key={r.id}
+                  role="alertdialog"
+                  aria-label={`确认删除「${label}」`}
+                  className="rounded-xl border-2 border-severity-critical/40 bg-severity-critical/5 p-4"
+                >
+                  <p className="mb-2 text-sm leading-relaxed text-text-secondary">
+                    删除「<span className="text-text-primary">{label}</span>」？
+                    <br />
+                    <span className="text-xs text-text-muted">
+                      报告、各角色意见、全部追问记录一起没，无法撤销。
+                    </span>
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      autoFocus
+                      onClick={(e) => void handleDelete(e, r.id)}
+                      disabled={deletingId === r.id}
+                      className="flex items-center gap-1.5 rounded-lg bg-severity-critical/85 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-severity-critical disabled:opacity-60"
+                    >
+                      {deletingId === r.id && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />}
+                      删除
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfirmingId(null)
+                      }}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+
             return (
               <div
                 key={r.id}
@@ -238,9 +296,7 @@ export default function ReviewHistoryPage() {
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-text-primary truncate">
-                      {r.target_title || taskTypeName(r.task_type)}
-                    </span>
+                    <span className="font-medium text-text-primary truncate">{label}</span>
                     <span
                       className={cn('shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium', mb.bg, mb.color)}
                     >
@@ -268,10 +324,11 @@ export default function ReviewHistoryPage() {
                 )}
 
                 <button
-                  onClick={(e) => handleDelete(e, r.id)}
+                  onClick={(e) => askDelete(e, r.id)}
                   disabled={deletingId === r.id}
                   className="shrink-0 p-1.5 rounded-md text-text-muted hover:text-severity-critical hover:bg-severity-critical/10 transition-colors disabled:opacity-50"
-                  title="删除"
+                  aria-label={`删除「${label}」`}
+                  title="删除这条评审（会二次确认）"
                 >
                   {deletingId === r.id ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.25} />

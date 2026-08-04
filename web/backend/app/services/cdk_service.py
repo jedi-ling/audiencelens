@@ -220,14 +220,24 @@ def credit_balance(db: Session, user_id: str) -> int:
     return int(total or 0)
 
 
-def _credit_lock_key(user_id: str) -> int:
-    """把 user_id 映射成 pg_advisory_lock 需要的 64 位有符号整数。"""
-    digest = hashlib.blake2b(f"al:credits:{user_id}".encode("utf-8"), digest_size=8).digest()
+def _advisory_lock_key(namespace: str, user_id: str) -> int:
+    """把 (资源命名空间, user_id) 映射成 pg_advisory_lock 需要的 64 位有符号整数。
+
+    命名空间必须进摘要：次数流水和配额预留是两种独立资源，共用一把锁只会
+    让互不相干的两条路径互相排队；而两个命名空间碰撞成同一个整数，则会让
+    "扣次数"和"占配额"看起来像同一把锁——都不是我们要的。
+    """
+    digest = hashlib.blake2b(f"al:{namespace}:{user_id}".encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "big", signed=True)
 
 
-def _serialize_credit_writes(db: Session, user_id: str) -> None:
-    """把同一用户的次数扣减/退还串行化到本事务结束。
+def _credit_lock_key(user_id: str) -> int:
+    """次数流水这条资源的锁键（命名空间固定为 credits，取值与历史一致）。"""
+    return _advisory_lock_key("credits", user_id)
+
+
+def serialize_user_writes(db: Session, user_id: str, namespace: str = "credits") -> None:
+    """把同一用户在同一资源上的"先查后写"串行化到本事务结束。
 
     这里以前只有一条 `INSERT ... SELECT ... WHERE (子查询)`，注释还写着
     "检查与扣减在同一条语句里，并发不可能双花"。那句话在 SQLite 上碰巧成立
@@ -237,10 +247,21 @@ def _serialize_credit_writes(db: Session, user_id: str) -> None:
     事务级 advisory lock 是代价最小的正解：不动"流水求和才是事实源"这个模型
     （改成可变计数器就会与流水漂移），锁随 commit/rollback 自动释放，
     也不会在 SQLite 上引入任何行为变化（那边直接跳过）。
+
+    做成带命名空间的公共函数，是因为 quota_service 的日配额预留是**同一形状
+    的并发缺陷**（检查与占位之间无锁），必须用同一套防线；抄一份到那边迟早
+    会出现"一边修了一边没修"，那正是这个仓库反复踩的坑。
     """
     if db.get_bind().dialect.name != "postgresql":
         return
-    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _credit_lock_key(user_id)})
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(:k)"), {"k": _advisory_lock_key(namespace, user_id)}
+    )
+
+
+def _serialize_credit_writes(db: Session, user_id: str) -> None:
+    """次数扣减/退还专用的串行化入口（见 serialize_user_writes）。"""
+    serialize_user_writes(db, user_id, "credits")
 
 
 def try_consume_credit(db: Session, user_id: str, ref_id: Optional[str] = None) -> bool:

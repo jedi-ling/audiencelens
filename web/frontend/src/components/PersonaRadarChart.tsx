@@ -69,10 +69,14 @@ export default function PersonaRadarChart({ data, compareData, name1 = '角色 A
   const normalizedData = normalizeData(data)
   const normalizedCompare = compareData ? normalizeData(compareData) : undefined
 
-  const chartData = normalizedData.map((d, i) => ({
+  // 对比数据按轴名（已归一化成中文 label）配对，而不是按数组下标：
+  // 不同角色包 behavior_profile 的键序可能不同，按下标配对会整条错位。
+  // 找不到对应维度就留给 recharts 按缺失值处理（不画该顶点），不硬凑错位数据。
+  const compareByAxis = new Map((normalizedCompare ?? []).map((c) => [c.axis, c.value]))
+  const chartData = normalizedData.map((d) => ({
     axis: d.axis,
     value1: d.value,
-    value2: normalizedCompare?.[i]?.value ?? undefined,
+    value2: compareByAxis.get(d.axis),
   }))
 
   const fontSize = computedSize < 200 ? 8 : computedSize < 300 ? 9 : 10

@@ -1,9 +1,13 @@
 import argparse
 import concurrent.futures
+import copy
 import json
 import logging
 import os
+import random
+import re
 import threading
+import time
 from typing import Callable, List, Optional
 
 import yaml
@@ -32,6 +36,7 @@ try:
         render_prompt,
         select_model,
     )
+    from .llm_client import is_retryable_error
     from .validator import load_schema, validate_output
 except ImportError:
     from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
@@ -54,6 +59,7 @@ except ImportError:
         render_prompt,
         select_model,
     )
+    from runner.llm_client import is_retryable_error
     from runner.validator import load_schema, validate_output
 
 SIMULATION_WARNING = (
@@ -164,6 +170,138 @@ class AllPersonasFailedError(RuntimeError):
             f"全部 {self.attempted} 位人格评审失败，未产出任何有效输出，因此不产出报告。"
             f"各人格错误：{details}"
         )
+
+
+# ---- 重试口径（budget.yaml 的 retry 段，见那里的注释）----
+#
+# 这四个值就是 retry_on 认的全部取值。配置里写别的会被忽略——但不是静默忽略：
+# _retry_settings 会把无法识别的值原样带进返回值的 unknown 字段，run_panel 把它
+# 记进 report["validation"]["retry"]，让"配了个拼错的旋钮"看得见。
+RETRY_TRANSPORT = "transport_error"
+RETRY_SCHEMA = "schema_failure"
+RETRY_ROLE_DRIFT = "role_drift"
+RETRY_HALLUCINATION = "hallucination"
+KNOWN_RETRY_REASONS = (RETRY_TRANSPORT, RETRY_SCHEMA, RETRY_ROLE_DRIFT, RETRY_HALLUCINATION)
+
+# schema 校验里哪些字段不合格算"这位人格根本没交出可用意见"（硬失败、计入
+# failed_personas / degradation），哪些只是元数据瑕疵（标注即可）。
+#
+# 判断依据：报告是从哪些字段拼出来的。evidence / key_issues / scores /
+# primary_stance / persona_id 缺失或形状不对，聚合器就只能拿到空东西——那位人格
+# 出现在"N 位角色完成评审"里但一句话没贡献，正是本仓库反复清理的那种谎话。
+# 反过来，persona_version 没填、meta 里多个字段这类问题不影响任何结论，
+# 把它们也判成失败会让第三方 BYOK 模型（几乎没人严格守 additionalProperties:false）
+# 大面积"评审失败"，那是另一种形式的不诚实。
+BLOCKING_SCHEMA_FIELDS = frozenset({
+    "persona_id",
+    "primary_stance",
+    "evidence",
+    "key_issues",
+    "scores",
+})
+
+_REQUIRED_PROP_RE = re.compile(r"'([^']+)' is a required property")
+
+
+def _schema_error_field(message: str) -> str:
+    """从 validate_schema 拼出来的错误字符串里取出"这条错误说的是哪个顶层字段"。
+
+    validate_schema 返回的是 f"{'.'.join(path)}: {message}"，两种形态：
+      · "evidence.0.inference_level: 'x' is not one of [...]" → 顶层字段 evidence
+      · ": 'evidence' is a required property"（路径为空，缺顶层必填字段）→ evidence
+    """
+    path, _, detail = message.partition(": ")
+    if path:
+        return path.split(".")[0]
+    m = _REQUIRED_PROP_RE.search(detail)
+    return m.group(1) if m else ""
+
+
+def blocking_schema_errors(schema_errors: List[str]) -> List[str]:
+    """挑出"足以让这位人格作废"的 schema 错误，见 BLOCKING_SCHEMA_FIELDS 的说明。"""
+    return [e for e in schema_errors if _schema_error_field(e) in BLOCKING_SCHEMA_FIELDS]
+
+
+def _retry_settings(budget_config: dict) -> dict:
+    """把 budget.yaml 的 retry 段读成引擎真正用得上的形状。
+
+    配置缺失时退回"不重试"——不是退回某个隐含默认值。默认值藏在代码里、
+    配置文件里看不见，本身就是下一个"配置和行为对不上"的种子。
+    """
+    raw = (budget_config or {}).get("retry") or {}
+    try:
+        max_retries = int(raw.get("max_retries_per_persona") or 0)
+    except (TypeError, ValueError):
+        max_retries = 0
+    try:
+        backoff = float(raw.get("backoff_base_seconds") or 1.0)
+    except (TypeError, ValueError):
+        backoff = 1.0
+
+    configured = raw.get("retry_on") or []
+    if isinstance(configured, str):
+        configured = [configured]
+    reasons = [r for r in configured if r in KNOWN_RETRY_REASONS]
+    unknown = [r for r in configured if r not in KNOWN_RETRY_REASONS]
+
+    return {
+        "max_retries": max(0, max_retries),
+        "retry_on": reasons,
+        "unknown_retry_on": unknown,
+        "backoff_base_seconds": max(0.0, backoff),
+    }
+
+
+def _backoff_sleep(attempt: int, backoff_base_seconds: float) -> None:
+    """指数退避 + 抖动，与 llm_client.chat_completion 同一口径。
+
+    重试预算在 run_single_persona 一层统一管理（见 2.3 的实现说明），
+    所以传输层调用 chat_completion 时不再叠它的 max_retries——退避在这里做，
+    才能让"总共最多重试 N 次"真的只有一套计数。
+    """
+    delay = backoff_base_seconds * (2 ** attempt)
+    time.sleep(delay + random.uniform(0, backoff_base_seconds))
+
+
+def _validation_failure_reason(validation: dict) -> Optional[str]:
+    """把 validate_output 的布尔结论翻译成 retry_on / 门控认的失败类型。
+
+    优先顺序：schema_failure → role_drift → hallucination，只返回第一个命中的——
+    门控和重试都只需要"这一条为什么失败"，细节留给 error 消息。
+    schema 只认 BLOCKING_SCHEMA_FIELDS（persona_id/primary_stance/evidence/
+    key_issues/scores）上的错误：meta 里多个字段这类不伤结论的瑕疵，重试一百次
+    也一样，不该烧钱也不该拦人（见 BLOCKING_SCHEMA_FIELDS 的说明）。
+    """
+    if not validation.get("schema_valid"):
+        schema = (validation.get("details") or {}).get("schema") or {}
+        if blocking_schema_errors(schema.get("errors") or []):
+            return RETRY_SCHEMA
+    if not validation.get("role_consistent"):
+        return RETRY_ROLE_DRIFT
+    if not validation.get("evidence_grounded"):
+        return RETRY_HALLUCINATION
+    return None
+
+
+def _validation_error_message(validation: dict, reason: str) -> str:
+    """把一条校验失败翻译成能直接进 failed_personas[].error 的人话。"""
+    details = validation.get("details") or {}
+    if reason == RETRY_SCHEMA:
+        schema = details.get("schema") or {}
+        top = blocking_schema_errors(schema.get("errors") or [])[:2]
+        return "校验未通过（schema_failure）" + (f"：{'; '.join(top)}" if top else "")
+    if reason == RETRY_ROLE_DRIFT:
+        role = details.get("role") or {}
+        issues = role.get("issues") or ["角色一致性不达标"]
+        return "校验未通过（role_drift）：" + "; ".join(issues)
+    if reason == RETRY_HALLUCINATION:
+        evidence = details.get("evidence") or {}
+        risk = float(evidence.get("hallucination_risk", 0.0) or 0.0)
+        return (
+            f"校验未通过（hallucination）：direct 证据 {risk:.0%} 在材料中找不到出处"
+            "（阈值 30%），疑似幻觉"
+        )
+    return f"校验未通过：{reason}"
 
 
 def _is_dissenter(persona: dict) -> bool:

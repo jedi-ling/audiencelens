@@ -23,7 +23,25 @@ model_pricing:
   claude-opus-4-20250514:
     input_per_mtok: 15.0
     output_per_mtok: 75.0
+# 人格评审的重试。**这一段的每个键都有真实读取点**（src/runner/cli.py 的
+# _retry_settings / run_single_persona，以及 llm_client.chat_completion 的
+# max_retries/backoff）——在这里加旋钮之前，先确认代码里真有人读。
+#
+# 历史：这一段曾经声称"每位人格最多重试 3 次，遇到 schema_failure / role_drift /
+# hallucination 就重试"，还有一行 alert_on: [low_disagreement, time_drift]，
+# 而全仓库（src/ 与 web/backend/）对它们是**零读取点**——瞬时网络抖动照样让人格
+# 直接失败，谁也不会被 alert。alert_on 没有任何告警通道可接，按事实删除；
+# 其余三项改成真生效。
+#
+# retry_on 可选值（其余值会被忽略）：
+#   transport_error —— 网络/限流/5xx 等瞬时故障（不含 401、余额不足这类死错）
+#   schema_failure  —— 模型返回无法解析，或输出不满足 output-schema 的关键字段
+#   role_drift      —— must_comment_on 覆盖率过低 / 推断比例过高
+#   hallucination   —— direct 证据在材料里找不到出处
+# 默认只开前两项：role_drift 和 hallucination 是**输出质量**信号而不是"这次调用
+# 坏了"，重跑一次未必更好，但每次重试都是一整轮人格调用的钱。想开的人自己权衡。
 retry:
   max_retries_per_persona: 3
-  retry_on: [schema_failure, role_drift, hallucination]
-  alert_on: [low_disagreement, time_drift]
+  retry_on: [transport_error, schema_failure]
+  # 指数退避基数（秒）：第 n 次重试等 backoff * 2^n + 随机抖动
+  backoff_base_seconds: 1.0

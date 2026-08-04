@@ -39,10 +39,18 @@
             <!-- P3 原为第三套亮金 #c9a04a/#d4b86a，与古铜金不同色系；改成主色的低明度变体，
                  既归入古铜色系又和 P1 拉开明度，仍能读出"另一个人格" -->
             <span style="background:linear-gradient(135deg,#7a5326,#B77E3B)">P3</span>
-            <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+63</span>
+            <!-- 溢出数 = 人格总数 − 上面画出来的头像数。这里是隐式计数：写着 +63 时
+                 谁都不会联想到"人格数过期了"，72 人格上线后它就一直错着。
+                 tests/test_public_claims.py::test_landing_avatar_overflow_matches_persona_count
+                 现在会数上面的 <span> 再加这个数字去比对仓库真值，改一边漏一边就会红。 -->
+            <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+69</span>
           </div>
           <span class="sep"></span>
-          <span><b>72 个人格</b> · <b>14 种场景</b> · <b>1655 项测试</b></span>
+          <!-- 这里原本也写了一个测试数，和同页 STATS 区那格对不上——它其实只是引擎单套件的
+               收集数被当成了全仓总数。测试数会随开发漂移，本页只允许 STATS 区写一处并带统计
+               日期（见 test_public_claims.py::test_test_counts_are_stated_once_and_dated），
+               所以 hero 改成同样可自动核对的 Pack 数。 -->
+          <span><b>72 个人格</b> · <b>14 种场景</b> · <b>11 个人格 Pack</b></span>
         </div>
 
         <div class="hero-models">
