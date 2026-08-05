@@ -191,7 +191,37 @@ async def send_verify_email(
         raise NotFound("账号不存在")
     if user.email_verified_at:
         return {"sent": False, "detail": "邮箱已验证"}
-    await _send_verify_email(db, user)
+    # 这里**不能**复用注册那条"失败也吞掉"的路径。注册时吞是对的（注册本身
+    # 已经成功，不该因为邮件服务商抽风把用户挡在门外）；但这个接口是用户
+    # 亲手点了「重新发送」，这一次点击的全部目的就是把信发出去。失败还回
+    # sent:true，用户会守着收件箱空等，然后反复点，把发信配额打满。
+    #
+    # 曾经就是这样：_send_mail_off_loop 吞掉异常，这里写死 sent:True，
+    # 于是 SMTP 报 550 被拒、日志里明明白白记了一行 WARNING，前端照样显示
+    # "已发送，请查收"。
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services import auth_token_service, mail_service
+    from app.services.mail_service import MailError
+
+    raw = auth_token_service.issue(
+        db, user.id, auth_token_service.PURPOSE_VERIFY_EMAIL, settings.email_token_ttl_seconds
+    )
+    link = f"{settings.public_web_url}/verify-email?token={raw}"
+    try:
+        await run_in_threadpool(
+            mail_service.send_mail_strict,
+            user.email,
+            "验证你的 AudienceLens 邮箱",
+            f"点击链接完成邮箱验证（{settings.email_token_ttl_seconds // 3600} 小时内有效）：\n{link}\n\n"
+            "如果不是你本人操作，忽略这封邮件即可。",
+        )
+    except MailError as exc:
+        # 真实原因进日志给运维；返回给用户的是一句他能行动的话。
+        # mail_service 的错误文案是写给运维看的（会点名 AL_SMTP_* 该改哪一项），
+        # 直接吐给终端用户既没用又泄露部署细节。
+        logger.warning("重发验证邮件失败 | 收件人=%s | %s", user.email, exc)
+        return {"sent": False, "detail": "邮件发送失败，请稍后再试；若持续失败请联系我们"}
     return {"sent": True}
 
 

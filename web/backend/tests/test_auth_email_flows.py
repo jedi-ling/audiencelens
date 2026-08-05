@@ -172,3 +172,63 @@ class TestTokenStorage:
         assert client.post(
             "/api/auth/verify-email/confirm", json={"token": token}
         ).status_code == 400
+
+
+class TestResendReportsRealOutcome:
+    """用户亲手点「重新发送」时，发信失败必须如实回报。
+
+    这条曾经是坏的：_send_mail_off_loop 吞掉异常、接口写死 sent:True，
+    于是 SMTP 明明回了 550、日志里记了 WARNING，前端照样显示「已发送，请查收」，
+    用户守着空收件箱等，然后反复点，把发信配额打满。
+
+    注意这里**只**改主动重发那条路。注册时发信失败仍然要吞——注册本身已经成功，
+    不该因为邮件服务商抽风把用户挡在门外。下面第二条就是钉住这个区别的。
+    """
+
+    def _login(self, client, email="resend-case@example.com"):
+        _register(client, email)
+        r = client.post("/api/auth/login", json={"email": email, "password": "password123"})
+        return {"Authorization": f"Bearer {r.json()['token']}"}
+
+    def test_send_failure_reported_as_not_sent(self, client, monkeypatch, captured_mail):
+        headers = self._login(client)
+
+        from app.services import mail_service
+
+        def boom(to, subject, body):
+            raise mail_service.MailError("SMTP 错误：550 Invalid `to` field")
+
+        monkeypatch.setattr(mail_service, "send_mail_strict", boom)
+
+        r = client.post("/api/auth/verify-email/send", headers=headers)
+        assert r.status_code == 200  # 令牌签发了，请求本身没毛病——不是 HTTP 错误
+        assert r.json()["sent"] is False
+        # 给终端用户的话里不能出现 SMTP 细节/环境变量名（那是写给运维看的）
+        assert "SMTP" not in r.json()["detail"]
+        assert "550" not in r.json()["detail"]
+
+    def test_success_still_reports_sent(self, client, monkeypatch):
+        """反向对照：发信成功时必须回 sent:True。
+
+        缺了这条，一个"永远返回 sent:False"的实现也能让上面那条通过。
+        """
+        headers = self._login(client, "resend-ok@example.com")
+
+        from app.services import mail_service
+
+        monkeypatch.setattr(mail_service, "send_mail_strict", lambda to, s, b: "smtp")
+
+        r = client.post("/api/auth/verify-email/send", headers=headers)
+        assert r.json()["sent"] is True
+
+    def test_registration_still_tolerates_mail_failure(self, client, monkeypatch):
+        """注册那条路不受影响：发信炸了，注册照样成功。"""
+        from app.services import mail_service
+
+        def boom(to, subject, body):
+            raise mail_service.MailError("炸了")
+
+        monkeypatch.setattr(mail_service, "send_mail", boom)
+
+        r = _register(client, "reg-tolerant@example.com")
+        assert r.status_code == 200

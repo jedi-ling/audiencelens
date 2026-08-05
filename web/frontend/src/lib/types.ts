@@ -257,6 +257,9 @@ export interface UsageSummary {
   window: string
   reviews_used: number
   reviews_limit: number | null
+  /** reviews_limit 是否被「邮箱未验证」压低了。由后端算，前端不要自己推：
+   *  是否真被压还取决于 quota_enabled / quota_mode / 是否匿名，在前端重算必然走偏。 */
+  reviews_limit_capped_unverified: boolean
   cost_usd_total: number
   cost_usd_on_server_key: number
   cost_usd_limit: number | null

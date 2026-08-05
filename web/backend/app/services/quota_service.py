@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.errors import QuotaExceeded
-from app.models import UsageRecord
+from app.models import UsageRecord, User
 from app.services import admin_settings_service, plan_service
 
 # ---------------------------------------------------------------------------
@@ -89,6 +89,34 @@ def _quota_enabled(db: Session) -> bool:
     return admin_settings_service.get(db, "quota_enabled", settings.quota_enabled)
 
 
+def effective_reviews_limit(db: Session, user_id: str, plan_limit: int) -> int:
+    """把「未验证邮箱」这条软拦叠加到套餐日次数上限之上。
+
+    返回 min(套餐上限, 未验证上限)——**只会压低，永远不会抬高**。这条不是
+    风格问题：如果写成直接返回未验证上限，那么当运营把免费档调到 1 次以下时，
+    未验证账号反而比已验证账号额度更高，闸门会变成漏斗。
+
+    三种情况原样返回 plan_limit（即本机制不介入）：
+      · 配置为负数 —— 显式关闭；
+      · user_id 是共享匿名桶 —— 匿名访客根本没有邮箱可验证，压这里等于把
+        全站所有未登录访客共用的试用额度压成每天 1 次，是全局故障不是限流；
+      · 库里查不到这个 user 或已验证 —— 没有可拦的对象。
+
+    调用点必须同时覆盖 check_quota（真闸门）和 usage_summary（前端显示的数字）。
+    只改其中一个的后果在本文件里已经有前车之鉴：用量页显示 3/5、闸门按 1/1 拒绝，
+    用户看到的是一个说谎的数字。
+    """
+    cap = settings.quota_unverified_reviews_per_day
+    if cap < 0:
+        return plan_limit
+    if user_id == settings.anonymous_user_id:
+        return plan_limit
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or user.email_verified_at is not None:
+        return plan_limit
+    return min(plan_limit, cap)
+
+
 def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
     """近 24h 用量 + 剩余额度（前端设置页/用量页直接用）。
 
@@ -133,7 +161,19 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         "plan": plan_info["id"],
         "plan_name": plan_info["name"],
         "reviews_used": int(count or 0),
-        "reviews_limit": plan_info["reviews_per_day"] if plan_limits_apply else None,
+        "reviews_limit": (
+            effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
+            if plan_limits_apply
+            else None
+        ),
+        # 前端据此决定要不要显示「验证邮箱解锁完整额度」提示条。放在这里而不是
+        # 让前端自己拿用户资料去判断：额度是不是真被压了，只有这一处算得准
+        # （还要看 quota_enabled / quota_mode / 是否匿名），前端重算必然走偏。
+        "reviews_limit_capped_unverified": (
+            plan_limits_apply
+            and effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
+            < plan_info["reviews_per_day"]
+        ),
         "cost_usd_total": round(float(cost or 0.0), 4),
         "cost_usd_on_server_key": round(float(server_cost or 0.0), 4),
         "cost_usd_limit": plan_info["cost_usd_per_day"] if plan_limits_apply else None,
@@ -197,7 +237,7 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
         return
 
     plan_info = plan_service.get_plan(plan, db)
-    reviews_limit = plan_info["reviews_per_day"]
+    reviews_limit = effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
     cost_limit = plan_info["cost_usd_per_day"]
 
     since = _day_ago()
@@ -227,6 +267,16 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     # "超出日限之后的加量"），所以不再插占位记录。
     if cdk_service.try_consume_credit(db, user_id):
         return
+    # 额度是被"未验证"压下来的时候，必须先说这件事：此时用户看到的
+    # "限 1 次"根本不是套餐的真实额度，让他去升级套餐或兑换 CDK 属于误导，
+    # 而他真正要做的（去邮箱点一下激活链接）是免费且立刻生效的。
+    if reviews_limit < plan_info["reviews_per_day"]:
+        raise QuotaExceeded(
+            f"24 小时内评审次数已用完（未验证邮箱的账号每天限 {reviews_limit} 次）。"
+            f"去邮箱点一下激活链接即可解锁 {plan_info['name']} 套餐的"
+            f"每天 {plan_info['reviews_per_day']} 次——没收到可在账户页重新发送。"
+            "也可以填写自己的 API Key（BYOK）以不受限制使用。"
+        )
     raise QuotaExceeded(
         f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
         "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"

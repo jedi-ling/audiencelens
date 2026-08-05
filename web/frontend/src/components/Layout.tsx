@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Menu, X, User, LogOut, Settings, ChevronDown } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
+import { api } from '@/lib/apiClient'
 
 const navItems = [
   { path: '/', label: '首页' },
@@ -35,7 +36,24 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   // 账户下拉菜单——之前点邮箱按钮就直接退出登录，误触一下就被登出了
   const [accountOpen, setAccountOpen] = useState(false)
-  const { config, identity, bootstrap, logout, sessionExpired, dismissSessionExpired } = useSessionStore()
+  const { config, identity, usage, bootstrap, logout, sessionExpired, dismissSessionExpired } = useSessionStore()
+  // 重发验证邮件的四态。做成状态而不是 toast，是因为"已发送"这个信息要一直留在
+  // 提示条上——用户去邮箱翻找、回来发现按钮恢复原样，会以为根本没发出去，于是
+  // 反复点，把发信配额打满。
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+
+  const resendVerifyEmail = async () => {
+    if (resendState === 'sending' || resendState === 'sent') return
+    setResendState('sending')
+    try {
+      // 必须看 sent 字段，不能因为没抛异常就当成功：发信失败时接口是 200 + sent:false
+      // （发信失败不该是 HTTP 错误——令牌已经签发了，请求本身没毛病）。
+      const r = await api.sendVerifyEmail()
+      setResendState(r.sent ? 'sent' : 'failed')
+    } catch {
+      setResendState('failed')
+    }
+  }
 
   useEffect(() => {
     void bootstrap()
@@ -62,25 +80,20 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip">
-      <header className="sticky top-0 z-50 bg-bg-primary/60 backdrop-blur-xl border-b border-transparent shrink-0">
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand-primary/40 to-transparent" />
-        <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          {/* 品牌标志与营销落地页统一：金色星芒 + Audience（白）/ Lens（金） */}
-          {/* 星芒与紧邻的 "Lens" 字样必须同色，否则品牌组合是两种金。
-              实测 #B77E3B 在 bg-primary #0c0a08 上对比度 5.70:1（图形元素要求 3:1），
-              余量充足，不需要提亮；#F9D67D 按 index.css 的定义只用于强调文字，不用于标志。 */}
+      <header className="sticky top-0 z-50 bg-bg-primary/70 backdrop-blur-xl backdrop-saturate-150 border-b border-black/5 shrink-0">
+        <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2.5 group shrink-0">
             <svg
               viewBox="0 0 24 24"
-              className="w-5 h-5 shrink-0 drop-shadow-[0_0_10px_rgba(183,126,59,0.5)]"
+              className="w-5 h-5 shrink-0"
               aria-hidden="true"
             >
               <path
                 d="M12 2l1.9 6.2L20 10l-6.1 1.8L12 18l-1.9-6.2L4 10l6.1-1.8L12 2z"
-                fill="#B77E3B"
+                fill="#0071e3"
               />
             </svg>
-            <span className="font-display font-bold text-lg whitespace-nowrap">
+            <span className="font-display font-semibold text-[17px] tracking-tight whitespace-nowrap">
               <span className="text-text-primary">Audience</span>
               <span className="text-brand-primary">Lens</span>
             </span>
@@ -97,17 +110,17 @@ export default function Layout() {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      'relative flex items-center px-2 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 transition-all',
+                      'relative flex items-center px-2.5 py-2 rounded-full text-[13px] whitespace-nowrap shrink-0 transition-all',
                       isActive
-                        ? 'text-brand-primary'
+                        ? 'text-text-primary font-medium'
                         : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
                     <span>{item.label}</span>
                     <span
                       className={cn(
-                        'absolute bottom-0 left-0 h-0.5 rounded-full bg-brand-primary transition-all duration-300',
-                        isActive ? 'w-full' : 'w-0 group-hover:w-full'
+                        'absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[3px] rounded-full bg-brand-primary transition-all duration-300',
+                        isActive ? 'w-4' : 'w-0'
                       )}
                     />
                   </Link>
@@ -118,7 +131,7 @@ export default function Layout() {
             {!isCreatePage && (
               <Link
                 to="/review/new"
-                className="flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20 hover:border-brand-primary/50 transition-all"
+                className="flex items-center px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap shrink-0 bg-brand-primary text-white hover:bg-brand-primary-dim transition-all"
               >
                 <span>新建评审</span>
               </Link>
@@ -140,19 +153,19 @@ export default function Layout() {
                   <>
                     {/* 点击空白处收起 */}
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
-                    <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-black/5 bg-white p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
                       <p className="truncate px-3 py-2 text-xs text-text-muted">{identity?.email}</p>
                       <Link
                         to="/settings"
                         onClick={() => setAccountOpen(false)}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-bg-card-hover hover:text-text-primary transition-colors"
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary hover:bg-bg-card-hover hover:text-text-primary transition-colors"
                       >
                         <Settings className="w-4 h-4" strokeWidth={1.5} />
                         设置
                       </Link>
                       <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-colors"
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-colors"
                       >
                         <LogOut className="w-4 h-4" strokeWidth={1.5} />
                         退出登录
@@ -187,10 +200,10 @@ export default function Layout() {
       {menuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
             onClick={() => setMenuOpen(false)}
           />
-          <nav className="absolute left-0 top-0 bottom-0 w-64 bg-bg-primary border-r border-border shadow-2xl animate-fade-in flex flex-col pt-20 px-4">
+          <nav className="absolute left-0 top-0 bottom-0 w-64 bg-white border-r border-black/5 shadow-2xl animate-fade-in flex flex-col pt-20 px-4">
             {navItems.map((item) => {
               const isActive = item.path === '/'
                 ? location.pathname === '/'
@@ -201,10 +214,10 @@ export default function Layout() {
                   to={item.path}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    'flex items-center px-4 py-3 rounded-lg text-sm transition-all mb-1',
+                    'flex items-center px-4 py-3 rounded-xl text-sm transition-all mb-1',
                     isActive
-                      ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-card'
+                      ? 'bg-brand-primary/10 text-brand-primary font-medium'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-card-hover'
                   )}
                 >
                   <span>{item.label}</span>
@@ -216,21 +229,21 @@ export default function Layout() {
               <Link
                 to="/review/new"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center px-4 py-3 mt-4 rounded-lg text-sm font-medium bg-brand-primary/10 text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/20 transition-all"
+                className="flex items-center justify-center px-4 py-3 mt-4 rounded-full text-sm font-medium bg-brand-primary text-white hover:bg-brand-primary-dim transition-all"
               >
                 <span>新建评审</span>
               </Link>
             )}
 
             {loggedIn ? (
-              <div className="mt-2 border-t border-border pt-2">
+              <div className="mt-2 border-t border-black/5 pt-2">
                 <p className="flex items-center gap-2 px-4 py-2 text-xs text-text-muted">
                   <User className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
                   <span className="truncate">{identity?.email}</span>
                 </p>
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-4 py-3 rounded-lg text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-all"
+                  className="flex w-full items-center gap-2 px-4 py-3 rounded-xl text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-all"
                 >
                   <LogOut className="w-4 h-4" strokeWidth={1.5} />
                   退出登录
@@ -240,7 +253,7 @@ export default function Layout() {
               <Link
                 to="/login"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center px-4 py-3 mt-2 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card transition-all"
+                className="flex items-center px-4 py-3 mt-2 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-all"
               >
                 <span>登录</span>
               </Link>
@@ -249,7 +262,7 @@ export default function Layout() {
             <Link
               to="/privacy"
               onClick={() => setMenuOpen(false)}
-              className="mt-4 flex items-center gap-3 border-t border-border px-4 py-3 pt-5 rounded-lg text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card transition-all"
+              className="mt-4 flex items-center gap-3 border-t border-black/5 px-4 py-3 pt-5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
             >
               <span>隐私政策</span>
             </Link>
@@ -262,11 +275,36 @@ export default function Layout() {
         // 不知道发生了什么。这里显式说明，且不挡内容（可关闭）。
         <div className="flex items-center justify-center gap-3 border-b border-warm-orange/30 bg-warm-orange/10 px-4 py-2 text-sm text-warm-orange">
           <span>登录已过期，请重新登录</span>
-          <Link to="/login" className="font-medium underline underline-offset-2 hover:text-gold-cream" onClick={dismissSessionExpired}>
+          <Link to="/login" className="font-medium underline underline-offset-2 hover:text-text-primary" onClick={dismissSessionExpired}>
             去登录
           </Link>
           <button onClick={dismissSessionExpired} className="ml-1 text-warm-orange/70 hover:text-warm-orange" aria-label="关闭提示">
             <X className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
+        </div>
+      )}
+
+      {loggedIn && usage?.reviews_limit_capped_unverified && (
+        // 未验证邮箱 → 每日次数被压到很低。不挡人使用（软拦），但必须让用户
+        // 知道额度为什么这么少、以及怎么解锁——否则他看到的"限 1 次"会被当成
+        // 产品本来就这么小气，而真正的动作（去邮箱点一下）是免费且立刻生效的。
+        // 故意不给关闭按钮：关掉之后用户下次撞上限额仍然不知道原因。
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-cyan/30 bg-cyan/10 px-4 py-2 text-sm text-cyan">
+          <span>
+            邮箱尚未验证，每天只能评审 {usage.reviews_limit} 次。验证后解锁完整额度。
+          </span>
+          <button
+            onClick={() => void resendVerifyEmail()}
+            disabled={resendState === 'sending'}
+            className="font-medium underline underline-offset-2 hover:text-text-primary disabled:opacity-60 disabled:no-underline"
+          >
+            {resendState === 'sending'
+              ? '发送中…'
+              : resendState === 'sent'
+                ? '已发送，请查收（含垃圾箱）'
+                : resendState === 'failed'
+                  ? '发送失败，点此重试'
+                  : '重新发送验证邮件'}
           </button>
         </div>
       )}
@@ -276,11 +314,10 @@ export default function Layout() {
       </main>
 
       {!isAskPage && (
-      <footer className="relative border-t border-transparent py-8 shrink-0">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <footer className="relative border-t border-black/5 py-8 shrink-0 bg-bg-secondary">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
-            <span className="font-display font-bold text-sm">
+            <span className="font-display font-semibold text-sm tracking-tight">
               <span className="text-text-primary">Audience</span>
               <span className="text-brand-primary">Lens</span>
             </span>

@@ -172,6 +172,14 @@ class Settings:
         # 真正的读取点是 plan_service._free_plan(db)。
         self.quota_free_reviews_per_day: int = _int("AL_QUOTA_FREE_REVIEWS_PER_DAY", 5)
         self.quota_free_cost_usd_per_day: float = _float("AL_QUOTA_FREE_COST_USD_PER_DAY", 1.0)
+        # 未验证邮箱的账号，服务端 key 每日次数上限（软拦：能用，但只够试一次）。
+        # 在此之前 email_verified_at 只是一条记录，登录/评审/配额一处都不读它——
+        # 激活与不激活完全没区别，等于验证邮件白发。这一项是它唯一的抓手。
+        # 只压次数、不挡登录，也不影响 BYOK（用户自己的钱没理由限制）和 CDK
+        # 次数（那是花钱换来的）。设为负数即关闭本机制。
+        self.quota_unverified_reviews_per_day: int = _int(
+            "AL_QUOTA_UNVERIFIED_REVIEWS_PER_DAY", 1
+        )
 
         # ---- 限流（埋线：内存令牌桶，可换 Redis）----
         # 两个旋钮各管各的：per_minute 管普通接口，review_per_hour 只管发起评审
