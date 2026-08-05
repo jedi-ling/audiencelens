@@ -210,6 +210,22 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
 
+  /** 已登录改密码。成功会回一把**新令牌**：后端撤销了该用户所有旧会话
+   *  （其他设备被踢下线），必须换上这把新的，否则本设备下一次请求就 401。
+   *  调用方拿到后要立刻 setToken(r.token)。 */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ changed: boolean; token: string }>('/api/auth/password/change', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
+  /** 改昵称。邮箱不在这里改——那要走"向新地址发验证信"的两步流程。 */
+  updateProfile: (displayName: string) =>
+    request<{ id: string; email: string; display_name: string }>('/api/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ display_name: displayName }),
+    }),
+
   /** 申请密码重置链接。注册过与否都返回相同响应（后端防邮箱枚举）。 */
   forgotPassword: (email: string) =>
     request<{ sent: boolean; detail: string }>('/api/auth/password/forgot', {

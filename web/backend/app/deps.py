@@ -81,11 +81,15 @@ class Identity:
     """统一身份对象：匿名与登录用户走同一套下游逻辑。"""
 
     def __init__(self, user_id: str, email: Optional[str] = None, plan: str = "free",
-                 is_anonymous: bool = True, session_expired: bool = False):
+                 is_anonymous: bool = True, session_expired: bool = False,
+                 display_name: Optional[str] = None):
         self.user_id = user_id
         self.email = email
         self.plan = plan
         self.is_anonymous = is_anonymous
+        # 昵称之前不在这里：/auth/me 不返回它，前端于是既显示不出当前昵称、
+        # 改完也无从确认改成功了。匿名身份没有昵称，保持 None。
+        self.display_name = display_name
         # 只有 probe_identity（/auth/me）会把它置真：那条路不 401，
         # 但必须如实告诉前端"你带来的令牌被拒了"，否则又回到静默降级。
         self.session_expired = session_expired
@@ -94,6 +98,7 @@ class Identity:
         return {
             "user_id": self.user_id,
             "email": self.email,
+            "display_name": self.display_name,
             "plan": self.plan,
             "is_anonymous": self.is_anonymous,
             "session_expired": self.session_expired,
@@ -201,7 +206,11 @@ async def current_identity(
         raise SessionExpired("密码已修改，请用新密码重新登录")
 
     return Identity(
-        user_id=user.id, email=user.email, plan=user.plan, is_anonymous=False
+        user_id=user.id,
+        email=user.email,
+        plan=user.plan,
+        is_anonymous=False,
+        display_name=user.display_name,
     )
 
 

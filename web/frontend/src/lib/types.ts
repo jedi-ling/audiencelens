@@ -82,6 +82,8 @@ export interface HealthConfig {
 export interface Identity {
   user_id: string
   email: string | null
+  /** 昵称。匿名身份为 null。 */
+  display_name: string | null
   plan: string
   is_anonymous: boolean
 }

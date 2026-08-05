@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
@@ -25,6 +25,7 @@ import {
   Ticket,
   Download,
   AlertTriangle,
+  User,
 } from 'lucide-react'
 
 type Provider = 'anthropic' | 'openai_compatible'
@@ -43,7 +44,7 @@ const PROVIDER_CONFIG: Record<Provider, {
       border: 'border-brand-primary/50',
       bg: 'bg-brand-primary/10',
       text: 'text-brand-primary',
-      glow: 'shadow-[0_0_15px_rgba(183,126,59,0.15)]',
+      glow: 'shadow-[0_2px_12px_rgba(0,113,227,0.12)]',
     },
     desc: 'Claude 官方 API',
   },
@@ -54,7 +55,7 @@ const PROVIDER_CONFIG: Record<Provider, {
       border: 'border-cyan/50',
       bg: 'bg-cyan/10',
       text: 'text-cyan',
-      glow: 'shadow-[0_0_15px_rgba(78,205,196,0.15)]',
+      glow: 'shadow-[0_2px_12px_rgba(50,173,230,0.12)]',
     },
     desc: 'DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 等',
   },
@@ -102,6 +103,64 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteDone, setDeleteDone] = useState<Record<string, number> | null>(null)
 
+
+  // ---------------- 账户：改昵称 / 改密码 ----------------
+  // 这两件事以前在界面上**根本没有入口**，后端也没有对应接口：昵称在注册那一刻
+  // 定死，密码只能"退出登录 → 忘记密码 → 收邮件 → 点链接"。而邮件链路没配通的
+  // 部署里，后一条等于密码不可更改。
+  const [nameDraft, setNameDraft] = useState('')
+  const [nameBusy, setNameBusy] = useState(false)
+  const [nameMsg, setNameMsg] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
+
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNext, setPwNext] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwMsg, setPwMsg] = useState<string | null>(null)
+  const [pwError, setPwError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // 进页面时把当前昵称填进输入框当初值；identity 是异步拿的，所以放 effect 里。
+    if (identity?.display_name) setNameDraft(identity.display_name)
+  }, [identity?.display_name])
+
+  const handleSaveName = async () => {
+    const name = nameDraft.trim()
+    if (!name) { setNameError('昵称不能为空'); return }
+    setNameBusy(true); setNameError(null); setNameMsg(null)
+    try {
+      await api.updateProfile(name)
+      // 重新拉一次身份：顶栏、账户菜单都读 store 里的 identity，不刷新的话
+      // 页面上的名字会和刚保存的值不一致，看起来像没保存成功。
+      await useSessionStore.getState().bootstrap()
+      setNameMsg('昵称已更新')
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setNameBusy(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    // 两次新密码不一致要在本地就拦下——让用户把一个打错的密码提交上去、
+    // 成功了才发现自己不知道新密码是什么，是最糟的失败方式。
+    if (pwNext !== pwConfirm) { setPwError('两次输入的新密码不一致'); return }
+    if (pwNext.length < 8) { setPwError('新密码至少 8 位'); return }
+    setPwBusy(true); setPwError(null); setPwMsg(null)
+    try {
+      const r = await api.changePassword(pwCurrent, pwNext)
+      // 关键一步：后端撤销了该用户全部旧会话，手上这把 token 已经作废。
+      // 不换成返回的新令牌的话，改完密码下一个请求就 401，用户会以为自己被登出了。
+      setToken(r.token)
+      setPwCurrent(''); setPwNext(''); setPwConfirm('')
+      setPwMsg('密码已修改。其他设备上的登录已失效，本设备无需重新登录。')
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : '修改失败')
+    } finally {
+      setPwBusy(false)
+    }
+  }
 
   /** 导出：直接在浏览器里生成文件下载，不经过服务端存一份中间产物——
    *  少一个副本就少一处泄露面，也免得又攒出一堆没人清理的死文件。 */
@@ -466,7 +525,7 @@ export default function SettingsPage() {
                 'flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all shrink-0',
                 byokSaving || !byokKey.trim()
                   ? 'bg-bg-card text-text-muted cursor-not-allowed'
-                  : 'bg-brand-primary text-bg-primary hover:bg-brand-primary-dim'
+                  : 'bg-brand-primary text-white hover:bg-brand-primary-dim'
               )}
             >
               {byokSaving ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <Save className="w-4 h-4" strokeWidth={1.25} />}
@@ -626,6 +685,88 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {/* ---------------- 账户 ----------------
+         * 改昵称 / 改密码。以前这两件事在界面上没有任何入口，
+         * 密码只能走"退出 → 忘记密码 → 收邮件"，邮件没配通就等于改不了。 */}
+        {!identity?.is_anonymous && (
+        <section className="pt-8">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <User className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
+            账户
+          </h2>
+          <p className="mt-1 text-xs text-text-muted">
+            当前登录：{identity?.email}
+          </p>
+
+          {/* 昵称 */}
+          <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
+            <label className="block text-xs font-medium text-text-secondary">昵称</label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                value={nameDraft}
+                onChange={(e) => { setNameDraft(e.target.value); setNameMsg(null); setNameError(null) }}
+                maxLength={50}
+                className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                placeholder="怎么称呼你"
+              />
+              <button
+                onClick={() => void handleSaveName()}
+                disabled={nameBusy || !nameDraft.trim() || nameDraft.trim() === (identity?.display_name ?? '')}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+              >
+                {nameBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
+                保存
+              </button>
+            </div>
+            {nameMsg && <p className="mt-2 text-xs text-brand-primary">{nameMsg}</p>}
+            {nameError && <p className="mt-2 text-xs text-severity-critical">{nameError}</p>}
+            <p className="mt-2 text-xs text-text-muted">
+              邮箱暂不支持自助修改——它同时是登录名和找回密码的收件地址，改错一个字母
+              就会同时丢掉登录和找回两条路。需要更换请联系我们。
+            </p>
+          </div>
+
+          {/* 密码 */}
+          <div className="mt-3 rounded-lg border border-border bg-bg-card p-4">
+            <label className="block text-xs font-medium text-text-secondary">修改密码</label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <input
+                type="password" value={pwCurrent} autoComplete="current-password"
+                onChange={(e) => { setPwCurrent(e.target.value); setPwMsg(null); setPwError(null) }}
+                placeholder="当前密码"
+                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+              />
+              <input
+                type="password" value={pwNext} autoComplete="new-password"
+                onChange={(e) => { setPwNext(e.target.value); setPwMsg(null); setPwError(null) }}
+                placeholder="新密码（至少 8 位）"
+                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+              />
+              <input
+                type="password" value={pwConfirm} autoComplete="new-password"
+                onChange={(e) => { setPwConfirm(e.target.value); setPwMsg(null); setPwError(null) }}
+                placeholder="再输一次新密码"
+                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+              />
+            </div>
+            <button
+              onClick={() => void handleChangePassword()}
+              disabled={pwBusy || !pwCurrent || !pwNext || !pwConfirm}
+              className="mt-3 flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+            >
+              {pwBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <KeyRound className="h-4 w-4" strokeWidth={1.5} />}
+              修改密码
+            </button>
+            {pwMsg && <p className="mt-2 text-xs text-brand-primary">{pwMsg}</p>}
+            {pwError && <p className="mt-2 text-xs text-severity-critical">{pwError}</p>}
+            <p className="mt-2 text-xs text-text-muted">
+              改完会让<span className="text-text-secondary">其他设备</span>上的登录立即失效（这正是怀疑密码泄露时该做的），
+              本设备不需要重新登录。忘了当前密码请退出后走「忘记密码」。
+            </p>
+          </div>
+        </section>
+        )}
+
         {/* ---------------- 数据自主权 ----------------
          * "你的东西归你"不能只写在隐私政策里——给两个用户能亲手按的按钮，
          * 承诺才变成可验证的事实。 */}
@@ -717,7 +858,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => void handleDeleteAccount()}
                   disabled={deleting || deleteConfirm !== '删除我的账号'}
-                  className="rounded-md bg-severity-critical px-3 py-2 text-sm font-semibold text-bg-primary disabled:opacity-40"
+                  className="rounded-md bg-severity-critical px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
                   {deleting ? '删除中…' : '确认永久删除'}
                 </button>

@@ -306,6 +306,86 @@ async def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_d
     return {"reset": True}
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
+@router.post("/auth/password/change", dependencies=[Depends(rate_limit("auth", 20, 3600))])
+async def change_password(
+    body: ChangePasswordRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """已登录改密码。
+
+    在此之前**根本没有这个接口**：登录着的用户想改密码，唯一的路是退出登录 →
+    忘记密码 → 收邮件 → 点链接重置。而邮件链路在很多部署里压根没配通
+    （AL_SMTP_* 是空的、启动自检只是告警不拒启），两件事叠在一起的实际效果是
+    「密码不可更改」——包括怀疑自己密码泄露时也改不了。
+
+    必须验旧密码：只凭一把 JWT 就能换密码的话，任何偷到令牌的人都能把账号
+    永久夺走（改完密码原主人再也登不进去），令牌泄露从"临时冒用"升级成"彻底丢号"。
+
+    改完同样要 revoke_user_sessions——理由和密码重置那条完全一样：JWT 是自签的，
+    只认签名和 exp，密码换了旧令牌照样通行满一个 TTL（默认 7 天）。不撤销的话
+    "改密码"对已经发生的入侵毫无作用。
+    """
+    _require_auth_enabled()
+    _require_own_identity(identity)
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+    if not verify_password(body.current_password, user.password_hash):
+        raise Unauthorized("当前密码不正确")
+    if verify_password(body.new_password, user.password_hash):
+        raise BadRequest("新密码不能与当前密码相同")
+
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    revoke_user_sessions(db, user.id)
+    # 顺序要紧：先撤销、再签发。撤销点按整秒记且比较的是 iat < revoked_at，
+    # 之后签出来的令牌 iat >= 撤销点，一定存活。反过来先签再撤会把刚发的这把
+    # 一起作废——用户改完密码当场被踢下线，只能重新登录一次，白白吓一跳。
+    token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
+    # 换新令牌让**本设备**继续用，其他设备上的旧会话则已作废。
+    # 这正是改密码该有的语义：把别人踢出去，自己不用重登。
+    return {"changed": True, "token": token}
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=50)
+
+
+@router.patch("/auth/me")
+async def update_profile(
+    body: UpdateProfileRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """改昵称。
+
+    在此之前 display_name 只在注册那一刻写入（没填就取邮箱 @ 前面那截），
+    之后没有任何路径能改——注册时随手填的名字会跟着账号一辈子。
+
+    这里只放开昵称。**改邮箱故意不做**：邮箱同时是登录名、找回密码的收件地址
+    和账号唯一键，换它必须走"向新地址发验证信、验证通过后才生效"的两步流程，
+    否则填错一个字母就等于把账号锁死（登不进、也找不回）。那是一条独立的链路，
+    不该顺手塞进这个接口里假装支持了。
+    """
+    _require_auth_enabled()
+    _require_own_identity(identity)
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+    name = body.display_name.strip()
+    if not name:
+        raise BadRequest("昵称不能为空")
+    user.display_name = name
+    db.commit()
+    return {"id": user.id, "email": user.email, "display_name": user.display_name}
+
+
 # ---------- 数据自主权：导出我的数据 / 删除我的账号 ----------
 # 让"你的东西归你"不只是一句承诺，而是用户能亲手验证的两个按钮。
 
