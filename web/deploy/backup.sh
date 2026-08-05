@@ -26,12 +26,39 @@ mkdir -p "$BACKUP_DIR"
 
 STAMP=$(date +%Y%m%d-%H%M%S)
 
-# 唯一可信的事实源：后端进程自己算出来的 database_url（含 .env 与默认值），
-# 而不是本机 shell 里恰好有没有导出过 AL_DATABASE_URL。
-DB_URL=$(docker compose exec -T backend python -c \
-    'from app.config import settings; print(settings.database_url)' | tr -d '\r')
+# 唯一可信的事实源：让后端的 config 自己算出 database_url（它会读 web/.env、
+# 处理默认值与相对路径），而不是本机 shell 里恰好有没有导出过 AL_DATABASE_URL。
+#
+# 两种部署形态都要能跑：
+#   · Docker（DEPLOY.md）—— 进容器里问；
+#   · 裸机 systemd + nginx（DEPLOY-BAREMETAL.md）—— 用本机的 venv 直接问。
+# 这里以前只有 Docker 那条路，裸机上跑到这一步就 exit 1，而裸机手册恰恰让人
+# 把它挂进 crontab——等于每天定时失败一次，且没人会去看那个日志。
+#
+# 优先本机 venv：裸机上跑得通就不必依赖 docker 命令存在；
+# 找不到再回落容器。两条都不通才报错，并把两种情形都写进提示。
+_probe_db_url() {
+    local py="$1"; shift
+    "$py" -c 'from app.config import settings; print(settings.database_url)' 2>/dev/null | tr -d '\r'
+}
+
+REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+BACKEND_DIR="$REPO_ROOT/web/backend"
+VENV_PY="${VENV_PY:-$REPO_ROOT/.venv/bin/python}"
+
+DB_URL=""
+if [ -x "$VENV_PY" ] && [ -d "$BACKEND_DIR" ]; then
+    DB_URL=$(cd "$BACKEND_DIR" && _probe_db_url "$VENV_PY")
+fi
+if [ -z "$DB_URL" ] && command -v docker >/dev/null 2>&1; then
+    DB_URL=$(docker compose exec -T backend python -c \
+        'from app.config import settings; print(settings.database_url)' 2>/dev/null | tr -d '\r')
+fi
 if [ -z "$DB_URL" ]; then
-    echo "ERROR: 取不到后端的 AL_DATABASE_URL（backend 容器没起来？），未做任何备份" >&2
+    echo "ERROR: 取不到数据库地址，未做任何备份。两条探测都失败了：" >&2
+    echo "  · 本机 venv：$VENV_PY（不存在或 import app.config 失败）" >&2
+    echo "    裸机部署请确认 venv 路径，或用 VENV_PY=/path/to/python 覆盖" >&2
+    echo "  · Docker：docker compose exec backend（命令不存在或容器没起来）" >&2
     exit 1
 fi
 echo "database url: ${DB_URL%%://*}://…"   # 不打印口令

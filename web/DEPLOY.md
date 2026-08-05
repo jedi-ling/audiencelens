@@ -2,6 +2,10 @@
 
 前提：服务器装好 Docker（含 compose 插件），域名 A 记录已指向服务器 IP。
 
+> **不想装 Docker？** 看 [`DEPLOY-BAREMETAL.md`](DEPLOY-BAREMETAL.md)——
+> systemd + nginx + certbot 的裸机部署方案，适合机器上已经有 nginx、
+> 或者不打算引入容器运行时的情况。两份手册的配置项（`web/.env`）完全通用。
+
 ## 首次部署
 
 ```bash

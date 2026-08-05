@@ -527,7 +527,7 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 20 个页面组件（含落地页）、7 个组件、3 个 Zustand Store |
 | **服务** | `app/services/` 下 19 个模块（密钥 / 配额 / 任务 / 意图 / 留档 / CDK / 对话 / 邮件 / 套餐 / 后台设置 / 审计日志 / 认证令牌 / 伦理 / 评估 / 报告门禁 / 评审 / 用户数据 / 校验 / JSON 安全序列化），外加定义在 `services/__init__.py` 里的 `PersonaService` / `ReviewService` / `MaterialExtractor` | Anthropic 原生 SDK + OpenAI 兼容 HTTP（OpenAI / DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 预设）、刻板印象检测、伦理合规 |
 | **实时** | WebSocket（实际发出 5 种事件） | 实时评审进度、逐人格结果展示 |
-| **部署** | Docker Compose | 前端(Nginx) + 后端(Uvicorn) |
+| **部署** | Docker Compose（[`web/DEPLOY.md`](web/DEPLOY.md)）或 systemd + nginx 裸机（[`web/DEPLOY-BAREMETAL.md`](web/DEPLOY-BAREMETAL.md)） | 前端(Nginx) + 后端(Uvicorn，**必须单进程**：队列/WS/限流都在进程内存里) |
 
 **3 种评审模式**（`src/runner/cli.py` 的 `MODE_CONFIG`）：
 
