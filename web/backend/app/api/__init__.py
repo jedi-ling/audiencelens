@@ -41,6 +41,7 @@ from app.schemas import (
 )
 from app.db import get_db
 from app.config import settings
+from app.core.logging import logger
 from app.deps import (
     Identity,
     is_shared_anonymous,
@@ -151,15 +152,48 @@ def create_review(
 
     # key 显式透传，绝不写进程全局 os.environ——多 worker 并发跑不同用户的
     # 评审时环境变量注入会在用户间串 key（安全 + 计费问题）。
-    review_service.enqueue_review(
-        review.id,
-        api_key=resolved.key,
-        key_source=resolved.source,
-        user_id=identity.user_id,
-        provider=resolved.provider,
-        model=resolved.model,
-        api_base=resolved.api_base,
-    )
+    #
+    # 入队失败必须补偿，与 v2（platform.create_review_v2）逐条对齐。
+    # 这里此前是**裸调用**：check_quota 已经扣掉了 CDK 次数、占了日名额、
+    # 占了终身 token 额度，入队一炸就全被吞掉，用户什么都没得到还少了额度。
+    # v2 有完整的补偿分支，v1 一行都没有——又是"v2 修了 v1 没修"。
+    try:
+        review_service.enqueue_review(
+            review.id,
+            api_key=resolved.key,
+            key_source=resolved.source,
+            user_id=identity.user_id,
+            provider=resolved.provider,
+            model=resolved.model,
+            api_base=resolved.api_base,
+        )
+    except Exception as exc:
+        # 先把这条评审标成失败并写明原因。v1 的契约是"失败评审能从
+        # report_json 读到原因"（见 _report_json_for），删掉它反而让用户
+        # 拿到一个 500 之后什么线索都没有。
+        try:
+            review.status = "failed"
+            review.error_message = "评审任务入队失败，已执行计费补偿，请重新发起"
+            session.commit()
+        except Exception:
+            session.rollback()
+        try:
+            quota_service.refund_review_credit(
+                session, identity.user_id, review.id, key_source=resolved.source
+            )
+            # 这一条同时释放日名额占位与终身 token 占位（见 release_review_slot）
+            quota_service.release_review_slot(
+                session, identity.user_id, key_source=resolved.source
+            )
+        except Exception:
+            session.rollback()
+            logger.exception(
+                "review %s 入队失败后的计费补偿也失败——用户 %s 的额度可能被吞，需人工核对",
+                review.id,
+                identity.user_id,
+            )
+        raise HTTPException(status_code=500, detail="评审任务入队失败，请稍后重试") from exc
+
     return review
 
 
