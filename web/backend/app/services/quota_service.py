@@ -89,6 +89,106 @@ def _quota_enabled(db: Session) -> bool:
     return admin_settings_service.get(db, "quota_enabled", settings.quota_enabled)
 
 
+# 终身 token 额度的占位。与 RESERVATION_KIND（日名额占位）刻意分开：
+# 后者只在 plan 模式下产生、且会被 _counts_toward_daily_reviews 计入日次数；
+# 这一种在所有模式下都要有（credits 模式同样受终身闸约束），且绝不能计入
+# 日次数。共用一个 kind 会让 credits 模式凭空多出日名额消耗。
+TOKEN_HOLD_KIND = "token_hold"
+
+
+def effective_token_cap(db: Session, user_id: str) -> int:
+    """这个用户的终身 token 上限：**用户覆盖值 > 全局配置**，0 = 不限制。
+
+    做成函数而不是各处直接读 settings：这个值有三个读取点（占位的条件插入、
+    token_cap_error 的判断、usage_summary 的显示），任何一处忘了看覆盖值，
+    表现都是"后台给他提了额，但他还是被拦"或者反过来"页面显示提额了、
+    闸门不认"。这个仓库已经因为同型分岔出过两次事故，不再赌第三次。
+
+    覆盖值可以设成 0：语义是"这个用户不受限制"，与全局 0 一致。
+    要恢复成跟随全局，把列置回 NULL（后台传 -1 表示清除，见 admin.update_user）。
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is not None and user.token_quota_total is not None:
+        return int(user.token_quota_total)
+    return settings.quota_tokens_total
+
+
+def _hold_tokens(db: Session, user_id: str) -> bool:
+    """"没超额就占一笔"——查与占在**同一条语句**里完成。返回"占到了吗"。
+
+    第一版写成"先 token_cap_error() 查、再 db.add() 占"，并发测试当场打脸：
+    8 个线程 8/8 全部放行。原因是 advisory lock 只在 PostgreSQL 生效，
+    而本机与 CI 跑的是 SQLite，那边它直接 return——两次独立的语句之间毫无保护，
+    占位只是把竞态往后推了一步，没有消除它。
+
+    所以照搬 _reserve_review_slot 那条被验证过的形状：
+      · SQLite：单条 INSERT...SELECT 全程在库级写锁内完成，天然互斥；
+      · PostgreSQL：外层已取事务级 advisory lock（READ COMMITTED 下子查询
+        读的是语句开始时的快照，不加锁挡不住并发）。
+    两条防线缺一不可，这也是次数闸和 CDK 扣减用的同一套。
+
+    估算值设 0 = 关闭占位，退回 check-then-use——留这个开关是因为估算得太高
+    会让并发用户被过早拒绝，运营者需要能按自己的实际用量调。
+    """
+    cap = effective_token_cap(db, user_id)
+    estimate = settings.quota_tokens_per_review_estimate
+    if cap <= 0 or user_id == settings.anonymous_user_id:
+        return True  # 不限制 / 共享匿名桶豁免
+    if estimate <= 0:
+        # 关闭占位 ≠ 关闭闸门。这里必须退回只读检查，否则把估算值调成 0
+        # 就等于把整个终身额度关掉——而那个旋钮的文档写的是"退回 check-then-use"。
+        # 第一版这里直接 return True，被 test_default_user_still_blocked_at_global
+        # 当场抓到：闸门放行了一个已经超额一倍的用户。
+        return token_cap_error(db, user_id) is None
+    result = db.execute(
+        text(
+            "INSERT INTO usage_records "
+            "(id, user_id, review_id, kind, persona_count, cost_usd, "
+            " input_tokens, output_tokens, key_source, created_at) "
+            "SELECT :id, :uid, NULL, :hold_kind, 0, 0.0, :est, 0, 'server', :now "
+            "WHERE (SELECT COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0) "
+            "       FROM usage_records "
+            "       WHERE user_id = :uid AND key_source = 'server' "
+            # 与 tokens_used() 完全同一个谓词：过期占位不算。
+            # 两处若分岔，就会出现"闸门按 A 算、页面按 B 显示"——
+            # 这个仓库已经因为同型分岔出过两次事故。
+            "         AND (kind <> :hold_kind OR created_at >= :cutoff)) < :cap"
+        ),
+        {
+            "id": str(uuid.uuid4()),
+            "uid": user_id,
+            "hold_kind": TOKEN_HOLD_KIND,
+            "est": int(estimate),
+            "now": _naive_utc(datetime.now(timezone.utc)),
+            "cutoff": _naive_utc(_reservation_cutoff()),
+            "cap": int(cap),
+        },
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def _release_token_hold(db: Session, user_id: str) -> None:
+    """顶掉该用户最早的一条 token 占位（评审已结算，真实用量已入账）。
+
+    删最早的一条而不是"对应那条"：占位之间可互换（每条就是"一次在途评审"），
+    与日名额占位同一套模型。漏删也不致命——占位过 TTL 就不再计数，会自愈；
+    但不删的话，在 TTL 窗口内会与真实记录**双重计数**，把额度虚高消耗一遍。
+    """
+    row = (
+        db.query(UsageRecord)
+        .filter(
+            UsageRecord.user_id == user_id,
+            UsageRecord.kind == TOKEN_HOLD_KIND,
+        )
+        .order_by(UsageRecord.created_at.asc())
+        .first()
+    )
+    if row is not None:
+        db.delete(row)
+        db.commit()
+
+
 def tokens_used(db: Session, user_id: str) -> int:
     """该用户在本实例上**累计**烧掉的平台 token（输入 + 输出）。
 
@@ -111,6 +211,16 @@ def tokens_used(db: Session, user_id: str) -> int:
         .filter(
             UsageRecord.user_id == user_id,
             UsageRecord.key_source == "server",
+            # 在途占位算数，但**过期的不算**。这一条同时管两件事：
+            #   · 并发可见性 —— 第 N 个并发请求看得到前 N-1 个的占位，
+            #     否则 8 个请求全读到"没超"、8/8 全放行（实测过）；
+            #   · 漏释放自愈 —— 评审进程崩了、占位没删掉，过 TTL 后自动不再计数。
+            #     没有这一条的话，一次崩溃就永久吃掉用户一部分终身额度，
+            #     而终身额度没有任何清零路径，等于永久损失。
+            or_(
+                UsageRecord.kind != TOKEN_HOLD_KIND,
+                UsageRecord.created_at >= _reservation_cutoff(),
+            ),
         )
         .scalar()
     )
@@ -132,7 +242,7 @@ def token_cap_error(db: Session, user_id: str) -> Optional[str]:
     未登录访客共用一个 user_id，任何一个人烧完 300 万，之后**全站访客
     永久 402**。当初只在次数闸写了豁免、这里漏掉，是同一个判断没贯彻到底。
     """
-    cap = settings.quota_tokens_total
+    cap = effective_token_cap(db, user_id)
     if cap <= 0:
         return None
     if user_id == settings.anonymous_user_id:
@@ -182,17 +292,38 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
     quota_enabled = _quota_enabled(db)
     plan_info = plan_service.get_plan(plan, db)
     since = _day_ago()
-    q = db.query(
-        func.count(UsageRecord.id),
-        func.coalesce(func.sum(UsageRecord.cost_usd), 0.0),
-    ).filter(
-        UsageRecord.user_id == user_id,
-        # 与 check_quota 用同一个谓词：正在跑的评审（占位）也算"已经用掉一次"。
-        # 否则用量页会显示 3/5 而配额闸按 5/5 拒绝，用户看到的是一个说谎的数字。
-        _counts_toward_daily_reviews(),
-        UsageRecord.created_at >= since,
+    # 次数与总成本必须**分开查**，因为两者的口径不同，混在一条 SELECT 里必然错一个：
+    #   · 次数 → 只算平台垫付（与配额闸同源）
+    #   · 总成本 → 含 BYOK（cost_usd_total 的语义就是"你一共花了多少"，
+    #     另有 cost_usd_on_server_key 单独报平台垫付那部分）
+    # 这两件事以前共用一条查询，于是次数那侧被迫跟着"含 BYOK"，
+    # 与闸门口径分岔（见下面 key_source 那条注释）。
+    count = (
+        db.query(func.count(UsageRecord.id))
+        .filter(
+            UsageRecord.user_id == user_id,
+            # 与 check_quota 用同一个谓词：正在跑的评审（占位）也算"已经用掉一次"。
+            # 否则用量页会显示 3/5 而配额闸按 5/5 拒绝，用户看到的是一个说谎的数字。
+            _counts_toward_daily_reviews(),
+            # key_source 这一条以前漏了，而闸门那侧（_reserve_review_slot 的子查询）
+            # 一直带着它。同一件事两处口径不同，方向恰好与上面那句注释警告的相反：
+            # BYOK 用户跑 5 次自己付费的评审 → 用量页显示 5/5、提示"升级套餐或兑换 CDK"，
+            # 而闸门那边他一次平台额度都没用过、还剩满额。虚报用满同样是说谎的数字，
+            # 只是这次骗的是"你没额度了"而不是"你还有额度"。
+            UsageRecord.key_source == "server",
+            UsageRecord.created_at >= since,
+        )
+        .scalar()
     )
-    count, cost = q.one()
+    cost = (
+        db.query(func.coalesce(func.sum(UsageRecord.cost_usd), 0.0))
+        .filter(
+            UsageRecord.user_id == user_id,
+            _counts_toward_daily_reviews(),
+            UsageRecord.created_at >= since,
+        )
+        .scalar()
+    )
 
     # BYOK 花的是用户自己的钱，不该算进"我方配额"
     server_cost = (
@@ -241,7 +372,7 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         # 所以 quota_enabled=false 时同样如实回报"已用了多少"（只是不拦）——
         # 让用户和运营都能看见真实消耗，而不是等撞上限才第一次知道有这回事。
         "tokens_used": tokens_used(db, user_id),
-        "tokens_limit": settings.quota_tokens_total or None,
+        "tokens_limit": effective_token_cap(db, user_id) or None,
     }
 
 
@@ -295,9 +426,20 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     #     等于关掉计费的同时把钱包保护也一起关了。
     # 追问链路（chat_service._check_chat_quota）用的是同一个 token_cap_error，
     # 口径必须一致——两处对 quota_enabled 的态度分歧过一次，就是这里改出来的。
-    cap_error = token_cap_error(db, user_id)
-    if cap_error:
-        raise QuotaExceeded(cap_error)
+    from app.services import cdk_service as _cdk
+
+    # 查与占位之间必须串行，否则占位本身也救不了并发：两个请求同时读到"没超"，
+    # 各自插一条占位，双双放行——占位只是把竞态推后了一步。用与次数闸/CDK
+    # 扣减同一套 advisory lock（PostgreSQL 生效，SQLite 靠库级写锁天然串行）。
+    _cdk.serialize_user_writes(db, user_id, "tokens")
+    if not _hold_tokens(db, user_id):
+        # 占不到就是超额了。文案仍由 token_cap_error 生成（此刻它一定非空），
+        # 避免两处各写一份提示词漂移。
+        raise QuotaExceeded(
+            token_cap_error(db, user_id)
+            or f"体验额度已用完（上限 {effective_token_cap(db, user_id):,} tokens）。"
+            "填写自己的 API Key（BYOK）即可继续使用，不受此限制。"
+        )
 
     if not _quota_enabled(db):
         return
@@ -460,6 +602,14 @@ def release_review_slot(db: Session, user_id: str, key_source: str = "server") -
     """
     if key_source != "server":
         return False
+
+    # 终身额度的占位也要在这里放掉，而且要在下面那个 early return 之前——
+    # credits 模式压根没有日名额占位（_oldest_reservation 返回 None 直接 return
+    # False），但**有** token 占位。写在下面的话，credits 模式下每一次失败的评审
+    # 都会留下一笔占位，在 TTL 内持续吃着用户的终身额度。
+    # 这与日名额占位是两套独立的东西，各释放各的。
+    _release_token_hold(db, user_id)
+
     row = _oldest_reservation(db, user_id)
     if row is None:
         return False
@@ -541,6 +691,13 @@ def record_usage(
     找不到占位就照旧插入——BYOK、配额关闭、credits 模式、以及占位已过 TTL 被清掉
     的情形都走这一条，语义与改动前完全一致。
     """
+    # 先顶掉终身额度的占位，再落真实用量——顺序反了会在这两步之间出现一个
+    # "占位 + 真实记录同时存在"的瞬间，并发的另一个请求恰好读到就会多算一笔。
+    # 与日名额占位（下面的 _settle_reservation）是两套独立的占位，各释放各的：
+    # 前者所有模式都有、不计日次数；后者只在 plan 模式下产生、计日次数。
+    if kind == "review" and key_source == "server":
+        _release_token_hold(db, user_id)
+
     if kind == "review" and key_source == "server":
         settled = _settle_reservation(
             db,

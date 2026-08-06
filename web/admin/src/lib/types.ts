@@ -260,6 +260,8 @@ export interface AdminUser {
   input_tokens_total: number
   output_tokens_total: number
   tokens_total: number
+  /** 该用户单独的终身 token 上限；null = 跟随全局 AL_QUOTA_TOKENS_TOTAL */
+  token_quota_total: number | null
 }
 
 export interface AdminUserList {

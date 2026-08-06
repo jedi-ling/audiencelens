@@ -217,6 +217,10 @@ def _legacy_migrations() -> None:
             patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT false NOT NULL")
         if "email_verified_at" not in user_columns:
             patches.append("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
+        if "token_quota_total" not in user_columns:
+            # 可空 INTEGER，不带 DEFAULT：SQLite 与 PostgreSQL 都接受这条 DDL。
+            # （对比上面 is_guest 那条踩过的坑：DEFAULT 0 在 PG 的 boolean 上会挂。）
+            patches.append("ALTER TABLE users ADD COLUMN token_quota_total INTEGER")
 
     # ethics_reports 补归属列。老库里这张表没有 review_id，写进去的行
     # 既查不回来也删不掉，而 violations_json 里含用户内容摘录——等于

@@ -182,6 +182,15 @@ class Settings:
         # 并发发出去的，跑到一半刹不住车。它保证的是"下一次还能不能开始"，
         # 不是"这一次不会超"。真正的硬约束仍然是发出去多少 CDK 次数。
         self.quota_tokens_total: int = _int("AL_QUOTA_TOKENS_TOTAL", 0)
+        # 发起一次评审时，先按这个数字给终身额度**占位**，评审结束用真实用量顶掉。
+        # 存在的理由是终身闸本来是 check-then-use：查用量与真正烧 token 之间没有
+        # 任何写入，8 个并发请求实测全部读到"没超"、8/8 全放行，超额可达一个数量级。
+        # 占位让并发请求彼此可见：第 N 个请求看到的是"已用 + 前 N-1 个的占位"。
+        # 精度不是重点（真实用量差异很大），量级对就够——它把超额从"并发数 ×
+        # 单次用量"压到"一次评审的估算误差"。设 0 = 关闭占位，退回旧的 check-then-use。
+        self.quota_tokens_per_review_estimate: int = _int(
+            "AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE", 150_000
+        )
 
         # 未验证邮箱的账号，服务端 key 每日次数上限（软拦：能用，但只够试一次）。
         # 在此之前 email_verified_at 只是一条记录，登录/评审/配额一处都不读它——

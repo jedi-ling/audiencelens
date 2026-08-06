@@ -216,6 +216,10 @@ class User(Base):
     # 邮箱是否已验证。注册即可用（不挡住上手），但未验证的账号会被提示去验证——
     # 否则用户填错邮箱自己不知道，等到要找回密码时才发现联系不上，为时已晚。
     email_verified_at = Column(DateTime, nullable=True)
+    # 该用户单独的终身 token 上限；NULL = 用全局 AL_QUOTA_TOKENS_TOTAL。
+    # 存 NULL 而不是存全局默认值的副本：后者会让"改了全局配置、老用户不跟随"
+    # 变成一个静默的惊喜，而运营者以为自己改的是所有人。
+    token_quota_total = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     api_keys = relationship("UserApiKey", back_populates="user", cascade="all, delete-orphan")

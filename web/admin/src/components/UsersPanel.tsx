@@ -30,7 +30,10 @@ export function UsersPanel() {
     void load()
   }, [load])
 
-  const update = async (id: string, body: { plan?: string; is_active?: boolean }) => {
+  const update = async (
+    id: string,
+    body: { plan?: string; is_active?: boolean; token_quota_total?: number },
+  ) => {
     setPending(id)
     setError(null)
     try {
@@ -70,6 +73,7 @@ export function UsersPanel() {
               <th className="py-2 pr-3 font-normal">评审数</th>
               <th className="py-2 pr-3 font-normal">累计成本</th>
               <th className="py-2 pr-3 font-normal">累计 Token</th>
+              <th className="py-2 pr-3 font-normal" title="留空=跟随全局 AL_QUOTA_TOKENS_TOTAL">体验额度</th>
               <th className="py-2 pr-3 font-normal">注册时间</th>
               <th className="py-2 font-normal">状态</th>
             </tr>
@@ -77,7 +81,7 @@ export function UsersPanel() {
           <tbody className="divide-y divide-border">
             {users.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-text-muted">暂无注册用户</td>
+                <td colSpan={8} className="py-6 text-center text-text-muted">暂无注册用户</td>
               </tr>
             )}
             {users.map((u) => (
@@ -104,6 +108,30 @@ export function UsersPanel() {
                   title={`输入 ${u.input_tokens_total.toLocaleString('en-US')} · 输出 ${u.output_tokens_total.toLocaleString('en-US')}`}
                 >
                   {u.tokens_total.toLocaleString('en-US')}
+                </td>
+                <td className="py-2 pr-3">
+                  {/* 三态输入：留空 = 跟随全局（后端收 -1 清除覆盖），填数字 = 该用户专属上限。
+                      不用下拉/开关是因为运营真正要做的动作就是"给这个人多少"，
+                      一个数字框最直接；占位符里写明留空的含义，避免"清空=0"的误解。 */}
+                  <input
+                    defaultValue={u.token_quota_total ?? ''}
+                    placeholder="跟随全局"
+                    disabled={pending === u.id}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim()
+                      const next = raw === '' ? -1 : Number(raw)
+                      if (raw !== '' && (!Number.isFinite(next) || next < 0)) {
+                        e.target.value = String(u.token_quota_total ?? '')
+                        return
+                      }
+                      // 没变就别发请求——onBlur 每次失焦都会触发，
+                      // 不判断的话点一下表格就写一条审计日志。
+                      const current = u.token_quota_total ?? -1
+                      if (next === current) return
+                      void update(u.id, { token_quota_total: next })
+                    }}
+                    className="w-28 rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-right font-mono text-xs tabular-nums text-text-primary placeholder-text-muted outline-none focus:border-brand-primary disabled:opacity-50"
+                  />
                 </td>
                 <td className="py-2 pr-3 text-text-muted">
                   {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}

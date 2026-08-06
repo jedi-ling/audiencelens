@@ -187,8 +187,15 @@ export const adminApi = {
     return request<AdminUserList>(`/api/admin/users${qs ? `?${qs}` : ''}`)
   },
 
-  updateUser: (id: string, body: { plan?: string; is_active?: boolean }) =>
-    request<{ id: string; email: string; plan: string; is_active: boolean }>(
+  /** token_quota_total 三态：不传=不改；>=0=设为该值（0=不限制）；-1=清除覆盖回落全局 */
+  updateUser: (
+    id: string,
+    body: { plan?: string; is_active?: boolean; token_quota_total?: number },
+  ) =>
+    request<{
+      id: string; email: string; plan: string; is_active: boolean
+      token_quota_total: number | null
+    }>(
       `/api/admin/users/${id}`,
       { method: 'PUT', body: JSON.stringify(body) },
     ),

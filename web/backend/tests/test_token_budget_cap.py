@@ -214,3 +214,106 @@ class TestAnonymousBucketExempt:
         u = _user(db, "tok-normal@example.com")
         _burn(db, u.id, 3_000_000)
         assert quota_service.token_cap_error(db, u.id) is not None
+
+
+class TestConcurrencyIsBounded:
+    """并发发起时，终身闸不能让所有人一起过。
+
+    修复前是纯 check-then-use：查用量与真正烧 token 之间没有任何写入，
+    实测 used=cap-1 时 8 个并发请求 8/8 全部放行，超额量级 =
+    并发数 × 单次评审用量（10^5~10^6），也就是终身额度能在一小时内被超出
+    一个数量级。次数闸当初正是因为同型问题才加的占位。
+
+    修法是在放行的瞬间按估算值占位，让并发请求彼此可见。这里断言的是
+    "放行数被压到个位数量级"而不是精确值——占位是估算，本来就不追求精确，
+    要的是把超额从"并发数倍"压到"一次估算误差"。
+    """
+
+    def test_concurrent_requests_do_not_all_pass(self, db):
+        import threading
+
+        from app.db import SessionLocal
+
+        cap = settings.quota_tokens_total          # 3_000_000
+        est = settings.quota_tokens_per_review_estimate  # 150_000
+        u = _user(db, "tok-race@example.com")
+        # 留出恰好 2 个估算位的余量：正确实现最多放行 2~3 个
+        _burn(db, u.id, cap - 2 * est)
+
+        results = []
+        barrier = threading.Barrier(8)
+
+        def worker():
+            s = SessionLocal()
+            try:
+                barrier.wait(timeout=10)
+                quota_service.check_quota(s, u.id, key_source="server")
+                results.append("pass")
+            except QuotaExceeded:
+                results.append("blocked")
+            except Exception as e:  # 并发下 SQLite 可能报 locked，如实记下不掩盖
+                results.append(f"error:{type(e).__name__}")
+            finally:
+                s.close()
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+        passed = results.count("pass")
+        assert passed < 8, f"8 个并发全部放行 = 闸门形同虚设：{results}"
+        # 上界放宽到 4：SQLite 下的串行化靠库级写锁，边界上可能多放一个。
+        # 关键是"远小于 8"，不是精确到个位。
+        assert passed <= 4, f"放行数 {passed} 超出估算占位应有的量级：{results}"
+
+    def test_hold_is_released_on_settlement(self, db):
+        """评审结束后占位必须被真实用量顶掉，不能双重计数。"""
+        u = _user(db, "tok-settle@example.com")
+        before = quota_service.tokens_used(db, u.id)
+        quota_service.check_quota(db, u.id, key_source="server")
+        held = quota_service.tokens_used(db, u.id)
+        assert held > before, "放行后应留下占位"
+
+        quota_service.record_usage(
+            db, u.id, kind="review", key_source="server",
+            input_tokens=1000, output_tokens=500,
+        )
+        after = quota_service.tokens_used(db, u.id)
+        assert after == before + 1500, f"占位没被顶掉，出现双重计数：{after}"
+
+    def test_hold_is_released_on_failure(self, db):
+        """评审失败释放名额时，token 占位同样要放掉——否则失败的评审
+        会在 TTL 内一直吃着终身额度。credits 模式下没有日名额占位，
+        这条尤其容易漏（release_review_slot 会提前 return False）。"""
+        u = _user(db, "tok-fail@example.com")
+        before = quota_service.tokens_used(db, u.id)
+        quota_service.check_quota(db, u.id, key_source="server")
+        assert quota_service.tokens_used(db, u.id) > before
+
+        quota_service.release_review_slot(db, u.id, key_source="server")
+        assert quota_service.tokens_used(db, u.id) == before
+
+    def test_stale_hold_stops_counting(self, db):
+        """漏释放要能自愈：过了 TTL 的占位不再计数。
+
+        终身额度没有任何清零路径，一次进程崩溃如果永久吃掉一部分额度，
+        对用户就是永久损失。
+        """
+        from datetime import datetime, timedelta, timezone
+
+        from app.models import UsageRecord
+
+        u = _user(db, "tok-stale@example.com")
+        before = quota_service.tokens_used(db, u.id)
+        stale = UsageRecord(
+            user_id=u.id, kind=quota_service.TOKEN_HOLD_KIND,
+            persona_count=0, cost_usd=0.0,
+            input_tokens=999_999, output_tokens=0, key_source="server",
+            created_at=datetime.now(timezone.utc)
+            - timedelta(seconds=quota_service.RESERVATION_TTL_SECONDS + 60),
+        )
+        db.add(stale)
+        db.commit()
+        assert quota_service.tokens_used(db, u.id) == before

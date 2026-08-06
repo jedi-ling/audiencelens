@@ -451,6 +451,13 @@ async def reset_plan_field(plan_id: str, field: str, db: Session = Depends(get_d
 class UserUpdate(BaseModel):
     plan: Optional[str] = None
     is_active: Optional[bool] = None
+    # 该用户单独的终身 token 上限。语义三态，不能只用一个可空整数表达：
+    #   不传   → 不改动
+    #   >= 0  → 设为该值（0 = 这个人不受限制）
+    #   -1    → 清除覆盖，回落全局 AL_QUOTA_TOKENS_TOTAL
+    # 用 -1 而不是 null 表示"清除"：Pydantic 里 null 与"没传"在 Optional 上
+    # 无法区分，运营想恢复默认时会变成一个做不到的操作。
+    token_quota_total: Optional[int] = None
 
 
 @router.get("/users")
@@ -511,6 +518,8 @@ async def list_users(
                 "input_tokens_total": token_totals.get(u.id, (0, 0))[0],
                 "output_tokens_total": token_totals.get(u.id, (0, 0))[1],
                 "tokens_total": sum(token_totals.get(u.id, (0, 0))),
+                # None = 跟随全局配置
+                "token_quota_total": u.token_quota_total,
             }
             for u in rows
         ],
@@ -534,9 +543,15 @@ async def update_user(user_id: str, body: UserUpdate, db: Session = Depends(get_
     if body.is_active is not None:
         changes["is_active"] = {"from": user.is_active, "to": body.is_active}
         user.is_active = body.is_active
+    if body.token_quota_total is not None:
+        if body.token_quota_total < -1:
+            raise BadRequest("token_quota_total 只能是 -1（清除覆盖）或 >= 0 的整数")
+        new_cap = None if body.token_quota_total == -1 else int(body.token_quota_total)
+        changes["token_quota_total"] = {"from": user.token_quota_total, "to": new_cap}
+        user.token_quota_total = new_cap
 
     if not changes:
-        raise BadRequest("没有要修改的字段（plan / is_active）")
+        raise BadRequest("没有要修改的字段（plan / is_active / token_quota_total）")
 
     db.commit()
     audit_log_service.record(db, "user.update", user.email, changes)
@@ -545,6 +560,7 @@ async def update_user(user_id: str, body: UserUpdate, db: Session = Depends(get_
         "email": user.email,
         "plan": user.plan,
         "is_active": user.is_active,
+        "token_quota_total": user.token_quota_total,
     }
 
 

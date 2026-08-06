@@ -140,3 +140,52 @@ class TestSummaryAgreesWithGate:
         s = quota_service.usage_summary(db, u.id)
         assert s["reviews_limit"] == 5
         assert s["reviews_limit_capped_unverified"] is False
+
+
+class TestSummaryCountsOnlyPlatformReviews:
+    """用量页的次数必须与闸门同口径：只算平台垫付。
+
+    这一条以前是错的，而且方向比历史事故更隐蔽：闸门那侧
+    （_reserve_review_slot 的子查询）一直带着 key_source='server'，
+    用量页那侧没带。于是 BYOK 用户——花的全是自己的钱、一次平台额度都没用——
+    在用量页看到 5/5 并被提示"升级套餐或兑换 CDK"。
+    虚报"用满了"和虚报"还有余额"一样是说谎的数字。
+    """
+
+    def _burn(self, db, user_id, n, key_source):
+        from app.models import UsageRecord
+
+        for _ in range(n):
+            db.add(UsageRecord(
+                user_id=user_id, kind="review", persona_count=7,
+                cost_usd=0.2, input_tokens=10, output_tokens=10,
+                key_source=key_source,
+            ))
+        db.commit()
+
+    def test_byok_reviews_not_counted(self, db):
+        u = _make_user(db, "sum-byok@example.com", verified=True)
+        self._burn(db, u.id, 5, "byok")
+        s = quota_service.usage_summary(db, u.id)
+        assert s["reviews_used"] == 0, "BYOK 评审不该占我方配额"
+        # 反向对照：闸门此刻必须仍然放行，两者说的是同一件事
+        quota_service.check_quota(db, u.id, key_source="server")
+
+    def test_server_reviews_are_counted(self, db):
+        """反向对照：平台垫付的照算，否则一个"永远返回 0"的实现也能过上一条。"""
+        u = _make_user(db, "sum-server@example.com", verified=True)
+        self._burn(db, u.id, 3, "server")
+        assert quota_service.usage_summary(db, u.id)["reviews_used"] == 3
+
+    def test_total_cost_still_includes_byok(self, db):
+        """cost_usd_total 的语义是"你一共花了多少"，含 BYOK——不能被这次修复顺手改窄。
+
+        它与 cost_usd_on_server_key 是一对：前者给用户看总开销，后者是我方垫付。
+        两者相等就说明有一侧被改错了。
+        """
+        u = _make_user(db, "sum-cost@example.com", verified=True)
+        self._burn(db, u.id, 2, "byok")     # 0.4
+        self._burn(db, u.id, 1, "server")   # 0.2
+        s = quota_service.usage_summary(db, u.id)
+        assert round(s["cost_usd_total"], 2) == 0.6
+        assert round(s["cost_usd_on_server_key"], 2) == 0.2
