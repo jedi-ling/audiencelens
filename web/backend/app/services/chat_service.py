@@ -134,6 +134,19 @@ def _check_chat_quota(db: Session, user_id: str, key_source: str, plan: str) -> 
 
     from app.services import quota_service
 
+    # 终身 token 额度：这条必须在 quota_enabled 判断**之前**、也在下面所有
+    # mode 分支之前。它此前完全没挂在这条路上，而追问的 token 是照记进
+    # usage_records 的——于是"额度用完的用户仍可对平台 key 无限追问"，
+    # 账面上早已超额、闸门却永远放行。追问不扣次数是设计意图（追问是留存点），
+    # 但"不扣次数"不能等于"不受总量约束"。
+    #
+    # 不看 quota_enabled 是刻意的：这道闸保护的是运营者的钱包上限，
+    # 与"要不要按套餐计费"是两件事；把它挂在 quota_enabled 下面，
+    # 等于关掉计费的同时把钱包保护也一起关了。
+    cap_error = quota_service.token_cap_error(db, user_id)
+    if cap_error:
+        raise QuotaExceeded(cap_error)
+
     summary = quota_service.usage_summary(db, user_id, plan)
     if not summary["quota_enabled"]:
         return

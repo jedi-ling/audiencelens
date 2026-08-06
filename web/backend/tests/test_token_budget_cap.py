@@ -134,3 +134,83 @@ class TestSummary:
         assert s["tokens_limit"] is None
         # 不限制也要如实回报已用量——不然用户永远不知道自己烧了多少
         assert s["tokens_used"] == 42
+
+
+class TestNoBypassRoutes:
+    """终身闸必须覆盖**所有**烧平台 key 的入口，不只是评审。
+
+    这是审计翻出来的最严重一条：闸最初只挂在评审 v1/v2 上，而追问、意图解析、
+    人格生成三条路各自都拿平台 key 发请求、各自都把 token 记进 usage_records，
+    却都不查这道闸。于是 tokens_used 把它们算进来了、判断却漏了它们——
+    账面早已超额，闸门永远放行。
+    """
+
+    def test_chat_followup_blocked_when_exhausted(self, db):
+        """追问不扣次数是设计意图（追问是留存点），但不能等于不受总量约束。"""
+        from app.services import chat_service
+
+        u = _user(db, "tok-chat@example.com")
+        _burn(db, u.id, 3_000_000)
+        with pytest.raises(QuotaExceeded):
+            chat_service._check_chat_quota(db, u.id, "server", "free")
+
+    def test_chat_followup_allowed_under_cap(self, db):
+        """反向对照：没超额时追问必须放行，否则这个修复就把追问功能整个关掉了。"""
+        from app.services import chat_service
+
+        u = _user(db, "tok-chat-ok@example.com")
+        _burn(db, u.id, 100)
+        chat_service._check_chat_quota(db, u.id, "server", "free")  # 不抛
+
+    def test_chat_byok_unaffected(self, db):
+        from app.services import chat_service
+
+        u = _user(db, "tok-chat-byok@example.com")
+        _burn(db, u.id, 9_000_000)
+        chat_service._check_chat_quota(db, u.id, "byok", "free")  # 不抛
+
+    def test_gate_is_independent_of_quota_enabled(self, db, monkeypatch):
+        """这道闸由自己的开关控制，不该被 AL_QUOTA_ENABLED 一起关掉。
+
+        它保护的是运营者的钱包上限，与"要不要按套餐计次计费"是两件事。
+        挂在 quota_enabled 下面，等于关掉计费的同时把钱包保护也关了。
+        评审链路与追问链路必须对这一点取同一立场——两边分歧过一次。
+        """
+        monkeypatch.setattr(settings, "quota_enabled", False)
+        u = _user(db, "tok-noquota@example.com")
+        _burn(db, u.id, 3_000_000)
+
+        from app.services import chat_service
+
+        with pytest.raises(QuotaExceeded):
+            quota_service.check_quota(db, u.id, key_source="server")
+        with pytest.raises(QuotaExceeded):
+            chat_service._check_chat_quota(db, u.id, "server", "free")
+
+
+class TestAnonymousBucketExempt:
+    def test_shared_anonymous_never_capped(self, db, monkeypatch):
+        """共享匿名桶必须豁免，理由比次数闸那条更强。
+
+        次数闸是 24h 滚动的，压错了第二天自愈；这道闸不滚动、不重置、
+        没有清零路径。AL_AUTH_ENABLED=false 形态下所有未登录访客共用一个
+        user_id，任何一个人烧完额度，之后**全站访客永久 402**。
+        """
+        monkeypatch.setattr(settings, "anonymous_user_id", "anon-tok")
+        _user(db, "anon-tok@example.com")
+        from app.models import User
+
+        row = db.query(User).filter(User.email == "anon-tok@example.com").first()
+        row.id = "anon-tok"
+        db.commit()
+        _burn(db, "anon-tok", 99_000_000)
+
+        assert quota_service.token_cap_error(db, "anon-tok") is None
+        quota_service.check_quota(db, "anon-tok", key_source="server")  # 不抛
+
+    def test_normal_user_still_capped(self, db, monkeypatch):
+        """反向对照：豁免只给匿名桶，普通用户照拦。"""
+        monkeypatch.setattr(settings, "anonymous_user_id", "anon-tok2")
+        u = _user(db, "tok-normal@example.com")
+        _burn(db, u.id, 3_000_000)
+        assert quota_service.token_cap_error(db, u.id) is not None

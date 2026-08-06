@@ -7,6 +7,7 @@
 
 import hashlib
 import hmac
+import math
 import os
 import threading
 import time
@@ -20,7 +21,7 @@ from app.config import settings
 from app.core.errors import AdminDisabled, RateLimited, Unauthorized
 from app.core.logging import logger
 from app.core.ratelimit import get_limiter
-from app.core.security import decode_token
+from app.core.security import create_token, decode_token
 from app.db import get_db
 from app.models import User
 from app.services import admin_settings_service, key_service
@@ -128,10 +129,16 @@ def sessions_revoked_at(db: Session, user_id: str) -> Optional[int]:
     见 SESSION_REVOKE_PURPOSE 的说明。代价老实说：每个带令牌的请求多一次
     索引查询（auth_tokens.user_id / purpose 都有索引），换 JWT 可撤回。
 
-    为什么向下取整到秒：JWT 的 iat 只有整秒精度。若拿带微秒的时间点去比，
-    "重置于 10.4 秒、重置完立刻登录拿到 iat=10 的新令牌"会被判成
-    10 < 10.4 即刻作废——用户改完密码根本登不进去。代价是与重置发生在
-    同一秒内签发的令牌逃过一劫（≤1 秒的窗口），比登不进去可接受得多。
+    **向上**取整到秒。这里以前是向下取整，注释把代价写成"≤1 秒的窗口"——
+    那个措辞低估了后果：暴露窗口确实只有 1 秒，但一旦攻击者偷到的令牌恰好
+    与撤销发生在同一秒，iat == revoked_at 使 `iat < revoked_at` 恒为假，
+    那把令牌就**活满完整 TTL（默认 7 天）**且不会自愈。改密码这个动作对
+    该次入侵完全无效，而用户以为自己已经把人赶出去了。
+
+    向下取整当初是为了避免"改完密码自己登不进去"（自然签发的 iat 会落在
+    带微秒的撤销点之前）。向上取整重新引入了这个风险，所以改密码那条路径
+    必须把撤销点原样传给 create_token(issued_at=...) —— 见 platform.change_password。
+    两者是一对，只改一处就会退化成"改完密码当场掉线"。
     """
     from app.models import AuthToken
 
@@ -146,7 +153,28 @@ def sessions_revoked_at(db: Session, user_id: str) -> Optional[int]:
     created_at = row.created_at
     if created_at.tzinfo is None:  # SQLite 取回来是 naive，补上 UTC 再比（同 auth_token_service）
         created_at = created_at.replace(tzinfo=timezone.utc)
-    return int(created_at.timestamp())
+    return math.ceil(created_at.timestamp())
+
+
+def issue_session_token(db: Session, user_id: str) -> str:
+    """签发一把**不会被既有撤销声明误杀**的会话令牌。
+
+    所有签发会话令牌的地方都必须走这里，不要直接调 create_token。
+
+    原因：撤销点是向上取整到整秒的（见 sessions_revoked_at，这样同一秒内
+    被盗的令牌才会真的失效），而 create_token 自然取的是当前整秒。于是
+    "在 X.4 秒撤销 → 撤销点 = X+1 → 用户在 X.5 秒登录拿到 iat = X"
+    会被判成 X < X+1 即刻作废——**用户改完密码登不进来**。
+
+    这个坑第一次出现时只在改密码那条路上打了补丁，忘记密码 → 重置 → 立刻
+    重新登录同样会中（重置那条不自动登录，问题落在紧随其后的 login 上），
+    整套测试里只有一条覆盖到。所以收敛成一个函数：签发时把 iat 抬到不早于
+    撤销点，任何新增的签发点自动获得同样的保护。
+    """
+    revoked_at = sessions_revoked_at(db, user_id)
+    now = int(time.time())
+    issued_at = max(now, revoked_at) if revoked_at is not None else now
+    return create_token(user_id, settings.jwt_secret, settings.jwt_ttl_seconds, issued_at=issued_at)
 
 
 def revoke_user_sessions(db: Session, user_id: str) -> None:

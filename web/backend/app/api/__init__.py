@@ -789,6 +789,15 @@ def generate_personas(
     except Exception:
         key = None  # 没 key 就走内置原型库，不阻断
 
+    # 终身 token 额度用完后不再动平台 key，降级到内置原型库（与"没 key"同一条路）。
+    # 这个端点此前完全不查配额：额度用完的用户仍能不停地打它花运营的钱，
+    # 而它的 token 是照记进 usage_records 的——账面超额、闸门放行。
+    # 选择降级而不是 402，理由与 /intent/parse 相同：这条路本来就有非模型的
+    # 兜底实现，能力下降好过功能消失。
+    if key_source == "server" and quota_service.token_cap_error(session, identity.user_id):
+        key = None
+        key_source = "byok"
+
     usage: dict = {}
     personas = PersonaService.generate_personas(
         domain=request.domain,

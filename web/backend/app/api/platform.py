@@ -31,6 +31,7 @@ from app.deps import (
     rate_limit,
     require_isolated_identity,
     resolve_llm_key,
+    issue_session_token,
     revoke_user_sessions,
 )
 from app.models import Job, Review, User
@@ -80,7 +81,12 @@ def _require_auth_enabled():
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-@router.post("/auth/register", dependencies=[Depends(rate_limit("auth", 10, 3600))])
+# scope 用 "auth_register" 而不是共用的 "auth"：限流桶的 key 是 scope + 主体，
+# 三个认证接口以前共用 "auth" 桶，而令牌桶取 min(limit, ...) —— 注册那个 10
+# 会把登录的 20 一起压成 10，且额度是共享的。实测"连注册 12 次后，一个从未
+# 登录过的合法账号直接 429"：注册把登录的额度吃光了。
+# 把注册单独分桶后，刷注册只会封住注册，不再连坐登录。
+@router.post("/auth/register", dependencies=[Depends(rate_limit("auth_register", 10, 3600))])
 async def register(body: RegisterRequest, db: Session = Depends(get_db)):
     _require_auth_enabled()
     email = body.email.strip().lower()
@@ -107,7 +113,7 @@ async def register(body: RegisterRequest, db: Session = Depends(get_db)):
         raise BadRequest("该邮箱不可用，请更换邮箱；若已有账号请直接登录")
     db.refresh(user)
     await _send_verify_email(db, user)  # 失败不抛，注册本身不受影响
-    token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
+    token = issue_session_token(db, user.id)
     return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
 
@@ -124,7 +130,7 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
         raise Unauthorized("邮箱或密码错误")
     if not user.is_active:
         raise Unauthorized("账号已停用")
-    token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
+    token = issue_session_token(db, user.id)
     return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
 
@@ -344,10 +350,13 @@ async def change_password(
     user.password_hash = hash_password(body.new_password)
     db.commit()
     revoke_user_sessions(db, user.id)
-    # 顺序要紧：先撤销、再签发。撤销点按整秒记且比较的是 iat < revoked_at，
-    # 之后签出来的令牌 iat >= 撤销点，一定存活。反过来先签再撤会把刚发的这把
-    # 一起作废——用户改完密码当场被踢下线，只能重新登录一次，白白吓一跳。
-    token = create_token(user.id, settings.jwt_secret, settings.jwt_ttl_seconds)
+    # 顺序要紧：先撤销、再签发。但**只靠顺序不够**——撤销点是向上取整到整秒的
+    # （deps.sessions_revoked_at，这样同一秒内被盗的令牌才会真的失效），
+    # 而自然签发的 iat 取的是当前整秒，必定落在撤销点之前，新令牌会被自己
+    # 那次撤销当场杀掉。所以要把撤销点原样读回来传给 create_token。
+    # 这两处是一对：改任何一处都会退化——要么被盗令牌活满 7 天，要么用户
+    # 改完密码当场掉线。
+    token = issue_session_token(db, user.id)
     # 换新令牌让**本设备**继续用，其他设备上的旧会话则已作废。
     # 这正是改密码该有的语义：把别人踢出去，自己不用重登。
     return {"changed": True, "token": token}
@@ -357,7 +366,9 @@ class UpdateProfileRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=50)
 
 
-@router.patch("/auth/me")
+# 本轮新增的写接口里唯一漏挂限流的一条：实测单令牌连打 200 次全部 200，
+# 每次都是一轮 UPDATE + commit。改昵称是低频动作，30 次/小时绰绰有余。
+@router.patch("/auth/me", dependencies=[Depends(rate_limit("profile", 30, 3600))])
 async def update_profile(
     body: UpdateProfileRequest,
     identity: Identity = Depends(optional_identity),
@@ -381,6 +392,15 @@ async def update_profile(
     name = body.display_name.strip()
     if not name:
         raise BadRequest("昵称不能为空")
+    # 控制字符一律拒绝。重点是 NUL：SQLite 会照单全收，而 PostgreSQL 的 text
+    # 类型不接受 0x00，psycopg2 会直接抛错——也就是说这是一条"本机测不出来、
+    # 上了生产才 500"的路径（生产库按部署文档就是 PostgreSQL）。
+    # 顺带挡掉 U+202E 这类双向覆写符：它能让昵称在界面上反向显示，
+    # 用来伪装成别人或伪造后缀。可打印的 Unicode（中日韩、emoji）不受影响。
+    if any(ch < " " or ch == "\x7f" for ch in name) or any(
+        "‪" <= ch <= "‮" or "⁦" <= ch <= "⁩" for ch in name
+    ):
+        raise BadRequest("昵称包含不可见的控制字符，请去掉后重试")
     user.display_name = name
     db.commit()
     return {"id": user.id, "email": user.email, "display_name": user.display_name}
@@ -858,6 +878,15 @@ async def parse_intent(
     except Exception:
         api_key = None  # 没 key 就走启发式，不阻断
 
+    # 终身 token 额度用完后，不再用平台 key 打这个接口——但**不报错**，
+    # 降级成启发式档继续服务。这条路本来就有"没 key 就走启发式"的降级，
+    # 额度用完与没配 key 是同一类情形：能力下降，功能不断。
+    # 在对话框里输入一句话就 402 是最糟的表现形式（用户还没发起评审就被挡），
+    # 真正该拦的是评审本身，那条路在 check_quota 里。
+    if key_source == "server" and quota_service.token_cap_error(db, identity.user_id):
+        api_key = None
+        key_source = "byok"  # 不再消耗平台额度，记账也不该记到平台头上
+
     # 用量必须记账。对话页每发一条消息就调一次这个接口，走平台垫付 key 时
     # 它是一笔真实开销，以前既不进 UsageRecord 也不受任何配额约束——
     # 后台成本面板看不见它，日成本硬闸也管不到它。
@@ -1018,7 +1047,7 @@ async def redeem_cdk(
         db.commit()
         db.refresh(guest_user)
         user_id = guest_user.id
-        guest_token = create_token(user_id, settings.jwt_secret, settings.jwt_ttl_seconds)
+        guest_token = issue_session_token(db, user_id)
 
     try:
         result = cdk_service.redeem(db, body.code, user_id)

@@ -86,11 +86,11 @@ class TestChangePassword:
         满一个 TTL（默认 7 天），"改密码"对已经发生的入侵毫无作用。
         """
         stolen = _signup(client, "chpw4@example.com")
-        # 必须让旧令牌确实早于撤销点**一整秒**再改密码。
-        # 撤销点向下取整到整秒、判据是 iat < revoked_at（见 deps.sessions_revoked_at），
-        # 于是同一秒内签发的令牌会逃过一劫——这是刻意的取舍：JWT 的 iat 只有整秒精度，
-        # 拿带微秒的时间点去比会让"改完密码立刻拿到的新令牌"被当场判死，用户改完就登不进去。
-        # 不 sleep 的话本测试测的是那个 ≤1 秒窗口，而不是撤销本身，会红得莫名其妙。
+        # 这句 sleep 保留，但理由已经变了，注意别再照抄旧解释：
+        # 原先撤销点向下取整，同秒令牌逃生，不 sleep 这条会红——sleep 是在替
+        # 那个洞打掩护。现在撤销点向上取整、同秒也会被撤销（见
+        # TestRevocationHasNoSameSecondHole），这条不 sleep 同样能过。
+        # 留着它是为了覆盖"跨秒"这个更常见的路径，两条各测一边。
         time.sleep(1.1)
         r = client.post(
             "/api/auth/password/change",
@@ -169,3 +169,62 @@ class TestUpdateProfile:
         )
         me = client.get("/api/auth/me", headers=_h(t)).json()
         assert "hijack@example.com" not in str(me)
+
+
+class TestRevocationHasNoSameSecondHole:
+    """同一秒内被盗的令牌也必须失效。
+
+    这条是审计翻出来的：撤销点原先向下取整、判据是 iat < revoked_at，于是
+    iat == revoked_at 恒为假，与撤销发生在同一秒的令牌不但逃过一劫，还
+    **活满完整 TTL（默认 7 天）**且不会自愈——改密码这个动作对该次入侵完全无效，
+    而用户以为自己已经把人赶出去了。注释当时把代价写成"≤1 秒的窗口"，
+    低估了后果：窗口是 1 秒，奖品是 7 天。
+
+    上面 test_old_token_revoked 里那句 time.sleep(1.1) 正是为绕开这个洞才加的，
+    也就是说测试套永远碰不到它。这里不 sleep，专门钉住那一秒。
+    """
+
+    def _signup(self, client, email):
+        client.post("/api/auth/register", json={"email": email, "password": "password123"})
+        r = client.post("/api/auth/login", json={"email": email, "password": "password123"})
+        return r.json()["token"]
+
+    def test_same_second_stolen_token_is_revoked(self, client):
+        email = "samesec@example.com"
+        owner = self._signup(client, email)
+        # 同一秒内再登录一次，模拟"攻击者此刻偷到一把"
+        stolen = client.post(
+            "/api/auth/login", json={"email": email, "password": "password123"}
+        ).json()["token"]
+
+        r = client.post(
+            "/api/auth/password/change",
+            headers=_h(owner),
+            json={"current_password": "password123", "new_password": "newpassword456"},
+        )
+        assert r.status_code == 200
+        fresh = r.json()["token"]
+
+        # 不 sleep：这正是原先漏掉的那一秒
+        assert client.get("/api/usage", headers=_h(stolen)).status_code == 401
+        # 而本人这把新令牌必须活着——向上取整若不配合 create_token(issued_at=)，
+        # 这里会 401，表现为"改完密码当场掉线"。两者是一对，缺一不可。
+        assert client.get("/api/usage", headers=_h(fresh)).status_code == 200
+
+    def test_revoke_then_issue_order_is_load_bearing(self, client):
+        """顺序保证本身要能被测出来。
+
+        原先 test_old_token_revoked 里"新令牌可用"那句断言无法捕捉顺序反转：
+        变异把 revoke 挪到 create_token 之后，测试照样全绿（因为同秒取整让
+        iat == revoked_at 仍然通过）。改成向上取整之后，顺序反转会让新令牌
+        的 iat 落在撤销点之前，这条就真的红了。
+        """
+        email = "order@example.com"
+        t = self._signup(client, email)
+        r = client.post(
+            "/api/auth/password/change",
+            headers=_h(t),
+            json={"current_password": "password123", "new_password": "newpassword456"},
+        )
+        fresh = r.json()["token"]
+        assert client.get("/api/usage", headers=_h(fresh)).status_code == 200

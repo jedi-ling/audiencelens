@@ -156,11 +156,35 @@ export default function AskPage() {
     el.style.height = `${el.scrollHeight}px`
   }
 
-  // 发送后 input 被清空，但内联 height 还停在上一次撑开的值——不重置的话
-  // 发完一段长文，空输入框会一直保持那个高度，把整条工具栏顶得老高。
+  // 高度跟随 input 的**任何**变化，不只是清空。
+  //
+  // 这里原先只处理 input === ''，于是所有**程序化**赋值都不长高：autoGrow 挂在
+  // onChange 上，而 setInput 不派发 input 事件。落地页 CTA 的 /ask?q=... 预填
+  // 就落在这条路上——实测 86 字中文时框停在 36px、内容需要 56px，用户从首页
+  // 点进来看到的是一段被砍头的自己的话。附件抽取文本并入输入框同理。
+  //
+  // 空串时清掉内联高度而不是算一次：空 textarea 的 scrollHeight 会被浏览器
+  // 按内容撑到上一次的残留值，直接清掉交给 CSS 的 min-h 更稳。
   useEffect(() => {
-    if (input === '' && inputRef.current) inputRef.current.style.height = ''
+    const el = inputRef.current
+    if (!el) return
+    if (input === '') el.style.height = ''
+    else autoGrow(el)
   }, [input])
+
+  // 窗口尺寸变了要重算：高度是按当时的宽度算出来的像素值，钉在内联样式上。
+  // 拉窄窗口后同样的文字需要更多行，而内联高度纹丝不动——实测 192 字中文在
+  // 1280 宽下是 96px，拉到 700 宽时实际需要 456px，只露出约 4 行，且因为没到
+  // max-height，视觉上完全不像"该滚动"。要等用户下一次敲键盘才自愈。
+  // 移动端横竖屏切换、拖窗口、开合侧栏都会触发。
+  useEffect(() => {
+    const onResize = () => {
+      const el = inputRef.current
+      if (el && el.value !== '') autoGrow(el)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // 输入框工具栏：手动钉住技能/任务类型，绕开"靠 AI 从大白话里猜"——
   // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。

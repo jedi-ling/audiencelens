@@ -42,8 +42,21 @@ export default function Layout() {
   // 反复点，把发信配额打满。
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
+  // 换了账号（或登出再登入）必须重置这个状态。Layout 是根布局，路由切换与
+  // 登出登入都不会卸载它，logout() 也只清 store 不碰组件内 state——实测：
+  // A 点过重发后切成 B，B 的账户菜单显示 b@example.com，提示条却写着
+  // "已发送，请查收"，而 B 从没收到过任何邮件。
+  useEffect(() => {
+    setResendState('idle')
+  }, [identity?.user_id])
+
   const resendVerifyEmail = async () => {
-    if (resendState === 'sending' || resendState === 'sent') return
+    // 'sent' 不再直接拦死。原先这里 return 掉是想防止反复点把发信配额打满，
+    // 但按钮同时又是 enabled 的（只在 'sending' 时禁用），于是变成一个
+    // **点了毫无反应**的死控件：用户没收到邮件想再发一次，点不动、没有任何
+    // 反馈，只能刷整页。防滥用交给后端限流（auth_mail 5 次/小时），
+    // 前端这里只防重复提交。
+    if (resendState === 'sending') return
     setResendState('sending')
     try {
       // 必须看 sent 字段，不能因为没抛异常就当成功：发信失败时接口是 200 + sent:false
@@ -301,7 +314,7 @@ export default function Layout() {
             {resendState === 'sending'
               ? '发送中…'
               : resendState === 'sent'
-                ? '已发送，请查收（含垃圾箱）'
+                ? '已发送，请查收（含垃圾箱）·点此再发一次'
                 : resendState === 'failed'
                   ? '发送失败，点此重试'
                   : '重新发送验证邮件'}

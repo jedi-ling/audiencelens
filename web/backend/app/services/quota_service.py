@@ -117,6 +117,35 @@ def tokens_used(db: Session, user_id: str) -> int:
     return int(total or 0)
 
 
+def token_cap_error(db: Session, user_id: str) -> Optional[str]:
+    """终身 token 额度用完了吗？用完返回给用户看的提示，没用完返回 None。
+
+    做成独立函数是因为这道闸有**四个**调用点，而它最初只挂在两个上：
+    评审 v1/v2 走 check_quota，但追问（chat_service）、意图解析、人格生成
+    三条路各自都会拿平台 key 发请求、各自都会把 token 记进 usage_records，
+    却都不经过 check_quota。结果是"账面早已超额、闸门永远放行"——
+    tokens_used 把它们算进来了，判断却漏了它们。
+
+    匿名共享桶必须豁免，理由与 effective_reviews_limit 那条完全相同、
+    而且在这里更严重：次数闸是 24h 滚动的，压错了第二天自愈；这道闸
+    不滚动、不重置、没有任何清零路径。AL_AUTH_ENABLED=false 形态下所有
+    未登录访客共用一个 user_id，任何一个人烧完 300 万，之后**全站访客
+    永久 402**。当初只在次数闸写了豁免、这里漏掉，是同一个判断没贯彻到底。
+    """
+    cap = settings.quota_tokens_total
+    if cap <= 0:
+        return None
+    if user_id == settings.anonymous_user_id:
+        return None
+    used = tokens_used(db, user_id)
+    if used < cap:
+        return None
+    return (
+        f"体验额度已用完（累计 {used:,} / {cap:,} tokens）。"
+        "填写自己的 API Key（BYOK）即可继续使用，不受此限制。"
+    )
+
+
 def effective_reviews_limit(db: Session, user_id: str, plan_limit: int) -> int:
     """把「未验证邮箱」这条软拦叠加到套餐日次数上限之上。
 
@@ -254,22 +283,26 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     次数闸收紧之后，成本的并发溢出被压在 (日次数上限 × 单次成本) 这个量级，
     不再是"限流上限 × 单次成本"。这是取舍，写在这里免得下一个人以为它是硬闸。
     """
-    if not _quota_enabled(db) or key_source != "server":
+    if key_source != "server":
+        return
+
+    # 终身 token 闸的位置有两层讲究，两层都踩过：
+    #   · 在 mode 分支**之前** —— credits 分支自己 return，放在它后面等于
+    #     credits 模式完全绕过（而 credits 是推荐给生产的模式）；
+    #   · 在 _quota_enabled 判断**之前** —— 它由自己的开关
+    #     AL_QUOTA_TOKENS_TOTAL 控制（0 = 关闭），保护的是运营者的钱包上限，
+    #     与"要不要按套餐计次计费"是两件事。挂在 quota_enabled 下面，
+    #     等于关掉计费的同时把钱包保护也一起关了。
+    # 追问链路（chat_service._check_chat_quota）用的是同一个 token_cap_error，
+    # 口径必须一致——两处对 quota_enabled 的态度分歧过一次，就是这里改出来的。
+    cap_error = token_cap_error(db, user_id)
+    if cap_error:
+        raise QuotaExceeded(cap_error)
+
+    if not _quota_enabled(db):
         return
 
     from app.services import cdk_service
-
-    # 终身 token 闸必须在 mode 分支**之前**：credits 分支自己 return，放在它后面
-    # 等于 credits 模式完全绕过这道闸——而 credits 恰恰是推荐给生产的模式。
-    # 这类"新加的检查被放在早退分支之后"的漏，在这个项目里出现过不止一次。
-    total_cap = settings.quota_tokens_total
-    if total_cap > 0:
-        used = tokens_used(db, user_id)
-        if used >= total_cap:
-            raise QuotaExceeded(
-                f"体验额度已用完（累计 {used:,} / {total_cap:,} tokens）。"
-                "填写自己的 API Key（BYOK）即可继续使用，不受此限制。"
-            )
 
     mode = admin_settings_service.get(db, "quota_mode", settings.quota_mode)
     if mode == "credits":

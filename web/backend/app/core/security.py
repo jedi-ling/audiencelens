@@ -12,6 +12,7 @@ import hmac
 import json
 import os
 import time
+from typing import Optional
 
 _PBKDF2_ROUNDS = 200_000
 
@@ -47,9 +48,19 @@ def _b64u_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def create_token(subject: str, secret: str, ttl_seconds: int) -> str:
+def create_token(
+    subject: str, secret: str, ttl_seconds: int, issued_at: Optional[int] = None
+) -> str:
+    """签发 JWT。
+
+    issued_at 用来在**撤销之后**签发"不被自己那次撤销误伤"的新令牌：
+    改密码会把该用户此刻之前的令牌全部作废，而撤销点是向上取整到整秒的
+    （见 deps.sessions_revoked_at），自然签发的 iat 会落在撤销点之前，
+    新令牌当场自杀。调用方把撤销点原样传进来即可——代价是这把令牌的 iat
+    可能比真实时间早了不到 1 秒的"未来"，对 exp 的影响同样不到 1 秒。
+    """
     header = {"alg": "HS256", "typ": "JWT"}
-    now = int(time.time())
+    now = int(time.time()) if issued_at is None else int(issued_at)
     payload = {"sub": subject, "iat": now, "exp": now + ttl_seconds}
     segments = [
         _b64u(json.dumps(header, separators=(",", ":")).encode()),

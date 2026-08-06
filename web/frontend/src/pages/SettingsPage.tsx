@@ -683,7 +683,10 @@ export default function SettingsPage() {
               {/* 终身 token 额度。故意放在配额块最后、且不受 quota_enabled 影响：
                   上面那些是 24h 滚动窗口，这一条不重置——两者性质不同，混在一起
                   会让人以为"明天就恢复了"。没设上限时只显示已用量，不显示进度条。 */}
-              {usage.tokens_used > 0 && (
+              {/* 条件里的 tokens_limit != null 不能省：原先只判 tokens_used > 0，
+                  于是"额度已设、但还没用过"时整块不显示——而新用户在第一次评审前
+                  恰恰最需要知道自己有多少额度，那时 tokens_used 必然是 0。 */}
+              {(usage.tokens_used > 0 || usage.tokens_limit != null) && (
                 <div className="mt-4 border-t border-border pt-3">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs text-text-secondary">体验额度（累计，不按天重置）</span>

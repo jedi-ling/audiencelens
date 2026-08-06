@@ -64,8 +64,22 @@ class TestEffectiveLimit:
 
     def test_anonymous_bucket_untouched(self, db, monkeypatch):
         """共享匿名桶不能被压：匿名访客没有邮箱可验证，压这里等于把全站
-        未登录试用额度变成每天 1 次，是全局故障不是限流。"""
+        未登录试用额度变成每天 1 次，是全局故障不是限流。
+
+        这条以前是**空壳**：它没建 anon-shared 这一行 User，于是调用根本没走到
+        匿名分支，而是从"查不到用户"那条路返回的——和 test_unknown_user_untouched
+        是同一条测试换了个名字。变异测试（把匿名豁免整个删掉）它照样绿。
+        所以必须真的建一个未验证的 User 行，让匿名豁免成为唯一能让它通过的原因。
+        """
         monkeypatch.setattr(settings, "anonymous_user_id", "anon-shared")
+        _make_user(db, "anon-shared", verified=False)
+        # 覆盖掉 _make_user 生成的 id，让它就是匿名桶那个 id
+        from app.models import User
+
+        row = db.query(User).filter(User.email == "anon-shared").first()
+        row.id = "anon-shared"
+        db.commit()
+
         assert quota_service.effective_reviews_limit(db, "anon-shared", 5) == 5
 
     def test_disabled_by_negative_config(self, db, monkeypatch):
