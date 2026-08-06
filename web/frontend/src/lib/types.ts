@@ -267,6 +267,11 @@ export interface UsageSummary {
   cost_usd_limit: number | null
   /** CDK 次数余额：credits 模式下这就是全部额度；plan 模式下是日限用完后的加量 */
   bonus_credits: number
+  /** 累计烧掉的平台 token（输入+输出）。不按 24h 滚动，是终身量；只算平台垫付，不含 BYOK。
+   *  配额关闭时也如实回报，方便用户随时知道自己用了多少。 */
+  tokens_used: number
+  /** 终身 token 上限；null = 不限制 */
+  tokens_limit: number | null
 }
 
 /** POST /api/cdk/redeem 的响应。匿名兑换（认证开启）会附带游客身份 token——

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
@@ -318,11 +318,10 @@ export default function SettingsPage() {
     <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">
         <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-green mb-2">
-          LLM 设置
+          模型设置
         </h1>
         <p className="text-text-secondary">
-          配置评审系统实际调用的大语言模型：支持 Anthropic 原生，以及任意 OpenAI 兼容服务（DeepSeek / Kimi /
-          通义千问 / 智谱 GLM / Ollama 本地模型等）。测试按钮走的是评审真正会用的链路，不是摆设。
+          选择评审使用的大模型。支持 Anthropic 官方 API，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 等任意 OpenAI 兼容服务。点「测试」可验证连接是否可用。
         </p>
       </div>
 
@@ -333,8 +332,8 @@ export default function SettingsPage() {
             API Key（BYOK）
           </h2>
           <p className="text-xs text-text-muted mb-4">
-            自带 Key 用于 Web 评审链路：Key 加密存储在服务端，评审时按你的 Key 计费。
-            {keyStatus?.server_key_available && '（服务器也配置了共享 Key，可作为回落）'}
+            自带 Key 评审：Key 加密存储在服务端，评审费用从你的模型账户扣除。
+            {keyStatus?.server_key_available && '（平台也提供共享 Key 作为兜底）'}
           </p>
 
           {byokError && (
@@ -557,14 +556,13 @@ export default function SettingsPage() {
           )}
           <p className="mt-2 text-xs text-text-muted flex items-center gap-1">
             <ShieldCheck className="w-3 h-3 shrink-0" strokeWidth={1.25} />
-            API Key 加密存储在服务端，本页面不会明文回显
+            API Key 加密存储，本页面不会明文回显
           </p>
 
           <div className="mt-4 flex items-start gap-2 text-xs text-text-muted rounded-lg border border-border bg-bg-card p-3">
             <ImagePlus className="w-3.5 h-3.5 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.25} />
             <span>
-              多模态：对话页支持上传截图 / demo 图 / BP 页面，视觉能力模型（Claude、GPT-4o、Qwen-VL、GLM-4V 等）会真正"看到"图片；
-              非视觉模型会静默降级为纯文字，不会中断评审。
+              多模态支持：评审时可上传截图、设计稿、BP 页面。支持视觉的模型（Claude、GPT-4o、Qwen-VL、GLM-4V 等）会直接看图；不支持视觉的模型仅按文字评审，流程不会中断。
             </span>
           </div>
 
@@ -576,9 +574,9 @@ export default function SettingsPage() {
             </h3>
             <p className="text-xs text-text-muted mb-3">
               {usage?.quota_mode === 'credits'
-                ? '兑换后获得评审次数：每次评审消耗 1 次，用完可再兑（走平台垫付 Key 时生效）。'
-                : '兑换后获得评审加量次数，套餐日限用完后自动垫付（走平台垫付 Key 时生效）。'}
-              无需注册——匿名兑换会自动创建游客身份，次数存在这个浏览器里，清除缓存前请勿弄丢。
+                ? '兑换后获得评审次数：每次评审消耗 1 次，使用平台共享 Key 时生效。'
+                : '兑换后获得加量次数，套餐日限用完后自动垫付，使用平台共享 Key 时生效。'}
+              匿名兑换自动创建游客身份，次数存在当前浏览器，请在清除缓存前使用完。
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -681,6 +679,40 @@ export default function SettingsPage() {
                   <p className="mt-1.5 text-xs text-text-muted">配额窗口：{usage.window}</p>
                 </div>
               )}
+
+              {/* 终身 token 额度。故意放在配额块最后、且不受 quota_enabled 影响：
+                  上面那些是 24h 滚动窗口，这一条不重置——两者性质不同，混在一起
+                  会让人以为"明天就恢复了"。没设上限时只显示已用量，不显示进度条。 */}
+              {usage.tokens_used > 0 && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-text-secondary">体验额度（累计，不按天重置）</span>
+                    <span className="font-mono text-sm text-text-primary">
+                      {usage.tokens_used.toLocaleString()}
+                      {usage.tokens_limit != null && (
+                        <span className="font-normal text-text-muted"> / {usage.tokens_limit.toLocaleString()}</span>
+                      )}
+                      <span className="ml-1 text-xs text-text-muted">tokens</span>
+                    </span>
+                  </div>
+                  {usage.tokens_limit != null && usage.tokens_limit > 0 && (
+                    <>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-secondary">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all',
+                            usage.tokens_used >= usage.tokens_limit ? 'bg-severity-critical' : 'bg-cyan'
+                          )}
+                          style={{ width: `${Math.min(100, Math.round((usage.tokens_used / usage.tokens_limit) * 100))}%` }}
+                        />
+                      </div>
+                      <p className="mt-1.5 text-xs text-text-muted">
+                        只统计平台垫付的用量；填写自己的 API Key（BYOK）后不受此限制。
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -697,7 +729,6 @@ export default function SettingsPage() {
           <p className="mt-1 text-xs text-text-muted">
             当前登录：{identity?.email}
           </p>
-
           {/* 昵称 */}
           <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
             <label className="block text-xs font-medium text-text-secondary">昵称</label>
@@ -721,8 +752,7 @@ export default function SettingsPage() {
             {nameMsg && <p className="mt-2 text-xs text-brand-primary">{nameMsg}</p>}
             {nameError && <p className="mt-2 text-xs text-severity-critical">{nameError}</p>}
             <p className="mt-2 text-xs text-text-muted">
-              邮箱暂不支持自助修改——它同时是登录名和找回密码的收件地址，改错一个字母
-              就会同时丢掉登录和找回两条路。需要更换请联系我们。
+              邮箱暂不支持自助修改。如需更换，请联系我们。
             </p>
           </div>
 
@@ -760,8 +790,7 @@ export default function SettingsPage() {
             {pwMsg && <p className="mt-2 text-xs text-brand-primary">{pwMsg}</p>}
             {pwError && <p className="mt-2 text-xs text-severity-critical">{pwError}</p>}
             <p className="mt-2 text-xs text-text-muted">
-              改完会让<span className="text-text-secondary">其他设备</span>上的登录立即失效（这正是怀疑密码泄露时该做的），
-              本设备不需要重新登录。忘了当前密码请退出后走「忘记密码」。
+              修改后其他设备会自动退出登录，本设备保持登录。如忘记当前密码，请退出后通过「忘记密码」重置。
             </p>
           </div>
         </section>
@@ -776,7 +805,7 @@ export default function SettingsPage() {
             我的数据
           </h2>
           <p className="mt-1 text-xs text-text-muted">
-            你上传的材料、评审报告、追问记录都属于你。随时可以带走，也可以彻底删掉。
+            你上传的材料、评审报告、对话记录随时可以导出或永久删除。
           </p>
 
           {dataError && (

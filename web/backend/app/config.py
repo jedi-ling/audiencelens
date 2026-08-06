@@ -172,6 +172,17 @@ class Settings:
         # 真正的读取点是 plan_service._free_plan(db)。
         self.quota_free_reviews_per_day: int = _int("AL_QUOTA_FREE_REVIEWS_PER_DAY", 5)
         self.quota_free_cost_usd_per_day: float = _float("AL_QUOTA_FREE_COST_USD_PER_DAY", 1.0)
+        # 每个用户**累计**（非每日）能烧掉的平台 token 上限，0 = 不限制。
+        # 这是钱包的最后一道闸，和次数/成本那两道的性质不同：
+        #   · 次数闸管"一天能发几次"，跨天就重置，拦不住长期消耗；
+        #   · 成本闸同样按 24h 窗口滚动，同理；
+        #   · 这一条不滚动、不重置，是一个用户在这个实例上的**终身**试用额度。
+        # 只统计 key_source="server" 的消耗——BYOK 花的是用户自己的钱，与我方无关。
+        # 注意它拦不住"单次评审内部超支"：token 用量要等评审跑完才知道，人格又是
+        # 并发发出去的，跑到一半刹不住车。它保证的是"下一次还能不能开始"，
+        # 不是"这一次不会超"。真正的硬约束仍然是发出去多少 CDK 次数。
+        self.quota_tokens_total: int = _int("AL_QUOTA_TOKENS_TOTAL", 0)
+
         # 未验证邮箱的账号，服务端 key 每日次数上限（软拦：能用，但只够试一次）。
         # 在此之前 email_verified_at 只是一条记录，登录/评审/配额一处都不读它——
         # 激活与不激活完全没区别，等于验证邮件白发。这一项是它唯一的抓手。

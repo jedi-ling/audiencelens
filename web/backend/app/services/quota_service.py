@@ -89,6 +89,34 @@ def _quota_enabled(db: Session) -> bool:
     return admin_settings_service.get(db, "quota_enabled", settings.quota_enabled)
 
 
+def tokens_used(db: Session, user_id: str) -> int:
+    """该用户在本实例上**累计**烧掉的平台 token（输入 + 输出）。
+
+    三个刻意的选择：
+      · 不设时间窗 —— 这是终身试用额度，跨天不重置。次数闸和成本闸都是 24h
+        滚动窗口，拦不住"每天用满、连用一个月"这种长期消耗。
+      · 只算 key_source="server" —— BYOK 花的是用户自己的钱，计进来等于
+        惩罚自带 key 的用户，而他们恰恰是不花我方一分钱的那批。
+      · 输入输出相加 —— 上限本身是个粗粒度的钱包保护，按单价加权反而会让
+        运营者难以估算"3000000 到底等于多少钱"。要精细控制成本用成本闸。
+
+    评审删除不影响这里：usage_records 与 reviews 是弱引用（ondelete=SET NULL），
+    用户删掉评审后账仍在。否则"删掉历史就能重置额度"会是一个免费的刷量后门。
+    """
+    total = (
+        db.query(
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0)
+            + func.coalesce(func.sum(UsageRecord.output_tokens), 0)
+        )
+        .filter(
+            UsageRecord.user_id == user_id,
+            UsageRecord.key_source == "server",
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
 def effective_reviews_limit(db: Session, user_id: str, plan_limit: int) -> int:
     """把「未验证邮箱」这条软拦叠加到套餐日次数上限之上。
 
@@ -180,6 +208,11 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         # CDK 次数余额：credits 模式下这就是全部额度（每次评审 -1，用完即止）；
         # plan 模式下是日限用完后的加量
         "bonus_credits": cdk_service.credit_balance(db, user_id),
+        # 终身 token 额度。与上面几项不同，它不随 quota_mode 变化，也不按 24h 滚动，
+        # 所以 quota_enabled=false 时同样如实回报"已用了多少"（只是不拦）——
+        # 让用户和运营都能看见真实消耗，而不是等撞上限才第一次知道有这回事。
+        "tokens_used": tokens_used(db, user_id),
+        "tokens_limit": settings.quota_tokens_total or None,
     }
 
 
@@ -225,6 +258,18 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
         return
 
     from app.services import cdk_service
+
+    # 终身 token 闸必须在 mode 分支**之前**：credits 分支自己 return，放在它后面
+    # 等于 credits 模式完全绕过这道闸——而 credits 恰恰是推荐给生产的模式。
+    # 这类"新加的检查被放在早退分支之后"的漏，在这个项目里出现过不止一次。
+    total_cap = settings.quota_tokens_total
+    if total_cap > 0:
+        used = tokens_used(db, user_id)
+        if used >= total_cap:
+            raise QuotaExceeded(
+                f"体验额度已用完（累计 {used:,} / {total_cap:,} tokens）。"
+                "填写自己的 API Key（BYOK）即可继续使用，不受此限制。"
+            )
 
     mode = admin_settings_service.get(db, "quota_mode", settings.quota_mode)
     if mode == "credits":
