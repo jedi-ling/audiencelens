@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 对话式入口 —— 真正的多轮聊天，不是"填一次表单"。
  *
  * 完整链路：
@@ -89,11 +89,11 @@ function confidenceLevel(confidence: number): { label: string; barClass: string 
   return { label: '偏低', barClass: 'bg-warm-orange' }
 }
 
-/** 助手身份头像 —— 金色渐变徽记 + 微光，让对话双方一眼可辨 */
+/** 助手身份头像 —— 蓝色渐变徽记，让对话双方一眼可辨 */
 function AssistantAvatar() {
   return (
-    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-primary/40 bg-gradient-to-br from-brand-primary/25 to-brand-primary-dim/5 shadow-[0_0_12px_rgba(183,126,59,0.25)]">
-      <Sparkles className="h-3.5 w-3.5 text-gold-cream" strokeWidth={1.5} />
+    <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-primary shadow-[0_2px_8px_rgba(0,113,227,0.35)]">
+      <Sparkles className="h-3.5 w-3.5 text-white" strokeWidth={1.5} />
     </div>
   )
 }
@@ -126,7 +126,7 @@ export default function AskPage() {
       id: nextId(),
       role: 'assistant',
       kind: 'text',
-      text: '我是 AudienceLens 的评审助手。说说你想评审什么——一个页面、一份文案、一个产品概念都行，我会组一个多角度的用户评审团来看。',
+      text: '你好，说说你想评审什么——一个页面、一份文案、一个产品概念都可以。',
       // 开场白的发出时间；惰性初始化保证只在挂载时取一次
       ts: Date.now(),
     },
@@ -145,6 +145,22 @@ export default function AskPage() {
   const sessionImagesRef = useRef<ImageAttachment[]>([])
   const listRef = useRef<HTMLDivElement>(null) // 消息列表容器：滚动只发生在它内部，不能带动 window
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  /** 输入框随内容增高。配合 rows=1 用——rows=1 才能让单行文字与两侧 h-9 按钮对齐，
+   *  但单行装不下长文，所以这里补上增高。上限交给 CSS 的 max-h-40，超了内部滚动。
+   *  先置 auto 再读 scrollHeight 是必须的：不清空的话 scrollHeight 永远不小于当前
+   *  height，删字时框只会一直变高、再也缩不回去。 */
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
+  // 发送后 input 被清空，但内联 height 还停在上一次撑开的值——不重置的话
+  // 发完一段长文，空输入框会一直保持那个高度，把整条工具栏顶得老高。
+  useEffect(() => {
+    if (input === '' && inputRef.current) inputRef.current.style.height = ''
+  }, [input])
 
   // 输入框工具栏：手动钉住技能/任务类型，绕开"靠 AI 从大白话里猜"——
   // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。
@@ -221,7 +237,7 @@ export default function AskPage() {
         id: nextId(),
         role: 'assistant',
         kind: 'text',
-        text: '我是 AudienceLens 的评审助手。说说你想评审什么——一个页面、一份文案、一个产品概念都行，我会组一个多角度的用户评审团来看。',
+        text: '你好，说说你想评审什么——一个页面、一份文案、一个产品概念都可以。',
         ts: Date.now(),
       },
     ])
@@ -679,7 +695,7 @@ export default function AskPage() {
         <Sparkles className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
         <div>
           <h1 className="text-lg font-semibold text-text-primary font-display">对话评审</h1>
-          <p className="text-xs text-text-muted">说人话，剩下的交给评审团</p>
+          <p className="text-xs text-text-muted">描述你要评审的内容，剩下的交给评审团</p>
         </div>
       </header>
 
@@ -687,9 +703,9 @@ export default function AskPage() {
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warm-orange/40 bg-warm-orange/10 p-3 text-sm shrink-0">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warm-orange" strokeWidth={2} />
           <div>
-            <p className="font-medium text-text-primary">尚未配置 API Key</p>
+            <p className="font-medium text-text-primary">请先配置 API Key</p>
             <p className="mt-1 text-text-secondary">
-              评审必须使用真实模型——模拟数据没有评审价值。
+              评审需要调用真实模型，未配置 Key 无法开始。
               <button
                 className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
                 onClick={() => navigate('/settings')}
@@ -741,7 +757,7 @@ export default function AskPage() {
       </div>
       <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted shrink-0">
         <Paperclip className="h-3 w-3" strokeWidth={1.5} />
-        支持拖拽文件到上方对话区，或直接 Ctrl+V 粘贴截图
+        支持拖拽文件到对话区，或 Ctrl+V 粘贴截图
       </p>
 
       {/* 示例入口常驻：首轮后自动收起，随时可再展开 */}
@@ -763,7 +779,7 @@ export default function AskPage() {
             {EXAMPLES.map((ex) => (
               <button
                 key={ex}
-                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+                className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)]"
                 onClick={() => void send(ex)}
               >
                 {ex}
@@ -894,7 +910,7 @@ export default function AskPage() {
             <Zap className="h-4 w-4" strokeWidth={2} />
           </button>
           {skillPickerOpen && (
-            <div className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
               {SKILLS.filter((s) => s.type === 'red_team_audience' || s.type === 'audience_panel').map((s) => (
                 <button
                   key={s.type}
@@ -929,7 +945,7 @@ export default function AskPage() {
             <Target className="h-4 w-4" strokeWidth={2} />
           </button>
           {typePickerOpen && (
-            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
               <div className="flex items-center gap-1.5 border-b border-border px-2 py-1.5">
                 <Search className="h-3.5 w-3.5 text-text-muted shrink-0" strokeWidth={2} />
                 <input
@@ -979,7 +995,7 @@ export default function AskPage() {
             <FolderOpen className="h-4 w-4" strokeWidth={2} />
           </button>
           {projectPickerOpen && (
-            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-2 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-2 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
               <p className="px-1 pb-1.5 text-xs text-text-muted">新建项目</p>
               <div className="flex items-center gap-1.5">
                 <input
@@ -1003,7 +1019,7 @@ export default function AskPage() {
                     setNewProjectName('')
                     setProjectPickerOpen(false)
                   }}
-                  className="shrink-0 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-bg-primary disabled:opacity-40"
+                  className="shrink-0 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40"
                 >
                   创建
                 </button>
@@ -1040,13 +1056,23 @@ export default function AskPage() {
         <div className="h-9 w-px shrink-0 bg-border" aria-hidden="true" />
 
         <textarea
-          className="min-h-[44px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
+          ref={inputRef}
+          // rows=1 是对齐的关键，不是样式偏好：容器用 items-end 底部对齐，而 textarea
+          // 的文字**从顶部内边距往下排**。rows=2 会让盒子固定 56px（2×20 行高 + 16 内边距），
+          // 底边和两侧 h-9(36px) 的按钮对齐，多出来的 20px 全压在文字上方——
+          // 单行时看起来就是"文字比图标高一截"。rows=1 时 20+16=36，和按钮严丝合缝。
+          // （min-h-[36px] 在 rows=2 下完全不起作用，它比固有高度小，我一开始就是在这里判断错的。）
+          //
+          // 代价是单行装不下长文，所以配一个 autoGrow：输入时按内容撑高，上限 max-h-40，
+          // 超了内部滚动。这时 items-end 才真正发挥作用——框变高，按钮跟着停在底部。
+          className="min-h-[36px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
+          rows={1}
           placeholder={
             activeChatContext ? `问问${activeChatContext.label}…（Enter 发送）` : '说说你想评审什么…（Enter 发送，Shift+Enter 换行）'
           }
           value={input}
           disabled={busy}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); autoGrow(e.currentTarget) }}
           onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1056,13 +1082,13 @@ export default function AskPage() {
           }}
         />
         <button
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-primary text-bg-primary shadow-[0_0_16px_rgba(183,126,59,0.35)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_0_24px_rgba(183,126,59,0.5)] disabled:opacity-50 disabled:shadow-none"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-primary text-white shadow-[0_2px_10px_rgba(0,113,227,0.30)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.40)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
           disabled={busy || (!input.trim() && attachments.length === 0)}
           aria-label="发送"
         >
           {busy ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-bg-primary border-t-transparent" />
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
           ) : (
             <Send className="h-4 w-4" strokeWidth={2} />
           )}
@@ -1515,7 +1541,7 @@ function ReviewStatusBody({
               静止的条会被读成「卡死」，流光负责传达「还在跑」。仅此分支（pending/running）渲染 */}
           <div className="shimmer-bar mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
             <div
-              className="h-full rounded-full bg-brand-primary shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all duration-500"
+              className="h-full rounded-full bg-brand-primary shadow-none transition-all duration-500"
               style={{ width: `${reviewState.progress}%` }}
             />
           </div>
@@ -1546,7 +1572,7 @@ function ReviewStatusBody({
       {reviewState.status === 'completed' && (
         <div className="animate-pop-in rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="min-w-0 truncate text-[15px] font-semibold text-gold-cream font-display">
+            <h3 className="min-w-0 truncate text-[15px] font-semibold text-text-primary font-display">
               {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
             </h3>
             {risk && (
@@ -1678,12 +1704,12 @@ function ReportModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-brand-primary/30 bg-bg-secondary shadow-[0_0_36px_rgba(183,126,59,0.08)]"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl border border-brand-primary/30 bg-bg-secondary shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-gold-cream font-display">
+            <h2 className="truncate text-base font-semibold text-text-primary font-display">
               {TASK_LABELS[detail.task_type ?? ''] ?? detail.task_type}
             </h2>
             <p className="text-xs text-text-muted">完整报告</p>
@@ -1884,13 +1910,13 @@ function ChatBubble({
                   key={i}
                   src={src}
                   alt={`附图 ${i + 1}`}
-                  className="h-20 w-20 rounded-lg border border-brand-primary/30 object-cover shadow-[0_2px_16px_rgba(183,126,59,0.2)]"
+                  className="h-20 w-20 rounded-lg border border-brand-primary/30 object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                 />
               ))}
             </div>
           )}
           {message.text && (
-            <div className="rounded-xl rounded-br-sm bg-brand-primary px-4 py-2.5 text-sm leading-relaxed text-bg-primary whitespace-pre-wrap shadow-[0_2px_16px_rgba(183,126,59,0.25)]">
+            <div className="rounded-xl rounded-br-sm bg-brand-primary px-4 py-2.5 text-sm leading-relaxed text-white whitespace-pre-wrap shadow-[0_2px_10px_rgba(0,113,227,0.22)]">
               {message.text}
             </div>
           )}
@@ -1921,7 +1947,7 @@ function ChatBubble({
                 </span>
                 <button
                   onClick={onGoLogin}
-                  className="font-medium text-brand-primary underline underline-offset-2 hover:text-gold-cream"
+                  className="font-medium text-brand-primary underline underline-offset-2 hover:text-text-primary"
                 >
                   登录看完整回答
                 </button>
@@ -1946,7 +1972,7 @@ function ChatBubble({
                 {message.text}
                 {message.needsKey && (
                   <button
-                    className="ml-2 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
+                    className="ml-2 text-brand-primary underline underline-offset-2 hover:text-text-primary"
                     onClick={onGoSettings}
                   >
                     去填写 API Key
@@ -1966,7 +1992,7 @@ function ChatBubble({
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
         <div className="flex w-full max-w-[85%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
+          <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
             <ReviewStatusBody reviewState={reviewState} onStartFollowUp={onStartFollowUp} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
@@ -1987,7 +2013,7 @@ function ChatBubble({
                 {message.candidates.map((c) => (
                   <button
                     key={c}
-                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
+                    className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)]"
                     onClick={() => onPickCandidate(c)}
                   >
                     {TASK_LABELS[c] ?? c}
@@ -2010,9 +2036,9 @@ function ChatBubble({
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
       <div className="flex w-full max-w-[85%] flex-col">
-        <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_0_36px_rgba(183,126,59,0.08)]">
+        <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
-          <h3 className="mt-1.5 text-base font-semibold text-gold-cream font-display">
+          <h3 className="mt-1.5 text-base font-semibold text-text-primary font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
           </h3>
 
@@ -2086,7 +2112,7 @@ function ChatBubble({
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
               <div
-                className={`h-full rounded-full ${conf.barClass} shadow-[0_0_8px_rgba(183,126,59,0.5)] transition-all`}
+                className={`h-full rounded-full ${conf.barClass} shadow-none transition-all`}
                 style={{ width: `${Math.round(intent.confidence * 100)}%` }}
               />
             </div>
@@ -2098,7 +2124,7 @@ function ChatBubble({
           </div>
 
           <button
-            className="mt-4 w-full rounded-md bg-brand-primary py-2.5 font-semibold text-bg-primary shadow-[0_2px_16px_rgba(183,126,59,0.3)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_24px_rgba(183,126,59,0.4)] disabled:opacity-50"
+            className="mt-4 w-full rounded-md bg-brand-primary py-2.5 font-semibold text-white shadow-[0_2px_10px_rgba(0,113,227,0.25)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.35)] disabled:opacity-50"
             onClick={() => onConfirm(intent, activePersonas)}
             disabled={busy}
           >

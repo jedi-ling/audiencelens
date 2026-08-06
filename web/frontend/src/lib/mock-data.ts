@@ -809,10 +809,16 @@ export const TASK_TYPES: TaskType[] = [
   { id: 'localization_review', name: '本地化评审', description: '文化适配、语言质量、UI适配', icon: '🌐', category: 'operations', IconComponent: Globe, stance_enum: ['文化适配良好', '存在问题', '观望'], score_dimensions: ['cultural_adaptation', 'language_quality', 'ui_adaptation'] },
   { id: 'discord_community_review', name: '社区运营评审', description: '社区氛围、互动设计、用户留存', icon: '💬', category: 'community', IconComponent: MessageCircle, stance_enum: ['会加入', '不会', '观望'], score_dimensions: ['community_vibe', 'engagement_design', 'retention_signal'] },
   { id: 'looking_for_party_post', name: '找搭子帖', description: '社区文案、传播性、社交吸引力', icon: '👥', category: 'community', IconComponent: Users, stance_enum: ['会转发', '不会', '观望'], score_dimensions: ['social_appeal', 'friction_to_join', 'shareability'] },
-  { id: 'product_feedback_review', name: '产品反馈评审', description: '通用产品反馈收集与解读，不限游戏', icon: '💬', category: 'product', IconComponent: MessageSquareText, stance_enum: ['有价值', '价值有限', '观望'], score_dimensions: ['clarity', 'actionability', 'coverage'] },
-  { id: 'pricing_page_review', name: '定价页评审', description: '定价分层、价值传达、信任信号，不限游戏', icon: '🏷️', category: 'product', IconComponent: Tag, stance_enum: ['会购买', '不会', '观望'], score_dimensions: ['value_for_money', 'clarity', 'trust_signals'] },
-  { id: 'onboarding_review', name: '新手引导评审', description: '首次使用体验、上手摩擦，不限游戏', icon: '🧭', category: 'product', IconComponent: Compass, stance_enum: ['顺利上手', '中途放弃', '观望'], score_dimensions: ['onboarding_friendliness', 'clarity', 'time_to_value'] },
-  { id: 'pitch_review', name: '创业项目评审', description: 'BP/路演/申报表，投资人与尽调视角，不限行业', icon: '💼', category: 'product', IconComponent: Briefcase, stance_enum: ['值得投入', '不值得', '观望'], score_dimensions: ['clarity', 'trust_signals', 'differentiation'] },
+  // 下面 4 条的 stance_enum / score_dimensions 曾与后端注册表不一致（前端自造了一套
+  // 「有价值/价值有限」「会购买」「顺利上手」「值得投入」，维度也对不上）。评审照样能跑
+  // ——前端只把 task_type 的 id 发给后端，引擎用的是自己那份词表——所以不报错，
+  // 只是**界面在向用户承诺一套它不会兑现的东西**：选「会不会买」得到的报告里写着「会付费」，
+  // 报告页按维度渲染时还会整列对不上。以后端 app/services/TASK_TYPES 为唯一准绳。
+  // 防再次漂移的卡口见 web/backend/tests/test_task_type_parity.py。
+  { id: 'product_feedback_review', name: '产品反馈评审', description: '通用产品反馈收集与解读，不限游戏', icon: '💬', category: 'product', IconComponent: MessageSquareText, stance_enum: ['会继续用', '会流失', '观望'], score_dimensions: ['usability', 'value_perception', 'trust_signals'] },
+  { id: 'pricing_page_review', name: '定价页评审', description: '定价分层、价值传达、信任信号，不限游戏', icon: '🏷️', category: 'product', IconComponent: Tag, stance_enum: ['会付费', '不会', '观望'], score_dimensions: ['value_for_money', 'pricing_clarity', 'trust_signals'] },
+  { id: 'onboarding_review', name: '新手引导评审', description: '首次使用体验、上手摩擦，不限游戏', icon: '🧭', category: 'product', IconComponent: Compass, stance_enum: ['会留下', '会放弃', '观望'], score_dimensions: ['onboarding_friendliness', 'time_to_value', 'clarity'] },
+  { id: 'pitch_review', name: '创业项目评审', description: 'BP/路演/申报表，投资人与尽调视角，不限行业', icon: '💼', category: 'product', IconComponent: Briefcase, stance_enum: ['值得跟进', '不投', '观望'], score_dimensions: ['market_potential', 'team_credibility', 'evidence_quality'] },
 ]
 
 export interface TaskTypeCategory {
