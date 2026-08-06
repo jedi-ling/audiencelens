@@ -1118,6 +1118,39 @@ class CreateReviewRequest(BaseModel):
     enable_red_team: bool = False
 
 
+# 路径不能用 /skills/quota —— api/__init__.py 已经有 /api/skills/{skill_type}，
+# 那条动态路由会把 "quota" 当成技能类型名匹配掉，返回 404「技能类型 'quota' 不存在」。
+# 两个 router 挂在同一个 /api 前缀下，谁先注册谁先匹配，靠顺序取胜是隐患。
+@router.get("/skill-quota")
+async def skill_quota(
+    identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
+):
+    """每个高级技能还剩几次免费体验。null = 不受限（BYOK / 匿名桶 / 机制关闭）。
+
+    单独开一个接口而不是塞进 /api/usage：技能次数与配额是两套独立的东西
+    （配额管"能不能发起评审"，这个管"发起时带不带那一层"），混在一个响应里
+    迟早有人把两个数字当成同一件事。
+    """
+    from app.services import key_service, skill_quota_service
+
+    # 必须知道"这个用户此刻会用谁的 key"，否则 BYOK 用户会看到一个根本不适用于
+    # 他的数字。解析失败（还没配任何 key）按平台垫付算——那时他看到的次数
+    # 正是真实会遇到的限制。
+    try:
+        key_source = key_service.resolve_key(db, identity.user_id).source
+    except Exception:
+        key_source = "server"
+
+    return {
+        "key_source": key_source,
+        "free_uses": settings.skill_free_uses,
+        "skills": {
+            skill: skill_quota_service.uses_left(db, identity.user_id, skill, key_source)
+            for skill in sorted(settings.premium_skills)
+        },
+    }
+
+
 @router.post(
     "/v2/reviews",
     status_code=202,
@@ -1147,10 +1180,17 @@ async def create_review_v2(
         db, identity.user_id, key_source=resolved.source, plan=identity.plan
     )
 
-    from app.services import apply_skill_hint
+    from app.services import apply_skill_hint, skill_quota_service
 
-    bundle = apply_skill_hint(body.artifact or {}, body.skill_type)
-    if body.enable_red_team and body.skill_type != "red_team_audience":
+    # 高级技能的免费次数：用完不报错，降级成普通评审并**如实告知**。
+    # 必须在 apply_skill_hint 之前——降级后的值要同时用于拼 prompt 和落库，
+    # 只拿提示去展示、仍按原参数跑，就成了"说降级了实际没降"。
+    skill_type, enable_red_team, degraded = skill_quota_service.apply(
+        db, identity.user_id, resolved.source, body.skill_type, body.enable_red_team
+    )
+
+    bundle = apply_skill_hint(body.artifact or {}, skill_type)
+    if enable_red_team and skill_type != "red_team_audience":
         # 红队开关与技能选择独立：选了受众面板也能叠加对抗视角提示
         bundle = apply_skill_hint(bundle, "red_team_audience")
 
@@ -1161,9 +1201,11 @@ async def create_review_v2(
         artifact_bundle=bundle,
         persona_pack=persona_pack,
         selected_personas=body.selected_personas,
-        skill_type=body.skill_type,
+        skill_type=skill_type,          # 降级后的值，不是 body 里的原值
         project_key=body.project_key,
         enable_evaluation=body.enable_evaluation,
+        enable_red_team=enable_red_team,
+        key_source=resolved.source,
         mode=body.mode,
         status="pending",
     )
@@ -1221,6 +1263,9 @@ async def create_review_v2(
         "job_id": job_id,
         "status": "pending",
         "key_source": resolved.source,  # 让用户知道这次花的是谁的钱
+        # 降级说明。None = 没降级。必须回给前端并显示出来——不吭声地少给一层
+        # 能力，用户会以为产品本来就这样，这正是本仓库要根除的"静默降级"。
+        "skill_degraded": degraded,
         "websocket": f"/ws/review/{review.id}",
     }
 

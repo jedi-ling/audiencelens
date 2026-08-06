@@ -189,6 +189,15 @@ export default function AskPage() {
   // 输入框工具栏：手动钉住技能/任务类型，绕开"靠 AI 从大白话里猜"——
   // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。
   const [pinnedSkill, setPinnedSkill] = useState<{ type: string; name: string } | null>(null)
+  // 高级技能剩余免费次数。null 值 = 该技能不受限（BYOK / 匿名 / 机制关闭），
+  // 这时**不显示任何数字**——给 BYOK 用户看一个根本不适用于他的"剩余 3 次"，
+  // 比不显示更糟。
+  const [skillQuota, setSkillQuota] = useState<Record<string, number | null>>({})
+  useEffect(() => {
+    api.skillQuota()
+      .then((q) => setSkillQuota(q.skills))
+      .catch(() => setSkillQuota({}))  // 拿不到就不显示，不阻断选技能
+  }, [])
   const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
   const [pinnedProject, setPinnedProject] = useState<string | null>(null)
   // 报告出来后的追问——钉在同一个对话里，不弹独立窗口：钉住后普通发送
@@ -660,6 +669,17 @@ export default function AskPage() {
         skill_type: intent.skill_type,
         project_key: intent.project_key,
       })
+      // 高级技能次数用完被降级时，必须**在这里说出来**。后端已经把技能剥掉了，
+      // 前端不吭声的话，用户看到的是一份悄悄少了一层的报告——他会以为产品
+      // 本来就这样，而不知道自己刚用完免费次数。静默降级是这个仓库反复要根除的。
+      if (res.skill_degraded) {
+        appendMessage({
+          id: nextId(),
+          role: 'assistant',
+          kind: 'text',
+          text: `${res.skill_degraded}。想继续用可以兑换 CDK，或在设置页填写自己的 API Key（BYOK 不受此限制）。`,
+        })
+      }
       // 评审卡片直接嵌进这条对话——不跳走，用户可以边等边继续聊
       appendMessage({ id: nextId(), role: 'assistant', kind: 'review', reviewId: res.review_id })
       setAttachments([])
@@ -944,7 +964,23 @@ export default function AskPage() {
                     setSkillPickerOpen(false)
                   }}
                 >
-                  <span className="text-sm font-medium text-text-primary">{s.name}</span>
+                  <span className="flex w-full items-center gap-1.5 text-sm font-medium text-text-primary">
+                    {s.name}
+                    {skillQuota[s.type] != null && (
+                      <span
+                        className={cn(
+                          'ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal',
+                          (skillQuota[s.type] as number) > 0
+                            ? 'bg-cyan/15 text-cyan'
+                            : 'bg-text-muted/15 text-text-muted',
+                        )}
+                      >
+                        {(skillQuota[s.type] as number) > 0
+                          ? `剩 ${skillQuota[s.type]} 次免费`
+                          : '免费次数已用完'}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-xs text-text-muted">{s.description_zh}</span>
                 </button>
               ))}

@@ -179,7 +179,23 @@ def _legacy_migrations() -> None:
     if "project_key" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN project_key VARCHAR")
     if "enable_evaluation" not in columns:
-        patches.append("ALTER TABLE reviews ADD COLUMN enable_evaluation BOOLEAN DEFAULT 0 NOT NULL")
+        # DEFAULT false 而不是 DEFAULT 0 —— 与下面 users.is_guest 同一个坑：
+        # PostgreSQL 的 boolean 不接受整数字面量，这条迁移在 PG 上会直接报
+        # "column is of type boolean but default expression is of type integer"。
+        # 这里原本写的就是 DEFAULT 0，而那个坑在同一个文件里已经被记录过一次——
+        # 新建库走 create_all 不经过这条路，所以本机 SQLite 永远测不出来。
+        patches.append(
+            "ALTER TABLE reviews ADD COLUMN enable_evaluation BOOLEAN DEFAULT false NOT NULL"
+        )
+    if "enable_red_team" not in columns:
+        patches.append(
+            "ALTER TABLE reviews ADD COLUMN enable_red_team BOOLEAN DEFAULT false NOT NULL"
+        )
+    if "key_source" not in columns:
+        # 可空、无默认：老数据确实不知道当时花的是谁的钱，写成 'byok' 会是编造，
+        # 写成 'server' 会凭空给老用户扣掉免费次数。NULL 如实表达"不知道"，
+        # 而计次那侧只统计 key_source == 'server'，NULL 自然不计入。
+        patches.append("ALTER TABLE reviews ADD COLUMN key_source VARCHAR")
     if "input_tokens" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN input_tokens INTEGER DEFAULT 0 NOT NULL")
     if "output_tokens" not in columns:

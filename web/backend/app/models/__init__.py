@@ -50,6 +50,15 @@ class Review(Base):
     selected_personas = Column(JSON, nullable=True)
     # 附加技能标签（见 SkillType）——影响评审 prompt 的取向，不影响流程本身
     skill_type = Column(String, nullable=True)
+    # 红队叠加。与 skill_type 独立（选了受众面板也能再叠红队），此前**只作用到
+    # prompt、不落库**——于是"这次评审用没用红队"事后完全查不到，既做不了
+    # 按技能计次，也做不了成本归因。而红队恰恰是最贵的那一层（多跑一轮质询）。
+    enable_red_team = Column(Boolean, default=False, nullable=False)
+    # 这次评审花的是谁的钱：byok = 用户自己的 key，server = 平台垫付。
+    # 加这一列是因为所有"免费额度"类的规则都必须豁免 BYOK（花自己的钱没理由限制），
+    # 而此前 Review 上没有任何字段能回答这个问题——只有 UsageRecord 有，
+    # 但那是评审**结束后**才写的，在途的评审查不到。
+    key_source = Column(String, nullable=True)
     # 长期评审项目的分组键：同 project_key 的历次评审在前端聚合成一条时间线。
     # 不建独立 Project 表——纯字符串分组，用户改名即视为新项目，足够轻量。
     project_key = Column(String, index=True, nullable=True)

@@ -27,6 +27,7 @@ import {
   type PersonaPack,
   type Plan,
   type RedeemCdkResult,
+  type SkillQuota,
   type ReviewDetail,
   type ReviewMode,
   type TaskType,
@@ -336,6 +337,10 @@ export const api = {
       rememberPendingReview(res.review_id)
       return res
     }),
+
+  /** 高级技能的剩余免费次数。路径是 /api/skill-quota 而不是 /api/skills/quota——
+   *  后者会被 /api/skills/{skill_type} 那条动态路由吃掉。 */
+  skillQuota: () => request<SkillQuota>('/api/skill-quota'),
 
   /** 报告出来后追问——不传 personaId 是跟评审团整体聊，传了是跟该人格保持人设聊。
    * images：随消息附带的截图 data URI（支持视觉的模型直接"看"，其余降级纯文字）。 */

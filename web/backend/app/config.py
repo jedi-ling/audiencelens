@@ -192,6 +192,21 @@ class Settings:
             "AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE", 150_000
         )
 
+        # ---- 高级技能的免费体验次数 ----
+        # 每个账号能免费用几次高级技能（用平台垫付 key 时）。用完**不报错**，
+        # 静默降级成普通评审——报告照出，只是少了那一层。理由：新用户往往还没
+        # 建立价值感就撞墙，转化反而更差；"你已经见过好东西了"比"此路不通"有效。
+        # 0 = 该技能对免费用户完全关闭；负数 = 不限制。
+        self.skill_free_uses: int = _int("AL_SKILL_FREE_USES", 3)
+        # 哪些技能算"高级"。默认只有红队：它是唯一真正多花钱的那层（在人格
+        # 评审之后额外跑一轮对抗质询），而受众面板是本产品的核心价值，
+        # 把它设成收费等于把产品本身关掉。逗号分隔，取值见 models.SkillType。
+        self.premium_skills: set = {
+            s.strip()
+            for s in os.environ.get("AL_PREMIUM_SKILLS", "red_team_audience").split(",")
+            if s.strip()
+        }
+
         # 未验证邮箱的账号，服务端 key 每日次数上限（软拦：能用，但只够试一次）。
         # 在此之前 email_verified_at 只是一条记录，登录/评审/配额一处都不读它——
         # 激活与不激活完全没区别，等于验证邮件白发。这一项是它唯一的抓手。

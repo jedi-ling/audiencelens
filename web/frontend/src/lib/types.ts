@@ -174,7 +174,18 @@ export interface CreateReviewResponse {
   status: string
   /** 'byok' | 'server' —— 让用户知道这次花的是谁的钱 */
   key_source: 'byok' | 'server'
+  /** 高级技能免费次数用完时的降级说明；null = 没降级。
+   *  必须显示给用户——不吭声地少给一层能力，用户会以为产品本来就这样。 */
+  skill_degraded: string | null
   websocket: string
+}
+
+/** GET /api/skill-quota —— 高级技能还剩几次免费体验 */
+export interface SkillQuota {
+  key_source: 'byok' | 'server'
+  free_uses: number
+  /** skill_type → 剩余次数；null = 不受限（BYOK / 匿名 / 机制关闭） */
+  skills: Record<string, number | null>
 }
 
 export interface ReviewDetail {

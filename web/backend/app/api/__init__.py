@@ -125,6 +125,14 @@ def create_review(
         session, identity.user_id, key_source=resolved.source, plan=identity.plan
     )
 
+    # 高级技能免费次数：与 v2 同一个函数、同一套口径。v1 不接的话，
+    # 用户换个端点就能无限用高级技能——"v2 修了 v1 没修"是这个仓库最大的洞源。
+    from app.services import skill_quota_service
+
+    skill_type, _red, _degraded = skill_quota_service.apply(
+        session, identity.user_id, resolved.source, data.skill_type, False
+    )
+
     svc = ReviewService(session)
     review = svc.create_review(
         task_type=data.task_type,
@@ -133,8 +141,12 @@ def create_review(
         selected_personas=data.selected_personas,
         mode=data.mode.value if hasattr(data.mode, 'value') else data.mode,
         user_id=identity.user_id,
-        skill_type=data.skill_type,
+        skill_type=skill_type,   # 降级后的值
         project_key=data.project_key,
+        # v1 也要落这两个字段。只改 v2 的话，从 v1 入口发起的评审在技能计次里
+        # 完全看不见——用户走那条路就能无限用高级技能。这个仓库反复出现的
+        # "v2 修了 v1 没修" 正是这个形状。
+        key_source=resolved.source,
     )
 
     # key 显式透传，绝不写进程全局 os.environ——多 worker 并发跑不同用户的

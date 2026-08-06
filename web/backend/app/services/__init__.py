@@ -756,6 +756,8 @@ class ReviewService:
         user_id: str = "anonymous",
         skill_type: Optional[str] = None,
         project_key: Optional[str] = None,
+        enable_red_team: bool = False,
+        key_source: Optional[str] = None,
     ) -> Review:
         review = Review(
             id=str(uuid.uuid4()),
@@ -767,6 +769,8 @@ class ReviewService:
             selected_personas=selected_personas,
             skill_type=skill_type,
             project_key=project_key,
+            enable_red_team=enable_red_team,
+            key_source=key_source,
             mode=mode,
             status="pending",
             created_at=datetime.now(timezone.utc),
