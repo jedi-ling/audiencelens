@@ -110,10 +110,10 @@ export default function HeroScene() {
 
       // 粒子量按屏宽缩放：小笔记本没必要背满 3 万颗
       const q = Math.min(1, w() / 1600)
-      const SWARM_PER_NODE = Math.round(150 * (0.55 + q * 0.45))
-      const NEBULA = Math.round(11000 * (0.5 + q * 0.5))
-      const RING_PER = Math.round(1100 * (0.5 + q * 0.5))
-      const DUST = Math.round(2600 * (0.5 + q * 0.5))
+      const SWARM_PER_NODE = Math.round(70 * (0.55 + q * 0.45))
+      const NEBULA = Math.round(3600 * (0.5 + q * 0.5))
+      const RING_PER = Math.round(700 * (0.5 + q * 0.5))
+      const DUST = Math.round(1800 * (0.5 + q * 0.5))
 
       const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
       // 海量粒子下关掉 MSAA：粒子本身就是软边圆点，抗锯齿没有可见收益、只有开销
@@ -127,7 +127,7 @@ export default function HeroScene() {
       camera.position.set(0, 0.6, 13)
 
       const rig = new THREE.Group()
-      rig.position.x = 2.3 // 右移，左侧留给文案
+      rig.position.x = 4.4 // 右移：上一版 2.3 时星云盘压在文案上，把正文糊掉了
       scene.add(rig)
 
       const COLD = new THREE.Color(0xbcd6ff) // 冷白蓝——参考图那种银白调
@@ -161,17 +161,17 @@ export default function HeroScene() {
 
       // ---------- 1) 中心星云盘：被审视的材料 ----------
       for (let i = 0; i < NEBULA; i++) {
-        const r = Math.pow(Math.random(), 0.55) * 3.5 // 幂分布 → 内密外疏
+        const r = Math.pow(Math.random(), 1.0) * 2.9 // 幂分布 → 内密外疏。0.55 时核心过密，加色下饱和成一团白
         const a = Math.random() * Math.PI * 2
-        const flat = 0.34 * (1 - r / 4.2) // 盘状：越靠外越薄
-        const t = Math.min(1, r / 3.5)
+        const flat = 0.28 * (1 - r / 3.6) // 盘状：越靠外越薄
+        const t = Math.min(1, r / 2.9)
         // 内圈偏白偏亮、外圈偏蓝偏暗——纵深感的主要来源
         push(
           Math.cos(a) * r + gauss() * 0.12,
           gauss() * flat,
           Math.sin(a) * r + gauss() * 0.12,
           CORE.clone().lerp(COLD, 0.25 + t * 0.75),
-          1.05 + Math.random() * 1.5 * (1 - t),
+          0.62 + Math.random() * 0.85 * (1 - t),
           0.05 + (1 - t) * 0.1,
         )
       }
@@ -199,7 +199,7 @@ export default function HeroScene() {
             cy + u * shell,
             cz + sr * Math.sin(ph) * shell,
             base.clone().lerp(CORE, Math.random() * 0.5),
-            0.8 + Math.random() * 1.4,
+            0.5 + Math.random() * 0.8,
             0.03 + Math.random() * 0.02,
           )
         }
@@ -224,7 +224,7 @@ export default function HeroScene() {
             y0 * ct - z0 * st,
             y0 * st + z0 * ct,
             COLD.clone().lerp(CORE, Math.random() * 0.35),
-            0.7 + Math.random() * 0.7,
+            0.45 + Math.random() * 0.45,
             0.018 + idx * 0.004,
           )
         }
@@ -240,7 +240,7 @@ export default function HeroScene() {
         dPos.push((Math.random() - 0.5) * 46, (Math.random() - 0.5) * 26, (Math.random() - 0.5) * 26 - 6)
         const c = COLD.clone().lerp(CORE, Math.random() * 0.6)
         dCol.push(c.r, c.g, c.b)
-        dSiz.push(0.35 + Math.random() * 0.7)
+        dSiz.push(0.3 + Math.random() * 0.5)
         dSpn.push(0.004)
         dSed.push(Math.random())
       }
@@ -269,9 +269,13 @@ export default function HeroScene() {
         return { points: new THREE.Points(g, m), geo: g, mat: m }
       }
 
-      const main = makePoints(pos, col, siz, spn, sed, 1)
+      // 单颗粒子的 alpha 必须很低：加色混合会累加，alpha 一高，几千颗一叠就撞上 1.0 的
+      // 天花板，整块糊成白斑（实测 uOpacity=0.5 时右半屏均值 0.92、过曝像素 91.6%，
+      // 而且此时砍一半粒子只把 0.94 挪到 0.92——在天花板上砍量是没用的）。
+      // 低 alpha 让"要叠很多层才亮"重新成立，这才是黑底稀疏亮点的成因。
+      const main = makePoints(pos, col, siz, spn, sed, 0.02)
       rig.add(main.points)
-      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.55)
+      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.05)
       scene.add(dustP.points) // 挂 scene：星尘不随主体转
 
       const totalParticles = pos.length / 3 + dPos.length / 3
@@ -326,6 +330,38 @@ export default function HeroScene() {
         last = now
         t += dt
         draw()
+      }
+      ;(window as unknown as Record<string, unknown>).__heroLum = () => {
+        // 渲到离屏目标再读回：readPixels 对默认帧缓冲在合成后会读到全 0
+        // （preserveDrawingBuffer=false），只有 RenderTarget 才读得到真实像素。
+        const W = 240
+        const H = Math.max(1, Math.round((W * h()) / w()))
+        const rt = new THREE.WebGLRenderTarget(W, H)
+        renderer.setRenderTarget(rt)
+        renderer.render(scene, camera)
+        const buf = new Uint8Array(W * H * 4)
+        renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf)
+        renderer.setRenderTarget(null)
+        rt.dispose()
+        const band = (x0: number, x1: number) => {
+          let sum = 0
+          let hot = 0
+          let n = 0
+          for (let y = 0; y < H; y++) {
+            for (let x = Math.floor(W * x0); x < Math.floor(W * x1); x++) {
+              const i = (y * W + x) * 4
+              // 必须乘 alpha：RT 是透明底，粒子 RGB 再亮，alpha=0 也压不到深色背景上。
+              // 不乘的话读出来右半屏均值 0.94（"几乎纯白"），是探针在骗人不是画面在爆。
+              const a = buf[i + 3] / 255
+              const l = ((0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2]) / 255) * a
+              sum += l
+              if (l > 0.5) hot++
+              n++
+            }
+          }
+          return { mean: +(sum / n).toFixed(4), hotPct: +((hot / n) * 100).toFixed(2) }
+        }
+        return { 文案区_左45: band(0, 0.45), 右侧舞台: band(0.55, 1), 全幅: band(0, 1) }
       }
       raf = requestAnimationFrame(tick)
       cleanups.push(() => cancelAnimationFrame(raf))
