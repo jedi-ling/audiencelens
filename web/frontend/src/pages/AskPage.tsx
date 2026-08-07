@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 对话式入口 —— 真正的多轮聊天，不是"填一次表单"。
  *
  * 完整链路：
@@ -23,7 +23,7 @@ import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
-import type { IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
+import type { ConversationSummary, IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
 import type { Review, ReviewListItem } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
@@ -143,6 +143,12 @@ export default function AskPage() {
   // answer 几句之后才凑齐 confirm 卡片，不能因为中途某条消息"发送"了
   // 就把图丢了：真正消费图片、清空这个累积区的时机是评审真的建出来那一刻。
   const sessionImagesRef = useRef<ImageAttachment[]>([])
+  // 当前对话在服务端的 id。惰性创建：用户只是打开页面看看、一个字没发时
+  // 不该在库里留下空对话。第一条消息落库时才真正建。
+  const conversationIdRef = useRef<string | null>(null)
+  // 建对话的在途 Promise。没有它的话，用户快速连发两条消息会并发触发两次
+  // createConversation，第二条消息落进一段全新的空对话里，聊天记录被劈成两半。
+  const creatingConvRef = useRef<Promise<string | null> | null>(null)
   const listRef = useRef<HTMLDivElement>(null) // 消息列表容器：滚动只发生在它内部，不能带动 window
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -217,6 +223,9 @@ export default function AskPage() {
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
+  // 还没产出评审的对话。此前它们在侧栏里**完全不可见**——侧栏读的是评审列表，
+  // 一条评审都还没建的对话就不存在于任何列表里，关掉页面等于永久消失。
+  const [draftConvs, setDraftConvs] = useState<ConversationSummary[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // 正在等二次确认的那条（页面内确认，不用 window.confirm，理由见 askDeleteHistory）
@@ -249,6 +258,14 @@ export default function AskPage() {
       setReviewHistory(items)
       setHistoryRequiresLogin(requiresLogin)
       setHistoryError(null)
+      // 只列还没产出评审的对话：已经产出评审的那些，下面的评审历史里
+      // 已经有一条了，两边都列会变成同一段对话出现两次。
+      try {
+        const { conversations } = await api.listConversations()
+        setDraftConvs(conversations.filter((c) => !c.review_id))
+      } catch {
+        // 对话列表拉不到不该让评审历史也跟着空掉——两者是独立的失败面
+      }
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : '加载失败')
     }
@@ -262,6 +279,9 @@ export default function AskPage() {
   const startNewConversation = () => {
     historyRef.current = []
     sessionImagesRef.current = []
+    // 断开与上一段对话的关联，否则新对话的消息会继续追加到旧对话里
+    conversationIdRef.current = null
+    creatingConvRef.current = null
     setAttachments([])
     setInput('')
     setShowExamples(true)
@@ -279,6 +299,7 @@ export default function AskPage() {
     setPinnedProject(null)
     setActiveChatContext(null)
     searchParams.delete('review')
+    searchParams.delete('c')
     setSearchParams(searchParams, { replace: true })
   }
 
@@ -409,10 +430,52 @@ export default function AskPage() {
   // openReviewConversation 都会把当前评审 id 写进 URL（?review=xxx），
   // 挂载时如果 URL 上带着它，就直接照着这个 id 把对话还原回来。
   useEffect(() => {
+    const convId = searchParams.get('c')
     const reviewId = searchParams.get('review')
-    if (!reviewId) return
+    if (!convId && !reviewId) return
     let cancelled = false
-    void fetchReview(reviewId)
+
+    // ?c= 优先：它是**真实存下来的**对话记录。
+    // ?review= 那条路走的是 openReviewConversation，从 artifact_bundle 反推出
+    // 一条用户气泡——在没有对话持久化之前那是唯一能做的近似，但它拿不回
+    // 评审创建前的多轮澄清，时间戳也只能填 Date.now()。现在有真记录了，
+    // 就不该再用近似值覆盖它。?review= 仍然保留：老链接和分享出去的
+    // 评审地址得继续能打开。
+    if (convId) {
+      void api
+        .getConversation(convId)
+        .then((conv) => {
+          if (cancelled) return
+          conversationIdRef.current = conv.id
+          const restored: ChatMessage[] = conv.messages.map((m) => {
+            const ts = m.created_at ? new Date(m.created_at).getTime() : Date.now()
+            const meta = (m.meta || {}) as { kind?: string; reviewId?: string | null }
+            if (m.role === 'user') {
+              return { id: nextId(), role: 'user', text: m.content, ts }
+            }
+            // 评审卡片按原样还原成卡片，而不是退化成一句文字
+            if (meta.kind === 'review' && meta.reviewId) {
+              return { id: nextId(), role: 'assistant', kind: 'review', reviewId: meta.reviewId, ts }
+            }
+            return { id: nextId(), role: 'assistant', kind: 'text', text: m.content, ts }
+          })
+          if (restored.length) {
+            setMessages(restored)
+            setShowExamples(false)
+            // 重建解析上下文，否则接着说话时系统会当成全新一轮，
+            // 把之前澄清过的信息全忘掉、再问一遍
+            historyRef.current = conv.messages.filter((m) => m.role === 'user').map((m) => m.content)
+          }
+        })
+        .catch(() => {
+          // 对话被删了或不属于当前身份——静默回到开场白
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void fetchReview(reviewId as string)
       .then((r) => {
         if (!cancelled) openReviewConversation(r)
       })
@@ -432,7 +495,84 @@ export default function AskPage() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const appendMessage = (m: ChatMessageBase) => setMessages((prev) => [...prev, { ...m, ts: Date.now() }])
+  /** 拿到（必要时创建）当前对话的服务端 id。并发安全见 creatingConvRef 的注释。 */
+  const ensureConversation = async (): Promise<string | null> => {
+    if (conversationIdRef.current) return conversationIdRef.current
+    if (creatingConvRef.current) return creatingConvRef.current
+    const p = api
+      .createConversation()
+      .then((c) => {
+        conversationIdRef.current = c.id
+        // 写进 URL：刷新后靠它把对话捞回来。用 replace 不留历史记录，
+        // 否则用户按后退键会在同一段对话的不同阶段之间来回跳。
+        const next = new URLSearchParams(searchParams)
+        next.set('c', c.id)
+        setSearchParams(next, { replace: true })
+        return c.id
+      })
+      .catch(() => null)
+      .finally(() => {
+        creatingConvRef.current = null
+      })
+    creatingConvRef.current = p
+    return p
+  }
+
+  /** 把一条消息落库。**故意不 await、失败也不打断用户**：
+   *  持久化失败时正确的行为是"这次没存上"，而不是"你这句话发不出去"。
+   *  真正的可靠性来自服务端，前端在这里挡住失败只会让人白打一遍字。 */
+  /** 把一条消息落库。**故意不 await、失败也不打断用户**：
+   *  持久化失败时正确的行为是"这次没存上"，而不是"你这句话发不出去"。
+   *  前端在这里挡住失败只会让人白打一遍字。 */
+  const persistMessage = (m: ChatMessageBase) => {
+    let role: 'user' | 'assistant' = 'assistant'
+    let content = ''
+    let meta: Record<string, unknown> | null = null
+
+    if (m.role === 'user') {
+      role = 'user'
+      content = m.text
+    } else {
+      switch (m.kind) {
+        case 'text':
+          content = m.text
+          break
+        case 'review':
+          // 卡片正文是空的（只有 reviewId）。存一句可读的占位，让导出的
+          // 对话记录仍然连贯；真正还原成卡片靠 meta.kind。
+          content = '[评审已创建]'
+          meta = { kind: 'review', reviewId: m.reviewId }
+          break
+        case 'clarify':
+          // 存成文字而不是可交互卡片：重放时那些候选项早就过期了，
+          // 还原成按钮只会让用户点一个已经没有意义的选项。
+          content = m.question
+          break
+        case 'confirm':
+          content = `[确认评审方案：${m.intent.task_type || '未定'}]`
+          break
+        case 'error':
+          // 瞬时错误提示不入库：重放时它没有意义，只会让历史对话里
+          // 凭空多出几条早已不成立的报错。
+          return
+        default:
+          return
+      }
+    }
+
+    if (!content.trim()) return
+    void ensureConversation().then((id) => {
+      if (!id) return
+      void api.appendConversationMessage(id, role, content, meta).catch(() => {
+        // 静默：见上面的说明
+      })
+    })
+  }
+
+  const appendMessage = (m: ChatMessageBase) => {
+    persistMessage(m)
+    setMessages((prev) => [...prev, { ...m, ts: Date.now() }])
+  }
 
   /** 追问模式下发送：同一个对话框、同一条消息列表，只是路由目标从
    * "意图解析→开新评审"换成"这条评审的 chat 接口"。用户说"就是要在同一个
@@ -685,9 +825,25 @@ export default function AskPage() {
       setAttachments([])
       sessionImagesRef.current = []
       void loadHistory() // 新评审马上出现在左侧历史里
-      // URL 带上 review id：纯 React state 的对话在原地刷新页面（F5）会被清空回开场白，
-      // 跟"点历史侧栏能找回来"是两回事——这里让"当前正在聊的这条"也扛得住刷新。
-      setSearchParams({ review: res.review_id }, { replace: true })
+      // 把评审关联到这段对话。弱引用：之后删掉评审不会连带删掉用户
+      // 在评审之前打的那些字。
+      void ensureConversation().then((cid) => {
+        if (cid) void api.linkConversationReview(cid, res.review_id).catch(() => {})
+      })
+      // URL 同时带 c 与 review：
+      //   c      —— 刷新后按真实记录还原整段对话（含评审创建前的多轮澄清）
+      //   review —— 保持既有的分享/回访链接可用
+      // 只写 review 会让刷新走回"从 artifact_bundle 反推一条用户气泡"的近似路径，
+      // 把刚刚存下来的真实记录盖掉。
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('review', res.review_id)
+          if (conversationIdRef.current) next.set('c', conversationIdRef.current)
+          return next
+        },
+        { replace: true },
+      )
     } catch (e) {
       if (e instanceof ApiError && e.needsApiKey) {
         appendMessage({ id: nextId(), role: 'assistant', kind: 'error', text: e.message, needsKey: true })
@@ -713,6 +869,17 @@ export default function AskPage() {
       <HistorySidebar
         open={sidebarOpen}
         history={reviewHistory}
+        drafts={draftConvs}
+        activeConversationId={searchParams.get('c')}
+        onOpenConversation={(id) => {
+          // 走 URL 而不是直接 setMessages：挂载时那段恢复逻辑已经能按 ?c=
+          // 把整段对话还原回来，这里复用它，避免两套还原代码各自漂移。
+          const next = new URLSearchParams(searchParams)
+          next.set('c', id)
+          next.delete('review')
+          setSearchParams(next, { replace: true })
+          window.location.reload()
+        }}
         error={historyError}
         deletingId={deletingId}
         confirmingId={confirmingId}
@@ -1127,6 +1294,7 @@ export default function AskPage() {
           // 超了内部滚动。这时 items-end 才真正发挥作用——框变高，按钮跟着停在底部。
           className="min-h-[36px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
           rows={1}
+          aria-label="评审输入"
           placeholder={
             activeChatContext ? `问问${activeChatContext.label}…（Enter 发送）` : '说说你想评审什么…（Enter 发送，Shift+Enter 换行）'
           }
@@ -1212,6 +1380,9 @@ function groupHistoryByProject(history: ReviewListItem[]): { projects: { key: st
 function HistorySidebar({
   open,
   history,
+  drafts,
+  activeConversationId,
+  onOpenConversation,
   error,
   deletingId,
   confirmingId,
@@ -1224,6 +1395,9 @@ function HistorySidebar({
 }: {
   open: boolean
   history: ReviewListItem[] | null
+  drafts: ConversationSummary[]
+  activeConversationId: string | null
+  onOpenConversation: (id: string) => void
   error: string | null
   deletingId: string | null
   confirmingId: string | null
@@ -1237,7 +1411,7 @@ function HistorySidebar({
   return (
     <aside
       className={cn(
-        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary/40 transition-all duration-200',
+        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary/60 transition-all duration-200',
         open ? 'w-64' : 'w-0 border-r-0'
       )}
     >
@@ -1245,7 +1419,7 @@ function HistorySidebar({
         <div className="shrink-0 p-3">
           <button
             onClick={onNewConversation}
-            className="flex w-full items-center gap-2 rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-3 py-2 text-sm font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
+            className="flex w-full items-center gap-2 rounded-xl border border-brand-primary/30 bg-brand-primary/10 px-3 py-2.5 text-sm font-semibold text-brand-primary transition-all hover:bg-brand-primary/20 hover:shadow-[0_2px_12px_rgba(0,113,227,0.12)]"
           >
             <Plus className="h-4 w-4" strokeWidth={2} />
             新建对话
@@ -1253,7 +1427,40 @@ function HistorySidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pb-3">
-          <p className="mb-1.5 px-1 font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">评审历史</p>
+          {/* 还没产出评审的对话。它们此前在这里完全不可见——侧栏只读评审列表，
+              于是"聊到一半还没开评审"的内容关掉页面就永久消失。 */}
+          {drafts.length > 0 && (
+            <div className="mb-4">
+              <div className="mb-2 flex items-center gap-1.5 px-1">
+                <div className="h-4 w-[3px] rounded-full bg-text-muted/40" />
+                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">
+                  进行中的对话
+                </p>
+              </div>
+              <div className="space-y-1">
+                {drafts.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => onOpenConversation(c.id)}
+                    className={cn(
+                      'block w-full truncate rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+                      c.id === activeConversationId
+                        ? 'bg-brand-primary/10 text-brand-primary'
+                        : 'text-text-secondary hover:bg-bg-card',
+                    )}
+                    title={c.title || '未命名对话'}
+                  >
+                    {c.title || '未命名对话'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-2 flex items-center gap-1.5 px-1">
+            <div className="h-4 w-[3px] rounded-full bg-brand-primary/40" />
+            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">评审历史</p>
+          </div>
 
           {/* 加载失败 / 删除失败都走这里，必须是明确可见的一块，不能只是一行灰字 */}
           {error && (
@@ -1276,8 +1483,10 @@ function HistorySidebar({
               // 空列表有两种完全不同的含义，必须分开说：
               // "你还没做过评审" vs "这台实例上历史要登录才看得到"。
               // 后者如果也显示成"还没有评审记录"，用户会以为自己的评审丢了。
-              <div className="flex flex-col items-center gap-2 px-1 py-6 text-center text-xs text-text-muted">
-                <LogIn className="h-5 w-5" strokeWidth={1.25} />
+              <div className="flex flex-col items-center gap-3 px-2 py-8 text-center text-xs text-text-muted rounded-xl bg-bg-card border border-border border-dashed">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/10">
+                  <LogIn className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+                </div>
                 <span className="leading-relaxed">
                   登录后可以看到自己的评审历史
                   <br />
@@ -1285,15 +1494,18 @@ function HistorySidebar({
                 </span>
                 <Link
                   to="/login"
-                  className="rounded border border-brand-primary/40 px-2.5 py-1 text-[11px] text-brand-primary transition-colors hover:bg-brand-primary/10"
+                  className="rounded-lg border border-brand-primary/40 bg-brand-primary/10 px-3 py-1.5 text-[11px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
                 >
                   去登录
                 </Link>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 px-1 py-6 text-center text-xs text-text-muted">
-                <Inbox className="h-5 w-5" strokeWidth={1.25} />
-                还没有评审记录
+              <div className="flex flex-col items-center gap-3 px-2 py-8 text-center text-xs text-text-muted rounded-xl bg-bg-card border border-border border-dashed">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-secondary">
+                  <Inbox className="h-5 w-5 text-text-muted" strokeWidth={1.5} />
+                </div>
+                <span>还没有评审记录</span>
+                <span className="text-[10px] text-text-muted/70">开始一段新对话，评审结果会出现在这里</span>
               </div>
             )
           ) : (
@@ -1344,8 +1556,9 @@ function HistorySidebar({
                   <div
                     key={r.id}
                     onClick={() => onOpenReview(r)}
-                    className="group flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary transition-all hover:bg-bg-card hover:shadow-sm hover:text-text-primary border border-transparent hover:border-border"
                   >
+                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary/30 group-hover:bg-brand-primary/60 transition-colors" />
                     <span className="min-w-0 flex-1 truncate">{label}</span>
                     {/* 删除按钮常驻可见（低对比度，hover/focus 才提亮）。
                         以前是 opacity-0 + group-hover 才显形：触屏没有 hover，
@@ -1353,7 +1566,7 @@ function HistorySidebar({
                         p-1.5 + h-3.5 图标 ≈ 26px 命中区，配合行高够手指点。 */}
                     <button
                       onClick={(e) => onAskDelete(e, r.id)}
-                      className="shrink-0 rounded p-1.5 text-text-muted/70 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
+                      className="shrink-0 rounded p-1.5 text-text-muted/40 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
                       aria-label={`删除「${label}」`}
                       title="删除这条评审（会二次确认）"
                     >
@@ -1366,12 +1579,14 @@ function HistorySidebar({
                 <div className="space-y-3">
                   {projects.map((group) => (
                     <div key={group.key}>
-                      <div className="mb-1 flex items-center gap-1.5 px-1 text-[11px] font-medium text-warm-orange">
-                        <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                      <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-warm-orange">
+                        <div className="flex h-5 w-5 items-center justify-center rounded bg-warm-orange/10">
+                          <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                        </div>
                         <span className="min-w-0 flex-1 truncate">{group.key}</span>
-                        <span className="shrink-0 text-text-muted">{group.items.length}</span>
+                        <span className="shrink-0 text-text-muted font-normal">{group.items.length}</span>
                       </div>
-                      <div className="space-y-1 border-l border-border pl-2">
+                      <div className="space-y-0.5 border-l-2 border-border/60 pl-2.5">
                         {group.items.map(renderItem)}
                       </div>
                     </div>

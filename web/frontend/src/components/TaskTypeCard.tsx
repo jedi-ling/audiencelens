@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+﻿import { cn } from '@/lib/utils'
 import type { TaskType } from '@/lib/mock-data'
 
 interface TaskTypeCardProps {
@@ -18,7 +18,7 @@ export default function TaskTypeCard({ taskType, selected, onClick }: TaskTypeCa
         'bg-bg-card hover:bg-bg-card-hover',
         selected
           ? 'border-brand-primary border-glow-green'
-          : 'border-border hover:border-border-hover hover:shadow-[0_0_12px_rgba(183,126,59,0.12)]'
+          : 'border-border hover:border-border-hover hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]'
       )}
     >
       <div className={cn(

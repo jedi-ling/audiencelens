@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 评审历史列表——之前产品里完全没有这个页面，用户发起评审后除了当次的进度页
  * 链接，没有任何地方能回看"我都评审过什么"。数据走 fetchReviewsPage()
  * （/api/reviews），后端已按登录身份过滤（见 app/api/__init__.py 的
@@ -229,7 +229,7 @@ export default function ReviewHistoryPage() {
             <p className="text-text-secondary text-sm mb-4">还没有评审记录</p>
             <Link
               to="/ask"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-colors"
             >
               发起第一次评审 →
             </Link>

@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+﻿import { Link } from 'react-router'
 import { TASK_MATERIALS, TASK_TYPES } from '@/lib/mock-data'
 import {
   ListChecks,
@@ -259,7 +259,7 @@ export default function TutorialPage() {
         <div className="flex items-center justify-center py-4">
           <Link
             to="/review/new"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-brand-primary text-bg-primary font-medium hover:bg-brand-primary-dim glow-green transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-dim glow-green transition-all"
           >
             开始创建评审
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />

@@ -230,7 +230,8 @@ class TestWebSocketOwnership:
 
         rid = self._mk_review(db, "owner-user-2")
         token = create_token("owner-user-2", settings.jwt_secret, 300)
-        with client.websocket_connect(f"/ws/review/{rid}?token={token}"):
+        # token 走 Sec-WebSocket-Protocol 子协议，不再走 URL 查询参数（HIGH-4）
+        with client.websocket_connect(f"/ws/review/{rid}", subprotocols=[token]):
             pass  # 能建立连接不被拒即通过
 
     def test_unknown_review_closed(self, client):

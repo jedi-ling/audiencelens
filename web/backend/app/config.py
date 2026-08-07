@@ -67,8 +67,12 @@ def _load_dotenv_once() -> None:
 
 _load_dotenv_once()
 
-# 开发默认 JWT 密钥。它同时是落库加密密钥的回落值——泄露 = 所有已存 API key 可解。
+# 开发默认 JWT 密钥。仅用于本机开发签发登录态，绝不能拿来加密落库的 API Key。
 DEV_JWT_SECRET = "dev-insecure-secret-change-me"
+# 开发默认落库加密密钥。与 JWT 密钥**故意不同**：两者同一默认值会让"泄露 JWT
+# 密钥 = 解开所有已存 API Key"。生产环境必须显式设置 AL_ENCRYPTION_KEY，
+# 否则 _validate_startup 会拒绝启动。
+DEV_ENCRYPTION_KEY = "dev-insecure-encryption-key-change-me"
 # 后台令牌是静态共享密钥、无有效期，长度就是它唯一的强度来源。
 ADMIN_TOKEN_MIN_LENGTH = 16
 
@@ -150,10 +154,12 @@ class Settings:
         self.jwt_secret: str = os.environ.get("AL_JWT_SECRET", DEV_JWT_SECRET)
         self.jwt_ttl_seconds: int = _int("AL_JWT_TTL_SECONDS", 7 * 24 * 3600)
         self.anonymous_user_id: str = "anonymous"
-        # BYOK/平台 key 落库加密的密钥，与 JWT 签名密钥分离——
-        # 轮换 JWT 密钥只会踢掉登录态，不该让所有已存的 API key 变成解不开的密文。
-        # 未设置时回落 jwt_secret（兼容存量数据：旧密文都是用 jwt_secret 加密的）。
-        self.encryption_key: str = os.environ.get("AL_ENCRYPTION_KEY") or self.jwt_secret
+        # BYOK/平台 key 落库加密的密钥，与 JWT 签名密钥**必须分离**——
+        # 轮换 JWT 密钥只会踢掉登录态，不该让所有已存的 API key 变成解不开的密文；
+        # 同一密钥更会让"泄露 JWT 密钥 = 解开所有已存 API Key"（HIGH-1）。
+        # 未设置时用独立的开发默认值（与 DEV_JWT_SECRET 不同）；生产环境必须显式设置，
+        # 否则 _validate_startup 会拒绝启动。
+        self.encryption_key: str = os.environ.get("AL_ENCRYPTION_KEY") or DEV_ENCRYPTION_KEY
 
         # ---- LLM key 解析策略（埋线：BYOK vs 托管）----
         # "byok"    : 只用用户自带 key（服务端不垫钱）
@@ -345,9 +351,16 @@ class Settings:
         if self.jwt_secret == DEV_JWT_SECRET:
             raise RuntimeError(
                 "检测到类生产环境（AL_ENV=production 或 CORS/站点地址指向公网），"
-                "但 AL_JWT_SECRET 仍是开发默认值。该密钥同时用于签发登录态和加密落库的 "
-                "API Key，泄露即等于所有用户的 key 全部可解。"
+                "但 AL_JWT_SECRET 仍是开发默认值。该密钥用于签发登录态，泄露即可伪造任意用户的 token。"
                 "请先生成强随机密钥：openssl rand -hex 32"
+            )
+
+        if self.encryption_key == DEV_ENCRYPTION_KEY:
+            raise RuntimeError(
+                "检测到类生产环境，但未设置 AL_ENCRYPTION_KEY（仍是开发默认值）。"
+                "该密钥用于加密落库的 BYOK/平台 API Key，泄露即可解出所有已存的 key；"
+                "且它必须与 AL_JWT_SECRET 不同，否则泄露其一即等于两者皆泄。"
+                "请生成独立的强随机密钥：openssl rand -hex 32"
             )
 
         if not self.auth_enabled and not self.allow_shared_anonymous:
@@ -406,12 +419,6 @@ class Settings:
                     "这不是一个公网地址，用户点开验证/重置链接会打不开。"
                     "请设成用户实际访问的站点地址，例如 https://你的域名。"
                 )
-        if not os.environ.get("AL_ENCRYPTION_KEY"):
-            self._warn(
-                "未设置 AL_ENCRYPTION_KEY，落库加密密钥回落到 AL_JWT_SECRET。"
-                "此后轮换 JWT 密钥会让所有已存的 API Key 解不开。建议现在就分开设置。"
-            )
-
         if self.env != "production":
             self._warn(
                 f"AL_ENV={self.env!r} 但服务已对公网主机提供服务"

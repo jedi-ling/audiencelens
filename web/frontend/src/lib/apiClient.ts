@@ -35,6 +35,9 @@ import {
   type UsageSummary,
   type ValidationMetrics,
   type Verdict,
+  type ConversationSummary,
+  type ConversationDetail,
+  type StoredConversationMessage,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
@@ -358,6 +361,48 @@ export const api = {
     request<{ messages: ChatMessage[] }>(
       `/api/v2/reviews/${reviewId}/chat${personaId ? `?persona_id=${encodeURIComponent(personaId)}` : ''}`,
     ),
+
+  // ---------------- 对话持续化 ----------------
+  //
+  // 与上面 ReviewChat 的分工别搞混：
+  //   · 这一组       —— 评审被创建**之前**的来回澄清，可以一条评审都还没有
+  //   · ReviewChat  —— 评审完成**之后**的追问，必须挂在某条 review 上
+  // 此前只有后者落库，前者活在 AskPage 的 useState/useRef 里，刷新即永久丢失。
+
+  listConversations: () =>
+    request<{ conversations: ConversationSummary[] }>('/api/v2/conversations'),
+
+  createConversation: (title?: string | null) =>
+    request<ConversationSummary>('/api/v2/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ title: title ?? null }),
+    }),
+
+  getConversation: (id: string) =>
+    request<ConversationDetail>(`/api/v2/conversations/${id}`),
+
+  /** 追加一条消息。seq 由服务端分配——前端算会在并发提交和"重放历史后接着发"
+   * 两种情形下把两条消息排到同一个位置。 */
+  appendConversationMessage: (
+    id: string,
+    role: 'user' | 'assistant' | 'system',
+    content: string,
+    meta?: Record<string, unknown> | null,
+  ) =>
+    request<StoredConversationMessage>(`/api/v2/conversations/${id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ role, content, meta: meta ?? null }),
+    }),
+
+  /** 把对话与它产出的评审关联起来（弱引用：删评审不会删掉这段对话） */
+  linkConversationReview: (id: string, reviewId: string) =>
+    request<ConversationSummary>(`/api/v2/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ review_id: reviewId }),
+    }),
+
+  deleteConversation: (id: string) =>
+    request<{ ok: boolean }>(`/api/v2/conversations/${id}`, { method: 'DELETE' }),
 
   /** 手动对已完成评审运行 8 维质量评估（创建时没开 enable_evaluation 的补跑入口） */
   runEvaluation: (reviewId: string) =>

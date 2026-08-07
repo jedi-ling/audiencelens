@@ -256,16 +256,16 @@
       <p class="sec-desc">一套评审团，14 种任务类型，覆盖你最怕出错的那几次上线。</p>
     </div>
     <div class="use-grid">
-      <!-- P1-5：use-card 图标加 onerror 隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy" onerror="this.style.display='none'"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy" onerror="this.style.display='none'"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy" onerror="this.style.display='none'"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy" onerror="this.style.display='none'"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy" onerror="this.style.display='none'"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
+      <!-- P1-5：use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
       <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
            （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
            真实存在的是面板里几个专职唱反调的人格，照此写。 -->
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy" onerror="this.style.display='none'"><h3>对抗性视角</h3><p>面板里自带几个专职挑刺的人格：魔鬼代言人、单位经济学质疑者、怀疑型评测者。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy"><h3>对抗性视角</h3><p>面板里自带几个专职挑刺的人格：魔鬼代言人、单位经济学质疑者、怀疑型评测者。</p></div>
     </div>
   </div>
 </section>

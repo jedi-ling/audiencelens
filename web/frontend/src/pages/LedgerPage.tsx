@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 判断复利闭环 —— 产品的护城河页面。
  *
  * 一次性评审工具跑完就断了；这一页把每条预测留档，
@@ -111,7 +111,7 @@ export default function LedgerPage() {
             {needsLogin(error) && (
               <Link
                 to="/login"
-                className="rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-bg-primary hover:bg-brand-primary-dim"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-primary-dim"
               >
                 登录 / 注册
               </Link>
@@ -288,7 +288,7 @@ export default function LedgerPage() {
                     {needsLogin(verifyError.error) && (
                       <Link
                         to="/login"
-                        className="mt-2 inline-block rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-bg-primary hover:bg-brand-primary-dim"
+                        className="mt-2 inline-block rounded-md bg-brand-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-primary-dim"
                       >
                         登录 / 注册后再回填
                       </Link>

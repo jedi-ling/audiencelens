@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, Check, CheckCircle2, Info, KeyRound, Loader2, Mail, Ticket, XCircle } from 'lucide-react'
+import { ArrowRight, Check, CheckCircle2, Crown, Info, KeyRound, Loader2, Mail, Sparkles, Ticket, XCircle, Zap } from 'lucide-react'
 import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import { useSessionStore } from '@/store/session-store'
@@ -122,10 +122,15 @@ export default function PlansPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 animate-fade-in">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-green mb-2">套餐与额度</h1>
-        <p className="text-text-secondary max-w-2xl">
-          额度只约束「走平台垫付 Key」的评审。填自己的 API Key（BYOK）跑评审不消耗任何额度，也不受下面这些限制。
+      <header className="mb-10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+            <Crown className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+          </div>
+          <h1 className="font-display text-3xl md:text-4xl font-bold text-text-primary">套餐与额度</h1>
+        </div>
+        <p className="text-text-secondary max-w-2xl text-[15px] leading-relaxed">
+          使用自带 API Key（BYOK）跑评审不消耗平台额度。套餐额度仅适用于使用平台提供的 Key。
         </p>
       </header>
 
@@ -133,104 +138,112 @@ export default function PlansPage() {
       <section className="mb-8 space-y-3">
         {!quotaEnabled && (
           <Banner tone="info">
-            当前部署<strong className="font-semibold">未开启配额限制</strong>：下面各档的每日限额目前不生效，评审不受次数约束。
-            运营随时可能在后台打开它——所以档位信息仍然按真实定义展示。
+            当前部署<strong className="font-semibold">未开启配额限制</strong>，评审暂不受次数约束。
           </Banner>
         )}
         {quotaEnabled && creditsMode && (
           <Banner tone="info">
-            当前部署按 <strong className="font-semibold">CDK 次数制</strong>计费：套餐的「每日次数」不生效，
-            你的额度就是下面的兑换码余额，每跑一次评审扣 1 次，用完可再兑。
+            当前部署按 <strong className="font-semibold">CDK 次数制</strong>计费：每次评审消耗 1 次，用完可再兑。
           </Banner>
         )}
         {byokOnly && (
           <Banner tone="info">
-            当前部署为 <strong className="font-semibold">BYOK 模式</strong>：评审一律走你自己填的 Key，
-            平台不垫付、也就不扣额度。套餐在这种部署下没有实际约束力。
+            当前部署为 <strong className="font-semibold">BYOK 模式</strong>：评审使用你自己填的 Key，套餐额度不生效。
           </Banner>
         )}
         {authEnabled && isAnonymous && (
           <Banner tone="warn">
-            你还没登录。未登录时的用量记在<strong className="font-semibold">全站共享的匿名身份</strong>上，
-            额度可能已经被别人用掉。
-            <Link to="/register" className="ml-1 underline underline-offset-2 hover:text-gold-cream">
-              注册一个账号
+            未登录时用量保存在浏览器本地（共享匿名身份）。
+            <Link to="/register" className="ml-1 underline underline-offset-2 hover:text-text-primary">
+              注册账号
             </Link>
-            ，额度才真正属于你。
+            后，额度与账号绑定。
           </Banner>
         )}
       </section>
 
       {/* ---------- 我的额度 ---------- */}
       <section className="mb-10">
-        <h2 className="mb-3 font-display text-lg font-semibold text-text-primary">我的额度（近 24 小时）</h2>
+        <h2 className="mb-4 font-display text-lg font-semibold text-text-primary">我的额度（近 24 小时）</h2>
         {loading ? (
           <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-muted">正在读取用量…</div>
         ) : usage ? (
-          <div className="rounded-xl border border-border bg-bg-card p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div>
-                <div className="text-xs text-text-muted mb-1">当前档位</div>
-                <div className="font-display font-bold text-brand-primary">
+          <div className="rounded-2xl border border-border bg-bg-card p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-xl bg-bg-primary/50 border border-border/80 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-primary/10">
+                    <Sparkles className="h-3.5 w-3.5 text-brand-primary" strokeWidth={2} />
+                  </div>
+                  <div className="text-xs text-text-muted">当前档位</div>
+                </div>
+                <div className="font-display text-xl font-bold text-brand-primary">
                   {plans?.find((p) => p.id === currentPlanId)?.name ?? currentPlanId}
                 </div>
               </div>
-              <div>
-                <div className="text-xs text-text-muted mb-1">已用评审</div>
-                <div className="font-display font-bold text-text-primary">
+              <div className="rounded-xl bg-bg-primary/50 border border-border/80 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan/10">
+                    <Zap className="h-3.5 w-3.5 text-cyan" strokeWidth={2} />
+                  </div>
+                  <div className="text-xs text-text-muted">已用评审</div>
+                </div>
+                <div className="font-display text-xl font-bold text-text-primary">
                   {usage.reviews_used}
                   {usage.reviews_limit != null && (
-                    <span className="font-normal text-text-muted"> / {usage.reviews_limit}</span>
+                    <span className="font-normal text-text-muted text-sm ml-1">/ {usage.reviews_limit}</span>
                   )}
                 </div>
               </div>
-              <div>
-                <div className="text-xs text-text-muted mb-1">{creditsMode ? '剩余次数' : '兑换码加量'}</div>
-                <div className="font-display font-bold text-warm-orange">
+              <div className="rounded-xl bg-bg-primary/50 border border-border/80 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-warm-orange/10">
+                    <Ticket className="h-3.5 w-3.5 text-warm-orange" strokeWidth={2} />
+                  </div>
+                  <div className="text-xs text-text-muted">{creditsMode ? '剩余次数' : '兑换码加量'}</div>
+                </div>
+                <div className="font-display text-xl font-bold text-warm-orange">
                   {usage.bonus_credits ?? 0}
-                  <span className="text-xs font-normal text-text-muted"> 次</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-text-muted mb-1">平台垫付成本</div>
-                <div className="font-display font-bold text-text-secondary">
-                  ${usage.cost_usd_on_server_key.toFixed(4)}
-                  {usage.cost_usd_limit != null && (
-                    <span className="font-normal text-text-muted"> / ${usage.cost_usd_limit}</span>
-                  )}
+                  <span className="text-xs font-normal text-text-muted ml-1">次</span>
                 </div>
               </div>
             </div>
 
             {usage.reviews_limit != null && usage.reviews_limit > 0 && (
-              <div className="mt-4">
-                <div className="h-2 overflow-hidden rounded-full bg-bg-secondary">
+              <div className="mt-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-text-muted">配额使用进度</span>
+                  <span className="text-xs font-medium text-text-secondary">
+                    {Math.min(100, Math.round((usage.reviews_used / usage.reviews_limit) * 100))}%
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-bg-primary">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all duration-700',
-                      usage.reviews_used >= usage.reviews_limit ? 'bg-severity-critical' : 'bg-cyan',
+                      usage.reviews_used >= usage.reviews_limit ? 'bg-severity-critical' : 'bg-gradient-to-r from-brand-primary to-cyan',
                     )}
                     style={{
                       width: `${Math.min(100, Math.round((usage.reviews_used / usage.reviews_limit) * 100))}%`,
                     }}
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-text-muted">
-                  配额窗口：{usage.window}（滚动 24 小时，不是自然日）
+                <p className="mt-2 text-xs text-text-muted">
+                  配额周期：{usage.window}
                 </p>
               </div>
             )}
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-muted">
-            用量读取失败——不影响下面的套餐信息。
+            用量暂时无法读取
           </div>
         )}
       </section>
 
       {/* ---------- 三档套餐（价格与限额来自后端，后台改价这里立刻跟着变） ---------- */}
       <section className="mb-10">
-        <h2 className="mb-3 font-display text-lg font-semibold text-text-primary">套餐</h2>
+        <h2 className="mb-5 font-display text-lg font-semibold text-text-primary">套餐</h2>
 
         {plansError ? (
           <div className="rounded-xl border border-severity-critical/30 bg-severity-critical/10 p-4">
@@ -245,101 +258,121 @@ export default function PlansPage() {
         ) : loading ? (
           <div className="rounded-xl border border-border bg-bg-card p-6 text-sm text-text-muted">正在读取套餐…</div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {(plans ?? []).map((plan) => {
               const isCurrent = plan.id === currentPlanId
               const isFree = plan.price_usd_month <= 0
+              const tierIndex = plan.id === 'free' ? 0 : plan.id === 'pro' ? 1 : 2
+              const tierColor =
+                tierIndex === 0
+                  ? 'from-slate-400/40 to-slate-300/20'
+                  : tierIndex === 1
+                    ? 'from-brand-primary/40 to-brand-primary/15'
+                    : 'from-amber-400/50 to-amber-300/20'
+              const tierAccent =
+                tierIndex === 0 ? 'bg-slate-400' : tierIndex === 1 ? 'bg-brand-primary' : 'bg-amber-400'
+              const tierIcon = tierIndex === 0 ? <Sparkles className="h-4 w-4" /> : tierIndex === 1 ? <Zap className="h-4 w-4" /> : <Crown className="h-4 w-4" />
+
               return (
                 <div
                   key={plan.id}
                   className={cn(
-                    'flex flex-col rounded-xl border p-5 transition-colors',
+                    'group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300',
                     isCurrent
-                      ? 'border-brand-primary/50 bg-brand-primary/[0.06]'
-                      : 'border-border bg-bg-card hover:bg-bg-card-hover',
+                      ? 'border-brand-primary/40 bg-brand-primary/[0.04] shadow-[0_8px_32px_rgba(0,113,227,0.1)]'
+                      : 'border-border bg-bg-card shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1',
                   )}
                 >
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <h3 className="font-display text-lg font-bold text-text-primary">{plan.name}</h3>
-                    {isCurrent && (
-                      <span className="rounded-full border border-brand-primary/30 bg-brand-primary/10 px-2 py-0.5 text-[11px] text-brand-primary">
-                        当前档位
-                      </span>
-                    )}
-                  </div>
+                  {/* 顶部渐变 accent 条 */}
+                  <div className={cn('h-1.5 w-full bg-gradient-to-r', tierColor)} />
 
-                  <div className="mb-4">
-                    <span className="font-display text-3xl font-bold text-text-primary">
-                      {money(plan.price_usd_month)}
-                    </span>
-                    <span className="text-sm text-text-muted"> / 月</span>
-                  </div>
-
-                  <ul className="mb-5 space-y-2 text-sm text-text-secondary">
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
-                      <span>
-                        每天 <strong className="text-text-primary">{plan.reviews_per_day}</strong> 次评审
-                        {!quotaEnabled && <span className="text-text-muted">（当前部署未启用限额）</span>}
-                        {quotaEnabled && creditsMode && <span className="text-text-muted">（次数制部署下不生效）</span>}
+                  {/* 当前档位角标 */}
+                  {isCurrent && (
+                    <div className="absolute right-3 top-3">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                        <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
+                        当前使用
                       </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
-                      <span>
-                        平台垫付成本上限 <strong className="text-text-primary">${plan.cost_usd_per_day}</strong> / 天
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
-                      <span>自带 Key（BYOK）不限次，不计额度</span>
-                    </li>
-                  </ul>
+                    </div>
+                  )}
 
-                  <div className="mt-auto">
-                    {isCurrent ? (
-                      <div className="rounded-lg border border-border px-4 py-2.5 text-center text-sm text-text-muted">
-                        你正在用这一档
+                  <div className="p-6">
+                    {/* 档位名 + 图标 */}
+                    <div className="mb-4 flex items-center gap-2.5">
+                      <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm', tierAccent)}>
+                        {tierIcon}
                       </div>
-                    ) : isFree ? (
-                      <div className="rounded-lg border border-border px-4 py-2.5 text-center text-sm text-text-muted">
-                        免费档 · 无需付费
+                      <div>
+                        <h3 className="font-display text-base font-bold text-text-primary">{plan.name}</h3>
+                        <p className="text-[11px] text-text-muted">
+                          {tierIndex === 0 ? '入门体验' : tierIndex === 1 ? '个人深度使用' : '团队高频评审'}
+                        </p>
                       </div>
-                    ) : (
-                      <a
-                        href={upgradeMailto(plan)}
-                        className="flex items-center justify-center gap-2 rounded-lg border border-brand-primary/30 bg-brand-primary/10 px-4 py-2.5 text-sm font-medium text-brand-primary transition-all hover:bg-brand-primary/20 hover:border-brand-primary/50"
-                      >
-                        <Mail className="h-4 w-4" strokeWidth={1.5} />
-                        联系升级
-                      </a>
-                    )}
+                    </div>
+
+                    {/* 价格：大字号 + 强对比 */}
+                    <div className="mb-5 flex items-baseline gap-1">
+                      <span className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
+                        {money(plan.price_usd_month)}
+                      </span>
+                      <span className="text-sm text-text-muted">/ 月</span>
+                    </div>
+
+                    {/* 特性列表 */}
+                    <ul className="mb-6 space-y-2.5 text-sm text-text-secondary">
+                      <li className="flex items-start gap-2.5">
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+                          <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
+                        </div>
+                        <span>
+                          每天 <strong className="text-text-primary">{plan.reviews_per_day}</strong> 次评审
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+                          <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
+                        </div>
+                        <span>平台承担模型调用费用</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+                          <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
+                        </div>
+                        <span>自带 Key 不限次，不受额度约束</span>
+                      </li>
+                    </ul>
+
+                    {/* 底部操作区 */}
+                    <div className="mt-auto">
+                      {isCurrent ? (
+                        <div className="flex items-center justify-center gap-2 rounded-xl border-2 border-brand-primary/30 bg-brand-primary/10 px-4 py-3 text-sm font-semibold text-brand-primary">
+                          <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
+                          正在使用
+                        </div>
+                      ) : isFree ? (
+                        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-bg-primary/50 px-4 py-3 text-sm font-medium text-text-muted">
+                          <Sparkles className="h-4 w-4" strokeWidth={1.5} />
+                          免费档 · 无需付费
+                        </div>
+                      ) : (
+                        <a
+                          href={upgradeMailto(plan)}
+                          className="flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-primary/90 hover:shadow-[0_4px_16px_rgba(0,113,227,0.3)] active:scale-[0.98]"
+                        >
+                          <Mail className="h-4 w-4" strokeWidth={1.5} />
+                          联系升级
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
             })}
           </div>
         )}
-
-        <p className="mt-3 flex items-start gap-2 text-xs text-text-muted">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-          <span>
-            三档之间目前<strong className="text-text-secondary">只差额度</strong>：功能完全相同，没有专属人格、没有多席位、
-            没有团队协作空间。写在这里是为了让你按真实差异做决定——等这些能力真做出来了，这句话才会改。
-          </span>
-        </p>
       </section>
 
-      {/* ---------- 为什么没有"立即支付" ---------- */}
-      <section className="mb-10 rounded-xl border border-warm-orange/30 bg-warm-orange/[0.07] p-5">
-        <h2 className="mb-2 font-display text-base font-semibold text-warm-orange">为什么这里没有「立即支付」按钮</h2>
-        <p className="text-sm text-text-secondary">
-          在线支付还没接：没有 Stripe、没有支付宝、没有微信支付。与其放一个点下去跳空的按钮，不如直接说清楚
-          今天真能走通的两条路——下面这两个都是接好的，不是占位。付款方式接上之后，这一段会换成真正的结账入口。
-        </p>
-      </section>
-
-      {/* ---------- 真路径 1：兑换 CDK（本页直接兑，与设置页同一个接口） ---------- */}
+      {/* ---------- 兑换 CDK ---------- */}
       <section className="mb-8">
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
@@ -348,9 +381,9 @@ export default function PlansPage() {
           </h2>
           <p className="mb-3 text-xs text-text-muted">
             {creditsMode
-              ? '兑换后获得评审次数：每次评审消耗 1 次，用完可再兑。'
-              : '兑换后获得加量次数：套餐日限用完后自动垫上，走平台垫付 Key 时生效。'}
-            {authEnabled && ' 无需注册——匿名兑换会自动创建游客身份，次数存在这个浏览器里，清缓存前别弄丢。'}
+              ? '兑换后获得评审次数，每次评审消耗 1 次。'
+              : '兑换后获得加量次数，套餐日限用完后自动垫上。'}
+            {authEnabled && ' 无需注册，匿名兑换后次数保存在当前浏览器。'}
           </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -403,18 +436,19 @@ export default function PlansPage() {
           )}
 
           <p className="mt-3 text-xs text-text-muted">
-            没有码？发邮件说明用途，我给你发一个。
+            需要兑换码？发邮件至
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
-              className="ml-1 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
+              className="ml-1 text-brand-primary underline underline-offset-2 hover:text-text-primary"
             >
               {CONTACT_EMAIL}
             </a>
+            申请。
           </p>
         </div>
       </section>
 
-      {/* ---------- 真路径 2：人工开通 / 3：BYOK ---------- */}
+      {/* ---------- 其他方式 ---------- */}
       <section className="mb-10 grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
@@ -422,13 +456,12 @@ export default function PlansPage() {
             人工开通 Pro / Team
           </h2>
           <p className="mb-3 text-sm text-text-secondary">
-            AudienceLens 由一个人做。写封邮件说明你要哪一档、账号邮箱是什么，我手动把你的账号改档
-            （改完下一次请求就生效），或者直接给你发等额兑换码。
+            如需开通 Pro 或 Team 档，发邮件告知目标档位和账号邮箱即可。
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 升级咨询')}`}
-              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-gold-cream"
+              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-text-primary"
             >
               {CONTACT_EMAIL}
             </a>
@@ -446,11 +479,11 @@ export default function PlansPage() {
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
             <KeyRound className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-            不想付月费？自带 Key
+            自带 API Key
           </h2>
           <p className="mb-3 text-sm text-text-secondary">
-            填自己的 API Key（Anthropic 原生，或任意 OpenAI 兼容服务），评审走你自己的额度：
-            不消耗平台次数、不受日限约束，token 花费直接结算在你的服务商账单上。
+            填入自己的 API Key（Anthropic 原生，或任意 OpenAI 兼容服务），评审消耗你自己的 API 额度，
+            不受平台次数和日限约束，token 费用由服务商直接结算。
           </p>
           <Link
             to="/settings"

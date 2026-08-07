@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 评审进度页 —— 同时接住 v1 / v2 两条链路。
  *
  * v1（旧）：/api/reviews/{id} 返回含 persona_outputs 的全量 Review，
@@ -615,7 +615,7 @@ export default function ReviewProgressPage() {
           </div>
           <Link
             to={`/review/${id}/report`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-colors"
           >
             <FileText className="w-4 h-4" strokeWidth={1.25} />
             查看完整报告 →

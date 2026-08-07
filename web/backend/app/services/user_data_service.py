@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     AuthToken,
     CdkRedemption,
+    Conversation,
     CreditLedger,
     Job,
     Review,
@@ -104,6 +105,36 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
     keys = db.query(UserApiKey).filter(UserApiKey.user_id == user_id).all()
     usage = db.query(UsageRecord).filter(UsageRecord.user_id == user_id).all()
 
+    # 对话必须进导出：它不挂在 Review 上（一段对话可能没产出评审），
+    # 上面按 Review 组装的 review_payload 一条都覆盖不到。少了它，
+    # "导出我的全部数据"就是一句不实描述——而用户自己打的字正是他最在意的部分。
+    conversations = (
+        db.query(Conversation)
+        .filter(Conversation.user_id == user_id)
+        .order_by(Conversation.updated_at.desc())
+        .all()
+    )
+    conversation_payload = [
+        {
+            "id": c.id,
+            "title": c.title,
+            "review_id": c.review_id,
+            "created_at": _iso(c.created_at),
+            "updated_at": _iso(c.updated_at),
+            "messages": [
+                {
+                    "seq": m.seq,
+                    "role": m.role,
+                    "content": m.content,  # 导出给本人，不做匿名裁剪
+                    "meta": m.meta_json,
+                    "created_at": _iso(m.created_at),
+                }
+                for m in c.messages
+            ],
+        }
+        for c in conversations
+    ]
+
     return {
         "export_version": 1,
         "exported_at": _iso(datetime.now(timezone.utc)),
@@ -132,6 +163,7 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
             for k in keys
         ],
         "reviews": review_payload,
+        "conversations": conversation_payload,
         "usage_records": [
             {
                 "kind": u.kind,
@@ -185,6 +217,16 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
 
     for r in reviews:
         db.delete(r)
+
+    # 对话：与评审是两套独立归属（一段对话可能一条评审都没产出），
+    # 所以不会被上面的 Review 级联带走，必须单独删。逐条 db.delete 而不是
+    # 批量 delete()：批量删绕过 ORM 级联，conversation_messages 会成为
+    # 指向已删对话的孤儿行——用户资料删了，他打的字还留在库里。
+    conversations = db.query(Conversation).filter(Conversation.user_id == user_id).all()
+    stats["conversations_deleted"] = len(conversations)
+    stats["conversation_messages_deleted"] = sum(len(c.messages) for c in conversations)
+    for c in conversations:
+        db.delete(c)
 
     stats["api_keys_deleted"] = (
         db.query(UserApiKey).filter(UserApiKey.user_id == user_id).delete(synchronize_session=False)

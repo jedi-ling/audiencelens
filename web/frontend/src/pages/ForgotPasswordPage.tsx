@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 忘记密码：申请重置链接。
  *
  * 无论邮箱是否注册过，界面都显示同样的成功文案——后端本来就不区分
@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={busy || !email.trim()}
-              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
+              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
               {busy ? '发送中…' : '发送重置链接'}
             </button>

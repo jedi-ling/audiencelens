@@ -154,8 +154,7 @@ const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
 }
 
 // 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
-// 首色用绸缎金 #F9D67D 而非品牌主色 #B77E3B：主色明度太低，紧邻 #ffbb33 会糊成一团
-const STANCE_PALETTE = ['#F9D67D', '#ffbb33', '#ff6b35', '#ff3355', '#4ECDC4', '#a78bfa']
+const STANCE_PALETTE = ['#0071e3', '#ff9f0a', '#ff6b35', '#ff3355', '#32ade6', '#a78bfa']
 
 const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
@@ -308,7 +307,7 @@ function ReviewFailedNotice({
               )}
               <Link
                 to="/review/new"
-                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
               >
                 重新发起评审
               </Link>
@@ -346,7 +345,7 @@ function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 onClick={onRetry}
-                className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
               >
                 <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
                 重试
@@ -1110,7 +1109,7 @@ export default function ReportPage() {
             }
           </button>
           {showHtmlReport && (
-            <div className="mt-3 rounded-xl border border-border overflow-hidden bg-white">
+            <div className="mt-3 rounded-xl border border-border overflow-hidden bg-bg-card">
               <iframe
                 ref={iframeRef}
                 title="HTML Report"
@@ -1186,8 +1185,8 @@ export default function ReportPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
-                      itemStyle={{ color: '#e8e8f0' }}
+                      contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
+                      itemStyle={{ color: '#ffffff' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1546,15 +1545,15 @@ export default function ReportPage() {
                   return {
                     name: dim?.name ?? r.dimension,
                     score: r.score,
-                    fill: r.passed ? '#B77E3B' : '#ff3355',
+                    fill: r.passed ? '#0071e3' : '#ff3355',
                   }
                 })}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#8888a0' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#8888a0' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#86868b' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#86868b' }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
-                    itemStyle={{ color: '#e8e8f0' }}
+                    contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
+                  itemStyle={{ color: '#ffffff' }}
                   />
                   <Bar dataKey="score" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -1688,7 +1687,7 @@ export default function ReportPage() {
                               {ETHICS_SEVERITY_LABELS[v.severity]}
                             </span>
                             {v.rule && (
-                              <code className="text-[10px] font-mono text-gold-cream break-all">{v.rule}</code>
+                              <code className="text-[10px] font-mono text-text-primary break-all">{v.rule}</code>
                             )}
                           </div>
                           <p className="text-xs text-text-secondary leading-relaxed">{v.detail}</p>
@@ -1788,7 +1787,7 @@ export default function ReportPage() {
                 <input type="checkbox" checked={decisionChanged} onChange={(e) => setDecisionChanged(e.target.checked)} className="accent-brand-primary" />
                 报告改变了我的产品或发布决策
               </label>
-              <button className="rounded-md bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary" onClick={async () => {
+              <button className="rounded-md bg-brand-primary px-4 py-2 text-sm font-semibold text-white" onClick={async () => {
                 setFeedbackError(null)
                 try {
                   await api.submitReviewFeedback(id, {
@@ -1893,7 +1892,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
         </p>
         <Link
           to="/login"
-          className="mt-4 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+          className="mt-4 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
         >
           登录 / 注册看完整报告
         </Link>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { UserPlus } from 'lucide-react'
 import { ApiError } from '@/lib/apiClient'
@@ -109,7 +109,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={busy || !email.trim() || password.length < 8}
-          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
+          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           {busy ? '注册中…' : '注册'}
         </button>

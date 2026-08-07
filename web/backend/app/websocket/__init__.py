@@ -22,8 +22,8 @@ class ConnectionManager:
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
 
-    async def connect(self, review_id: str, websocket: WebSocket):
-        await websocket.accept()
+    async def connect(self, review_id: str, websocket: WebSocket, subprotocol: Optional[str] = None):
+        await websocket.accept(subprotocol=subprotocol)
         self.active[review_id].append(websocket)
 
     def disconnect(self, review_id: str, websocket: WebSocket):
@@ -72,12 +72,16 @@ WS_EVENTS = (
 
 
 def _resolve_ws_user(websocket: WebSocket) -> str:
-    """从 ?token= 解析身份；无 token 或 token 无效一律按匿名处理。
+    """从 Sec-WebSocket-Protocol 子协议解析身份；无 token 或 token 无效一律按匿名处理。
 
-    浏览器 WebSocket API 不能带自定义 header，所以 token 走查询参数。
+    浏览器 WebSocket API 不能带自定义 header，但可以带子协议——token 走子协议
+    而不是 URL 查询参数，避免被访问日志、代理缓存、Referer 等记录（HIGH-4）。
     与 HTTP 侧 optional_identity 同一哲学：不 401，静默回落匿名。
     """
-    token = websocket.query_params.get("token") or ""
+    token = websocket.headers.get("sec-websocket-protocol") or ""
+    # 客户端理论上可传多个子协议（逗号分隔）；我们只取第一个非空项
+    if "," in token:
+        token = next((t.strip() for t in token.split(",") if t.strip()), "")
     if not token:
         return settings.anonymous_user_id
     try:
@@ -87,6 +91,14 @@ def _resolve_ws_user(websocket: WebSocket) -> str:
         return str(payload.get("sub") or settings.anonymous_user_id)
     except Exception:
         return settings.anonymous_user_id
+
+
+def _ws_auth_subprotocol(websocket: WebSocket) -> Optional[str]:
+    """握手阶段客户端声明的子协议（即 token）。accept 时必须原样回显，否则浏览器会拒绝连接。"""
+    token = websocket.headers.get("sec-websocket-protocol") or ""
+    if "," in token:
+        token = next((t.strip() for t in token.split(",") if t.strip()), "")
+    return token or None
 
 
 @router.websocket("/ws/review/{review_id}")
@@ -118,7 +130,8 @@ async def review_websocket(websocket: WebSocket, review_id: str):
 
     if manager._loop is None:
         manager.set_loop(asyncio.get_running_loop())
-    await manager.connect(review_id, websocket)
+    # accept 时回显客户端声明的子协议（token），否则浏览器会以握手失败拒绝连接（HIGH-4）
+    await manager.connect(review_id, websocket, subprotocol=_ws_auth_subprotocol(websocket))
     try:
         while True:
             await websocket.receive_text()

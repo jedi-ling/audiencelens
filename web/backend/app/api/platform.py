@@ -1335,6 +1335,156 @@ def _serialize_chat_message(m, gate_assistant: bool = False) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# 对话持续化
+#
+# 与上面 /v2/reviews/{id}/chat 的分工不要搞混：
+#   · 这一组   —— 评审被创建**之前**的那段来回澄清，可以一条评审都还没有
+#   · reviews/chat —— 评审完成**之后**的追问，必须挂在某条 review 上
+# 此前只有后者落库，前者活在前端内存里，刷新即永久丢失。
+#
+# 所有端点的归属校验一律回 404 而不是 403：403 等于确认"这个 id 存在但不是
+# 你的"，可被用来枚举他人对话 id。口径与 review 一致。
+# ---------------------------------------------------------------------------
+
+
+class ConversationCreateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+
+
+class ConversationMessageRequest(BaseModel):
+    role: str = Field(pattern="^(user|assistant|system)$")
+    # 单条消息的长度上限。不设上限时，一次粘贴整本 BP 就能把单行撑到几 MB，
+    # 之后每次打开这段对话都要全量拉回。
+    content: str = Field(min_length=1, max_length=100_000)
+    # 卡片类消息（评审卡 / 确认卡 / 附件列表）的结构化载荷：
+    # 重放时要还原"当时那条气泡长什么样"，只存纯文本还原不出来。
+    meta: Optional[dict] = None
+
+
+class ConversationPatchRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    review_id: Optional[str] = None
+
+
+@router.get("/v2/conversations")
+async def list_conversations(
+    limit: int = 50,
+    offset: int = 0,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import conversation_service
+
+    rows = conversation_service.list_conversations(db, identity.user_id, limit, offset)
+    return {"conversations": [conversation_service.to_dict(c) for c in rows]}
+
+
+@router.post(
+    "/v2/conversations",
+    dependencies=[Depends(rate_limit("conversation_create", 60, 3600))],
+)
+async def create_conversation(
+    body: ConversationCreateRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import conversation_service
+
+    conv = conversation_service.create_conversation(db, identity.user_id, body.title)
+    return conversation_service.to_dict(conv)
+
+
+@router.get("/v2/conversations/{conversation_id}")
+async def get_conversation(
+    conversation_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import conversation_service
+
+    conv = conversation_service.get_owned(db, conversation_id, identity.user_id)
+    if conv is None:
+        raise NotFound("对话不存在")
+    return conversation_service.to_dict(conv, with_messages=True)
+
+
+@router.patch("/v2/conversations/{conversation_id}")
+async def patch_conversation(
+    conversation_id: str,
+    body: ConversationPatchRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import conversation_service
+
+    conv = conversation_service.get_owned(db, conversation_id, identity.user_id)
+    if conv is None:
+        raise NotFound("对话不存在")
+    if body.title is not None:
+        conv.title = body.title.strip()[:200] or None
+    if body.review_id is not None:
+        # 只允许关联自己的评审，否则可以把任意评审 id 绑到自己的对话上，
+        # 让前端顺着这条关联去拉他人报告。
+        review = db.get(Review, body.review_id)
+        if not review or (review.user_id or "anonymous") != identity.user_id:
+            raise NotFound("评审不存在")
+        conv.review_id = body.review_id
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return conversation_service.to_dict(conv)
+
+
+@router.delete("/v2/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import conversation_service
+
+    conv = conversation_service.get_owned(db, conversation_id, identity.user_id)
+    if conv is None:
+        raise NotFound("对话不存在")
+    conversation_service.delete_conversation(db, conv)
+    return {"ok": True}
+
+
+@router.post(
+    "/v2/conversations/{conversation_id}/messages",
+    dependencies=[Depends(rate_limit("conversation_message", 300, 3600))],
+)
+async def append_conversation_message(
+    conversation_id: str,
+    body: ConversationMessageRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """只做落库，不产生任何模型调用——回复由既有的评审/意图链路生成。
+
+    这样写的原因：把"存"和"生成"绑在一起，会让持久化跟着模型调用一起失败，
+    而两者的失败率完全不是一个量级。
+    """
+    from app.services import conversation_service
+
+    conv = conversation_service.get_owned(db, conversation_id, identity.user_id)
+    if conv is None:
+        raise NotFound("对话不存在")
+    try:
+        msg = conversation_service.append_message(db, conv, body.role, body.content, body.meta)
+    except ValueError as exc:
+        raise BadRequest(str(exc))
+    return {
+        "id": msg.id,
+        "seq": msg.seq,
+        "role": msg.role,
+        "content": msg.content,
+        "meta": msg.meta_json,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+    }
+
+
 @router.get("/v2/reviews/{review_id}/chat")
 async def list_review_chat(
     review_id: str,

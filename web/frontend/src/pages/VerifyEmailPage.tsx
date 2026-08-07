@@ -1,4 +1,4 @@
-/** 邮箱验证落地页：从邮件链接进来，自动消费令牌。 */
+﻿/** 邮箱验证落地页：从邮件链接进来，自动消费令牌。 */
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -52,7 +52,7 @@ export default function VerifyEmailPage() {
             <p className="mt-1 text-sm text-text-secondary">{message}</p>
             <Link
               to="/ask"
-              className="mt-6 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-bg-primary transition-colors hover:bg-brand-primary-dim"
+              className="mt-6 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
             >
               开始评审
             </Link>

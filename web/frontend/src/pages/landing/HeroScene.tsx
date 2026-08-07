@@ -116,10 +116,10 @@ export default function HeroScene() {
 
       // 粒子量按屏宽缩放：小笔记本没必要背满 3 万颗
       const q = Math.min(1, w() / 1600)
-      const SWARM_PER_NODE = Math.round(110 * (0.55 + q * 0.45))
-      const NEBULA = Math.round(9000 * (0.5 + q * 0.5))
-      const RING_PER = Math.round(1100 * (0.5 + q * 0.5))
-      const DUST = Math.round(4000 * (0.5 + q * 0.5))
+      const SWARM_PER_NODE = Math.round(140 * (0.55 + q * 0.45))
+      const NEBULA = Math.round(12000 * (0.5 + q * 0.5))
+      const RING_PER = Math.round(1400 * (0.5 + q * 0.5))
+      const DUST = Math.round(5500 * (0.5 + q * 0.5))
 
       const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
       // 海量粒子下关掉 MSAA：粒子本身就是软边圆点，抗锯齿没有可见收益、只有开销
@@ -130,10 +130,10 @@ export default function HeroScene() {
 
       const scene = new THREE.Scene()
       const camera = new THREE.PerspectiveCamera(38, w() / h(), 0.1, 200)
-      camera.position.set(0, 0.6, 13)
+      camera.position.set(0, 0.4, 17)
 
       const rig = new THREE.Group()
-      rig.position.x = 4.4 // 右移：上一版 2.3 时星云盘压在文案上，把正文糊掉了
+      rig.position.x = 0.8 // 微右移平衡视觉重心，粒子主体基本居中
       scene.add(rig)
 
       const COLD = new THREE.Color(0xbcd6ff) // 冷白蓝——参考图那种银白调
@@ -167,10 +167,10 @@ export default function HeroScene() {
 
       // ---------- 1) 中心星云盘：被审视的材料 ----------
       for (let i = 0; i < NEBULA; i++) {
-        const r = Math.pow(Math.random(), 1.25) * 3.4 // 幂分布 → 内密外疏。0.55 时核心过密，加色下饱和成一团白
+        const r = Math.pow(Math.random(), 1.25) * 4.6 // 幂分布 → 内密外疏。相机后退后同步放大
         const a = Math.random() * Math.PI * 2
-        const flat = 0.28 * (1 - r / 3.6) // 盘状：越靠外越薄
-        const t = Math.min(1, r / 2.9)
+        const flat = 0.28 * (1 - r / 5.0) // 盘状：越靠外越薄
+        const t = Math.min(1, r / 4.0)
         // 内圈偏白偏亮、外圈偏蓝偏暗——纵深感的主要来源
         push(
           Math.cos(a) * r + gauss() * 0.12,
@@ -183,7 +183,7 @@ export default function HeroScene() {
       }
 
       // ---------- 2) 72 个视角粒子团 ----------
-      const R = 5.6
+      const R = 7.2
       const golden = Math.PI * (3 - Math.sqrt(5))
       for (let i = 0; i < VIEWPOINT_COUNT; i++) {
         const yy = 1 - (i / (VIEWPOINT_COUNT - 1)) * 2
@@ -243,7 +243,7 @@ export default function HeroScene() {
       const dSpn: number[] = []
       const dSed: number[] = []
       for (let i = 0; i < DUST; i++) {
-        dPos.push((Math.random() - 0.5) * 46, (Math.random() - 0.5) * 26, (Math.random() - 0.5) * 26 - 6)
+        dPos.push((Math.random() - 0.5) * 56, (Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32 - 6)
         const c = COLD.clone().lerp(CORE, Math.random() * 0.6)
         dCol.push(c.r, c.g, c.b)
         dSiz.push(0.3 + Math.random() * 0.5)
@@ -330,12 +330,29 @@ export default function HeroScene() {
       let visible = true
       let last = performance.now()
       const tick = (now: number) => {
-        raf = requestAnimationFrame(tick)
-        if (!visible) return
+        // 不可见（移出视口）或页面被隐藏（切 tab/最小化）时停掉 rAF 链：
+        // 不再 requestAnimationFrame 续帧，主线程完全不参与，避免后台空转占主帧。
+        // 恢复可见时由 IntersectionObserver / visibilitychange 回调重新启动。
+        if (!visible || document.hidden) {
+          raf = 0
+          return
+        }
         const dt = Math.min((now - last) / 1000, 0.05)
         last = now
         t += dt
         draw()
+        raf = requestAnimationFrame(tick)
+      }
+      const start = () => {
+        if (raf || !visible || document.hidden) return
+        last = performance.now() // 重置时间基准，避免恢复后第一帧 dt 过大被 clamp
+        raf = requestAnimationFrame(tick)
+      }
+      const stop = () => {
+        if (raf) {
+          cancelAnimationFrame(raf)
+          raf = 0
+        }
       }
       ;(window as unknown as Record<string, unknown>).__heroLum = () => {
         // 渲到离屏目标再读回：readPixels 对默认帧缓冲在合成后会读到全 0

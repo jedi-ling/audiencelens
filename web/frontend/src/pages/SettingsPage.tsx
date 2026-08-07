@@ -325,16 +325,23 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="space-y-8">
-        <section className="pt-2">
-          <h2 className="text-lg font-display font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
-            API Key（BYOK）
-          </h2>
-          <p className="text-xs text-text-muted mb-4">
-            自带 Key 评审：Key 加密存储在服务端，评审费用从你的模型账户扣除。
-            {keyStatus?.server_key_available && '（平台也提供共享 Key 作为兜底）'}
-          </p>
+      <div className="space-y-6">
+        {/* API Key 区块 */}
+        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+              <KeyRound className="w-5 h-5 text-brand-primary" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-display font-semibold text-text-primary">
+                API Key（BYOK）
+              </h2>
+              <p className="text-xs text-text-muted">
+                自带 Key 评审：Key 加密存储在服务端，评审费用从你的模型账户扣除。
+                {keyStatus?.server_key_available && '（平台也提供共享 Key 作为兜底）'}
+              </p>
+            </div>
+          </div>
 
           {byokError && (
             <div className="mb-4 flex items-start gap-2 text-sm text-severity-critical">
@@ -349,7 +356,7 @@ export default function SettingsPage() {
               {keyStatus.keys.map((k) => (
                 <div
                   key={k.provider}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-card border border-brand-primary/30"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-bg-secondary border border-brand-primary/20 shadow-sm"
                 >
                   <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0" strokeWidth={1.25} />
                   <div className="min-w-0 flex-1">
@@ -395,15 +402,22 @@ export default function SettingsPage() {
                   className={cn(
                     'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer relative overflow-hidden',
                     'bg-bg-card hover:bg-bg-card-hover',
-                    isSelected ? cn(cfg.color.border, cfg.color.glow) : 'border-border hover:border-border-hover'
+                    isSelected
+                      ? cn(cfg.color.border, cfg.color.glow, 'shadow-sm')
+                      : 'border-border hover:border-border-hover'
                   )}
                 >
-                  {isSelected && <div className={cn('absolute inset-0 opacity-10', cfg.color.bg)} />}
-                  <Icon
-                    className={cn('w-6 h-6 relative z-10 transition-colors', isSelected ? cfg.color.text : 'text-text-muted')}
-                    strokeWidth={1.25}
-                  />
-                  <span className={cn('text-sm font-medium relative z-10 transition-colors', isSelected ? 'text-text-primary' : 'text-text-secondary')}>
+                  {isSelected && <div className={cn('absolute inset-0 opacity-[0.07]', cfg.color.bg)} />}
+                  <div className={cn(
+                    'flex h-10 w-10 items-center justify-center rounded-lg transition-colors relative z-10',
+                    isSelected ? cfg.color.bg : 'bg-bg-secondary'
+                  )}>
+                    <Icon
+                      className={cn('w-5 h-5 transition-colors', isSelected ? cfg.color.text : 'text-text-muted')}
+                      strokeWidth={1.5}
+                    />
+                  </div>
+                  <span className={cn('text-sm font-semibold relative z-10 transition-colors', isSelected ? 'text-text-primary' : 'text-text-secondary')}>
                     {cfg.label}
                   </span>
                   <span className={cn('text-[10px] font-mono relative z-10 text-center transition-colors', isSelected ? 'text-text-secondary' : 'text-text-muted')}>
@@ -427,12 +441,17 @@ export default function SettingsPage() {
                     className={cn(
                       'flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all cursor-pointer text-left',
                       'bg-bg-card hover:bg-bg-card-hover',
-                      isMatch ? 'border-cyan/50 bg-cyan/5' : 'border-border hover:border-border-hover'
+                      isMatch ? 'border-cyan/50 bg-cyan/[0.06] shadow-sm' : 'border-border hover:border-border-hover'
                     )}
                   >
-                    <Icon className={cn('w-4 h-4 shrink-0', isMatch ? 'text-cyan' : 'text-text-muted')} strokeWidth={1.25} />
+                    <div className={cn(
+                      'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                      isMatch ? 'bg-cyan/10' : 'bg-bg-secondary'
+                    )}>
+                      <Icon className={cn('w-3.5 h-3.5', isMatch ? 'text-cyan' : 'text-text-muted')} strokeWidth={1.5} />
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <div className={cn('text-xs font-medium truncate', isMatch ? 'text-text-primary' : 'text-text-secondary')}>
+                      <div className={cn('text-xs font-semibold truncate', isMatch ? 'text-text-primary' : 'text-text-secondary')}>
                         {preset.name}
                       </div>
                       <div className="text-[10px] text-text-muted font-mono truncate">{preset.model}</div>
@@ -490,6 +509,7 @@ export default function SettingsPage() {
                   setByokKey(e.target.value)
                   resetTest()
                 }}
+                aria-label="API Key"
                 placeholder={byokProvider === 'anthropic' ? 'sk-ant-…（输入 Anthropic API Key）' : '输入对应服务商的 API Key（Ollama 本地可留空）'}
                 className="w-full px-4 py-3 pr-12 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
               />
@@ -567,11 +587,15 @@ export default function SettingsPage() {
           </div>
 
           {/* CDK 兑换码：无需登录，兑换后自动获得游客身份 */}
-          <div className="mt-6 rounded-xl border border-border bg-bg-card p-4">
-            <h3 className="text-sm font-display font-semibold text-text-primary mb-1 flex items-center gap-2">
-              <Ticket className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
-              CDK 兑换码
-            </h3>
+          <div className="mt-6 rounded-xl border border-border bg-bg-secondary/60 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-warm-orange/10 border border-warm-orange/20">
+                <Ticket className="w-3.5 h-3.5 text-warm-orange" strokeWidth={1.5} />
+              </div>
+              <h3 className="text-sm font-display font-semibold text-text-primary">
+                CDK 兑换码
+              </h3>
+            </div>
             <p className="text-xs text-text-muted mb-3">
               {usage?.quota_mode === 'credits'
                 ? '兑换后获得评审次数：每次评审消耗 1 次，使用平台共享 Key 时生效。'
@@ -630,42 +654,43 @@ export default function SettingsPage() {
 
           {/* 24h 用量：quota 关闭时只报数字，不画配额条 */}
           {usage && (
-            <div className="mt-6 rounded-xl border border-border bg-bg-card p-4">
-              <h3 className="text-sm font-display font-semibold text-text-primary mb-3 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-cyan" strokeWidth={1.25} />
-                近 24 小时用量
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div>
+            <div className="mt-6 rounded-xl border border-border bg-bg-secondary/60 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan/10 border border-cyan/20">
+                  <BarChart3 className="w-3.5 h-3.5 text-cyan" strokeWidth={1.5} />
+                </div>
+                <h3 className="text-sm font-display font-semibold text-text-primary">
+                  近 24 小时用量
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-lg bg-bg-card border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">评审次数</div>
-                  {/* 显示**真实**次数（含 BYOK）。这里以前显示的是配额口径，
-                      于是 BYOK 用户今天跑了 5 次却看到 0——那是他自己付钱跑的。
-                      配额口径降为副行，两个数字各自标清楚是什么，不合并。 */}
-                  <div className="font-display font-bold text-text-primary">
+                  <div className="font-display text-2xl font-bold text-text-primary">
                     {usage.reviews_used_all}
                   </div>
                   {usage.quota_enabled && usage.reviews_limit != null && (
-                    <div className="mt-0.5 text-[10px] text-text-muted">
-                      其中平台垫付 {usage.reviews_used} / {usage.reviews_limit}
+                    <div className="mt-1 text-[10px] text-text-muted">
+                      平台垫付 {usage.reviews_used} / {usage.reviews_limit}
                     </div>
                   )}
                 </div>
-                <div>
+                <div className="rounded-lg bg-bg-card border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">
                     {usage.quota_mode === 'credits' ? '剩余次数' : '加量余额'}
                   </div>
-                  <div className="font-display font-bold text-brand-primary">
+                  <div className="font-display text-2xl font-bold text-brand-primary">
                     {usage.bonus_credits ?? 0}
-                    <span className="text-text-muted font-normal text-xs"> 次</span>
+                    <span className="text-text-muted font-normal text-sm"> 次</span>
                   </div>
                 </div>
-                <div>
+                <div className="rounded-lg bg-bg-card border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">总费用</div>
-                  <div className="font-display font-bold text-warm-orange">${usage.cost_usd_total.toFixed(4)}</div>
+                  <div className="font-display text-2xl font-bold text-warm-orange">${usage.cost_usd_total.toFixed(2)}</div>
                 </div>
-                <div>
+                <div className="rounded-lg bg-bg-card border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">其中服务器 Key</div>
-                  <div className="font-display font-bold text-text-secondary">${usage.cost_usd_on_server_key.toFixed(4)}</div>
+                  <div className="font-display text-2xl font-bold text-text-secondary">${usage.cost_usd_on_server_key.toFixed(2)}</div>
                 </div>
               </div>
               {usage.quota_enabled && usage.reviews_limit != null && usage.reviews_limit > 0 && (
@@ -730,14 +755,20 @@ export default function SettingsPage() {
          * 改昵称 / 改密码。以前这两件事在界面上没有任何入口，
          * 密码只能走"退出 → 忘记密码 → 收邮件"，邮件没配通就等于改不了。 */}
         {!identity?.is_anonymous && (
-        <section className="pt-8">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <User className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            账户
-          </h2>
-          <p className="mt-1 text-xs text-text-muted">
-            当前登录：{identity?.email}
-          </p>
+        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+              <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-display font-semibold text-text-primary">
+                账户
+              </h2>
+              <p className="text-xs text-text-muted">
+                当前登录：{identity?.email}
+              </p>
+            </div>
+          </div>
           {/* 昵称 */}
           <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
             <label className="block text-xs font-medium text-text-secondary">昵称</label>
@@ -808,14 +839,20 @@ export default function SettingsPage() {
         {/* ---------------- 数据自主权 ----------------
          * "你的东西归你"不能只写在隐私政策里——给两个用户能亲手按的按钮，
          * 承诺才变成可验证的事实。 */}
-        <section className="pt-8">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <ShieldCheck className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            我的数据
-          </h2>
-          <p className="mt-1 text-xs text-text-muted">
-            你上传的材料、评审报告、对话记录随时可以导出或永久删除。
-          </p>
+        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+              <ShieldCheck className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-display font-semibold text-text-primary">
+                我的数据
+              </h2>
+              <p className="text-xs text-text-muted">
+                你上传的材料、评审报告、对话记录随时可以导出或永久删除。
+              </p>
+            </div>
+          </div>
 
           {dataError && (
             <p className="mt-3 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-3 py-2 font-mono text-xs text-severity-critical">

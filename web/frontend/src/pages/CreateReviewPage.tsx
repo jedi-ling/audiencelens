@@ -304,7 +304,7 @@ export default function CreateReviewPage() {
               className={cn(
                 'w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-mono font-bold shrink-0 transition-all',
                 s < step
-                  ? 'bg-brand-primary text-bg-primary'
+                  ? 'bg-brand-primary text-white'
                   : s === step
                     ? 'bg-brand-primary/20 text-brand-primary border-2 border-brand-primary'
                     : 'bg-bg-card text-text-muted border border-border'
@@ -338,7 +338,7 @@ export default function CreateReviewPage() {
         {step === 0 && (
           <div>
             <h2 className="text-xl font-semibold text-text-primary mb-2">选择评审技能</h2>
-            <p className="text-sm text-text-secondary mb-6">不同技能提供差异化的评审策略，选择最适合你当前需求的技能</p>
+            <p className="text-sm text-text-secondary mb-6">不同技能对应不同的评审视角和侧重点</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {SKILLS.map((skill) => (
@@ -783,9 +783,8 @@ export default function CreateReviewPage() {
                     {selectedPackIds.map(packName).join('、')}）
                   </p>
                   <p>
-                    一次评审只会在同一个角色包内执行：别的包里的角色会被整批丢弃，
-                    最终跑的人跟你在这里选的对不上。请只保留同一个包内的角色，
-                    或直接点上面的包一键选人。
+                    一次评审只能使用同一个角色包内的角色，跨包选择时只会保留其中一个包。
+                    请只保留同一包内的角色，或直接点上面的角色包一键选择。
                   </p>
                 </div>
               </div>
@@ -798,8 +797,8 @@ export default function CreateReviewPage() {
                     超出「{modeConfig[selectedMode].label}模式」的角色上限（{modeMax} 位）
                   </p>
                   <p>
-                    超出的部分会被后端按包内顺序截掉，被丢掉的是谁无法预期。
-                    请取消 {selectedPersonaIds.size - modeMax} 位，或回第 1 步（任务类型）换成人数上限更高的模式。
+                    当前模式最多支持 {modeMax} 位评审员，请取消 {selectedPersonaIds.size - modeMax} 位，
+                    或回到「任务类型」步骤选择人数上限更高的模式。
                   </p>
                 </div>
               </div>
@@ -840,7 +839,7 @@ export default function CreateReviewPage() {
                   'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
                   enableEvaluation ? 'bg-cyan border-cyan' : 'border-border'
                 )}>
-                  {enableEvaluation && <CheckCircle2 className="w-3 h-3 text-bg-primary" strokeWidth={1.25} />}
+                  {enableEvaluation && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={1.25} />}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -876,7 +875,7 @@ export default function CreateReviewPage() {
                   'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
                   enableRedTeam ? 'bg-red-400 border-red-400' : 'border-border'
                 )}>
-                  {enableRedTeam && <CheckCircle2 className="w-3 h-3 text-bg-primary" strokeWidth={1.25} />}
+                  {enableRedTeam && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={1.25} />}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -1105,7 +1104,7 @@ export default function CreateReviewPage() {
             className={cn(
               'flex items-center gap-2 px-5 md:px-6 py-2.5 rounded-lg font-medium transition-all text-sm',
               canNext()
-                ? 'bg-brand-primary text-bg-primary hover:bg-brand-primary-dim hover:shadow-[0_0_20px_rgba(183,126,59,0.25)]'
+                ? 'bg-brand-primary text-white hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.30)]'
                 : 'bg-bg-card text-text-muted cursor-not-allowed'
             )}
           >
@@ -1121,7 +1120,7 @@ export default function CreateReviewPage() {
               onClick={handleLaunch}
               disabled={launching}
               className={cn(
-                'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-brand-primary text-bg-primary font-bold hover:bg-brand-primary-dim glow-green transition-all text-sm',
+                'flex items-center gap-2 px-6 md:px-8 py-2.5 rounded-lg bg-brand-primary text-white font-bold hover:bg-brand-primary-dim glow-green transition-all text-sm',
                 launching && 'opacity-70 cursor-not-allowed'
               )}
             >
@@ -1159,7 +1158,7 @@ function PersonaSelectCard({
         'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
         selected ? 'bg-brand-primary border-brand-primary' : 'border-border'
       )}>
-        {selected && <CheckCircle2 className="w-3 h-3 text-bg-primary" strokeWidth={1.25} />}
+        {selected && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={1.25} />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

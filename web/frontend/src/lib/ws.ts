@@ -61,18 +61,19 @@ export function connectReviewSocket(reviewId: string, opts: ReviewSocketOptions)
   }
 
   const base = (import.meta.env.VITE_API_BASE as string) || window.location.origin
-  // 浏览器 WS 不能带自定义 header，token 走查询参数——后端据此校验评审归属
+  // 浏览器 WS 不能带自定义 header，token 走 Sec-WebSocket-Protocol 子协议——
+  // 查询参数会被访问日志 / 代理缓存 / Referer 记录，子协议走请求头、不落 URL（HIGH-4）。
+  // 后端在 accept 时原样回显该子协议，否则浏览器会以握手失败拒绝连接。
+  // JWT(base64url) 字符集为 A-Za-z0-9-_.，均为合法的子协议 token 字符。
   const token = getToken()
-  const wsUrl =
-    base.replace(/^http/, 'ws') +
-    `/ws/review/${reviewId}` +
-    (token ? `?token=${encodeURIComponent(token)}` : '')
+  const wsUrl = base.replace(/^http/, 'ws') + `/ws/review/${reviewId}`
+  const protocols = token ? [token] : undefined
 
   const open = () => {
     if (closedByUs) return
     setStatus(everOpened ? 'reconnecting' : 'connecting')
     try {
-      ws = new WebSocket(wsUrl)
+      ws = new WebSocket(wsUrl, protocols)
     } catch {
       scheduleRetry()
       return

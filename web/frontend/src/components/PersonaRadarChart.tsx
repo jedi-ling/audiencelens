@@ -85,15 +85,15 @@ export default function PersonaRadarChart({ data, compareData, name1 = '角色 A
     <div ref={containerRef}>
       <ResponsiveContainer width={computedSize} height={computedSize}>
         <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid stroke="#2a2a3a" />
-          <PolarAngleAxis dataKey="axis" tick={{ fill: '#8888a0', fontSize, fontFamily: 'Noto Sans SC' }} />
+          <PolarGrid stroke="#e5e5ea" />
+          <PolarAngleAxis dataKey="axis" tick={{ fill: '#86868b', fontSize, fontFamily: 'Noto Sans SC' }} />
           <PolarRadiusAxis angle={30} domain={[0, 1]} tick={false} axisLine={false} />
-          <Radar name={name1} dataKey="value1" stroke="#F9D67D" fill="#F9D67D" fillOpacity={0.18} strokeWidth={2} />
+          <Radar name={name1} dataKey="value1" stroke="#0071e3" fill="#0071e3" fillOpacity={0.18} strokeWidth={2} />
           {normalizedCompare && (
-            <Radar name={name2} dataKey="value2" stroke="#4ECDC4" fill="#4ECDC4" fillOpacity={0.15} strokeWidth={2} />
+            <Radar name={name2} dataKey="value2" stroke="#32ade6" fill="#32ade6" fillOpacity={0.15} strokeWidth={2} />
           )}
           {normalizedCompare && (
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: '#8888a0' }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'Noto Sans SC', color: '#86868b' }} />
           )}
         </RadarChart>
       </ResponsiveContainer>

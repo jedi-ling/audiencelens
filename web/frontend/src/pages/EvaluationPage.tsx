@@ -118,7 +118,7 @@ export default function EvaluationPage() {
             <p className="text-text-muted text-sm mb-6">这不代表评估没跑过——接口可能临时抖动，点下面重试</p>
             <button
               onClick={handleRetry}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-bg-primary text-sm font-bold hover:bg-brand-primary-dim transition-all mb-6"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-all mb-6"
             >
               <Loader2 className="w-4 h-4" strokeWidth={1.25} />
               重试
@@ -198,20 +198,20 @@ export default function EvaluationPage() {
           <h3 className="text-sm font-medium text-text-muted mb-4">维度雷达图</h3>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="#2a2a3a" />
-              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#8888a0' }} />
-              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#8888a0' }} />
+              <PolarGrid stroke="#e5e5ea" />
+              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#86868b' }} />
+              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#86868b' }} />
               <Radar
                 name="评分"
                 dataKey="score"
-                stroke="#4ECDC4"
-                fill="#4ECDC4"
+                stroke="#32ade6"
+                fill="#32ade6"
                 fillOpacity={0.2}
                 strokeWidth={2}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: '#16161f', border: '1px solid #2a2a3a', borderRadius: '8px', fontSize: '12px' }}
-                itemStyle={{ color: '#e8e8f0' }}
+                contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '8px', fontSize: '12px' }}
+                itemStyle={{ color: '#ffffff' }}
               />
             </RadarChart>
           </ResponsiveContainer>
@@ -387,7 +387,7 @@ export default function EvaluationPage() {
                                 {ETHICS_SEVERITY_LABELS[v.severity]}
                               </span>
                               {v.rule && (
-                                <code className="text-[10px] font-mono text-gold-cream break-all">{v.rule}</code>
+                                <code className="text-[10px] font-mono text-text-primary break-all">{v.rule}</code>
                               )}
                             </div>
                             <p className="text-xs text-text-secondary leading-relaxed">{v.detail}</p>

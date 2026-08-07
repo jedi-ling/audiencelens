@@ -395,3 +395,33 @@ export interface WsEvent<T = Record<string, unknown>> {
 
 // 注：后台管理（Admin* 类型 + adminClient）已拆分到独立项目 web/admin/，
 // 不再嵌入这个用户产品前端里。见 web/admin/src/lib/types.ts。
+
+// ---------------- 对话持续化 ----------------
+// 评审**之前**那段来回澄清。与 ReviewChatMessage（评审之后的追问）是两回事：
+// 后者必须挂在某条 review 上，前者可以一条评审都还没有。
+
+export interface ConversationSummary {
+  id: string
+  title: string | null
+  /** 这段对话最终产出的评审（弱引用：删评审不会删掉对话本身） */
+  review_id: string | null
+  created_at: string | null
+  /** 列表按它倒序。按 created_at 排会让老对话里的新消息沉底。 */
+  updated_at: string | null
+}
+
+export interface StoredConversationMessage {
+  id: string
+  /** 服务端分配的顺序号。不能靠 created_at 排——同一次交互的问与答
+   *  可能落在同一毫秒，会被随机颠倒成一答一问。 */
+  seq: number
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  /** 卡片类消息（评审卡/确认卡/附件）的结构化载荷，重放时还原气泡形态用 */
+  meta: Record<string, unknown> | null
+  created_at: string | null
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: StoredConversationMessage[]
+}

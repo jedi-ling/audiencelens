@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { usePersonaStore } from '@/store/persona-store'
 import { cn } from '@/lib/utils'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
@@ -187,7 +187,7 @@ export default function PersonasPage() {
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
             onClick={() => setDrawerOpen(false)}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-bg-primary border-t border-border rounded-t-2xl max-h-[70vh] overflow-y-auto p-5 animate-fade-in">

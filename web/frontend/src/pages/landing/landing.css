@@ -3,26 +3,26 @@
 .al-landing{position:relative;width:100%;min-height:100vh;isolation:isolate}
 .al-landing *, .al-landing *::before, .al-landing *::after{margin:0;padding:0;box-sizing:border-box}
 .al-landing{
-  --bg:#f5f5f7;--bg-alt:#fbfbfd;--bg-card:#ffffff;--bg-elev:#f0f0f2;
-  --text:#1d1d1f;--text-dim:#6e6e73;--text-mute:#86868b;
-  --gold:#0071e3;--gold-bright:#2997ff;--gold-soft:rgba(0,113,227,.08);
+  --bg:#000000;--bg-alt:#1c1c1e;--bg-card:#1c1c1e;--bg-elev:#2c2c2e;
+  --text:#ffffff;--text-dim:#8e8e93;--text-mute:#636366;
+  --gold:#0a84ff;--gold-bright:#2997ff;--gold-soft:rgba(10,132,255,.08);
   --mint:#32ade6;
-  --line:rgba(0,0,0,.08);--line-strong:rgba(0,0,0,.14);
-  --glow-gold:0 8px 30px rgba(0,113,227,.12);
+  --line:rgba(255,255,255,.08);--line-strong:rgba(255,255,255,.14);
+  --glow-gold:0 8px 30px rgba(10,132,255,.12);
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei","Noto Sans SC","Helvetica Neue",sans-serif;
   --mono:"SF Mono",ui-monospace,"Cascadia Code","Roboto Mono",monospace;
   --maxw:1180px;
 }
 .al-landing{scroll-behavior:smooth;font-size:16px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .al-landing{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.65;overflow-x:hidden;font-weight:400}
-.al-landing ::selection{background:rgba(0,113,227,.18);color:var(--text)}
+.al-landing ::selection{background:rgba(10,132,255,.25);color:var(--text)}
 .al-landing a{color:inherit;text-decoration:none;transition:color .25s,opacity .25s}
 .al-landing img{max-width:100%;display:block}
 .al-landing .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
 .al-landing .tag{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;
   text-transform:uppercase;color:var(--gold);opacity:.85}
-.al-landing .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.al-landing .eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:22px;display:flex;align-items:center;gap:10px}
 .al-landing .eyebrow::before{content:"";width:22px;height:1px;background:var(--gold);opacity:.6}
 .al-landing .gold{color:var(--gold)}
 .al-landing .grad-gold{color:var(--gold);font-weight:900}
@@ -43,9 +43,9 @@
 }
 .al-landing nav{position:fixed;top:0;left:0;right:0;z-index:100;transition:background .35s,border-color .35s,backdrop-filter .35s;
   border-bottom:1px solid transparent}
-.al-landing nav.scrolled{background:rgba(251,251,253,.72);backdrop-filter:blur(18px) saturate(180%);
+.al-landing nav.scrolled{background:rgba(28,28,30,.72);backdrop-filter:blur(18px) saturate(180%);
   /* // P0-4：滚动后强化导航与正文的层级分隔 */
-  -webkit-backdrop-filter:blur(18px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.08);box-shadow:0 8px 32px rgba(0,0,0,.06)}
+  -webkit-backdrop-filter:blur(18px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 8px 32px rgba(0,0,0,.3)}
 .al-landing .nav-inner{max-width:var(--maxw);margin:0 auto;padding:0 28px;height:68px;
   display:flex;align-items:center;justify-content:space-between}
 .al-landing .brand{font-weight:700;font-size:1.05rem;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
@@ -71,21 +71,23 @@
 .al-landing .btn .arw{transition:transform .28s}
 .al-landing .btn:hover .arw{transform:translateX(3px)}
 .al-landing section{position:relative}
-.al-landing .sec{padding:120px 0}
+.al-landing .sec{padding:140px 0}
 .al-landing .sec-alt{background:var(--bg-alt)}
 .al-landing .sec-head{max-width:720px;margin-bottom:64px}
-.al-landing .sec-title{font-size:clamp(1.8rem,4vw,3rem);font-weight:800;letter-spacing:-.02em;line-height:1.12}
+.al-landing .sec-title{font-size:clamp(2rem,4.2vw,3.2rem);font-weight:800;letter-spacing:-.03em;line-height:1.08}
 .al-landing .sec-desc{color:var(--text-dim);font-size:1.06rem;margin-top:18px;max-width:600px}
 .al-landing .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;
   padding:112px 0 72px;text-align:center}
+/* 背景层1：极淡的噪点纹理，替代网格线——有质感但不抢戏 */
 .al-landing .hero::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
-  background-size:64px 64px;
-  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 42%,#000 0%,transparent 78%);
-  mask-image:radial-gradient(ellipse 80% 60% at 50% 42%,#000 0%,transparent 78%);opacity:.5}
-.al-landing .hero::after{content:"";position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);
-  width:760px;height:760px;max-width:120vw;z-index:0;pointer-events:none;
-  background:radial-gradient(circle,rgba(0,113,227,.08) 0%,transparent 62%)}
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-size:256px 256px;opacity:.35}
+/* 背景层2：主光晕+辅助光晕——组合多层径向渐变创造空间深度 */
+.al-landing .hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 30%,rgba(41,151,255,.16) 0%,rgba(0,113,227,.05) 32%,transparent 58%),
+    radial-gradient(circle at 78% 18%,rgba(74,169,255,.08) 0%,transparent 45%),
+    radial-gradient(circle at 22% 65%,rgba(50,173,230,.05) 0%,transparent 40%)}
 .al-landing .hero-inner{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;
   /* 左文右卡双栏：文案列固定 720px，保证主标题「让 72 个 AI 评审员，」一行放下 */
   display:grid;grid-template-columns:minmax(0,720px) minmax(0,1fr);gap:56px;align-items:center;text-align:left}
@@ -93,11 +95,11 @@
 .al-landing .hero-models{margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:9px}
 .al-landing .hero-models .lbl{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase}
 .al-landing .hero-models .m{font-size:.76rem;color:var(--text-dim);border:1px solid var(--line);border-radius:7px;
-  padding:4px 11px;background:rgba(0,0,0,.02)}
+  padding:4px 11px;background:rgba(255,255,255,.06)}
 .al-landing .hero-badge{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.72rem;
   letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);
   border:1px solid var(--line-strong);border-radius:999px;padding:7px 16px;margin-bottom:34px;
-  background:rgba(0,0,0,.02)}
+  background:rgba(255,255,255,.06)}
 .al-landing .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint)}
 /* 主标题两行整句断行：「让 72 个 AI 评审员，/ 在你上线前找到风险」。
    上限 4rem（64px），第一行约 660px < 文案列 720px，永不碎行 */
@@ -112,7 +114,7 @@
 .al-landing .chips-examples{margin:-12px 0 26px;gap:7px}
 .al-landing .chips-examples .chip{font-size:.72rem;padding:5px 12px;color:var(--text-mute)}
 .al-landing .chip{font-size:.78rem;color:var(--text-dim);border:1px solid var(--line);border-radius:999px;
-  padding:6px 14px;background:rgba(0,0,0,.02);cursor:pointer;transition:all .25s}
+  padding:6px 14px;background:rgba(255,255,255,.05);cursor:pointer;transition:all .25s}
 .al-landing .chip:hover{border-color:rgba(0,113,227,.45);color:var(--gold);background:var(--gold-soft)}
 .al-landing .hero-cta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:40px}
 .al-landing .hero-ask{display:flex;align-items:center;gap:8px;max-width:480px;margin:0 0 22px;
@@ -123,9 +125,9 @@
   font-family:inherit;min-width:0}
 .al-landing .hero-ask input::placeholder{color:var(--text-mute)}
 .al-landing .hero-ask button{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:.82rem;font-weight:600;
-  color:#ffffff;background:var(--gold);border:none;border-radius:8px;padding:9px 15px;cursor:pointer;
-  transition:background .2s}
-.al-landing .hero-ask button:hover{background:var(--gold-bright)}
+  color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));border:none;border-radius:999px;padding:9px 18px;cursor:pointer;
+  transition:all .25s;box-shadow:0 4px 16px rgba(0,113,227,.35)}
+.al-landing .hero-ask button:hover{background:linear-gradient(105deg,var(--gold-bright),#5bbdff);box-shadow:0 6px 22px rgba(0,113,227,.5);transform:translateY(-1px)}
 @media(max-width:920px){.al-landing .hero-ask{margin-left:auto;margin-right:auto}}
 .al-landing .proof{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--text-mute);font-size:.86rem}
 .al-landing .avatars{display:flex}
@@ -136,7 +138,7 @@
 .al-landing .proof b{color:var(--text-dim);font-weight:600}
 /* 辩论卡与左侧文案列同档宽度，justify-self:end 靠右对齐，形成稳定的右栏 */
 .al-landing .debate-card{background:var(--bg-card);border:1px solid var(--line);border-radius:20px;
-  padding:26px 24px;box-shadow:0 12px 40px rgba(0,0,0,.08);position:relative;width:100%;max-width:none;transform:translateY(8px)}
+  padding:26px 24px;box-shadow:0 12px 40px rgba(0,0,0,.35);position:relative;width:100%;max-width:none;transform:translateY(8px)}
 /* // P0-2：叠加卡片最终偏移，保留既有 .reveal 滚动渐显 */
 .al-landing .debate-card.reveal{transform:translateY(36px)}
 .al-landing .debate-card.reveal.in{transform:translateY(8px)}
@@ -176,21 +178,28 @@
 .al-landing .chips, .al-landing .hero-cta, .al-landing .proof{justify-content:center}
 .al-landing .debate-card{max-width:460px;margin:0 auto}}
 .al-landing .pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.al-landing .pain-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:34px 30px;
-  box-shadow:0 4px 24px rgba(0,0,0,.06);
-  transition:transform .35s,border-color .35s,box-shadow .35s;
+.al-landing .pain-card{background:var(--bg-card);border:1px solid var(--line);border-radius:18px;padding:36px 32px;
+  box-shadow:0 2px 12px rgba(0,0,0,.2),0 8px 32px rgba(0,0,0,.25);
+  transition:transform .4s cubic-bezier(.16,1,.3,1),border-color .35s,box-shadow .4s;
   /* P1-4: flex 列布局让 .cost 用 margin-top:auto 推至卡底，三张卡片高度对齐 */
-  display:flex;flex-direction:column}
-.al-landing .pain-card:hover{transform:translateY(-5px);border-color:var(--line-strong);box-shadow:0 12px 36px rgba(0,0,0,.1)}
-.al-landing .pain-card .n{font-family:var(--mono);font-size:.72rem;letter-spacing:.15em;color:var(--text-mute);margin-bottom:16px}
+  display:flex;flex-direction:column;
+  /* 顶部 accent 条：增加视觉锚点和品牌色呼应 */
+  position:relative;overflow:hidden}
+.al-landing .pain-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-bright));opacity:.6;transition:opacity .35s}
+.al-landing .pain-card:hover{transform:translateY(-6px);border-color:rgba(10,132,255,.2);box-shadow:0 12px 40px rgba(10,132,255,.12),0 4px 16px rgba(0,0,0,.25)}
+.al-landing .pain-card:hover::before{opacity:1}
+.al-landing .pain-card .n{font-family:var(--mono);font-size:.78rem;letter-spacing:.18em;color:var(--gold);margin-bottom:18px;opacity:.85}
 .al-landing .pain-card h3{font-size:1.16rem;font-weight:700;margin-bottom:12px;letter-spacing:-.01em}
 .al-landing .pain-card p{color:var(--text-dim);font-size:.94rem}
 .al-landing .pain-card .cost{margin-top:auto;font-family:var(--mono);font-size:.8rem;color:var(--gold);
   /* P1-4: margin-top:auto 把 cost 推到卡底，让三张卡等高；用 padding-top:18px 替代原先的 margin-top:18px，避免 flex 布局下与 auto 冲突 */
   padding-top:18px}
-.al-landing .gap{padding:120px 0;text-align:center}
-.al-landing .gap p{font-size:clamp(1.5rem,3.4vw,2.5rem);font-weight:700;letter-spacing:-.02em;line-height:1.32;
-  max-width:900px;margin:0 auto;color:var(--text)}
+.al-landing .gap{padding:160px 0;text-align:center;position:relative;overflow:hidden}
+.al-landing .gap::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:700px;height:700px;pointer-events:none;background:radial-gradient(circle,rgba(0,113,227,.06) 0%,transparent 60%)}
+.al-landing .gap p{font-size:clamp(1.6rem,3.6vw,2.6rem);font-weight:800;letter-spacing:-.03em;line-height:1.28;
+  max-width:900px;margin:0 auto;color:var(--text);position:relative;z-index:1}
 .al-landing .gap .muted{color:var(--text-mute)}
 .al-landing .stage{display:grid;grid-template-columns:1fr;gap:20px}
 .al-landing .stage-row{display:grid;grid-template-columns:200px 1fr;gap:40px;align-items:start;
@@ -217,9 +226,9 @@
 .al-landing .flow-step p{color:var(--text-dim);font-size:.9rem}
 .al-landing .use-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
 .al-landing .use-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:30px 28px;
-  box-shadow:0 4px 24px rgba(0,0,0,.06);
+  box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s;position:relative;overflow:hidden}
-.al-landing .use-card:hover{transform:translateY(-5px);border-color:rgba(0,113,227,.3);box-shadow:0 12px 36px rgba(0,113,227,.12)}
+.al-landing .use-card:hover{transform:translateY(-5px);border-color:rgba(10,132,255,.3);box-shadow:0 12px 36px rgba(10,132,255,.15)}
 .al-landing .use-card .ico{width:38px;height:38px;margin-bottom:18px;display:block;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,113,227,.2))}
 /* P1-5：use-card 图标 emoji 兜底 —— 仅当 img 加载失败（onerror 把 img display:none 后）才显示，
    用 :nth-of-type 选择 6 张卡片依次给 🎮💰🚀💡📊⚔，不影响 img 正常加载时排版 */
@@ -238,9 +247,9 @@
 .al-landing .use-card p{color:var(--text-dim);font-size:.92rem}
 .al-landing .cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
 .al-landing .cap-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:34px 30px;
-  box-shadow:0 4px 24px rgba(0,0,0,.06);
+  box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s}
-.al-landing .cap-card:hover{transform:translateY(-5px);border-color:var(--line-strong);box-shadow:0 12px 36px rgba(0,0,0,.1)}
+.al-landing .cap-card:hover{transform:translateY(-5px);border-color:var(--line-strong);box-shadow:0 12px 36px rgba(0,0,0,.35)}
 .al-landing .cap-card .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
   background:var(--gold-soft);border:1px solid rgba(0,113,227,.18);color:var(--gold);margin-bottom:20px}
 .al-landing .cap-card .ico img{width:22px;height:22px;object-fit:contain}
@@ -248,7 +257,7 @@
 .al-landing .cap-card p{color:var(--text-dim);font-size:.93rem}
 .al-landing .cap-card .meta{margin-top:16px;font-family:var(--mono);font-size:.74rem;color:var(--text-mute);letter-spacing:.04em}
 .al-landing .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--bg-card);
-  box-shadow:0 4px 24px rgba(0,0,0,.06)}
+  box-shadow:0 4px 24px rgba(0,0,0,.25)}
 .al-landing table.cmp{width:100%;border-collapse:collapse;font-size:.92rem;min-width:720px}
 .al-landing table.cmp thead th{text-align:left;padding:22px 20px;font-weight:600;color:var(--text-dim);font-size:.86rem;
   border-bottom:1px solid var(--line-strong)}
@@ -256,24 +265,24 @@
 .al-landing table.cmp tbody td{padding:16px 20px;border-bottom:1px solid var(--line);color:var(--text-dim);vertical-align:middle}
 .al-landing table.cmp tbody tr:last-child td{border-bottom:none}
 .al-landing table.cmp td.dim-key{color:var(--text);font-weight:500}
-.al-landing table.cmp td.us{color:var(--text);font-weight:500;background:rgba(0,113,227,.04)}
-.al-landing table.cmp thead th.us{background:rgba(0,113,227,.05)}
+.al-landing table.cmp td.us{color:var(--text);font-weight:500;background:rgba(10,132,255,.08)}
+.al-landing table.cmp thead th.us{background:rgba(10,132,255,.1)}
 .al-landing .ck{color:var(--mint);font-weight:600}
 .al-landing .cx{color:var(--text-mute)}
 .al-landing .cg{color:var(--gold);font-weight:600}
 .al-landing .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
 .al-landing .stat{padding:38px 24px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;text-align:center;
-  box-shadow:0 4px 24px rgba(0,0,0,.06);
+  box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s}
-.al-landing .stat:hover{transform:translateY(-4px);border-color:rgba(0,113,227,.3);box-shadow:0 12px 36px rgba(0,0,0,.1)}
+.al-landing .stat:hover{transform:translateY(-4px);border-color:rgba(10,132,255,.3);box-shadow:0 12px 36px rgba(0,0,0,.35)}
 /* // P1-1：统一数据数字与全局金色文字渐变方向 */
 .al-landing .stat .num{font-size:2.8rem;font-weight:800;letter-spacing:-.03em;line-height:1;
   color:var(--gold);font-weight:900}
 .al-landing .stat .lbl{margin-top:12px;font-size:.84rem;color:var(--text-dim)}
-.al-landing .final{text-align:center;padding:140px 0;position:relative;overflow:hidden}
+.al-landing .final{text-align:center;padding:160px 0;position:relative;overflow:hidden}
 .al-landing .final::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  width:820px;height:820px;max-width:130vw;pointer-events:none;
-  background:radial-gradient(circle,rgba(0,113,227,.08) 0%,transparent 60%)}
+  width:900px;height:900px;max-width:130vw;pointer-events:none;
+  background:radial-gradient(circle,rgba(0,113,227,.1) 0%,rgba(0,113,227,.03) 40%,transparent 65%)}
 .al-landing .final .inner{position:relative;z-index:1;max-width:720px;margin:0 auto}
 .al-landing .final h2{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-bottom:18px}
 .al-landing .final p{color:var(--text-dim);font-size:1.1rem;margin-bottom:38px}
@@ -298,7 +307,7 @@
 .al-landing .stage-key{position:static}}
 @media(max-width:640px){.al-landing .sec{padding:88px 0}
 .al-landing .nav-links{position:fixed;top:68px;left:0;right:0;flex-direction:column;gap:0;
-    background:rgba(251,251,253,.97);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);
+    background:rgba(28,28,30,.97);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);
     padding:8px 28px 20px;display:none}
 .al-landing .nav-links.open{display:flex}
 .al-landing .nav-links li{width:100%;border-bottom:1px solid var(--line)}
@@ -362,11 +371,11 @@
    ------------------------------------------------------------ */
 .al-landing ::selection{background:rgba(0,113,227,.16);color:var(--text)}
 .al-landing :focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
-.al-landing{scrollbar-color:rgba(0,0,0,.22) transparent;scrollbar-width:thin}
+.al-landing{scrollbar-color:rgba(255,255,255,.22) transparent;scrollbar-width:thin}
 .al-landing ::-webkit-scrollbar{width:10px;height:10px}
-.al-landing ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:99px;
+.al-landing ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:99px;
   border:3px solid transparent;background-clip:content-box}
-.al-landing ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.32);background-clip:content-box}
+.al-landing ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.32);background-clip:content-box}
 .al-landing ::-webkit-scrollbar-track{background:transparent}
 /* 数字用表格数位对齐：数据行里等宽数字才不会跳 */
 .al-landing .debate-meter b,.al-landing .stat-num,.al-landing .num{font-variant-numeric:tabular-nums}
@@ -383,15 +392,15 @@
 .al-landing .hero{
   /* 与 HeroScene 里的 Fog 颜色 0x0a1024 对齐，边缘才不露缝 */
   background:
-    radial-gradient(ellipse 90% 70% at 72% 42%,#122244 0%,transparent 60%),
-    linear-gradient(180deg,#0b1226 0%,#0a1024 62%,#0d1526 100%);
+    radial-gradient(ellipse 90% 70% at 72% 42%,#0a1628 0%,transparent 60%),
+    linear-gradient(180deg,#000000 0%,#05080f 62%,#0a1020 100%);
   color:#e9eefb}
 
 /* 网格改成暗底上的浅线，并整体压淡——它是空间基底，不是内容 */
 .al-landing .hero::before{
-  background-image:linear-gradient(rgba(140,180,255,.10) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(140,180,255,.10) 1px,transparent 1px);
-  opacity:.55}
+  background-image:linear-gradient(rgba(140,180,255,.07) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(140,180,255,.07) 1px,transparent 1px);
+  opacity:.4}
 /* 中心光晕加强：深底上它才真正成为"光源" */
 .al-landing .hero::after{
   background:radial-gradient(circle,rgba(41,151,255,.16) 0%,transparent 62%)}
@@ -404,22 +413,22 @@
    压狠了 3D 会被吃掉一半，那就又回到"效果太弱" */
 .al-landing .hero-bg3d::after{
   background:linear-gradient(100deg,
-    #0a1024 0%,
-    color-mix(in srgb,#0a1024 82%,transparent) 24%,
-    color-mix(in srgb,#0a1024 34%,transparent) 42%,
+    #000000 0%,
+    color-mix(in srgb,#000000 82%,transparent) 24%,
+    color-mix(in srgb,#000000 34%,transparent) 42%,
     transparent 58%)}
 
 /* ---- hero 内的文字与控件翻成浅色 ---- */
 .al-landing .hero h1{color:#fff;text-shadow:0 2px 30px rgba(4,10,26,.5)}
 .al-landing .h1-accent{color:#4aa9ff;font-weight:900}
-.al-landing .hero-sub{color:#aebbd6}
+.al-landing .hero-sub{color:#c8d6ed}
 .al-landing .hero-sub b{color:#fff}
 
-.al-landing .hero .chip{color:#b9c6e0;border-color:rgba(150,185,255,.22);
-  background:rgba(255,255,255,.04);backdrop-filter:blur(6px)}
-.al-landing .hero .chip:hover{color:#fff;border-color:rgba(150,185,255,.5);
-  background:rgba(255,255,255,.09)}
-.al-landing .hero .chips-examples .chip{color:#8fa0c2}
+.al-landing .hero .chip{color:#c8d6ed;border-color:rgba(150,185,255,.28);
+  background:rgba(255,255,255,.06);backdrop-filter:blur(6px)}
+.al-landing .hero .chip:hover{color:#fff;border-color:rgba(150,185,255,.55);
+  background:rgba(255,255,255,.12);box-shadow:0 4px 16px rgba(74,169,255,.12)}
+.al-landing .hero .chips-examples .chip{color:#9fb3d4}
 
 .al-landing .hero-ask{background:rgba(255,255,255,.06);border-color:rgba(150,185,255,.26);
   backdrop-filter:blur(10px);box-shadow:0 8px 32px -12px rgba(0,0,0,.6)}
@@ -439,10 +448,23 @@
 
 
 
-/* 产出卡片保持浅色：深舞台上的一张亮卡，读作"评审团正在产出的东西"，
-   对比越强它越像主角，正好是我们要的层级。 */
+/* 产出卡片：半透明毛玻璃，融入深色舞台，不再像"从另一页贴过来的"。
+   backdrop-filter 需要浏览器支持，降级 gracefully 到半透明背景。 */
 .al-landing .hero .debate-card{
-  box-shadow:0 24px 70px -20px rgba(0,0,0,.65),0 0 0 1px rgba(150,185,255,.14)}
+  background:rgba(255,255,255,.07);
+  border-color:rgba(150,185,255,.18);
+  backdrop-filter:blur(20px) saturate(140%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:0 24px 70px -20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
+
+/* debate-card 内部元素适配深色背景——简化设计，减少视觉噪音 */
+.al-landing .hero .debate-card .debate-round{color:rgba(180,200,230,.55);border-color:rgba(150,185,255,.14);background:rgba(255,255,255,.04)}
+.al-landing .hero .debate-card .debate-msg .bubble{background:rgba(255,255,255,.06);border:none;color:#c8d6ed;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.al-landing .hero .debate-card .debate-msg .who{color:rgba(180,200,230,.6);font-size:.66rem}
+.al-landing .hero .debate-card .debate-flip{color:#5ecfff;border-color:rgba(150,185,255,.12);font-size:.7rem}
+.al-landing .hero .debate-card .meter-cell b{color:#fff;font-size:1.1rem}
+.al-landing .hero .debate-card .meter-cell span{color:rgba(180,200,230,.55);font-size:.68rem}
+.al-landing .hero .debate-card .debate-foot{color:rgba(180,200,230,.45);border-color:rgba(150,185,255,.08);font-size:.65rem}
 
 /* 焦点环在深底上要用亮蓝，沿用浅色主色会看不见 */
 .al-landing .hero :focus-visible{outline-color:#4aa9ff}
@@ -464,7 +486,7 @@
 
 /* 信任条：从 hero 内部移出来的独立区块（hero 文本元素原本有 8 个，上限 4）。
    放在首屏正下方，滚动一点就能看到，但不再和主张挤在同一列。 */
-.al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line)}
+.al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0a1020 0%,var(--bg) 100%)}
 .al-landing .sec-trust .wrap{display:flex;align-items:center;justify-content:space-between;
   gap:20px 34px;flex-wrap:wrap}
 .al-landing .sec-trust .proof,.al-landing .sec-trust .hero-models{margin-top:0}

@@ -162,7 +162,7 @@ export default function TaskTypesPage() {
                     <span className="text-xs text-text-muted">评分维度：</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {scoreDimensions.map((d) => (
-                        <span key={d} className="px-1.5 py-0.5 rounded text-[10px] bg-warm-orange/10 text-warm-orange">
+                        <span key={d} className="px-1.5 py-0.5 rounded text-[10px] bg-text-muted/10 text-text-secondary">
                           {d}
                         </span>
                       ))}
@@ -180,7 +180,7 @@ export default function TaskTypesPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModal} />
+          <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" onClick={closeModal} />
           <div className="relative w-full max-w-lg rounded-2xl border border-border bg-bg-primary shadow-2xl animate-fade-in overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <h2 className="text-lg font-semibold text-text-primary">任务类型详情</h2>
@@ -225,7 +225,7 @@ export default function TaskTypesPage() {
                     <span className="text-xs text-text-muted">评分维度 (score_dimensions)</span>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {selectedDetail.score_dimensions.map((d) => (
-                        <span key={d} className="px-2 py-1 rounded-md text-xs bg-warm-orange/10 text-warm-orange border border-warm-orange/20">
+                        <span key={d} className="px-2 py-1 rounded-md text-xs bg-text-muted/10 text-text-secondary border border-black/5">
                           {d}
                         </span>
                       ))}

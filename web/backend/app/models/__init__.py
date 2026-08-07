@@ -133,6 +133,74 @@ class ReviewChatMessage(Base):
     review = relationship("Review", back_populates="chat_messages")
 
 
+class Conversation(Base):
+    """评审**之前**那段对话本身。
+
+    此前系统里只存"评审结果"和"报告出来后的追问"（ReviewChatMessage），
+    唯独用户说清自己想评审什么的那段来回澄清没有落点——它活在前端
+    AskPage 的 useState/useRef 里，刷新即永久丢失。而那恰恰是用户投入了
+    最多描述、最不愿意重打一遍的部分。
+
+    与 ReviewChatMessage 的分工（两张表不能合并）：
+      · Conversation      —— 评审被创建**之前**，可以一条 review 都还没有
+      · ReviewChatMessage —— 评审完成**之后**，必须挂在某条 review 上
+
+    review_id 可空且是弱引用（不设外键）：一段对话可能最终没有产出评审，
+    产出了也只是它的结果之一。设成真外键会让"删评审"连带删掉用户的
+    原始描述，那是数据丢失而不是级联。
+    """
+
+    __tablename__ = "conversations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    # 归属口径与 Review 完全一致（匿名为 "anonymous"），否则两套历史列表
+    # 会对同一个访客给出不同的可见范围
+    user_id = Column(String, index=True, nullable=True, default="anonymous")
+    title = Column(String, nullable=True)
+    # 弱引用，见类文档。不加 ForeignKey 是刻意的。
+    review_id = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    # 列表按它倒序——按 created_at 排会让老对话里的新消息沉底
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    messages = relationship(
+        "ConversationMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ConversationMessage.seq",
+    )
+
+
+class ConversationMessage(Base):
+    """对话里的一条消息。
+
+    seq 而不是靠 created_at 排序：同一次交互里用户消息和助手消息可能落在
+    同一毫秒，靠时间排会随机颠倒顺序，把对话读成前言不搭后语。
+    """
+
+    __tablename__ = "conversation_messages"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(
+        String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    seq = Column(Integer, nullable=False)
+    role = Column(String, nullable=False)  # 'user' | 'assistant' | 'system'
+    content = Column(Text, nullable=False)
+    # 卡片类消息（评审卡、确认卡、附件列表）的结构化载荷。前端重放时
+    # 要还原的是"当时那条气泡长什么样"，只存纯文本还原不出来。
+    meta_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    conversation = relationship("Conversation", back_populates="messages")
+
+
 class EvaluationResult(Base):
     __tablename__ = "evaluation_results"
 

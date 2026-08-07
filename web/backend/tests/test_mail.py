@@ -347,6 +347,7 @@ def _build_settings(monkeypatch, **env):
 PROD_BASE = {
     "AL_ENV": "production",
     "AL_JWT_SECRET": "0" * 64,
+    "AL_ENCRYPTION_KEY": "1" * 64,
     "AL_AUTH_ENABLED": "true",
     "AL_PUBLIC_WEB_URL": "https://example.com",
     "AL_CORS_ORIGINS": "https://example.com",

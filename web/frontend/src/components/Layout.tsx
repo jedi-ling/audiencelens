@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Menu, X, User, LogOut, Settings, ChevronDown } from 'lucide-react'
@@ -36,7 +36,16 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   // 账户下拉菜单——之前点邮箱按钮就直接退出登录，误触一下就被登出了
   const [accountOpen, setAccountOpen] = useState(false)
-  const { config, identity, usage, bootstrap, logout, sessionExpired, dismissSessionExpired } = useSessionStore()
+  // 按字段拆分订阅：原 useSessionStore() 整体订阅会让 store 任意状态变更
+  // （如 usage 刷新、loading 切换）都触发整页重渲染。函数引用在 store 生命周期
+  // 内稳定，单独订阅不会触发重渲染；identity/usage/sessionExpired 各自独立订阅，
+  // 任一变化只重渲染真正依赖它的子树。
+  const identity = useSessionStore((s) => s.identity)
+  const usage = useSessionStore((s) => s.usage)
+  const sessionExpired = useSessionStore((s) => s.sessionExpired)
+  const bootstrap = useSessionStore((s) => s.bootstrap)
+  const logout = useSessionStore((s) => s.logout)
+  const dismissSessionExpired = useSessionStore((s) => s.dismissSessionExpired)
   // 重发验证邮件的四态。做成状态而不是 toast，是因为"已发送"这个信息要一直留在
   // 提示条上——用户去邮箱翻找、回来发现按钮恢复原样，会以为根本没发出去，于是
   // 反复点，把发信配额打满。
@@ -91,9 +100,19 @@ export default function Layout() {
     setAccountOpen(false)
   }, [location.pathname])
 
+  // Esc 键关闭移动端菜单
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip">
-      <header className="sticky top-0 z-50 bg-bg-primary/70 backdrop-blur-xl backdrop-saturate-150 border-b border-black/5 shrink-0">
+      <header className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-xl backdrop-saturate-180 border-b border-black/[0.06] shrink-0">
         <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2.5 group shrink-0">
             <svg
@@ -166,7 +185,7 @@ export default function Layout() {
                   <>
                     {/* 点击空白处收起 */}
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
-                    <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-black/5 bg-white p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-black/[0.06] bg-bg-card p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
                       <p className="truncate px-3 py-2 text-xs text-text-muted">{identity?.email}</p>
                       <Link
                         to="/settings"
@@ -199,6 +218,9 @@ export default function Layout() {
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="菜单"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
             className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-card transition-colors"
           >
             {menuOpen ? (
@@ -214,9 +236,16 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+            aria-hidden="true"
             onClick={() => setMenuOpen(false)}
           />
-          <nav className="absolute left-0 top-0 bottom-0 w-64 bg-white border-r border-black/5 shadow-2xl animate-fade-in flex flex-col pt-20 px-4">
+          <nav
+            id="mobile-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="导航菜单"
+            className="absolute left-0 top-0 bottom-0 w-64 bg-bg-card border-r border-black/[0.06] shadow-2xl animate-fade-in flex flex-col pt-20 px-4"
+          >
             {navItems.map((item) => {
               const isActive = item.path === '/'
                 ? location.pathname === '/'
@@ -327,7 +356,7 @@ export default function Layout() {
       </main>
 
       {!isAskPage && (
-      <footer className="relative border-t border-black/5 py-8 shrink-0 bg-bg-secondary">
+      <footer className="relative border-t border-black/[0.06] py-10 shrink-0">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
             <span className="font-display font-semibold text-sm tracking-tight">

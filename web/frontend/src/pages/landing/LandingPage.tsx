@@ -101,6 +101,18 @@ export default function LandingPage() {
     })
     cleanups.push(() => chipHandlers.forEach(([c, h]) => c.removeEventListener('click', h)))
 
+    // 图片加载失败时隐藏图标。原先走内联 onerror，但内联事件处理器会被严格 CSP
+    // 的 script-src 拦截，改由这里挂 error 监听（HIGH-3）。
+    const imgHandlers: Array<[HTMLImageElement, () => void]> = []
+    root.querySelectorAll<HTMLImageElement>('img.ico').forEach((img) => {
+      const h = () => {
+        img.style.display = 'none'
+      }
+      img.addEventListener('error', h)
+      imgHandlers.push([img, h])
+    })
+    cleanups.push(() => imgHandlers.forEach(([img, h]) => img.removeEventListener('error', h)))
+
     // 首页直接对话：单行输入条提交后带着内容跳去 /ask（SPA 内跳转，不刷新）
     const heroAsk = root.querySelector<HTMLFormElement>('#heroAsk')
     const heroAskInput = root.querySelector<HTMLInputElement>('#heroAskInput')

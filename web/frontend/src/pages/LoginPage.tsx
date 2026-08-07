@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogIn } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
@@ -95,7 +95,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy || !email.trim() || !password}
-          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
+          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           {busy ? '登录中…' : '登录'}
         </button>
