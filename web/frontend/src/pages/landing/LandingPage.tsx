@@ -6,6 +6,16 @@ import './landing-in-app.css' // hero 顶距等适配，与共享 Layout 拼接�
 
 // lazy：three.js 约 150KB gzip，绝不能进主包——app 内部页面一行都用不到它
 const HeroScene = lazy(() => import('./HeroScene'))
+
+/** 挂载点 → 已创建的 root。同一个节点重复 createRoot 会让两套场景同时活着
+ *  （StrictMode 下 effect 跑两次，而 unmount 是异步的，第二次 createRoot 抢在前面）。
+ *  实测控制台会报 "container that has already been passed to createRoot"，
+ *  代价不是一条警告，是**两份 26000 粒子的场景同时在渲染**。 */
+const stageRoots = new WeakMap<HTMLElement, ReturnType<typeof createRoot>>()
+/** 挂载世代。StrictMode 下 effect 跑两次，而清理被推到微任务里执行——
+ *  第一次的清理会晚于第二次挂载，把刚渲染好的场景又清空（实测：canvas 数 0）。
+ *  记一个世代号，只有"仍是最新那次"的清理才真正生效。 */
+const stageGen = new WeakMap<HTMLElement, number>()
 // landing-body.html / landing.css 就是落地页的正文本体——直接改这两个文件即可，
 // 不再有独立的静态设计源（曾经有过，已下线；本 React 版就是唯一权威版本）。
 import landingBody from './landing-body.html?raw'
@@ -203,15 +213,37 @@ export default function LandingPage() {
     // 节点身份从头到尾稳定。
     const stageMount = root.querySelector<HTMLElement>('#heroStageMount')
     if (stageMount) {
-      const stageRoot = createRoot(stageMount)
+      // 复用已有 root 而不是新建：见 stageRoots 的说明。
+      let stageRoot = stageRoots.get(stageMount)
+      if (!stageRoot) {
+        stageRoot = createRoot(stageMount)
+        stageRoots.set(stageMount, stageRoot)
+      }
+      const r = stageRoot
+      const gen = (stageGen.get(stageMount) ?? 0) + 1
+      stageGen.set(stageMount, gen)
       stageRoot.render(
         <Suspense fallback={null}>
           <HeroScene />
         </Suspense>,
       )
-      // 异步 unmount：在父组件的 cleanup 里同步卸载子 root，React 会警告
-      // "正在渲染时同步卸载 root"。推到微任务里既能清干净也不触发警告。
-      cleanups.push(() => queueMicrotask(() => stageRoot.unmount()))
+      // 卸载推到微任务：在父组件 cleanup 里同步卸载子 root 会触发
+      // "正在渲染时同步卸载" 警告。同时把注册表清掉，避免 WeakMap 里
+      // 留一个已卸载的 root 被下次误复用。
+      // 卸载走 render(null) 而不是 unmount()：
+      // root 一旦 unmount，同一个 DOM 节点就再也不能安全地 createRoot——
+      // React 内部记着这个容器，第二次创建会报
+      // "container that has already been passed to createRoot"，
+      // 而且两个 root 会同时活着（两份 26000 粒子的场景一起渲染）。
+      // render(null) 会正常卸载 HeroScene（触发它的 effect cleanup → 释放 three
+      // 的 renderer/geometry/material），同时把 root 留着给下次复用。
+      // root 本身随 DOM 节点被 GC —— stageRoots 是 WeakMap，不会泄漏。
+      cleanups.push(() =>
+        queueMicrotask(() => {
+          // 已经有更新的挂载了 → 这次清理是过期的，不能动
+          if (stageGen.get(stageMount) === gen) r.render(null)
+        }),
+      )
     }
 
     // 从别的路由进来时回到顶部
