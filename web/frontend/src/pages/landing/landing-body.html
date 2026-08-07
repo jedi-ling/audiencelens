@@ -7,14 +7,7 @@
     <div class="hero-inner">
       <div class="hero-copy">
         <h1>让 72 个 AI 评审员，<br>在你上线前<span class="h1-accent nobr">找到风险</span></h1>
-        <p class="hero-sub">游戏、产品页、定价、众筹、创业 BP——在找真人测试之前，先让 72 个 AI 评审员分组独立审阅，然后把分歧最大的争议点拉出来对质一轮，正反论据、谁改了口，都摆在你面前。</p>
-
-        <div class="chips">
-          <button class="chip" type="button">Steam 商店页</button>
-          <button class="chip" type="button">SaaS 定价页</button>
-          <button class="chip" type="button">创业 BP 路演</button>
-          <button class="chip" type="button">新手引导流程</button>
-        </div>
+        <p class="hero-sub">在找真人测试之前，先让 72 个 AI 评审员分组独立审阅，再把分歧最大的争议点拉出来对质一轮。</p>
 
         <form class="hero-ask" id="heroAsk">
           <input type="text" id="heroAskInput" placeholder="说说你想评审什么，比如「帮我看看这个定价页」…" autocomplete="off">
@@ -33,35 +26,6 @@
           <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">GitHub 源码</a>
         </div>
 
-        <div class="proof">
-          <div class="avatars">
-            <span style="background:linear-gradient(135deg,#0071e3,#2997ff)">P1</span>
-            <span style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P2</span>
-            <!-- P3 用主色的低明度变体，归入蓝色系又和 P1 拉开明度 -->
-            <span style="background:linear-gradient(135deg,#0055b3,#0071e3)">P3</span>
-            <!-- 溢出数 = 人格总数 − 上面画出来的头像数。这里是隐式计数：写着 +63 时
-                 谁都不会联想到"人格数过期了"，72 人格上线后它就一直错着。
-                 tests/test_public_claims.py::test_landing_avatar_overflow_matches_persona_count
-                 现在会数上面的 <span> 再加这个数字去比对仓库真值，改一边漏一边就会红。 -->
-            <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+69</span>
-          </div>
-          <span class="sep"></span>
-          <!-- 这里原本也写了一个测试数，和同页 STATS 区那格对不上——它其实只是引擎单套件的
-               收集数被当成了全仓总数。测试数会随开发漂移，本页只允许 STATS 区写一处并带统计
-               日期（见 test_public_claims.py::test_test_counts_are_stated_once_and_dated），
-               所以 hero 改成同样可自动核对的 Pack 数。 -->
-          <span><b>72 个人格</b> · <b>14 种场景</b> · <b>11 个人格 Pack</b></span>
-        </div>
-
-        <div class="hero-models">
-          <span class="lbl">兼容模型</span>
-          <span class="m">Anthropic</span>
-          <span class="m">DeepSeek</span>
-          <span class="m">Kimi</span>
-          <span class="m">通义千问</span>
-          <span class="m">智谱 GLM</span>
-          <span class="m">Ollama</span>
-        </div>
       </div>
 
       <!-- 独有视觉：报告里"争议点 + 反驳"区块的示意图。
@@ -99,14 +63,54 @@
             "桌面端仍占付费转化大头，移动端可以排在首版之后。"
           </div>
         </div>
+        <!-- 原来是两条带灰色填充轨道的进度条。技能把"带背景轨道的评分条"列为
+             落地页上的 dashboard 杂讯：轨道不承载信息，只占面积。改成数字本身。
+             数值仍只用引擎真实产出的字段（见本卡顶部注释的两条铁律）。 -->
         <div class="debate-meter">
-          <div class="meter-row"><span>覆盖率</span><div class="bar"><i style="width:92%"></i></div><b>92%</b></div>
-          <div class="meter-row"><span>推断率</span><div class="bar mint"><i style="width:34%"></i></div><b>34%</b></div>
+          <div class="meter-cell"><b>92%</b><span>必答项覆盖率</span></div>
+          <div class="meter-cell"><b>34%</b><span>结论靠推断得出</span></div>
         </div>
         <div class="debate-foot">Top-3 争议点 · 证据三级标注 · 一轮交叉质询</div>
       </div>
       </div><!-- /hero-col2 -->
     </div>
+  </div>
+</section>
+
+
+<!-- 信任条：技能规则「Used by / Trusted by 属于 hero 下方的独立区块，不能塞进 hero 同一列」。
+     它原本挤在 hero 里，把首屏文本元素堆到 8 个（上限 4），也是首屏显得拥挤的主因。 -->
+<section class="sec-trust">
+  <div class="wrap">
+          <div class="proof">
+            <div class="avatars">
+              <span style="background:linear-gradient(135deg,#0071e3,#2997ff)">P1</span>
+              <span style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P2</span>
+              <!-- P3 用主色的低明度变体，归入蓝色系又和 P1 拉开明度 -->
+              <span style="background:linear-gradient(135deg,#0055b3,#0071e3)">P3</span>
+              <!-- 溢出数 = 人格总数 − 上面画出来的头像数。这里是隐式计数：写着 +63 时
+                   谁都不会联想到"人格数过期了"，72 人格上线后它就一直错着。
+                   tests/test_public_claims.py::test_landing_avatar_overflow_matches_persona_count
+                   现在会数上面的 <span> 再加这个数字去比对仓库真值，改一边漏一边就会红。 -->
+              <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+69</span>
+            </div>
+            <span class="sep"></span>
+            <!-- 这里原本也写了一个测试数，和同页 STATS 区那格对不上——它其实只是引擎单套件的
+                 收集数被当成了全仓总数。测试数会随开发漂移，本页只允许 STATS 区写一处并带统计
+                 日期（见 test_public_claims.py::test_test_counts_are_stated_once_and_dated），
+                 所以 hero 改成同样可自动核对的 Pack 数。 -->
+            <span><b>72 个人格</b> · <b>14 种场景</b> · <b>11 个人格 Pack</b></span>
+          </div>
+  
+          <div class="hero-models">
+            <span class="lbl">兼容模型</span>
+            <span class="m">Anthropic</span>
+            <span class="m">DeepSeek</span>
+            <span class="m">Kimi</span>
+            <span class="m">通义千问</span>
+            <span class="m">智谱 GLM</span>
+            <span class="m">Ollama</span>
+          </div>
   </div>
 </section>
 
@@ -121,8 +125,8 @@
       <div class="pain-card reveal">
         <div class="n">01 / 真人焦点小组</div>
         <h3>又慢又贵</h3>
-        <p>招募一场真人焦点小组，$5,000 起步，还要等 2–4 周排期。等你拿到结论，窗口期可能已经过了。</p>
-        <div class="cost">$5,000+ · 2–4 周</div>
+        <p>招募一场真人焦点小组，$5,000 起步，还要等 2-4 周排期。等你拿到结论，窗口期可能已经过了。</p>
+        <div class="cost">$5,000+ · 2-4 周</div>
       </div>
       <div class="pain-card reveal">
         <div class="n">02 / 问单个 AI</div>
@@ -133,7 +137,7 @@
       <div class="pain-card reveal">
         <div class="n">03 / 其他合成工具</div>
         <h3>闭源、刻板、不可核对</h3>
-        <p>市面上的合成用户工具大多闭源黑箱，按人口统计标签编人设——你无法验证判断依据，也无法事后和真实结果对上账。</p>
+        <p>市面上的合成用户工具大多闭源黑箱，按人口统计标签编人设。你无法验证判断依据，也无法事后和真实结果对上账。</p>
         <div class="cost">闭源 · 无法核对</div>
       </div>
     </div>
@@ -143,7 +147,7 @@
 <!-- GAP -->
 <section class="gap sec-alt">
   <div class="wrap reveal">
-    <p>它们只给你一个<span class="muted">"综合建议"</span>——<br>不给你<span class="gold">分歧、证据等级和可核对的过程</span>。</p>
+    <p>它们只给你一个<span class="muted">"综合建议"</span>，<br>却不给你<span class="gold">分歧、证据等级和可核对的过程</span>。</p>
   </div>
 </section>
 
@@ -151,9 +155,8 @@
 <section class="sec" id="how">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="eyebrow">工作原理</div>
       <h2 class="sec-title">判断如何被生成、约束、验证</h2>
-      <p class="sec-desc">AudienceLens 把每条判断放进一套可追溯的流程——每一步都能在开源仓库里逐行对照。</p>
+      <p class="sec-desc">AudienceLens 把每条判断放进一套可追溯的流程，每一步都能在开源仓库里逐行对照。</p>
     </div>
     <div class="stage">
 
@@ -190,11 +193,11 @@
         <div class="stage-list">
           <div class="stage-item">
             <div class="ico">⌘</div>
-            <div><h4>证据三级标注 + 推断上限</h4><p>每条结论标注证据等级——direct（直接观察）/ inferred（合理推断）/ gap（信息缺口）。推断占比超过 40% 会被标记为"推断过度"。</p></div>
+            <div><h4>证据三级标注 + 推断上限</h4><p>每条结论标注证据等级：direct（直接观察）/ inferred（合理推断）/ gap（信息缺口）。推断占比超过 40% 会被标记为"推断过度"。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">⊘</div>
-            <div><h4>伦理护栏</h4><p>身份与行为解耦——人格基于行为特征定义，性别/年龄/地域字段在注入提示词前会被剥离；另有身份-行为因果推理检测自动标记倾向。</p></div>
+            <div><h4>伦理护栏</h4><p>身份与行为解耦：人格基于行为特征定义，性别/年龄/地域字段在注入提示词前会被剥离；另有身份-行为因果推理检测自动标记倾向。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">▤</div>
@@ -233,12 +236,11 @@
 <section class="sec sec-alt" id="flow">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="eyebrow">四步启动</div>
       <h2 class="sec-title">从一句话到结构化报告</h2>
       <p class="sec-desc">全流程自动化，实时推送进度，几分钟拿到发布风险清单。</p>    </div>
     <div class="flow">
-      <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么——页面、文案、概念、创业 BP 都行。</p></div>
-      <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面——图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
+      <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么，页面、文案、概念、创业 BP 都行。</p></div>
+      <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面都可以。图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
       <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 分歧聚类 → Top-3 争议点双方各反驳一轮 → 改票由代码判定，全程可追溯。</p></div>
       <div class="flow-step reveal"><div class="fn">04</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
     </div>
@@ -272,27 +274,26 @@
 <section class="sec sec-alt" id="capabilities">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="eyebrow">核心能力</div>
       <h2 class="sec-title">评审团背后的工程</h2>
     </div>
     <div class="cap-grid">
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-multimodal.png" alt="多模态评审" loading="lazy"></div>
         <h3>多模态评审</h3>
-        <p>截图、demo 图、BP 页面直接进视觉模型上下文——评审员能直接看到你的界面。不支持视觉的模型（如 DeepSeek、多数 Ollama 本地模型）会自动按文字评审，流程不中断。</p>
+        <p>截图、demo 图、BP 页面直接进视觉模型上下文，评审员能直接看到你的界面。不支持视觉的模型（如 DeepSeek、多数 Ollama 本地模型）会自动按文字评审，流程不中断。</p>
         <div class="meta">SCREENSHOT · DECK · UI → VISION（视觉模型限定）</div>
       </div>
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-model.png" alt="模型中立" loading="lazy"></div>
         <h3>自带 Key，模型任选</h3>
         <p>支持 Anthropic 原生，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型等任意 OpenAI 兼容服务。Key 加密存在服务端，按你的模型账户计费。未配置 Key 时接口直接返回提示，不会返回模拟数据。</p>
-        <div class="meta">ANTHROPIC · DEEPSEEK · KIMI · QWEN · GLM · OLLAMA</div>
+        <div class="meta">Anthropic、DeepSeek、Kimi、通义千问、智谱 GLM、Ollama</div>
       </div>
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-saas.png" alt="开箱即用 SaaS" loading="lazy"></div>
         <h3>开箱即用</h3>
         <p>无需注册即可体验：CDK 兑换码免登录换取评审次数，自动创建游客身份。渐进式认证、配额套餐、多租户管理后台全部就绪。</p>
-        <div class="meta">CDK · GUEST · MULTI-TENANT</div>
+        <div class="meta">兑换码、访客试用、多租户隔离</div>
       </div>
     </div>
   </div>
@@ -302,9 +303,8 @@
 <section class="sec" id="compare">
   <div class="wrap">
     <div class="sec-head reveal">
-      <div class="eyebrow">竞品对比</div>
       <h2 class="sec-title">不是所有合成研究都一样</h2>
-      <p class="sec-desc">分歧处理、证据可核验、多模态、开源——差异都在这张表里。AudienceLens 那一列的每一格都能在仓库里找到对应代码。</p>
+      <p class="sec-desc">分歧处理、证据可核验、多模态、开源，差异都在这张表里。AudienceLens 那一列的每一格都能在仓库里找到对应代码。</p>
     </div>
     <div class="tbl-wrap reveal">
       <table class="cmp">
@@ -337,7 +337,7 @@
     <div class="sec-head reveal">
       <div class="eyebrow">数字说话</div>
       <h2 class="sec-title">每一项都能在开源仓库里核对</h2>
-      <p class="sec-desc">人格数、任务类型、自动化测试——所有数字对应仓库里的真实代码和测试，不是幻灯片概念。</p>
+      <p class="sec-desc">人格数、任务类型、自动化测试，所有数字都对应仓库里的真实代码和测试，不是幻灯片概念。</p>
     </div>
     <div class="stats">
       <!-- 数字只能写实跑出来的值。测试数会随开发变动，所以这一格必须带统计日期，

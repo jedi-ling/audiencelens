@@ -155,6 +155,11 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 | `AL_QUOTA_MODE` | `plan` | `plan`（套餐日限）/ `credits`（纯 CDK 次数制，用完即止）——见"两种配额模式" |
 | `AL_QUOTA_FREE_REVIEWS_PER_DAY` | `5` | 仅约束走服务端 key 的评审 |
 | `AL_QUOTA_FREE_COST_USD_PER_DAY` | `1.0` | 同上 |
+| `AL_QUOTA_TOKENS_TOTAL` | `0` | 每账号**累计**能烧掉的平台 token，`0` = 不限。上面两条是 24h 滚动窗口，跨天重置，拦不住"每天用满连用一个月"；这一条不重置。只算平台垫付，BYOK 不受影响 |
+| `AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE` | `150000` | 发起评审时按这个数给终身额度占位，跑完用真实用量顶掉。**它决定并发超额的上界**：没有占位时并发请求会各自读到"没超"而全部放行（实测 8 线程 8/8 全过）。设 `0` = 关闭占位，闸门仍生效但退回逐次检查 |
+| `AL_QUOTA_UNVERIFIED_REVIEWS_PER_DAY` | `1` | 未验证邮箱的账号每天能用平台 key 评审几次。软拦：能登录能用，验证邮箱即解锁完整额度。负数 = 关闭本机制 |
+| `AL_SKILL_FREE_USES` | `3` | 高级技能的免费体验次数。用完不报错，静默降级成普通评审并如实告知。`0` = 对免费用户完全关闭；负数 = 不限制。BYOK 用户不受限 |
+| `AL_PREMIUM_SKILLS` | `red_team_audience` | 哪些技能算"高级"（逗号分隔，取值见 `models.SkillType`）。默认只有红队：它是唯一真正多花钱的那层 |
 | `AL_RATELIMIT_ENABLED` | `true` | |
 | `AL_RATELIMIT_PER_MINUTE` | `60` | 通用接口 |
 | `AL_RATELIMIT_REVIEW_PER_HOUR` | `20` | 评审接口 |

@@ -433,12 +433,11 @@
 .al-landing .hero .btn-ghost:hover{color:#fff;border-color:rgba(150,185,255,.55);
   background:rgba(255,255,255,.09)}
 
-.al-landing .hero .proof{color:#9fb0cf}
-.al-landing .hero .proof b{color:#e9eefb}
-.al-landing .hero .proof .sep{background:rgba(150,185,255,.25)}
-.al-landing .hero-models .lbl{color:#7e8fb0}
-.al-landing .hero-models .m{color:#b9c6e0;border-color:rgba(150,185,255,.2);
-  background:rgba(255,255,255,.04)}
+.al-landing .sec-trust .proof{color:var(--text-mute)}
+.al-landing .sec-trust .proof b{color:var(--text)}
+.al-landing .sec-trust .proof .sep{background:var(--line-strong)}
+
+
 
 /* 产出卡片保持浅色：深舞台上的一张亮卡，读作"评审团正在产出的东西"，
    对比越强它越像主角，正好是我们要的层级。 */
@@ -462,3 +461,21 @@
       rgba(74,169,255,.18) 240deg 244deg,transparent 244deg 280deg,
       rgba(255,179,64,.22) 280deg 284deg,transparent 284deg 320deg,
       rgba(74,169,255,.18) 320deg 324deg,transparent 324deg 360deg)}
+
+/* 信任条：从 hero 内部移出来的独立区块（hero 文本元素原本有 8 个，上限 4）。
+   放在首屏正下方，滚动一点就能看到，但不再和主张挤在同一列。 */
+.al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line)}
+.al-landing .sec-trust .wrap{display:flex;align-items:center;justify-content:space-between;
+  gap:20px 34px;flex-wrap:wrap}
+.al-landing .sec-trust .proof,.al-landing .sec-trust .hero-models{margin-top:0}
+
+/* 覆盖率/推断率：去掉填充轨道后的数字排版。等宽数字避免刷新时跳动。 */
+.al-landing .debate-meter{flex-direction:row;gap:28px}
+.al-landing .meter-cell{display:flex;flex-direction:column;gap:1px}
+.al-landing .meter-cell b{font-size:1.16rem;font-weight:650;color:var(--text);
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.al-landing .meter-cell span{font-size:.7rem;color:var(--text-mute)}
+
+@media (max-width:720px){
+  .al-landing .sec-trust .wrap{flex-direction:column;align-items:flex-start}
+}
