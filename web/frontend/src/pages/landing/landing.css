@@ -370,3 +370,95 @@
 .al-landing ::-webkit-scrollbar-track{background:transparent}
 /* 数字用表格数位对齐：数据行里等宽数字才不会跳 */
 .al-landing .debate-meter b,.al-landing .stat-num,.al-landing .num{font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   Hero 深色舞台
+   ------------------------------------------------------------
+   为什么整块翻深色：发光 / 辉光 / 流光靠加色混合（AdditiveBlending），
+   而加色在白底上直接隐形——**浅底做不出光**。前两版"效果太弱"的根因就是它。
+   深色只作用于 hero 这一屏，页面其余部分仍是浅色（深 hero + 浅正文是
+   这类产品站的常见结构，对比本身也是层级）。
+   ============================================================ */
+
+.al-landing .hero{
+  /* 与 HeroScene 里的 Fog 颜色 0x0a1024 对齐，边缘才不露缝 */
+  background:
+    radial-gradient(ellipse 90% 70% at 72% 42%,#122244 0%,transparent 60%),
+    linear-gradient(180deg,#0b1226 0%,#0a1024 62%,#0d1526 100%);
+  color:#e9eefb}
+
+/* 网格改成暗底上的浅线，并整体压淡——它是空间基底，不是内容 */
+.al-landing .hero::before{
+  background-image:linear-gradient(rgba(140,180,255,.10) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(140,180,255,.10) 1px,transparent 1px);
+  opacity:.55}
+/* 中心光晕加强：深底上它才真正成为"光源" */
+.al-landing .hero::after{
+  background:radial-gradient(circle,rgba(41,151,255,.16) 0%,transparent 62%)}
+
+/* 3D 层压在网格之上、内容之下 */
+.al-landing .hero-bg3d{z-index:1}
+.al-landing .hero-inner{z-index:2}
+
+/* 左侧遮罩改用深色，且更克制——深底上文字本就清楚，不必压太狠，
+   压狠了 3D 会被吃掉一半，那就又回到"效果太弱" */
+.al-landing .hero-bg3d::after{
+  background:linear-gradient(100deg,
+    #0a1024 0%,
+    color-mix(in srgb,#0a1024 82%,transparent) 24%,
+    color-mix(in srgb,#0a1024 34%,transparent) 42%,
+    transparent 58%)}
+
+/* ---- hero 内的文字与控件翻成浅色 ---- */
+.al-landing .hero h1{color:#fff;text-shadow:0 2px 30px rgba(4,10,26,.5)}
+.al-landing .h1-accent{color:#4aa9ff;font-weight:900}
+.al-landing .hero-sub{color:#aebbd6}
+.al-landing .hero-sub b{color:#fff}
+
+.al-landing .hero .chip{color:#b9c6e0;border-color:rgba(150,185,255,.22);
+  background:rgba(255,255,255,.04);backdrop-filter:blur(6px)}
+.al-landing .hero .chip:hover{color:#fff;border-color:rgba(150,185,255,.5);
+  background:rgba(255,255,255,.09)}
+.al-landing .hero .chips-examples .chip{color:#8fa0c2}
+
+.al-landing .hero-ask{background:rgba(255,255,255,.06);border-color:rgba(150,185,255,.26);
+  backdrop-filter:blur(10px);box-shadow:0 8px 32px -12px rgba(0,0,0,.6)}
+.al-landing .hero-ask:focus-within{border-color:rgba(74,169,255,.65);
+  box-shadow:0 0 0 3px rgba(74,169,255,.16),0 8px 32px -12px rgba(0,0,0,.6)}
+.al-landing .hero-ask input{color:#fff}
+.al-landing .hero-ask input::placeholder{color:#8092b5}
+
+.al-landing .hero .btn-ghost{color:#d7e2f7;border-color:rgba(150,185,255,.3);
+  background:rgba(255,255,255,.04)}
+.al-landing .hero .btn-ghost:hover{color:#fff;border-color:rgba(150,185,255,.55);
+  background:rgba(255,255,255,.09)}
+
+.al-landing .hero .proof{color:#9fb0cf}
+.al-landing .hero .proof b{color:#e9eefb}
+.al-landing .hero .proof .sep{background:rgba(150,185,255,.25)}
+.al-landing .hero-models .lbl{color:#7e8fb0}
+.al-landing .hero-models .m{color:#b9c6e0;border-color:rgba(150,185,255,.2);
+  background:rgba(255,255,255,.04)}
+
+/* 产出卡片保持浅色：深舞台上的一张亮卡，读作"评审团正在产出的东西"，
+   对比越强它越像主角，正好是我们要的层级。 */
+.al-landing .hero .debate-card{
+  box-shadow:0 24px 70px -20px rgba(0,0,0,.65),0 0 0 1px rgba(150,185,255,.14)}
+
+/* 焦点环在深底上要用亮蓝，沿用浅色主色会看不见 */
+.al-landing .hero :focus-visible{outline-color:#4aa9ff}
+
+/* three 失败兜底：深底上改成亮色描边构图 */
+.al-landing .hero-bg3d-fallback{
+  background:
+    radial-gradient(circle at 50% 50%,rgba(74,169,255,.22) 0 3px,transparent 4px),
+    conic-gradient(from 0deg at 50% 50%,
+      rgba(74,169,255,.18) 0deg 4deg,transparent 4deg 40deg,
+      rgba(255,179,64,.22) 40deg 44deg,transparent 44deg 80deg,
+      rgba(74,169,255,.18) 80deg 84deg,transparent 84deg 120deg,
+      rgba(74,169,255,.18) 120deg 124deg,transparent 124deg 160deg,
+      rgba(255,179,64,.22) 160deg 164deg,transparent 164deg 200deg,
+      rgba(74,169,255,.18) 200deg 204deg,transparent 204deg 240deg,
+      rgba(74,169,255,.18) 240deg 244deg,transparent 244deg 280deg,
+      rgba(255,179,64,.22) 280deg 284deg,transparent 284deg 320deg,
+      rgba(74,169,255,.18) 320deg 324deg,transparent 324deg 360deg)}
