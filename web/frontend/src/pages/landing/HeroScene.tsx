@@ -59,8 +59,14 @@ void main() {
   vFade = smoothstep(34.0, 9.0, -mv.z);
 
   gl_Position = projectionMatrix * mv;
-  // 透视衰减：远小近大。300 是配合相机 z≈13 的经验系数
-  gl_PointSize = aSize * uPixelRatio * (300.0 / max(-mv.z, 0.001));
+  // 透视衰减：远小近大。系数配合相机 z≈13。
+  // 这个数是控制"糊成白块"的最强杠杆：屏幕重叠面积正比于直径的平方，
+  // 砍一半直径 = 重叠量降到四分之一，而单颗的亮度完全不受影响。
+  // 相比之下砍粒子数量只是线性的，还会同时丢掉"海量"的观感。
+  // 再加一个上限：没有它，近处粒子被透视放大成大光斑，少数几颗就堆满一片区域，
+  // 逼着你砍总量——"海量"和"不糊"就变成了二选一。封住上限后两者可以同时成立。
+  float ps = aSize * uPixelRatio * (120.0 / max(-mv.z, 0.001));
+  gl_PointSize = min(ps, 2.6 * uPixelRatio);
 }
 `
 
@@ -110,10 +116,10 @@ export default function HeroScene() {
 
       // 粒子量按屏宽缩放：小笔记本没必要背满 3 万颗
       const q = Math.min(1, w() / 1600)
-      const SWARM_PER_NODE = Math.round(70 * (0.55 + q * 0.45))
-      const NEBULA = Math.round(3600 * (0.5 + q * 0.5))
-      const RING_PER = Math.round(700 * (0.5 + q * 0.5))
-      const DUST = Math.round(1800 * (0.5 + q * 0.5))
+      const SWARM_PER_NODE = Math.round(110 * (0.55 + q * 0.45))
+      const NEBULA = Math.round(9000 * (0.5 + q * 0.5))
+      const RING_PER = Math.round(1100 * (0.5 + q * 0.5))
+      const DUST = Math.round(4000 * (0.5 + q * 0.5))
 
       const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
       // 海量粒子下关掉 MSAA：粒子本身就是软边圆点，抗锯齿没有可见收益、只有开销
@@ -161,7 +167,7 @@ export default function HeroScene() {
 
       // ---------- 1) 中心星云盘：被审视的材料 ----------
       for (let i = 0; i < NEBULA; i++) {
-        const r = Math.pow(Math.random(), 1.0) * 2.9 // 幂分布 → 内密外疏。0.55 时核心过密，加色下饱和成一团白
+        const r = Math.pow(Math.random(), 1.25) * 3.4 // 幂分布 → 内密外疏。0.55 时核心过密，加色下饱和成一团白
         const a = Math.random() * Math.PI * 2
         const flat = 0.28 * (1 - r / 3.6) // 盘状：越靠外越薄
         const t = Math.min(1, r / 2.9)
@@ -273,9 +279,9 @@ export default function HeroScene() {
       // 天花板，整块糊成白斑（实测 uOpacity=0.5 时右半屏均值 0.92、过曝像素 91.6%，
       // 而且此时砍一半粒子只把 0.94 挪到 0.92——在天花板上砍量是没用的）。
       // 低 alpha 让"要叠很多层才亮"重新成立，这才是黑底稀疏亮点的成因。
-      const main = makePoints(pos, col, siz, spn, sed, 0.02)
+      const main = makePoints(pos, col, siz, spn, sed, 0.6)
       rig.add(main.points)
-      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.05)
+      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.62)
       scene.add(dustP.points) // 挂 scene：星尘不随主体转
 
       const totalParticles = pos.length / 3 + dPos.length / 3
@@ -347,6 +353,7 @@ export default function HeroScene() {
           let sum = 0
           let hot = 0
           let n = 0
+          const vals: number[] = []
           for (let y = 0; y < H; y++) {
             for (let x = Math.floor(W * x0); x < Math.floor(W * x1); x++) {
               const i = (y * W + x) * 4
@@ -354,12 +361,23 @@ export default function HeroScene() {
               // 不乘的话读出来右半屏均值 0.94（"几乎纯白"），是探针在骗人不是画面在爆。
               const a = buf[i + 3] / 255
               const l = ((0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2]) / 255) * a
+              vals.push(l)
               sum += l
               if (l > 0.5) hot++
               n++
             }
           }
-          return { mean: +(sum / n).toFixed(4), hotPct: +((hot / n) * 100).toFixed(2) }
+          // 只看均值会把两件事混为一谈：调暗亮点和拉稀粒子在均值上长得一样。
+          // 参考图的特征是"底黑 + 点亮"，所以必须同时看：
+          //   mean 低（底子黑）且 p999 接近 1（亮点脆）。
+          vals.sort((a, b) => a - b)
+          const pct = (f: number) => +(vals[Math.min(vals.length - 1, Math.floor(vals.length * f))] ?? 0).toFixed(3)
+          return {
+            mean: +(sum / n).toFixed(4),
+            hotPct: +((hot / n) * 100).toFixed(2),
+            p99: pct(0.99),
+            p999: pct(0.999),
+          }
         }
         return { 文案区_左45: band(0, 0.45), 右侧舞台: band(0.55, 1), 全幅: band(0, 1) }
       }
