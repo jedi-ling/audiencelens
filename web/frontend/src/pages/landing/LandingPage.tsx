@@ -1,7 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
+import { createRoot } from 'react-dom/client'
 import './landing.css'
 import './landing-in-app.css' // hero 顶距等适配，与共享 Layout 拼接用
+
+// lazy：three.js 约 150KB gzip，绝不能进主包——app 内部页面一行都用不到它
+const HeroScene = lazy(() => import('./HeroScene'))
 // landing-body.html / landing.css 就是落地页的正文本体——直接改这两个文件即可，
 // 不再有独立的静态设计源（曾经有过，已下线；本 React 版就是唯一权威版本）。
 import landingBody from './landing-body.html?raw'
@@ -10,14 +14,10 @@ import landingBody from './landing-body.html?raw'
  * 营销落地页 —— 作为 `/` 路由，与 app 共用同一套 Layout（导航/页脚）。
  *
  * 配色与 app 内部**完全一致**：landing.css 的 --gold 和 index.css 的
- * --color-brand-primary 都是古铜金 #B77E3B，--gold-bright / --color-gold-cream
- * 都是 #F9D67D。落地页之所以还留着自己一套 CSS 变量，只是因为它的样式作用域
+ * --color-brand-primary 都是 Apple 系统蓝 #0071e3，--gold-bright 是亮蓝 #2997ff。
+ * 落地页之所以还留着自己一套 CSS 变量，只是因为它的样式作用域
  * 化在 .al-landing 里、不走 Tailwind token，不是因为要走另一套视觉。
- *
- * （这里原本写着"金色主题与 app 内部的 brand-primary 界面刻意区分"——那是 2026-07
- * 全站统一成古铜金之前的旧状态。这条注释后来把一次 UI 审计带偏了：审计据此判定
- * "品牌色系统精神分裂"并列为头号问题，而实测两边是同一个色值。
- * 陈旧注释不是无害的，它会被下游当成事实。）
+ * 2026-08 全站由暗色古铜金统一改为浅色苹果风（见 index.css @theme 头部注释）。
  * 正文走 dangerouslySetInnerHTML + 作用域化到 .al-landing 的 CSS，
  * 交互脚本在下面的 useEffect 里，内部链接已改成 React Router 跳转，实现 SPA 无刷新链路。
  */
@@ -186,87 +186,32 @@ export default function LandingPage() {
     root.querySelectorAll<HTMLElement>('.num[data-target]').forEach((el) => co.observe(el))
     cleanups.push(() => co.disconnect())
 
-    // Hero 金色粒子（限 30fps + 滚出视口暂停）
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches
-    const canvas = root.querySelector<HTMLCanvasElement>('#heroCanvas')
-    const hero = canvas?.closest('.hero') as HTMLElement | null
-    if (canvas && hero && !reduce) {
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        const size = () => {
-          canvas.width = hero.offsetWidth
-          canvas.height = hero.offsetHeight
-        }
-        size()
-        window.addEventListener('resize', size)
-        cleanups.push(() => window.removeEventListener('resize', size))
-
-        type Pt = { x: number; y: number; vx: number; vy: number; r: number; a: number }
-        const parts: Pt[] = []
-        for (let i = 0; i < 46; i++)
-          parts.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 0.22,
-            vy: (Math.random() - 0.5) * 0.22,
-            r: Math.random() * 1.4 + 0.4,
-            a: Math.random() * 0.35 + 0.12,
-          })
-        let running = false
-        let last = 0
-        let raf = 0
-        const FRAME = 1000 / 30
-        const tick = (now: number) => {
-          if (!running) return
-          raf = requestAnimationFrame(tick)
-          if (now - last < FRAME) return
-          last = now
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-          for (let i = 0; i < parts.length; i++) {
-            const a = parts[i]
-            a.x += a.vx
-            a.y += a.vy
-            if (a.x < 0 || a.x > canvas.width) a.vx *= -1
-            if (a.y < 0 || a.y > canvas.height) a.vy *= -1
-            ctx.beginPath()
-            ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2)
-            ctx.fillStyle = 'rgba(183,126,59,' + a.a + ')'
-            ctx.fill()
-            for (let j = i + 1; j < parts.length; j++) {
-              const b = parts[j]
-              const dx = a.x - b.x
-              const dy = a.y - b.y
-              const d = Math.sqrt(dx * dx + dy * dy)
-              if (d < 130) {
-                ctx.beginPath()
-                ctx.moveTo(a.x, a.y)
-                ctx.lineTo(b.x, b.y)
-                ctx.strokeStyle = 'rgba(183,126,59,' + (1 - d / 130) * 0.06 + ')'
-                ctx.lineWidth = 0.5
-                ctx.stroke()
-              }
-            }
-          }
-        }
-        const startAnim = () => {
-          if (!running) {
-            running = true
-            raf = requestAnimationFrame(tick)
-          }
-        }
-        const stopAnim = () => {
-          running = false
-          if (raf) cancelAnimationFrame(raf)
-        }
-        const heroIo = new IntersectionObserver((es) => (es[0].isIntersecting ? startAnim() : stopAnim()), {
-          threshold: 0,
-        })
-        heroIo.observe(hero)
-        cleanups.push(() => {
-          stopAnim()
-          heroIo.disconnect()
-        })
-      }
+    // Hero 3D 舞台的挂载点。正文是 dangerouslySetInnerHTML 注进来的，
+    // 所以这里拿到节点后交给 createPortal，让 React 正常管理这棵子树的生命周期。
+    //
+    // 这里原本是 46 个浮动小圆点 + 连线——全互联网最泛滥的 SaaS 背景效果，
+    // 它不传达任何关于"多角色评审"的信息，谁家都能用。换成能说清产品是什么的东西。
+    // Hero 3D 舞台：在这里**命令式**挂一个独立 React root，不走 state + portal。
+    //
+    // 为什么不能用 state+portal（第一版就是那么写的，症状极其隐蔽）：
+    // 正文是 dangerouslySetInnerHTML 注进来的。setStageEl 会触发父组件重渲染，
+    // React 重新应用 innerHTML → **原来的挂载节点被销毁重建**，而 portal 仍然
+    // 往那个已脱离文档的旧节点里渲染。组件正常渲染、effect 正常执行、控制台零报错，
+    // 页面上什么都没有。实测 host 的 document.contains(host) === false 才定位到。
+    //
+    // 命令式挂载没有这个耦合：不产生 state 更新 → 不重渲染 → innerHTML 不会被重设，
+    // 节点身份从头到尾稳定。
+    const stageMount = root.querySelector<HTMLElement>('#heroStageMount')
+    if (stageMount) {
+      const stageRoot = createRoot(stageMount)
+      stageRoot.render(
+        <Suspense fallback={null}>
+          <HeroScene />
+        </Suspense>,
+      )
+      // 异步 unmount：在父组件的 cleanup 里同步卸载子 root，React 会警告
+      // "正在渲染时同步卸载 root"。推到微任务里既能清干净也不触发警告。
+      cleanups.push(() => queueMicrotask(() => stageRoot.unmount()))
     }
 
     // 从别的路由进来时回到顶部

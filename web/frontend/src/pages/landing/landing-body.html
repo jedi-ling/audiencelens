@@ -1,12 +1,10 @@
 <!-- HERO -->
 <section class="hero" id="top">
-  <canvas id="heroCanvas" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="hero-inner">
       <div class="hero-copy">
-        <div class="hero-badge"><span class="dot"></span>开源 · 多人格分组独立评审</div>
-        <h1>让 72 个 AI 评审员<br>在你上线前<span class="grad-gold">找到风险</span></h1>
-        <p class="hero-sub">游戏、产品、定价页、众筹页、创业 BP —— 在投入真人测试前，先让一支合成评审团分组独立评审，再挑出<b>分歧最大的争议点</b>让双方<b>真的互相反驳一轮</b>，正反论据、谁被说服改了口，都并排摆到你面前。</p>
+        <h1>让 72 个 AI 评审员，<br>在你上线前<span class="h1-accent nobr">找到风险</span></h1>
+        <p class="hero-sub">游戏、产品页、定价、众筹、创业 BP——在找真人测试之前，先让 72 个 AI 评审员分组独立审阅，然后把分歧最大的争议点拉出来对质一轮，正反论据、谁改了口，都摆在你面前。</p>
 
         <div class="chips">
           <button class="chip" type="button">Steam 商店页</button>
@@ -34,11 +32,10 @@
 
         <div class="proof">
           <div class="avatars">
-            <span style="background:linear-gradient(135deg,#B77E3B,#F9D67D)">P1</span>
-            <span style="background:linear-gradient(135deg,#4ECDC4,#6fded6)">P2</span>
-            <!-- P3 原为第三套亮金 #c9a04a/#d4b86a，与古铜金不同色系；改成主色的低明度变体，
-                 既归入古铜色系又和 P1 拉开明度，仍能读出"另一个人格" -->
-            <span style="background:linear-gradient(135deg,#7a5326,#B77E3B)">P3</span>
+            <span style="background:linear-gradient(135deg,#0071e3,#2997ff)">P1</span>
+            <span style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P2</span>
+            <!-- P3 用主色的低明度变体，归入蓝色系又和 P1 拉开明度 -->
+            <span style="background:linear-gradient(135deg,#0055b3,#0071e3)">P3</span>
             <!-- 溢出数 = 人格总数 − 上面画出来的头像数。这里是隐式计数：写着 +63 时
                  谁都不会联想到"人格数过期了"，72 人格上线后它就一直错着。
                  tests/test_public_claims.py::test_landing_avatar_overflow_matches_persona_count
@@ -75,13 +72,15 @@
            前后立场+置信度并与 yaml 里的 θ 比较），所以这两项可以出现——但
            "ROUND 3""分歧度""说服力"依然不存在：只跑一轮，也不算说服力分。
            别把这三个写回来。 -->
+      <div class="hero-col2">
+      <div id="heroStageMount"></div>
       <div class="debate-card reveal">
         <div class="debate-head">
           <span class="debate-tag">◈ 争议点 · 反驳</span>
           <span class="debate-round">示意图 · 样例数据</span>
         </div>
         <div class="debate-msg oppose">
-          <span class="pav" style="background:linear-gradient(135deg,#4ECDC4,#6fded6)">P05</span>
+          <span class="pav" style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P05</span>
           <div class="bubble">
             <div class="who">P05 · <em>反方 · severity high</em></div>
             "移动端适配缺失——首屏六成流量来自手机，这条必须优先修。"
@@ -92,7 +91,7 @@
           同一争议点 · 双方各反驳一轮
         </div>
         <div class="debate-msg agree">
-          <span class="pav" style="background:linear-gradient(135deg,#B77E3B,#F9D67D)">P12</span>
+          <span class="pav" style="background:linear-gradient(135deg,#0071e3,#2997ff)">P12</span>
           <div class="bubble">
             <div class="who">P12 · <em>正方 · evidence direct</em></div>
             "桌面端仍占付费转化大头，移动端可以排在首版之后。"
@@ -102,8 +101,9 @@
           <div class="meter-row"><span>覆盖率</span><div class="bar"><i style="width:92%"></i></div><b>92%</b></div>
           <div class="meter-row"><span>推断率</span><div class="bar mint"><i style="width:34%"></i></div><b>34%</b></div>
         </div>
-        <div class="debate-foot">TOP-3 争议点 · 证据三级标注 · 一轮反驳，不是多轮辩论</div>
+        <div class="debate-foot">Top-3 争议点 · 证据三级标注 · 一轮交叉质询</div>
       </div>
+      </div><!-- /hero-col2 -->
     </div>
   </div>
 </section>
@@ -119,19 +119,19 @@
       <div class="pain-card reveal">
         <div class="n">01 / 真人焦点小组</div>
         <h3>又慢又贵</h3>
-        <p>招募一场真人焦点小组，$5,000 起步，还要等 2–4 周排期。等你拿到结论，窗口期早就过了。</p>
+        <p>招募一场真人焦点小组，$5,000 起步，还要等 2–4 周排期。等你拿到结论，窗口期可能已经过了。</p>
         <div class="cost">$5,000+ · 2–4 周</div>
       </div>
       <div class="pain-card reveal">
-        <div class="n">02 / 问 ChatGPT</div>
-        <h3>一个人格自言自语</h3>
-        <p>单个模型给你一段"综合建议"，没有冲突、没有反方、没有第二种立场。它总倾向于讨好你。</p>
+        <div class="n">02 / 问单个 AI</div>
+        <h3>一个视角自言自语</h3>
+        <p>单个模型给你一段综合建议，没有冲突，没有反方，看不到第二种立场。</p>
         <div class="cost">无冲突 · 无反方</div>
       </div>
       <div class="pain-card reveal">
-        <div class="n">03 / 现有合成工具</div>
-        <h3>闭源、黑箱、刻板</h3>
-        <p>市面上的合成用户工具大多闭源黑箱，还在按人口统计标签编人设——你无法验证它凭什么这么说，也无法把它的判断和后来的真实结果对上账。</p>
+        <div class="n">03 / 其他合成工具</div>
+        <h3>闭源、刻板、不可核对</h3>
+        <p>市面上的合成用户工具大多闭源黑箱，按人口统计标签编人设——你无法验证判断依据，也无法事后和真实结果对上账。</p>
         <div class="cost">闭源 · 无法核对</div>
       </div>
     </div>
@@ -151,7 +151,7 @@
     <div class="sec-head reveal">
       <div class="eyebrow">工作原理</div>
       <h2 class="sec-title">判断如何被生成、约束、验证</h2>
-      <p class="sec-desc">不是又一个对话框。AudienceLens 把每一条判断都放进一套可追溯、可核对的流程里——每一步都能在开源仓库里逐行对照。</p>
+      <p class="sec-desc">AudienceLens 把每条判断放进一套可追溯的流程——每一步都能在开源仓库里逐行对照。</p>
     </div>
     <div class="stage">
 
@@ -163,19 +163,19 @@
         <div class="stage-list">
           <div class="stage-item">
             <div class="ico">◇</div>
-            <div><h4>分组独立评审</h4><p>72 个行为驱动人格按 Pack 分组，先各自独立给出评审意见，避免一开始就互相带节奏。</p></div>
+            <div><h4>分组独立评审</h4><p>72 个行为驱动人格按 Pack 分组，各自独立给出评审意见，避免一开始就互相带节奏。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">⇄</div>
-            <div><h4>Top-3 争议点 + 一轮真实反驳</h4><p>同一个问题换了措辞也会被相似度聚类合并，系统据此挑出分歧最大的三个争议点，把正反双方的原始论据抽出来，<b>再真的发一轮反驳调用</b>：标准档是一次仲裁式反驳，完整档是每位涉事人格各自重新发言。大家本来就一致的点会被滤掉，不为了"看起来辩论过"而造对立。只跑一轮，不是多轮辩论。</p></div>
+            <div><h4>Top-3 争议点交叉质询</h4><p>系统挑出分歧最大的三个争议点，让正反双方围绕原始论据各做一轮反驳。大家本来就一致的点会被滤掉。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">⚖</div>
-            <div><h4>改票由代码判定，不听模型自报</h4><p>反驳之后谁改了口，由代码比较反驳前后的立场与置信度来判定：立场文字要真的变，且置信度变化要达到阈值 θ（写在开源的 aggregation-rules.yaml 里）。模型自己声称"我被说服了"不算数；够不到阈值的会单独列成"未采纳的改票"，让你看得见它想改而系统没让它改。θ 是工程经验值，尚未经过实证验证。</p></div>
+            <div><h4>改票由代码判定</h4><p>反驳之后谁改了口，由代码比较反驳前后的立场与置信度变化来判定，阈值写在开源配置里。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">✎</div>
-            <div><h4>按影响面排修复优先级</h4><p>按"受影响人格数 × 严重度"排出该先修哪一条，严重度取所有提及者中的最高值——不让"5 个人都卡在新手引导"这种问题被一句 low 吞掉。</p></div>
+            <div><h4>按影响面排修复优先级</h4><p>按"受影响人格数 × 严重度"排序，让"5 个人都卡在新手引导"这种问题不会被一句 low 吞掉。</p></div>
           </div>
         </div>
       </div>
@@ -188,15 +188,15 @@
         <div class="stage-list">
           <div class="stage-item">
             <div class="ico">⌘</div>
-            <div><h4>证据三级标注 + 推断上限</h4><p>每条结论标注证据等级——direct（直接观察）/ inferred（合理推断）/ gap（信息缺口）。inferred 占比超过 40% 会被判为"推断过度"，这一条是真的在校验环节拦的，不是打个分了事。</p></div>
+            <div><h4>证据三级标注 + 推断上限</h4><p>每条结论标注证据等级——direct（直接观察）/ inferred（合理推断）/ gap（信息缺口）。推断占比超过 40% 会被标记为"推断过度"。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">⊘</div>
-            <div><h4>伦理护栏</h4><p>身份与行为解耦——人格基于行为特征定义，性别 / 年龄 / 地域字段在注入提示词前就被剥掉，模型根本看不到；另有身份-行为因果推理检测自动标记倾向。</p></div>
+            <div><h4>伦理护栏</h4><p>身份与行为解耦——人格基于行为特征定义，性别/年龄/地域字段在注入提示词前会被剥离；另有身份-行为因果推理检测自动标记倾向。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">▤</div>
-            <div><h4>8 维质量评估（可选，事后打分）</h4><p>可选开启的 Harness 会在评审跑完后从 8 个维度打分：可执行性、输入依据、人格区分度、刻板印象、结构完整、校准诚实、风险检出、分歧充分。八条阈值全部写在开源的 thresholds.yaml 里，代码自带"原型阈值，未经实证验证"的标注。它是记分卡，不拦截、不过滤、不重跑人格输出。</p></div>
+            <div><h4>8 维质量评估（可选）</h4><p>评审跑完后可从 8 个维度打分：可执行性、输入依据、人格区分度、刻板印象、结构完整、校准诚实、风险检出、分歧充分。阈值全部开源可查。</p></div>
           </div>
         </div>
       </div>
@@ -209,17 +209,17 @@
         <div class="stage-list">
           <div class="stage-item">
             <div class="ico">⏱</div>
-            <div><h4>预测盖时间戳留档</h4><p>评审完成时把每条预测盖上时间戳落库，形成一份"这个人格当时说了什么"的可审计记录。</p></div>
+            <div><h4>预测盖时间戳留档</h4><p>评审完成时把每条预测盖上时间戳落库，形成一份可审计记录。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">↺</div>
-            <div><h4>真人结果回填</h4><p>真人测试跑完后由你把真实结果回填（有一个"待回填"工作台专门列出还没验证的预测），系统据此比对预测与现实。</p></div>
+            <div><h4>真人结果回填</h4><p>真人测试跑完后回填真实结果，系统自动比对预测与现实。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">▲</div>
-            <div><h4>算出人格历史准确率</h4><p>累积之后能查到每个人格"历史上准不准"。样本量不够时会如实标注 low_confidence，绝不用 3 个样本吹"准确率 100%"。</p></div>
+            <div><h4>人格历史准确率</h4><p>累积之后能查到每个人格历史上准不准。样本量不够时会标注 low_confidence。</p></div>
           </div>
-          <div class="moat"><b>说清楚它是什么、不是什么。</b> 这是一份<b>可追溯的判断留档</b>：预测、回填、命中率都能查能导出。但系统<b>不会</b>拿这些历史分数去自动改选人或加权——要不要更信某个人格，现在由你来判断。自动反馈回路是路线图上的事，还没实现。</div>
+          <div class="moat">这是一份<b>可追溯的判断留档</b>：预测、回填、命中率都能查能导出。系统目前不会自动用历史分数调整人格权重——要不要更信某个人格，由你来判断。</div>
         </div>
       </div>
 
@@ -233,8 +233,7 @@
     <div class="sec-head reveal">
       <div class="eyebrow">四步启动</div>
       <h2 class="sec-title">从一句话到结构化报告</h2>
-      <p class="sec-desc">全流程自动化，实时推送进度，几分钟拿到发布风险清单。</p>
-    </div>
+      <p class="sec-desc">全流程自动化，实时推送进度，几分钟拿到发布风险清单。</p>    </div>
     <div class="flow">
       <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么——页面、文案、概念、创业 BP 都行。</p></div>
       <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面——图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
@@ -262,7 +261,7 @@
       <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
            （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
            真实存在的是面板里几个专职唱反调的人格，照此写。 -->
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy" onerror="this.style.display='none'"><h3>专职唱反调的人格</h3><p>魔鬼代言人、单位经济学质疑者、怀疑型评测者——面板里本来就坐着几个只负责挑刺的人，不用另开模式。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy" onerror="this.style.display='none'"><h3>对抗性视角</h3><p>面板里自带几个专职挑刺的人格：魔鬼代言人、单位经济学质疑者、怀疑型评测者。</p></div>
     </div>
   </div>
 </section>
@@ -278,18 +277,18 @@
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-multimodal.png" alt="多模态评审" loading="lazy"></div>
         <h3>多模态评审</h3>
-        <p>截图、demo 图、BP 页面会直接进视觉模型上下文——评审员真正"看到"你的界面，而不只是读文字描述。<b>前提是你选的模型认图</b>：目前视觉白名单是 Claude、GPT-4o / 4-turbo / 5、通义千问 VL、GLM-4V / GLM-5、MiniMax；DeepSeek、Kimi、多数 Ollama 本地模型不在其中，图片会被自动剥掉、只按文字评审，评审不中断但你看到的就是纯文本结论。白名单是一份写死的前缀表，在仓库里可查。</p>
+        <p>截图、demo 图、BP 页面直接进视觉模型上下文——评审员能直接看到你的界面。不支持视觉的模型（如 DeepSeek、多数 Ollama 本地模型）会自动按文字评审，流程不中断。</p>
         <div class="meta">SCREENSHOT · DECK · UI → VISION（视觉模型限定）</div>
       </div>
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-model.png" alt="模型中立" loading="lazy"></div>
-        <h3>模型中立 · 自带 Key · 可本地</h3>
-        <p>Anthropic 原生 + 任意 OpenAI 兼容服务：DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型都能接。自带 Key 意味着评审跑在你自己的模型账号上、按你的用量计费；自部署再接本地 Ollama，材料就根本不出你的机器。没配 Key 时接口直接返回 428，绝不静默拿模拟数据糊弄你。</p>
+        <h3>自带 Key，模型任选</h3>
+        <p>支持 Anthropic 原生，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型等任意 OpenAI 兼容服务。Key 加密存在服务端，按你的模型账户计费。未配置 Key 时接口直接返回提示，不会返回模拟数据。</p>
         <div class="meta">ANTHROPIC · DEEPSEEK · KIMI · QWEN · GLM · OLLAMA</div>
       </div>
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-saas.png" alt="开箱即用 SaaS" loading="lazy"></div>
-        <h3>开箱即用的 SaaS</h3>
+        <h3>开箱即用</h3>
         <p>无需注册即可体验：CDK 兑换码免登录换取评审次数，自动创建游客身份。渐进式认证、配额套餐、多租户管理后台全部就绪。</p>
         <div class="meta">CDK · GUEST · MULTI-TENANT</div>
       </div>
@@ -336,7 +335,7 @@
     <div class="sec-head reveal">
       <div class="eyebrow">数字说话</div>
       <h2 class="sec-title">每一项都能在开源仓库里核对</h2>
-      <p class="sec-desc">不是幻灯片概念——人格数看 src/personas/，任务类型看 src/runner/task_types.py 的 VALID_TASK_TYPES，测试数直接跑 pytest。逐条可验证。</p>
+      <p class="sec-desc">人格数、任务类型、自动化测试——所有数字对应仓库里的真实代码和测试，不是幻灯片概念。</p>
     </div>
     <div class="stats">
       <!-- 数字只能写实跑出来的值。测试数会随开发变动，所以这一格必须带统计日期，
