@@ -283,6 +283,12 @@ export interface UsageSummary {
   tokens_used: number
   /** 终身 token 上限；null = 不限制 */
   tokens_limit: number | null
+  /** 你**一共**烧了多少 token（含 BYOK，终身不设窗）。与 tokens_used 语义不同：
+   *  前者是"我方垫付了多少"（配额口径），这个是"你一共花了多少"（真实用量）。
+   *  BYOK 用户的消耗全在 byok 上，只看 tokens_used 会永远是 0。 */
+  tokens_used_all: number
+  /** 24h 内真实评审次数（含 BYOK）。reviews_used 是配额口径，只算平台垫付。 */
+  reviews_used_all: number
 }
 
 /** POST /api/cdk/redeem 的响应。匿名兑换（认证开启）会附带游客身份 token——

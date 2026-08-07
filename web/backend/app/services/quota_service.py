@@ -227,6 +227,32 @@ def tokens_used(db: Session, user_id: str) -> int:
     return int(total or 0)
 
 
+def tokens_used_all(db: Session, user_id: str) -> int:
+    """该用户**一共**烧了多少 token（含 BYOK，终身不设时间窗）。
+
+    与 tokens_used 的区别是刻意的，两者服务于不同的问题：
+      · tokens_used      —— "我方垫付了多少" → 配额闸和「x / 上限」用；
+      · tokens_used_all  —— "我一共花了多少" → 给用户看的真实用量。
+    BYOK 用户的消耗全记在 byok 上，只暴露前者的话，他在设置页永远看到 0，
+    而那是他自己付的钱。
+
+    占位（TOKEN_HOLD_KIND）在这里要排除：它是"预估的在途消耗"，不是已经
+    发生的事实，混进"你一共花了多少"会让用户看到一个比实际高的数字。
+    """
+    total = (
+        db.query(
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0)
+            + func.coalesce(func.sum(UsageRecord.output_tokens), 0)
+        )
+        .filter(
+            UsageRecord.user_id == user_id,
+            UsageRecord.kind != TOKEN_HOLD_KIND,
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
 def token_cap_error(db: Session, user_id: str) -> Optional[str]:
     """终身 token 额度用完了吗？用完返回给用户看的提示，没用完返回 None。
 
@@ -324,6 +350,18 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         )
         .scalar()
     )
+    # 24h 内的**真实**评审次数：含 BYOK。上面那个 count 是配额口径（只算垫付），
+    # 两者不能合并——BYOK 用户今天跑了 5 次却在用量页看到 0，
+    # 是与历史事故方向相反的同一种说谎数字。
+    reviews_used_all = (
+        db.query(func.count(UsageRecord.id))
+        .filter(
+            UsageRecord.user_id == user_id,
+            _counts_toward_daily_reviews(),
+            UsageRecord.created_at >= since,
+        )
+        .scalar()
+    ) or 0
 
     # BYOK 花的是用户自己的钱，不该算进"我方配额"
     server_cost = (
@@ -372,6 +410,16 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         # 所以 quota_enabled=false 时同样如实回报"已用了多少"（只是不拦）——
         # 让用户和运营都能看见真实消耗，而不是等撞上限才第一次知道有这回事。
         "tokens_used": tokens_used(db, user_id),
+        # ↑ 上面那个只算平台垫付（配额闸的口径）。BYOK 用户的用量全在 byok 上，
+        # 于是他在设置页看到的永远是 0——而那是他自己的钱，恰恰最该看见。
+        # 所以另给一组"真实用量"口径，两者语义不同、不能用一个数字兼任：
+        #   tokens_used      → 配额还剩多少（只算我方垫付）
+        #   tokens_used_all  → 你一共烧了多少（含 BYOK，终身不设窗）
+        "tokens_used_all": tokens_used_all(db, user_id),
+        # 24h 内的真实评审次数（含 BYOK）。reviews_used 是配额口径（只算垫付），
+        # 两个都要给：只给前者，BYOK 用户今天跑了 5 次却看到 0，
+        # 是与历史事故方向相反的同一种说谎数字。
+        "reviews_used_all": reviews_used_all,
         "tokens_limit": effective_token_cap(db, user_id) or None,
     }
 

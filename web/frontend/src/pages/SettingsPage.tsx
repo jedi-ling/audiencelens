@@ -638,12 +638,17 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <div className="text-xs text-text-muted mb-1">评审次数</div>
+                  {/* 显示**真实**次数（含 BYOK）。这里以前显示的是配额口径，
+                      于是 BYOK 用户今天跑了 5 次却看到 0——那是他自己付钱跑的。
+                      配额口径降为副行，两个数字各自标清楚是什么，不合并。 */}
                   <div className="font-display font-bold text-text-primary">
-                    {usage.reviews_used}
-                    {usage.quota_enabled && usage.reviews_limit != null && (
-                      <span className="text-text-muted font-normal"> / {usage.reviews_limit}</span>
-                    )}
+                    {usage.reviews_used_all}
                   </div>
+                  {usage.quota_enabled && usage.reviews_limit != null && (
+                    <div className="mt-0.5 text-[10px] text-text-muted">
+                      其中平台垫付 {usage.reviews_used} / {usage.reviews_limit}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="text-xs text-text-muted mb-1">
@@ -686,15 +691,15 @@ export default function SettingsPage() {
               {/* 条件里的 tokens_limit != null 不能省：原先只判 tokens_used > 0，
                   于是"额度已设、但还没用过"时整块不显示——而新用户在第一次评审前
                   恰恰最需要知道自己有多少额度，那时 tokens_used 必然是 0。 */}
-              {(usage.tokens_used > 0 || usage.tokens_limit != null) && (
+              {(usage.tokens_used_all > 0 || usage.tokens_limit != null) && (
                 <div className="mt-4 border-t border-border pt-3">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-text-secondary">体验额度（累计，不按天重置）</span>
+                    <span className="text-xs text-text-secondary">累计 token 用量（不按天重置）</span>
                     <span className="font-mono text-sm text-text-primary">
-                      {usage.tokens_used.toLocaleString()}
-                      {usage.tokens_limit != null && (
-                        <span className="font-normal text-text-muted"> / {usage.tokens_limit.toLocaleString()}</span>
-                      )}
+                      {/* 主数字是"你一共花了多少"（含 BYOK）。此前这里放的是
+                          tokens_used（只算平台垫付），BYOK 用户永远看到 0，
+                          整块还因为 >0 的条件被隐藏——等于这个功能对他不存在。 */}
+                      {usage.tokens_used_all.toLocaleString()}
                       <span className="ml-1 text-xs text-text-muted">tokens</span>
                     </span>
                   </div>
@@ -706,11 +711,12 @@ export default function SettingsPage() {
                             'h-full rounded-full transition-all',
                             usage.tokens_used >= usage.tokens_limit ? 'bg-severity-critical' : 'bg-cyan'
                           )}
-                          style={{ width: `${Math.min(100, Math.round((usage.tokens_used / usage.tokens_limit) * 100))}%` }}
+                          style={{ width: `${Math.min(100, Math.round((usage.tokens_used / usage.tokens_limit) * 100))}%` }}  /* 进度条按平台垫付口径——它约束的就是这部分 */
                         />
                       </div>
                       <p className="mt-1.5 text-xs text-text-muted">
-                        只统计平台垫付的用量；填写自己的 API Key（BYOK）后不受此限制。
+                        体验额度只约束平台垫付的部分：已用 {usage.tokens_used.toLocaleString()} /{' '}
+                        {usage.tokens_limit?.toLocaleString()}。用自己的 API Key（BYOK）跑的不计入。
                       </p>
                     </>
                   )}

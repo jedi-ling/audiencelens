@@ -68,3 +68,86 @@ def test_tls_overlay_vars_are_marked_required():
     for var in ("FRONTEND_BIND", "SITE_DOMAIN"):
         assigned = [ln for ln in lines if re.match(rf"^\s*{var}\s*=", ln)]
         assert assigned, f"{var} 必须在模板里作为待填项出现（而不是只在注释里被提到）"
+
+
+# ---------------------------------------------------------------------------
+# 反方向：模板/代码里有的 AL_* 配置项，compose 必须真的透传下去
+#
+# 上面那条守的是"compose 引用了、模板没写"。这次审计发现漏的是**反方向**：
+# 模板明写 AL_QUOTA_TOKENS_TOTAL=3000000，运维照填，但 compose 的
+# environment 是显式白名单、没有 env_file，容器里也不存在 /app/web/.env
+# （build context 是 ./backend），于是容器读到的是默认值 0 = 不限制——
+# 整条钱包闸静默关着，而运维以为它开着。
+#
+# 这与 enable_evaluation 那次"从 UI 传到后端被 schema 静默丢弃"是同一形状：
+# 配置项在链路的某一环被吞掉，两端都不报错。只是这次吞在编排层。
+# ---------------------------------------------------------------------------
+
+def _template_al_vars() -> set:
+    """模板里**未被注释掉**的 AL_* / ANTHROPIC_* 变量。
+
+    注释掉的（# AL_XXX=...）是"可选调优"提示，不强制要求透传——
+    但一旦有人取消注释填了值，就会踩同一个坑。所以下面的断言只管非注释项，
+    另有一条测试单独提醒可选项的风险。
+    """
+    names = set()
+    with open(TEMPLATE, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            m = re.match(r"^(AL_[A-Z0-9_]+|ANTHROPIC_API_KEY)=", line)
+            if m:
+                names.add(m.group(1))
+    return names
+
+
+def _compose_passthrough_vars() -> set:
+    """compose 的 environment 里真正透传给 backend 的变量名。"""
+    names = set()
+    path = os.path.join(WEB_DIR, "docker-compose.yml")
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            m = re.match(r"^\s*-\s*(AL_[A-Z0-9_]+|ANTHROPIC_API_KEY)=", line)
+            if m:
+                names.add(m.group(1))
+    return names
+
+
+# compose 故意不透传、且模板已诚实标注"写在这里不生效"的项。
+# 这个集合必须保持极小，每加一项都等于承认一处配置不生效。
+_KNOWN_NOT_PASSED = {
+    # 模板里明写了"docker-compose.yml 没有透传这一项，所以在 Docker 部署下
+    # 写在这里是不生效的——故意不列成配置项"
+    "AL_SMTP_TIMEOUT_SECONDS",
+}
+
+
+def test_every_template_var_is_passed_through_by_compose():
+    """模板要求填的每一项，Docker 下都必须真的到得了容器。
+
+    失败时说明有人加了配置项、写进了模板，却忘了加进 compose 的白名单——
+    照模板配置的运维会得到一个静默失效的开关。
+    """
+    missing = _template_al_vars() - _compose_passthrough_vars() - _KNOWN_NOT_PASSED
+    assert not missing, (
+        f"这些变量在 .env.production.example 里要求填写，但 docker-compose.yml 的 "
+        f"environment 白名单没有透传，Docker 部署下填了等于没填：{sorted(missing)}"
+    )
+
+
+def test_security_relevant_settings_are_passed_through():
+    """几个有安全/钱包含义的开关必须在透传列表里，不允许靠默认值。
+
+    单独钉住是因为上一条依赖"模板里写了"——万一有人把某项从模板里删掉，
+    上一条会跟着变绿，而这几项一旦失效是有真实代价的。
+    """
+    passed = _compose_passthrough_vars()
+    required = {
+        "AL_QUOTA_ENABLED",          # 关掉 = 配额整套不工作
+        "AL_QUOTA_TOKENS_TOTAL",     # 关掉 = 终身钱包闸不工作
+        "AL_RATELIMIT_ENABLED",      # 关掉 = 限流不工作
+        "AL_SKILL_FREE_USES",        # 关掉 = 高级技能免费次数不受控
+        "AL_AUTH_ENABLED",           # 关掉 = 所有人共用匿名桶
+    }
+    assert required <= passed, f"未透传：{sorted(required - passed)}"

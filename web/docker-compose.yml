@@ -39,6 +39,21 @@ services:
       - AL_QUOTA_MODE=${AL_QUOTA_MODE:-plan}
       - AL_QUOTA_FREE_REVIEWS_PER_DAY=${AL_QUOTA_FREE_REVIEWS_PER_DAY:-5}
       - AL_QUOTA_FREE_COST_USD_PER_DAY=${AL_QUOTA_FREE_COST_USD_PER_DAY:-1.0}
+      # 下面这几项此前漏在白名单外。compose 用的是**显式 environment 白名单**、
+      # 没有 env_file，而容器里也不存在 /app/web/.env（build context 是 ./backend），
+      # 所以 config.py 那条 dotenv 回落救不了场——运维照 .env.production.example
+      # 填了 AL_QUOTA_TOKENS_TOTAL=3000000，容器里读到的却是默认值 0 = 不限制，
+      # 整条钱包闸静默关着。这与 AL_SMTP_TIMEOUT_SECONDS 是同一个失效模式
+      # （那一项模板里已诚实标注不生效），只是这几项没人发现。
+      # 新增任何 AL_* 配置项时，必须同步加到这里，否则 Docker 下等于没加。
+      - AL_QUOTA_TOKENS_TOTAL=${AL_QUOTA_TOKENS_TOTAL:-0}
+      - AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE=${AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE:-150000}
+      - AL_QUOTA_UNVERIFIED_REVIEWS_PER_DAY=${AL_QUOTA_UNVERIFIED_REVIEWS_PER_DAY:-1}
+      - AL_SKILL_FREE_USES=${AL_SKILL_FREE_USES:-3}
+      - AL_PREMIUM_SKILLS=${AL_PREMIUM_SKILLS:-red_team_audience}
+      - AL_INTENT_MODEL=${AL_INTENT_MODEL:-claude-haiku-4-5-20251001}
+      - AL_INTENT_LLM_ENABLED=${AL_INTENT_LLM_ENABLED:-true}
+      - AL_RATELIMIT_ENABLED=${AL_RATELIMIT_ENABLED:-true}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - AL_RATELIMIT_PER_MINUTE=${AL_RATELIMIT_PER_MINUTE:-60}
       - AL_RATELIMIT_REVIEW_PER_HOUR=${AL_RATELIMIT_REVIEW_PER_HOUR:-20}
