@@ -309,48 +309,49 @@
 .al-landing .foot-inner{flex-direction:column;gap:36px}}
 
 /* ============================================================
-   Hero 舞台：3D 视角场景 + 产出卡片，同一块面板里的上下两段
+   Hero 全幅 3D 背景
    ============================================================ */
 
-.al-landing .hero-col2{display:flex;flex-direction:column;gap:18px;min-width:0}
+/* 全幅铺满 hero，压在所有内容之下。
+   pointer-events:none 是硬要求——背景绝不能挡住输入框、chips 和按钮。 */
+.al-landing .hero-bg3d{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.al-landing .hero-bg3d-canvas{position:absolute;inset:0}
+.al-landing .hero-bg3d-canvas canvas{display:block;width:100%;height:100%}
 
-.al-landing .hero-stage{
-  position:relative;height:clamp(220px,26vw,300px);border-radius:18px;overflow:hidden;
-  border:1px solid var(--line);
-  /* 舞台自己要有底，不能透出 hero 的网格背景——那会让 3D 物体像浮在纸上 */
-  background:
-    radial-gradient(ellipse 70% 90% at 50% 18%,rgba(0,113,227,.09),transparent 68%),
-    linear-gradient(180deg,var(--bg-card),var(--bg-alt));
-  /* 有偏移有模糊的真阴影；零偏移的彩色光晕只是装饰 */
-  box-shadow:0 12px 32px -12px rgba(0,0,0,.14),0 2px 6px -2px rgba(0,0,0,.06);
-}
-.al-landing .hero-stage-canvas{position:absolute;inset:0}
-.al-landing .hero-stage-canvas canvas{display:block;width:100%;height:100%;cursor:grab}
-.al-landing .hero-stage-canvas canvas:active{cursor:grabbing}
+/* 左侧收淡：正文压在背景上，对比度不能被节点和视线吃掉。
+   遮罩从左向右由不透明渐隐——文案区几乎看不到背景，右侧留出完整画面。 */
+.al-landing .hero-bg3d::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,
+    var(--bg) 0%,
+    color-mix(in srgb,var(--bg) 88%,transparent) 26%,
+    color-mix(in srgb,var(--bg) 45%,transparent) 44%,
+    transparent 62%)}
 
-/* three 加载失败时的静态兜底：给一个有构图的形，不是一块空白。
+/* three 加载失败的静态兜底：给一个有构图的形，不是空白。
    空白会被当成"页面没加载出来"，比降级本身更伤。 */
-.al-landing .hero-stage-fallback{position:absolute;inset:0;
+.al-landing .hero-bg3d-fallback{position:absolute;right:8%;top:50%;transform:translateY(-50%);
+  width:min(46vw,560px);aspect-ratio:1;
   background:
-    radial-gradient(circle at 50% 46%,rgba(0,113,227,.16) 0 2px,transparent 3px),
-    conic-gradient(from 0deg at 50% 46%,
-      rgba(0,113,227,.14) 0deg 6deg,transparent 6deg 51deg,
-      rgba(0,113,227,.14) 51deg 57deg,transparent 57deg 102deg,
-      rgba(255,159,10,.20) 102deg 108deg,transparent 108deg 153deg,
-      rgba(0,113,227,.14) 153deg 159deg,transparent 159deg 204deg,
-      rgba(0,113,227,.14) 204deg 210deg,transparent 210deg 255deg,
-      rgba(255,159,10,.20) 255deg 261deg,transparent 261deg 306deg,
-      rgba(0,113,227,.14) 306deg 312deg,transparent 312deg 360deg);
-  -webkit-mask-image:radial-gradient(circle at 50% 46%,#000 62%,transparent 78%);
-  mask-image:radial-gradient(circle at 50% 46%,#000 62%,transparent 78%)}
+    radial-gradient(circle at 50% 50%,rgba(0,113,227,.10) 0 3px,transparent 4px),
+    conic-gradient(from 0deg at 50% 50%,
+      rgba(0,113,227,.10) 0deg 4deg,transparent 4deg 40deg,
+      rgba(255,159,10,.14) 40deg 44deg,transparent 44deg 80deg,
+      rgba(0,113,227,.10) 80deg 84deg,transparent 84deg 120deg,
+      rgba(0,113,227,.10) 120deg 124deg,transparent 124deg 160deg,
+      rgba(255,159,10,.14) 160deg 164deg,transparent 164deg 200deg,
+      rgba(0,113,227,.10) 200deg 204deg,transparent 204deg 240deg,
+      rgba(0,113,227,.10) 240deg 244deg,transparent 244deg 280deg,
+      rgba(255,159,10,.14) 280deg 284deg,transparent 284deg 320deg,
+      rgba(0,113,227,.10) 320deg 324deg,transparent 324deg 360deg);
+  -webkit-mask-image:radial-gradient(circle,#000 55%,transparent 76%);
+  mask-image:radial-gradient(circle,#000 55%,transparent 76%)}
 
-.al-landing .hero-stage-hint{position:absolute;left:14px;bottom:11px;margin:0;
-  font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;color:var(--text-mute);
-  pointer-events:none;opacity:.85}
+/* 窄屏不要这层背景：手机上看不清，还要付电量与流量。
+   组件里也有一道 innerWidth<=920 的判断，两道保险。 */
+@media(max-width:920px){.al-landing .hero-bg3d{display:none}}
 
-/* 窄屏不加载 3D：手机上它既看不清也拖不动，还要付出电量与流量。
-   舞台整体收起，卡片独占第二列——信息一条不少。 */
-@media(max-width:920px){.al-landing .hero-stage{display:none}}
+/* 第二列现在只剩产出卡片 */
+.al-landing .hero-col2{display:flex;flex-direction:column;min-width:0}
 
 /* h1 强调：字重承担，不用渐变。渐变字在浅底上对比度不可控。 */
 .al-landing .h1-accent{font-weight:900;color:var(--gold)}
