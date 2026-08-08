@@ -1,5 +1,7 @@
-﻿import { Link } from 'react-router'
+﻿import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { TASK_MATERIALS, TASK_TYPES } from '@/lib/mock-data'
+import { fetchExamples } from '@/lib/api'
 import {
   ListChecks,
   FileText,
@@ -21,13 +23,25 @@ const steps = [
   { icon: Users, label: '选择角色并启动', desc: '选择角色包，启动评审查看报告' },
 ]
 
-const uploadMethods = [
+// 示例数量必须来自后端 /api/examples（examples/ 目录的真实文件数），
+// 写死数字的话改了 examples/ 目录这页就会撒谎。拿不到数量时退化成不含数字的说法，
+// 不能给一个占位数假装知道。
+function buildUploadMethods(exampleCount: number | null) {
+  const exampleLine =
+    exampleCount === null
+      ? '预设示例覆盖多种任务类型'
+      : `${exampleCount} 个预设示例覆盖多种任务类型`
+  return [
   {
     icon: Upload,
     title: '文件上传（推荐）',
     desc: '上传任意文档，AI 自动阅读并提取结构化材料',
     details: [
-      '支持 .txt .md .json .pdf .doc .docx 等格式',
+      // 这里不能写 .doc：后端对它有专门的拒绝分支（api/__init__.py:622，
+      // python-docx 解不了旧版 .doc），用户照着教程传 .doc 会直接撞报错。
+      // 教程页把一个后端明确拒收的格式写成"支持"，是最不该出的错。
+      // 口径对齐 CreateReviewPage 的 accept 属性。
+      '支持 .txt .md .json .pdf .docx（旧版 .doc 需先另存为 .docx）',
       'AI 阅读文档后自动填充所有字段',
       '提取完成后可手动修改每个字段',
       'GDD、设计文档、开发日志等均可直接上传',
@@ -39,7 +53,7 @@ const uploadMethods = [
     title: '示例导入',
     desc: '一键导入预设示例数据，快速体验评审流程',
     details: [
-      '7 个预设示例覆盖多种任务类型',
+      exampleLine,
       '适合首次使用时了解系统功能',
     ],
     highlight: false,
@@ -54,7 +68,8 @@ const uploadMethods = [
     ],
     highlight: false,
   },
-]
+  ]
+}
 
 const taskTypeTable = TASK_TYPES.map((tt) => {
   const fields = TASK_MATERIALS[tt.id] ?? []
@@ -65,13 +80,36 @@ const taskTypeTable = TASK_TYPES.map((tt) => {
 
 const resultItems = [
   { icon: ShieldCheck, label: '风险等级', desc: '绿/黄/橙/红 四级风险评估', color: 'text-brand-primary' },
-  { icon: Users, label: '立场分布', desc: '支持/中立/怀疑/反对 各角色立场', color: 'text-cyan' },
+  // 立场不是固定的四档。它由各任务类型自己定义（"加愿望单"/"值得推进"/"观望"…），
+  // ReportPage 的 STANCE_PALETTE 就是因为无法穷举才改成按出现顺序配色的。
+  // 原来写死的"支持/中立/怀疑/反对"在真实报告里基本不会原样出现。
+  { icon: Users, label: '立场分布', desc: '各角色的立场取向（具体档位由任务类型决定）', color: 'text-cyan' },
   { icon: AlertTriangle, label: '优先问题列表', desc: '按严重程度排序的关键问题', color: 'text-severity-warning' },
   { icon: Eye, label: '每个角色的详细视角', desc: '各角色的独立评审观点', color: 'text-text-primary' },
   { icon: BarChart3, label: '校准指标', desc: '一致性、覆盖率、幻觉率等质量指标', color: 'text-text-secondary' },
 ]
 
 export default function TutorialPage() {
+  // null 表示"数量未知"（加载中或接口失败），此时文案不出现数字。
+  // 教程页不因为一个可选的计数而报错或阻塞，失败就静默降级。
+  const [exampleCount, setExampleCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetchExamples()
+      .then((list) => {
+        if (alive) setExampleCount(list.length)
+      })
+      .catch(() => {
+        if (alive) setExampleCount(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const uploadMethods = buildUploadMethods(exampleCount)
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">

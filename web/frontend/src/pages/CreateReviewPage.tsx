@@ -363,10 +363,13 @@ export default function CreateReviewPage() {
                     </div>
                   </div>
                   <p className="text-sm text-text-secondary leading-relaxed mb-3">{skill.description_zh}</p>
+                  {/* 这里原本还显示"{skill.persona_count} 个角色"。那个数是本地常量里
+                      写死的（6/8/5/10），没有任何事实源，而且 persona_generate 标的 10
+                      超过了所有评审模式的人数上限 8——是个可以被当场证伪的数。
+                      技能中心那一页已经删掉它，这一页漏了，同一个假数还在站内另一处显示。
+                      不拿别的数补位：卡片上少一个数字，好过多一个假的。 */}
                   <div className="flex items-center gap-3 text-xs text-text-muted">
                     <span>{skill.task_types.length} 种任务</span>
-                    <span>·</span>
-                    <span>{skill.persona_count} 个角色</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {skill.use_cases.slice(0, 3).map((uc) => (

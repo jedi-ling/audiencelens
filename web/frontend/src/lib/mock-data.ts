@@ -1070,14 +1070,18 @@ export const MOCK_REVIEWS: Review[] = [
   },
 ]
 
-export const SKILLS: { type: SkillType; name: string; description_zh: string; icon: string; task_types: string[]; persona_count: number; use_cases: string[]; color: string; bg: string; border: string }[] = [
+// persona_count 已从本类型中移除。它曾经写死为 6/8/5/10 并直接显示给用户，
+// 而 persona_generate 标的 10 超过了所有评审模式的人数上限 8（见下方 REVIEW_MODES），
+// 也就是一个可以被当场证伪的数。真正决定人数的是评审模式的 persona_count_range，
+// 与技能无关，所以这里根本没有正确值可填——删掉字段而不是改个"对一点"的数，
+// 才能保证它不会被谁顺手加回来。
+export const SKILLS: { type: SkillType; name: string; description_zh: string; icon: string; task_types: string[]; use_cases: string[]; color: string; bg: string; border: string }[] = [
   {
     type: 'synthetic_playtest',
     name: '合成试玩',
     description_zh: '模拟真实玩家试玩体验，从上手到深度体验全流程评估，发现设计盲点与体验断裂',
     icon: '/skills/skill-game.png',
     task_types: ['concept_review', 'demo_first_play', 'devlog_review', 'update_announcement_review'],
-    persona_count: 6,
     use_cases: ['新概念验证', 'Demo首玩测试', '版本更新体验评估', '核心循环验证'],
     color: 'text-brand-primary',
     bg: 'bg-brand-primary/10',
@@ -1089,7 +1093,6 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     description_zh: '组建目标受众虚拟焦点小组，收集不同人群的真实反应与偏好，量化市场接受度',
     icon: '/skills/skill-audience.png',
     task_types: ['steam_page_review', 'kickstarter_review', 'product_feedback_review', 'pricing_page_review', 'onboarding_review'],
-    persona_count: 8,
     use_cases: ['商店页优化', '众筹页评估', '广告效果预测', '落地页转化分析'],
     color: 'text-brand-primary',
     bg: 'bg-brand-primary/10',
@@ -1101,7 +1104,6 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     description_zh: '用对抗性视角主动攻击产品弱点，模拟最挑剔的用户和恶意场景，暴露隐藏风险',
     icon: '/skills/skill-redteam.png',
     task_types: ['monetization_review', 'discord_community_review', 'localization_review', 'update_announcement_review'],
-    persona_count: 5,
     use_cases: ['付费模型压力测试', '社区危机预演', '本地化文化风险', '公关危机模拟'],
     color: 'text-brand-primary',
     bg: 'bg-brand-primary/10',
@@ -1113,7 +1115,6 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
     description_zh: '根据产品特征自动生成定制化人格，创建专属评审角色，覆盖特殊用户群体',
     icon: '/skills/skill-persona.png',
     task_types: ['concept_review', 'demo_first_play', 'steam_page_review', 'kickstarter_review', 'discord_community_review'],
-    persona_count: 10,
     use_cases: ['特定人群定制', '边缘用户覆盖', '跨文化人格', '特殊需求用户'],
     color: 'text-brand-primary',
     bg: 'bg-brand-primary/10',
