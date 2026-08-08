@@ -24,7 +24,13 @@ try:
     )
     from .evidence_precheck import precheck_panel
     from .llm_client import chat_completion
-    from .panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
+    from .panel_selector import (
+        DISSENTER_PREFIXES,
+        load_persona_pack_meta,
+        load_personas,
+        load_presets,
+        select_panel,
+    )
     # _minify_persona 是人格身份卡的唯一裁剪口径（人格评审那一轮就是用它渲染
     # persona-prompt.md 的 [PERSONA CARD]）。full 档重新调用人格做反驳时必须复用它，
     # 否则就是在代码里另开一套人格提示词，两边迟早不一致。
@@ -50,7 +56,13 @@ except ImportError:
     )
     from runner.evidence_precheck import precheck_panel
     from runner.llm_client import chat_completion
-    from runner.panel_selector import DISSENTER_PREFIXES, load_personas, load_presets, select_panel
+    from runner.panel_selector import (
+        DISSENTER_PREFIXES,
+        load_persona_pack_meta,
+        load_personas,
+        load_presets,
+        select_panel,
+    )
     from runner.persona_agent import (
         _minify_persona,
         estimate_cost,
@@ -117,6 +129,27 @@ REBUTTAL_PERSONA_HEADER = (
 # 这里保持同一口径。
 REBUTTAL_PERSONA_HIDDEN_FIELDS = ("id", "name")
 
+
+
+def _json_safe(value):
+    """把不能进 JSON 的字典键（主要是元组）递归拍平成字符串。
+
+    修在这里而不是 calibration.py：元组键对 calibration 的 Python 消费方是合理的，
+    真正的约束来自"report 必须可 JSON 序列化"这一条引擎自己的契约。谁把值放进
+    report，谁负责满足这个契约。
+
+    web/backend/app/services/json_safe.py 有一份同语义的实现，服务于 JSON 列。
+    这里不复用它：src/runner/ 是可独立运行的引擎，反向依赖 web/backend 会让
+    CLI 在没有后端的环境里直接 import 失败。
+    """
+    if isinstance(value, dict):
+        return {
+            ("|".join(str(k) for k in key) if isinstance(key, tuple) else key): _json_safe(v)
+            for key, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
 
 def _rebuttal_persona_card(persona: dict) -> str:
     """反驳轮用的匿名身份卡：同一套 _minify_persona 裁剪，只是先摘掉 id/name。"""
@@ -798,15 +831,28 @@ def run_panel(
 
     panel_selected = None
     panel_skipped = []
+    # 显式点名的人格里哪些没匹配上，必须留痕。以前是纯静默回落：对话里"呼叫某某角色"
+    # 时 id 拼错或串了人格包，引擎不报错、直接换成 task_type 预设面板跑完，报告里
+    # 一个字都不提——用户会以为自己点的角色发过言了。部分匹配更隐蔽（指定 3 个命中
+    # 1 个，另外 2 个被悄悄丢弃）。degradation / budget / cross_exam 都做了留痕，
+    # 唯独这条没有，这里补上，口径与 report["degradation"] 一致。
+    requested_personas = list(selected_personas or [])
+    matched_persona_ids = []
+    fell_back_to_auto = False
     if selected_personas:
         panel_selected = [p for p in personas if p["id"] in selected_personas]
+        matched_persona_ids = [p["id"] for p in panel_selected]
         if not panel_selected:
             panel_selected = None  # 一个都没匹配上——回落自动选人，别跑空面板
 
     if panel_selected is None:
+        fell_back_to_auto = bool(requested_personas)
+        matched_persona_ids = []
         panel = select_panel(task_type, personas, presets)
         panel_selected = panel["selected"]
         panel_skipped = panel["skipped"]
+
+    missing_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
 
     mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
     if mode_config:
@@ -980,6 +1026,10 @@ def run_panel(
         artifact_summary,
         rules,
         cross_exam_data,
+        # 受众画像只有人格 YAML 里有（persona_outputs 是 LLM 的输出，没有这些字段），
+        # 不传的话 next_human_test.recruit_types 会如实留空
+        panel_personas=valid_personas,
+        persona_pack=load_persona_pack_meta(personas_path),
     )
 
     if simulated:
@@ -1023,8 +1073,45 @@ def run_panel(
         "notice": budget_notice,
     }
 
+    # 显式点名人格的匹配结果进 report 本体（与 degradation / budget 同一个理由：
+    # 只放返回值顶层的话，重新打开历史报告就看不见"你点的角色其实没参与"）。
+    # 没有显式点名时整键不写，免得给报告塞一堆恒为空的字段。
+    if requested_personas:
+        report["panel_selection"] = {
+            "requested": requested_personas,
+            "matched": matched_persona_ids,
+            "missing": missing_persona_ids,
+            "fell_back_to_auto": fell_back_to_auto,
+            "notice": (
+                "你指定的人格 " + "、".join(missing_persona_ids) + " 在本次人格包中不存在，"
+                + ("已改用任务类型的预设面板。" if fell_back_to_auto else "未参与本次评审。")
+                if missing_persona_ids
+                else ""
+            ),
+        }
+
     calibration_enabled = mode_config["calibration"] if mode_config else True
     calibration = run_calibration_check(persona_outputs, artifact_texts) if calibration_enabled else None
+
+    # 校准结果也挂进 report["validation"]：它是引擎真算出来的三个指标
+    # （角色一致性 / 视角覆盖度 / 无幻觉率），以前只从 run_panel 顶层返回，
+    # 导出的 HTML/Markdown 里一个数都没有，而 HTML 模板里那块指标卡等的是
+    # harness_score / grounding_rate / divergence_score——引擎从不产出这三个字段，
+    # 于是整块永远不渲染。现在让模板读真实存在的 calibration，那三个假字段已删。
+    if calibration:
+        # 必须先把元组键拍平再塞进 report。calibration.coverage.pairwise_distances
+        # 用 (id1, id2) 元组做键——对 CLI 这种 Python 消费方完全合理，但 report
+        # **由引擎自己承诺可 JSON 序列化**（本文件下方 json.dump(result["report"])，
+        # 以及 web 侧 review.report_json 是 JSON 列）。不拍平的话：
+        #   · CLI：跑完整场评审，最后一步写文件 TypeError，报告全丢
+        #   · web：SQLAlchemy flush 时崩，整条 UPDATE 失败，评审 100% 标 failed，
+        #          而且报错是一句与评审内容毫无关系的 "keys must be str"
+        # 只要成功人格 ≥2 就必现（<2 时 compute_coverage_score 提前返回空 dict，
+        # 元组键根本不生成——这正是单人格的模拟模式测不出它的原因）。
+        report["validation"]["calibration"] = _json_safe(calibration)
+
+    # markdown / html 两处横幅都要用，所以在两个分支之外算一次
+    panel_notice = (report.get("panel_selection") or {}).get("notice")
 
     markdown = ""
     if report_template_path:
@@ -1035,6 +1122,8 @@ def run_panel(
             markdown = f"> **⚠️ 交叉质询未完整完成：{cross_exam_notice}**\n\n{markdown}"
         if budget_notice:
             markdown = f"> **⚠️ {budget_notice}**\n\n{markdown}"
+        if panel_notice:
+            markdown = f"> **⚠️ {panel_notice}**\n\n{markdown}"
         # 报告模板不认识 degradation 字段（模板不在本次改动范围），横幅在这里补上，
         # 保证降级信息在渲染产物里也看得见，而不是只躺在 JSON 里
         if degraded:
@@ -1057,6 +1146,13 @@ def run_panel(
                 '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
                 'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
                 f"⚠️ 交叉质询未完整完成：{cross_exam_notice}</div>",
+            )
+        if panel_notice:
+            html = _insert_body_banner(
+                html,
+                '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
+                'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
+                f"⚠️ {panel_notice}</div>",
             )
         if degraded:
             failed_list = "、".join(f["persona_id"] for f in failed_personas)

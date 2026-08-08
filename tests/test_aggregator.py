@@ -17,6 +17,23 @@ SCHEMA_PATH = os.path.join(PROJECT_ROOT, "src", "schemas", "report-schema.json")
 TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "src", "templates", "report-template.md")
 
 
+def _pyproject_version():
+    """从 pyproject.toml 的 [project] 段读真实包版本。
+
+    测试自己重新解析一遍而不是调 aggregator.resolve_build_version()：
+    后者正是被测对象，用它当期望值等于"自己证明自己"，把硬编码改回去也不会红。
+    """
+    import re
+    path = os.path.join(PROJECT_ROOT, "pyproject.toml")
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    section = text.split("[project]", 1)[1].split("\n[", 1)[0]
+    match = re.search(r"""^\s*version\s*=\s*["']([^"']+)["']""", section, re.M)
+    return match.group(1)
+
+
+
+
 def _make_persona(
     persona_id="p1",
     persona_name="Tester",
@@ -75,52 +92,82 @@ class TestLoadAggregationRules:
             load_aggregation_rules("/nonexistent/path.yaml")
 
 
+def _issue(title, severity="medium"):
+    return {
+        "severity": severity,
+        "title": title,
+        "why_it_matters": "matters",
+        "suggested_fix": "fix",
+    }
+
+
 class TestComputeConsensus:
-    def test_full_consensus(self):
+    """共识必须是议题级的。
+
+    这组测试钉的是"agreed_points 里装的是被多数人格各自提到的**议题**，
+    不是立场标签"：谁把它改回按 primary_stance 频次统计，下面这些断言就红。
+    """
+
+    def test_agreed_points_are_issues_not_stance_labels(self):
+        personas = [
+            _make_persona("p1", primary_stance="positive", key_issues=[_issue("新手引导讲不清")]),
+            _make_persona("p2", primary_stance="positive", key_issues=[_issue("新手引导讲不清")]),
+            _make_persona("p3", primary_stance="positive", key_issues=[_issue("新手引导讲不清")]),
+        ]
+        result = compute_consensus(personas, threshold=0.7)
+        assert result["agreed_points"] == ["新手引导讲不清"]
+        # 立场标签绝不能出现在共识点里
+        assert "positive" not in result["agreed_points"]
+        assert "positive" not in result["questioned_points"]
+        assert result["stance_distribution"]["positive"] == 3
+
+    def test_agreed_points_can_exceed_one(self):
+        """旧实现受 threshold>0.5 所限，agreed_points 长度恒 ≤1。"""
+        personas = [
+            _make_persona("p1", key_issues=[_issue("新手引导讲不清楚"), _issue("价格明显高于同类竞品")]),
+            _make_persona("p2", key_issues=[_issue("新手引导讲不清楚"), _issue("价格明显高于同类竞品")]),
+            _make_persona("p3", key_issues=[_issue("新手引导讲不清楚"), _issue("价格明显高于同类竞品")]),
+        ]
+        result = compute_consensus(personas, threshold=0.7)
+        assert sorted(result["agreed_points"]) == ["价格明显高于同类竞品", "新手引导讲不清楚"]
+
+    def test_minority_issue_goes_to_questioned(self):
+        personas = [
+            _make_persona("p1", key_issues=[_issue("新手引导讲不清楚"), _issue("音乐循环太短容易腻")]),
+            _make_persona("p2", key_issues=[_issue("新手引导讲不清楚")]),
+            _make_persona("p3", key_issues=[_issue("新手引导讲不清楚")]),
+        ]
+        result = compute_consensus(personas, threshold=0.7)
+        assert "新手引导讲不清楚" in result["agreed_points"]
+        assert "音乐循环太短容易腻" in result["questioned_points"]
+
+    def test_single_persona_is_never_consensus(self):
+        """一个人的独角戏不构成共识，哪怕它占了 100%。"""
+        personas = [_make_persona("p1", key_issues=[_issue("我一个人提到的问题")])]
+        result = compute_consensus(personas, threshold=0.7)
+        assert result["agreed_points"] == []
+        assert result["min_personas_for_agreement"] >= 2
+
+    def test_no_issues_means_empty_consensus(self):
+        """没有议题就诚实地返回空，不许拿立场词凑数。"""
         personas = [
             _make_persona("p1", primary_stance="positive"),
             _make_persona("p2", primary_stance="positive"),
             _make_persona("p3", primary_stance="positive"),
         ]
         result = compute_consensus(personas, threshold=0.7)
-        assert "positive" in result["stance_distribution"]
-        assert result["stance_distribution"]["positive"] == 3
-        assert len(result["agreed_points"]) > 0
+        assert result["agreed_points"] == []
+        assert result["questioned_points"] == []
 
-    def test_partial_consensus(self):
+    def test_shared_concerns_expose_who_raised_it(self):
         personas = [
-            _make_persona("p1", primary_stance="positive"),
-            _make_persona("p2", primary_stance="positive"),
-            _make_persona("p3", primary_stance="positive"),
-            _make_persona("p4", primary_stance="negative"),
+            _make_persona("p1", key_issues=[_issue("同一件事")]),
+            _make_persona("p2", key_issues=[_issue("同一件事")]),
         ]
         result = compute_consensus(personas, threshold=0.7)
-        assert result["stance_distribution"]["positive"] == 3
-        assert result["stance_distribution"]["negative"] == 1
-        assert "positive" in result["agreed_points"]
-        assert "negative" in result["questioned_points"]
-
-    def test_complete_disagreement(self):
-        personas = [
-            _make_persona("p1", primary_stance="positive"),
-            _make_persona("p2", primary_stance="negative"),
-            _make_persona("p3", primary_stance="neutral"),
-        ]
-        result = compute_consensus(personas, threshold=0.7)
-        assert len(result["agreed_points"]) == 0
-        assert len(result["questioned_points"]) == 3
-
-    def test_threshold_boundary(self):
-        personas = [
-            _make_persona("p1", primary_stance="positive"),
-            _make_persona("p2", primary_stance="positive"),
-            _make_persona("p3", primary_stance="negative"),
-            _make_persona("p4", primary_stance="negative"),
-            _make_persona("p5", primary_stance="positive"),
-        ]
-        result = compute_consensus(personas, threshold=0.6)
-        assert "positive" in result["agreed_points"]
-        assert result["stance_distribution"]["positive"] == 3
+        concern = result["shared_concerns"][0]
+        assert concern["persona_count"] == 2
+        assert set(concern["personas"]) == {"p1", "p2"}
 
     def test_empty_input(self):
         result = compute_consensus([], threshold=0.7)
@@ -147,7 +194,9 @@ class TestComputeDisagreements:
         assert len(result) >= 1
         assert result[0]["topic"] != ""
         assert len(result[0]["persona_stances"]) >= 2
-        assert result[0]["resolution_suggestion"] != ""
+        # resolution_suggestion 已删除：以前填的是把标题回填进英文套话，
+        # 前端却以"建议："的口吻展示。没有调解逻辑就不许有这个字段。
+        assert "resolution_suggestion" not in result[0]
 
     def test_disagreement_with_common_issues(self):
         personas = [
@@ -474,9 +523,13 @@ class TestAggregateReport:
         meta = report["meta"]
         assert meta["task_type"] == "demo_first_play"
         assert meta["target"] == "GameX"
-        assert meta["build_version"] == "0.1.0"
-        assert meta["prompt_version"] == "0.1.0"
-        assert meta["persona_pack_version"] == "0.1.0"
+        # 版本号必须来自真实事实源。这条断言故意跟 pyproject.toml 对齐：
+        # 谁把 build_version 改回硬编码字面量，它就红。
+        assert meta["build_version"] == _pyproject_version()
+        # 没有事实源的字段不许存在（提示词模板从来没有版本机制）
+        assert "prompt_version" not in meta
+        # 没传 persona_pack 时不许凭空编一个包版本
+        assert "persona_pack_version" not in meta
         assert meta["is_synthetic"] is True
         datetime.fromisoformat(meta["generated_at"])
 
@@ -622,3 +675,177 @@ class TestAggregatorToleratesOffSchemaOutput:
         ]
         report = aggregate_report(weird, "concept_review", "X", rules)
         assert "executive_summary" in report
+
+
+class TestTruthfulReportFields:
+    """把"这些数字来自真实来源"钉死：改回硬编码/占位串就红。"""
+
+    def test_caveats_come_from_persona_outputs(self):
+        personas = [
+            _make_persona("p1"),  # 默认 meta.caveats = ["synthetic"]
+            _make_persona("p2"),
+        ]
+        personas[1]["meta"]["caveats"] = ["仅基于商店页文案"]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        assert report["meta"]["caveats"] == ["synthetic", "仅基于商店页文案"]
+
+    def test_caveats_render_into_markdown(self):
+        personas = [_make_persona("p1")]
+        personas[0]["meta"]["caveats"] = ["只看了 30 秒预告片"]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        md = render_markdown_report(report, TEMPLATE_PATH)
+        assert "Limitations & Caveats" in md
+        assert "只看了 30 秒预告片" in md
+
+    def test_persona_pack_version_comes_from_pack(self):
+        personas = [_make_persona("p1")]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(
+            personas, "demo_first_play", "GameX", rules,
+            persona_pack={"pack_id": "mobile-f2p", "version": "0.1.0"},
+        )
+        # 必须带包名：所有人格包目前都是 0.1.0，只写版本号等于没有版本信息
+        assert report["meta"]["persona_pack_version"] == "mobile-f2p@0.1.0"
+
+    def test_recruit_types_are_never_persona_names(self):
+        """招募人群绝不能是本次跑过的 AI 人格代号。"""
+        personas = [_make_persona("p1", persona_name="林岚")]
+        panel = [{
+            "id": "p1",
+            "name": "林岚",
+            "age_range": "25-32",
+            "region": "中国华东",
+            "gaming_profile": {"experience": "核心", "platforms": ["PC", "Switch"]},
+        }]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(
+            personas, "demo_first_play", "GameX", rules, panel_personas=panel
+        )
+        recruit = report["next_human_test"]["recruit_types"]
+        assert recruit == ["25-32 · 中国华东 · 核心 · PC/Switch"]
+        assert "林岚" not in recruit
+
+    def test_no_english_placeholder_when_nothing_derived(self):
+        """推不出来就留空，不许回落成 General players 这类占位串。"""
+        personas = [_make_persona("p1")]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        nht = report["next_human_test"]
+        assert nht["suggested_tasks"] == []
+        assert nht["recruit_types"] == []
+        assert nht["next_materials"] == []
+
+    def test_release_risk_counts_deduped_issues(self):
+        """两位人格用不同措辞说同一个 high 问题，不该升级成 critical。"""
+        personas = [
+            _make_persona("p1", key_issues=[_issue("新手引导讲不清楚", "high")]),
+            _make_persona("p2", key_issues=[_issue("新手引导讲不清楚", "high")]),
+        ]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        assert len(report["priority_fixes"]) == 1
+        assert report["executive_summary"]["release_risk"] == "high"
+
+    def test_missing_evidence_sufficiency_is_excluded_not_zero(self):
+        """缺字段的人格排除出分母，不能按 0 拉低"证据充分度"。"""
+        personas = [
+            _make_persona("p1", evidence_sufficiency=0.9),
+            _make_persona("p2", evidence_sufficiency=0.9),
+        ]
+        del personas[1]["evidence_sufficiency"]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        assert report["executive_summary"]["evidence_quality"] == "strong"
+
+    def test_all_missing_evidence_sufficiency_is_unknown_not_insufficient(self):
+        personas = [_make_persona("p1")]
+        del personas[0]["evidence_sufficiency"]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        # None 而不是 "insufficient"：字段缺失不等于证据很差
+        assert report["executive_summary"]["evidence_quality"] is None
+
+    def test_markdown_contains_cross_exam_and_compliance(self):
+        """服务端 Markdown 必须和 HTML 说同样的话。"""
+        personas = [_make_persona("p1")]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(
+            personas, "demo_first_play", "GameX", rules,
+            cross_exam_data={
+                "mode": "derived_summary",
+                "is_live_debate": False,
+                "limitation": "没有发生实时反驳",
+                "disputes": [],
+            },
+        )
+        md = render_markdown_report(report, TEMPLATE_PATH)
+        assert "交叉质询" in md
+        assert "这不是一场辩论" in md
+        assert "没有发生实时反驳" in md
+        assert "合规检查" in md
+        assert "身份-行为解耦检查" in md
+
+    def test_markdown_has_no_python_list_repr(self):
+        """导出件里不许出现 ['a', 'b'] 这种列表 repr。"""
+        personas = [_make_persona("p1", key_issues=[_issue("引导太长")])]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        md = render_markdown_report(report, TEMPLATE_PATH)
+        assert "['" not in md
+
+    def test_markdown_omits_version_rows_without_source(self):
+        personas = [_make_persona("p1")]
+        rules = load_aggregation_rules(RULES_PATH)
+        report = aggregate_report(personas, "demo_first_play", "GameX", rules)
+        md = render_markdown_report(report, TEMPLATE_PATH)
+        assert "prompt_version" not in md
+        assert "persona_pack_version" not in md
+        assert "0.1.0" not in md
+
+
+# ---------------------------------------------------------------------------
+# report 必须可 JSON 序列化 —— 这是引擎对外的硬契约
+# ---------------------------------------------------------------------------
+
+
+def test_report_with_calibration_is_json_serializable():
+    """report 里挂了 calibration 之后仍然必须能 json.dumps。
+
+    这条测试的存在是因为一次真实的破坏：有人把 run_calibration_check 的原始
+    返回值直接塞进 report["validation"]["calibration"]，而它的
+    coverage.pairwise_distances 用 (id1, id2) **元组**做键。后果是两条链路同时炸：
+      · CLI：cli.py 最后一步 json.dump(result["report"]) TypeError，
+        用户跑完整场评审，报告在写文件那一刻全丢
+      · web：review.report_json 是 JSON 列，flush 时崩 → 整条 UPDATE 失败 →
+        评审 100% 标 failed，报错还是一句与评审内容毫无关系的 "keys must be str"
+
+    当时**三套测试全绿**都没拦住它，因为模拟模式默认只跑 1 个人格，而
+    compute_coverage_score 在 len(ids) < 2 时提前返回空 dict，元组键根本不生成。
+    所以这条测试必须显式构造 ≥2 个人格。
+    """
+    import json
+
+    from runner.calibration import compute_coverage_score
+    from runner.cli import _json_safe
+
+    outputs = [
+        {"persona_id": "P01", "key_issues": ["首屏说不清玩法", "价格偏高"]},
+        {"persona_id": "P02", "key_issues": ["移动端适配差", "引导太长"]},
+    ]
+    coverage = compute_coverage_score(outputs)
+
+    # 前置条件：确认这次真的生成了元组键，否则下面的断言什么都证明不了
+    assert coverage.get("pairwise_distances"), "前置条件不成立：没有生成 pairwise_distances"
+    assert any(
+        isinstance(k, tuple) for k in coverage["pairwise_distances"]
+    ), "前置条件不成立：键不是元组，这条测试失去意义"
+
+    # 反向对照：不拍平就是会炸。这一句失败说明 calibration 的结构变了，
+    # 那时应当重新确认本测试是否还有意义，而不是直接删掉它。
+    with pytest.raises(TypeError):
+        json.dumps({"validation": {"calibration": {"coverage": coverage}}})
+
+    report = {"validation": {"calibration": _json_safe({"coverage": coverage})}}
+    json.dumps(report)  # 不抛异常即通过
