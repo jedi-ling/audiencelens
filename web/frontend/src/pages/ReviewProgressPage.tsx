@@ -12,7 +12,7 @@
 import { useParams, Link } from 'react-router'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { fetchReview } from '@/lib/api'
-import { api, claimPendingReviews } from '@/lib/apiClient'
+import { api, claimPendingReviews, getReviewJobId } from '@/lib/apiClient'
 import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { cn } from '@/lib/utils'
@@ -44,10 +44,16 @@ const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: st
   full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
-function getPersonaProgress(status: string): number {
-  if (status === 'completed' || status === 'failed') return 100
-  if (status === 'running') return 50
-  return 0
+/** 每张人格卡的进度条怎么画。
+ *  后端不提供人格粒度的百分比，所以除了 completed 之外没有可展示的真实数字：
+ *  · running 以前恒写 50%——一个编出来的数，任务卡死时它也纹丝不动地骗人，
+ *    改成不带数字的流光条（「在跑，但说不出跑到哪」如实呈现为不确定态）；
+ *  · failed 以前和 completed 一样画满 100%——失败被伪装成「进度圆满」，
+ *    现在失败不画进度条，只留下面那行红色的失败说明。 */
+function personaBarMode(status: string): 'full' | 'indeterminate' | 'none' {
+  if (status === 'completed') return 'full'
+  if (status === 'running') return 'indeterminate'
+  return 'none'
 }
 
 function isTerminal(status: string | null | undefined): boolean {
@@ -170,6 +176,21 @@ export default function ReviewProgressPage() {
         setDetail(d)
         pollFailRef.current = 0
         setPollFailures(0)
+        // v2 的百分比进度只有 WS 和 /api/jobs/{job_id} 两个来源。WS 断线时
+        // 光靠 getReview 只能拿到状态字段，进度条会停在断线那一刻的数字上。
+        // 创建评审时记下的 job_id 在这里补上百分比；查不到映射（换设备 /
+        // 清了本地存储）或 job 端点失败都只是维持现状，不算轮询失败。
+        const jobId = getReviewJobId(id)
+        if (jobId && !isTerminal(d.status)) {
+          try {
+            const job = await api.getJob(jobId)
+            if (typeof job.progress === 'number') {
+              setV2Progress(Math.max(0, Math.min(100, Math.round(job.progress))))
+            }
+          } catch {
+            // 拿不到百分比不影响状态轮询这条主链路
+          }
+        }
         if (d.status === 'completed') {
           setCrossExamPhase('completed')
           setAggregationPhase('completed')
@@ -693,7 +714,7 @@ export default function ReviewProgressPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {personaOutputs.map((po) => {
               const psc = statusConfig[po.status] ?? statusConfig.pending
-              const progress = getPersonaProgress(po.status)
+              const barMode = personaBarMode(po.status)
               const persona = personas.find((p) => p.id === po.persona_id)
               return (
                 <div
@@ -738,25 +759,30 @@ export default function ReviewProgressPage() {
 
                   <div className="flex items-center gap-2 mb-2">
                     <span className={cn('text-xs', psc.color)}>{psc.label}</span>
-                    {po.status !== 'pending' && (
+                    {barMode !== 'none' && (
                       <div
                         className={cn(
                           'flex-1 h-2 bg-bg-secondary rounded-full overflow-hidden',
                           // 只有真在跑的人格才流光；completed 还在流光是错误信号
-                          po.status === 'running' && 'shimmer-bar',
+                          barMode === 'indeterminate' && 'shimmer-bar',
                         )}
                       >
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-700',
-                            po.status === 'completed' ? 'bg-brand-primary' : 'bg-cyan'
+                            barMode === 'full'
+                              ? 'bg-brand-primary'
+                              // 不确定态：低透明度铺满配合流光，视觉上是「在动」
+                              // 而不是「停在某个具体百分比」
+                              : 'bg-cyan/40'
                           )}
-                          style={{ width: `${progress}%` }}
+                          style={{ width: '100%' }}
                         />
                       </div>
                     )}
-                    {po.status !== 'pending' && (
-                      <span className="text-xs font-mono text-text-muted">{progress}%</span>
+                    {/* 只有 completed 才有真实的 100% 可写；running 没有可信数字，不编 */}
+                    {barMode === 'full' && (
+                      <span className="text-xs font-mono text-text-muted">100%</span>
                     )}
                   </div>
 

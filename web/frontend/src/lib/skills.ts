@@ -7,11 +7,11 @@ import { getToken } from './apiClient'
  *
  * persona_generate 在后端 PersonaService._SKILL_PROMPT_HINTS 里没有任何提示语，
  * 带着它创建评审跑出来的就是一次普通评审，skill_type 只被落库当标签；真正能生成
- * 人格的是 POST /api/generate-personas，那是另一条链路（且 lib/api.ts 里那个
- * generatePersonas 封装的请求体与后端 PersonaGenerateRequest 对不上，接上就是 422）。
+ * 人格的是 POST /api/generate-personas，那是另一条链路（lib/api.ts 的
+ * generatePersonas 封装已对齐后端 PersonaGenerateRequest，但当前仍无调用点）。
  *
- * 处理方式选的是「摘掉入口」而不是「接上生成端点」：接生成端点要同时改 api.ts 的
- * 请求体、加一个展示生成结果的页面、决定生成出来的人格存到哪里——那是一个新功能，
+ * 处理方式选的是「摘掉入口」而不是「接上生成端点」：接生成端点要加一个展示
+ * 生成结果的页面、决定生成出来的人格存到哪里——那是一个新功能，
  * 不是修一个洞。而留着这个按钮的代价是确定的：用户花掉一次评审额度，拿回一份和
  * 他选的技能毫无关系的报告，且全程没有任何提示。所以先让它不可点，并说明原因。
  *

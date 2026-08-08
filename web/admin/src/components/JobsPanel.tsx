@@ -67,6 +67,8 @@ export function JobsPanel() {
           <option value="running">running</option>
           <option value="done">done</option>
           <option value="failed">failed</option>
+          {/* 后端 Job.status 注释明确有 cancelled（job_service 取消链路会写入），筛选项要跟全 */}
+          <option value="cancelled">cancelled</option>
         </select>
       </div>
 

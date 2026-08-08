@@ -194,6 +194,48 @@ export function forgetPendingConversations(ids: string[]): void {
   writePendingConversations(listPendingConversations().filter((id) => !drop.has(id)))
 }
 
+// ---- review_id → job_id 的本地映射 ----
+//
+// 为什么需要它：job_id 只在 POST /api/v2/reviews 的响应里出现一次，评审详情
+// 端点不回传。而 /api/jobs/{job_id} 是唯一能拿到**任务级百分比进度**的 HTTP
+// 接口——WS 断了的时候，进度页只能靠它维持百分比更新（状态本身另有评审端点
+// 轮询兜底）。所以创建时把这层对应关系记在本地，进度页轮询时查用。
+// 查不到（换设备 / 清了存储 / 老评审）只是退回"没有百分比"，不影响任何主链路。
+const REVIEW_JOBS_KEY = 'al.review_jobs'
+
+function readReviewJobs(): Array<[string, string]> {
+  try {
+    const raw = localStorage.getItem(REVIEW_JOBS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (x): x is [string, string] =>
+        Array.isArray(x) && typeof x[0] === 'string' && typeof x[1] === 'string',
+    )
+  } catch {
+    return [] // 手工改坏 / 旧格式：当作没记过，别把页面搞崩
+  }
+}
+
+/** 记下这条评审背后的任务 id。存不进去（隐私模式 / 配额满）就算了，只是少了百分比。 */
+export function rememberReviewJob(reviewId: string, jobId: string): void {
+  if (!reviewId || !jobId) return
+  try {
+    const rest = readReviewJobs().filter(([rid]) => rid !== reviewId)
+    localStorage.setItem(
+      REVIEW_JOBS_KEY,
+      JSON.stringify([[reviewId, jobId], ...rest].slice(0, PENDING_REVIEWS_MAX)),
+    )
+  } catch {
+    // 同 writePendingReviews：尽力而为
+  }
+}
+
+export function getReviewJobId(reviewId: string): string | null {
+  const hit = readReviewJobs().find(([rid]) => rid === reviewId)
+  return hit ? hit[1] : null
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('Content-Type') && init.body && !(init.body instanceof FormData)) {
@@ -406,6 +448,8 @@ export const api = {
       // 匿名跑的评审在这里记下 id，登录后才认领得回来。写在唯一的创建出口上，
       // 两个入口（AskPage / review-store）就不会有哪个漏记。
       rememberPendingReview(res.review_id)
+      // job_id 同理只在这一处出现，记下来供进度页在 WS 断线时走 HTTP 轮询拿百分比
+      rememberReviewJob(res.review_id, res.job_id)
       return res
     }),
 

@@ -229,6 +229,8 @@ export function ServerKeyPanel() {
       </div>
 
       <div className="mt-3 flex gap-2">
+        {/* placeholder 不写"可留空"：save() 对空值直接 return、保存键也 disabled，后端同样拒空。
+            Ollama 本地无鉴权，但走的是同一条存 key 的链路，得填个占位符（服务端会原样带上，Ollama 忽略）。 */}
         <input
           type="password"
           value={input}
@@ -237,7 +239,7 @@ export function ServerKeyPanel() {
             resetTest()
           }}
           aria-label="API Key"
-          placeholder={provider === 'anthropic' ? 'sk-ant-…（轮换或首次设置）' : '对应服务商的 API Key（Ollama 本地可留空）'}
+          placeholder={provider === 'anthropic' ? 'sk-ant-…（轮换或首次设置）' : '对应服务商的 API Key（Ollama 无鉴权也需填任意占位符）'}
           className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
         />
         <button

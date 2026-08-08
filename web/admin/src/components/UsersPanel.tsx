@@ -5,7 +5,9 @@ import type { AdminUser } from '@/lib/types'
 import { Pager } from './Pager'
 
 const PAGE_SIZE = 20
-const PLAN_OPTIONS = ['free', 'pro', 'team']
+/* 兜底列表：套餐真实清单以 /api/admin/plans 为准（挂载后拉取覆盖），
+   这份静态值只在请求失败时保证下拉不至于空。 */
+const PLAN_OPTIONS_FALLBACK = ['free', 'pro', 'team']
 
 /** 用户管理：套餐调整立即影响配额校验，停用立即让该用户的 token 失效（登录也被拒）。 */
 export function UsersPanel() {
@@ -15,6 +17,19 @@ export function UsersPanel() {
   const [q, setQ] = useState('')
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [planOptions, setPlanOptions] = useState<string[]>(PLAN_OPTIONS_FALLBACK)
+
+  // 套餐清单从 /api/admin/plans 拉，和 PlansPanel 同一事实源；失败就保持兜底列表
+  useEffect(() => {
+    void (async () => {
+      try {
+        const ids = (await adminApi.plans()).plans.map((p) => p.id)
+        if (ids.length > 0) setPlanOptions(ids)
+      } catch {
+        /* 拉取失败静默保持兜底，不打断用户列表本身的使用 */
+      }
+    })()
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -96,7 +111,8 @@ export function UsersPanel() {
                     onChange={(e) => void update(u.id, { plan: e.target.value })}
                     className="rounded-md border border-border bg-bg-secondary px-1.5 py-0.5 text-xs text-text-primary outline-none focus:border-brand-primary"
                   >
-                    {PLAN_OPTIONS.map((p) => (
+                    {/* 用户当前套餐若不在清单里（历史遗留值），补一项以免 select 显示错乱 */}
+                    {(planOptions.includes(u.plan) ? planOptions : [...planOptions, u.plan]).map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>

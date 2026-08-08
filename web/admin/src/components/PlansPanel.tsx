@@ -9,6 +9,10 @@ const FIELD_LABELS: Record<PlanEditableField, string> = {
   cost_usd_per_day: '每日成本上限 (USD)',
 }
 
+/* 三个字段全量列表：free 档的每日限额不在 editable_fields 里（由「设置」页的
+   quota_free_* 管理），后端约定用 editable_fields 缺项来推断，缺的渲染成只读并指路设置页。 */
+const ALL_FIELDS = Object.keys(FIELD_LABELS) as PlanEditableField[]
+
 export function PlansPanel() {
   const [plans, setPlans] = useState<AdminPlan[]>([])
   const [pending, setPending] = useState<string | null>(null)
@@ -71,9 +75,25 @@ export function PlansPanel() {
               <span className="font-mono text-[10px] text-text-muted">{plan.id}</span>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {plan.editable_fields.map((field) => {
+              {ALL_FIELDS.map((field) => {
                 const token = `${plan.id}.${field}`
                 const overridden = plan.overridden_fields.includes(field)
+                if (!plan.editable_fields.includes(field)) {
+                  // 只读展示生效值：后端返回的就是含 quota_free_* 覆盖的真实值，
+                  // 给输入框会让人以为在这里能改，实际改了会被 API 拒绝。
+                  return (
+                    <div key={field} className="min-w-0">
+                      <div className="text-[10px] text-text-muted">{FIELD_LABELS[field]}</div>
+                      <div
+                        title="此项由「设置」页的免费额度开关管理，此处只读"
+                        className="w-full rounded-md border border-dashed border-border bg-bg-primary/40 px-2 py-1 font-mono text-xs text-text-secondary"
+                      >
+                        {plan[field]}
+                        <span className="ml-1.5 text-[10px] text-text-muted">在「设置」页调整</span>
+                      </div>
+                    </div>
+                  )
+                }
                 return (
                   <div key={field} className="flex items-center gap-1.5">
                     <div className="min-w-0 flex-1">

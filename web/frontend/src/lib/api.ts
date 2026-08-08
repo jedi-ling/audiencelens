@@ -325,12 +325,30 @@ export async function fetchRubric(): Promise<{ dimensions: { id: string; name: s
   return res.json()
 }
 
+/** POST /api/generate-personas 生成出来的人格。
+ *  形状照抄后端 PersonaService.generate_personas 的产出（服务层 docstring 与
+ *  fallback 实现均为这七个字段），不是评审用的 Persona——那个类型多出 pack 等
+ *  库内人格才有的字段，生成结果并不落库。 */
+export interface GeneratedPersona {
+  id: string
+  name: string
+  archetype: string
+  identity_summary: string
+  behavior_profile: Record<string, string>
+  motivations: string[]
+  decision_rules: string[]
+}
+
+/** 请求体逐字对齐后端 PersonaGenerateRequest（schemas/__init__.py）。
+ *  以前这里发的是 skill_type/task_type/constraints——后端一个都不认识，
+ *  domain 是必填缺失，接上就是 422；返回值也不是数组而是 {personas, count}。
+ *  当时因为零调用点没炸过，修正是为了让第一个接它的人不掉进坑里。 */
 export async function generatePersonas(data: {
-  skill_type: SkillType
-  task_type: string
+  domain: string
+  audience?: string
+  goals?: string
   count?: number
-  constraints?: Record<string, unknown>
-}): Promise<Persona[]> {
+}): Promise<{ personas: GeneratedPersona[]; count: number }> {
   const res = await authedFetch('/api/generate-personas', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

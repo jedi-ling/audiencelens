@@ -85,6 +85,8 @@ export function ReviewsPanel() {
           <option value="running">running</option>
           <option value="completed">completed</option>
           <option value="failed">failed</option>
+          {/* Review 模型的状态枚举含 cancelled，筛选项要跟全 */}
+          <option value="cancelled">cancelled</option>
         </select>
       </div>
 
@@ -157,6 +159,16 @@ export function ReviewsPanel() {
           <DetailField label="任务类型" value={selected.task_type} />
           <DetailField label="模式" value={selected.mode} />
           <DetailField label="人格包" value={selected.persona_pack ?? '—'} />
+          {/* 用户手选人格子集（v2 链路），空/未选时是 null，兜底成"—"而不是隐藏字段，
+              排查"为什么这次评审只有 N 个人格"时这里是第一现场 */}
+          <DetailField
+            label="手选人格"
+            value={
+              Array.isArray(selected.selected_personas) && selected.selected_personas.length > 0
+                ? selected.selected_personas.join('、')
+                : '—'
+            }
+          />
           <DetailField label="用户" value={selected.user_id ?? '—'} />
           <DetailField label="成本" value={`$${selected.total_cost_usd.toFixed(4)}`} />
           <DetailField

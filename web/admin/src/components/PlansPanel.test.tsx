@@ -126,4 +126,38 @@ describe('PlansPanel', () => {
       expect(mocked.resetPlanField).toHaveBeenCalledWith('pro', 'price_usd_month')
     })
   })
+
+  it('free 档非可编辑限额渲染为只读生效值并指向设置页，不给输入框', async () => {
+    // 后端契约：free 的每日限额由设置页 quota_free_* 管理，editable_fields 只剩月价，
+    // 但返回值里的 reviews_per_day / cost_usd_per_day 是真实生效值，面板要只读展示。
+    mocked.plans.mockResolvedValue({
+      plans: [{
+        ...basePlan,
+        id: 'free',
+        name: 'Free',
+        price_usd_month: 0,
+        reviews_per_day: 3,
+        cost_usd_per_day: 0.5,
+        editable_fields: ['price_usd_month'],
+        env_default: { price_usd_month: 0 },
+      }],
+    })
+
+    render(<PlansPanel />)
+
+    // 三个字段标签都在（缺项不是隐藏，是只读）
+    expect(await screen.findByText('每日评审上限')).toBeInTheDocument()
+    expect(screen.getByText('每日成本上限 (USD)')).toBeInTheDocument()
+
+    // 只读字段：显示生效值 + 设置页指引，且它所在块里没有 input
+    const dailyLabel = screen.getByText('每日评审上限')
+    const block = dailyLabel.parentElement as HTMLElement
+    expect(block.textContent).toContain('3')
+    expect(block.querySelector('input')).toBeNull()
+    expect(screen.getAllByText('在「设置」页调整')).toHaveLength(2)
+
+    // 可编辑的月价仍然是输入框
+    const priceLabel = screen.getByText('月价 (USD)')
+    expect(priceLabel.parentElement?.parentElement?.querySelector('input')).not.toBeNull()
+  })
 })

@@ -148,6 +148,9 @@ MATERIAL_GLOBS = (
     "docs/**/*.md",
     "docs/**/*.html",
     "web/frontend/src/pages/landing/landing-body.html",
+    # README 是仓库最先被看到的对外材料，里面的 72/11/14 出现十余处，
+    # 以前不在扫描范围里，任何一处过期都没人会发现。
+    "README.md",
 )
 
 # 整份不参与现状核对的文件，每个都要写清为什么。
@@ -217,6 +220,9 @@ EXEMPT_LINE_SUBSTRINGS = (
     # 说的是 .claude/agents/ 下的 Markdown 镜像文件数，且原句明确写着
     # "只镜像了游戏池"——那是 72 个里的游戏向子集，与总数是两个口径。
     "只镜像了游戏池",
+    # README 路线图表格的 v0.1 行记录的是那一版当时交付的 16 人格 / 6 任务类型，
+    # 是历史事实而非现状声明——与 docs/project/roadmap.md 整份豁免同一个理由。
+    "| v0.1 |",
 )
 
 
@@ -256,6 +262,9 @@ PATTERNS = {
         # 而它当时逃掉，就是因为下面这两条正则不存在。
         r"(\d+)\s*个\s*agent",
         r"跑\s*(\d+)\s*个\s*agent",
+        # README 的两种总数写法：中文「共 72 个人格」、英文「(72 personas total)」/「(72 personas)」
+        r"共\s*(\d+)\s*个人格",
+        r"\((\d+)\s+personas(?:\s+total)?\)",
     ],
     "pack": [
         r"(\d+)\s*个\s*(?:YAML\s*)?(?:人格\s*)?Pack",
@@ -273,6 +282,8 @@ PATTERNS = {
         r"(\d+)\s*种\s*review\s+task\s+type",
         r"(\d+)\s*个任务\s*id",
         r"(\d+)\s+task\s+types",
+        # README 英文表里的写法「the 14 review task types」
+        r"(\d+)\s+review\s+task\s+types",
         r'data-target="(\d+)">\d+</div><div class="lbl">任务类型',
         r"\|\s*\*\*(?:Total|合计)\*\*\s*\|\s*\*\*\d+\*\*\s*\|\s*\*\*\d+\*\*\s*\|\s*\*\*(\d+)\*\*",
     ],
@@ -281,6 +292,7 @@ PATTERNS = {
 # 哪些材料该声明哪些数字。这里列出来的文件，如果某个 metric 一条都匹配不到，
 # 就说明措辞被改写、正则失效了 —— 那属于"检查悄悄停止工作"，必须让它红。
 MUST_STATE = {
+    "README.md": ("persona", "pack", "task_type"),
     "web/frontend/src/pages/landing/landing-body.html": ("persona", "pack", "task_type"),
     "docs/business-plan.md": ("persona", "pack"),
     "docs/paper/arxiv-paper.md": ("persona", "pack", "task_type"),

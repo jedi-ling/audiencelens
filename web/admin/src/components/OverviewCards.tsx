@@ -1,4 +1,4 @@
-import { Activity, CircleDollarSign, ClipboardCheck, Coins, ListChecks } from 'lucide-react'
+import { Activity, CircleDollarSign, ClipboardCheck, Coins, ListChecks, UserRound } from 'lucide-react'
 import type { AdminOverview } from '@/lib/types'
 
 /** 大数字千分位化：token 动辄几十万，不加分隔看不清量级。 */
@@ -14,7 +14,8 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
   const byokCost = bySource['byok'] ?? 0
 
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    // 6 张卡：一行硬挤 6 列会太窄，lg 起 3+3 两行更可读
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <StatCard
         icon={<ClipboardCheck className="h-4 w-4" strokeWidth={1.5} />}
         accent="text-brand-primary"
@@ -38,6 +39,9 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
         label="24h 用量成本"
         value={`$${data.usage_24h.cost_usd_total.toFixed(4)}`}
       >
+        {/* 后端一直返回 24h 调用次数（usage_24h.count），之前没渲染；
+            成本和次数放一起，运营才能判断"贵是因为量大还是单次贵" */}
+        <div className="mb-2 font-mono text-[10px] text-text-muted">{fmtInt(data.usage_24h.count)} 次调用</div>
         <CostSplit server={serverCost} byok={byokCost} />
       </StatCard>
 
@@ -76,6 +80,13 @@ export function OverviewCards({ data }: { data: AdminOverview }) {
           statuses={data.jobs_by_status}
         />
       </StatCard>
+
+      <StatCard
+        icon={<UserRound className="h-4 w-4" strokeWidth={1.5} />}
+        accent="text-cyan"
+        label="注册用户"
+        value={data.registered_users}
+      />
     </section>
   )
 }

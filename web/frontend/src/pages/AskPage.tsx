@@ -202,14 +202,18 @@ export default function AskPage() {
   // 输入框工具栏：手动钉住技能/任务类型，绕开"靠 AI 从大白话里猜"——
   // 钉住后覆盖 intent 解析结果，直到用户自己摘掉或新建对话。
   const [pinnedSkill, setPinnedSkill] = useState<{ type: string; name: string } | null>(null)
-  // 高级技能剩余免费次数。null 值 = 该技能不受限（BYOK / 匿名 / 机制关闭），
-  // 这时**不显示任何数字**——给 BYOK 用户看一个根本不适用于他的"剩余 3 次"，
-  // 比不显示更糟。
-  const [skillQuota, setSkillQuota] = useState<Record<string, number | null>>({})
+  // 高级技能剩余免费次数。两层 null 含义不同，不能混：
+  //   · 整个 state 为 null = **没取到**（还在加载 / 请求失败）——以前失败回落
+  //     成空对象 {}，界面上和"不受限"长得一模一样，受限用户会在毫不知情的
+  //     情况下把免费次数用掉；现在没取到时技能面板里如实说一句。
+  //   · 某个技能的值为 null = 后端明确说**该技能不受限**（BYOK / 匿名 / 机制
+  //     关闭），这时不显示任何数字——给 BYOK 用户看一个根本不适用于他的
+  //     "剩余 3 次"，比不显示更糟。
+  const [skillQuota, setSkillQuota] = useState<Record<string, number | null> | null>(null)
   useEffect(() => {
     api.skillQuota()
       .then((q) => setSkillQuota(q.skills))
-      .catch(() => setSkillQuota({}))  // 拿不到就不显示，不阻断选技能
+      .catch(() => setSkillQuota(null)) // 失败保持"没取到"，不伪装成"不受限"；不阻断选技能
   }, [])
   const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
   const [pinnedProject, setPinnedProject] = useState<string | null>(null)
@@ -1167,7 +1171,7 @@ export default function AskPage() {
                 >
                   <span className="flex w-full items-center gap-1.5 text-sm font-medium text-text-primary">
                     {s.name}
-                    {skillQuota[s.type] != null && (
+                    {skillQuota?.[s.type] != null && (
                       <span
                         className={cn(
                           'ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal',
@@ -1185,6 +1189,12 @@ export default function AskPage() {
                   <span className="text-xs text-text-muted">{s.description_zh}</span>
                 </button>
               ))}
+              {/* 配额没取到时如实交代，而不是让"没数字"看上去等于"不受限" */}
+              {skillQuota === null && (
+                <p className="px-3 pb-1.5 pt-1 text-[10px] leading-relaxed text-text-muted">
+                  剩余免费次数暂时没取到。技能仍可选用，实际是否计次以创建评审时后端判定为准。
+                </p>
+              )}
             </div>
           )}
         </div>
