@@ -83,6 +83,7 @@ export function PlansPanel() {
                         type="number"
                         defaultValue={plan[field]}
                         disabled={pending === token}
+                        aria-label={FIELD_LABELS[field]}
                         onBlur={(e) => {
                           const v = parseFloat(e.target.value)
                           if (!Number.isNaN(v) && v !== plan[field]) void apply(plan.id, field, v)

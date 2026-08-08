@@ -1,9 +1,8 @@
 /**
  * 邮件发送面板：看清当前配置 + 当场打一封真信验证。
  *
- * 为什么需要它：邮件配错的表现是「什么都不发生」——默认 console 档不报错、
- * 注册接口照样返回 200，只有用户收不到激活信。不主动发一封真的，
- * 就只能等真实用户注册时才发现配错了。所以这个按钮**真的会发信**。
+ * 为什么需要它：邮件配错的表现是「什么都不发生」--默认 console 档不报错、
+ * 注册接口照样返回 200，只有用户收不到激活信。发一封测试邮件可以当场验证。
  *
  * 这里不走 adminClient：只借它的 getAdminToken（令牌存放口径要一致），
  * 请求逻辑自己实现，避免为一个面板去动共享的 API 客户端。
@@ -130,8 +129,7 @@ export function MailPanel() {
         </span>
       </h2>
       <p className="mt-1 text-xs text-text-muted">
-        配错邮件的表现是「什么都不发生」——注册接口照样返回成功，只有用户收不到激活信。
-        下面的按钮会**真的发出一封信**，配完请当场验一次。
+        邮件配错时注册接口仍返回成功，但用户收不到激活信。配置后请发一封测试邮件验证。
       </p>
 
       {loadError && <p className="mt-3 font-mono text-xs text-severity-critical">{loadError}</p>}
@@ -196,6 +194,7 @@ export function MailPanel() {
             setSendError(null)
           }}
           onKeyDown={(e) => e.key === 'Enter' && void sendTest()}
+          aria-label="测试邮件地址"
           placeholder="收测试邮件的地址，填一个你能立刻打开的邮箱"
           className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
         />

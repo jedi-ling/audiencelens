@@ -1,10 +1,22 @@
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
 /** 通用详情抽屉——任务/评审的"下钻"复用这一个壳子，内容各自传 children。 */
 export function DetailDrawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="h-full w-full max-w-lg overflow-y-auto border-l border-border bg-bg-secondary p-5"
         onClick={(e) => e.stopPropagation()}
       >

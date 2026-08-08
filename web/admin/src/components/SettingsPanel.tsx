@@ -89,6 +89,7 @@ function SettingControl({ row, disabled, onChange }: { row: AdminSettingRow; dis
         checked={Boolean(row.effective_value)}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
+        aria-label={row.label}
         className="h-4 w-4 shrink-0 accent-brand-primary"
       />
     )

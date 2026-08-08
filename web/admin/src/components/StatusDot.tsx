@@ -7,5 +7,13 @@ export function StatusDot({ status }: { status: string }) {
         : status === 'running'
           ? 'bg-cyan'
           : 'bg-text-muted'
-  return <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} />
+  const label =
+    status === 'completed' || status === 'done'
+      ? '完成'
+      : status === 'failed'
+        ? '失败'
+        : status === 'running'
+          ? '运行中'
+          : status
+  return <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-label={label} title={label} />
 }

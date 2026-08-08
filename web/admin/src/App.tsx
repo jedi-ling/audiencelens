@@ -79,6 +79,7 @@ export default function App() {
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void tryUnlock(tokenInput)}
+                aria-label="管理员令牌"
                 placeholder="AL_ADMIN_TOKEN"
                 autoFocus
                 className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"

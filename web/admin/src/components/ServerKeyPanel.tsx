@@ -109,7 +109,7 @@ export function ServerKeyPanel() {
       </h2>
       <p className="mt-1 text-xs text-text-muted">
         托管模式下服务端垫付的 key。支持 Anthropic 原生或任意 OpenAI 兼容服务（DeepSeek / Kimi / 通义千问 / 智谱 GLM /
-        Ollama 等）。测试按钮走的是评审真正会用的链路（runner.llm_client），不是摆设。
+        Ollama 等）。点击「测试」验证连接是否可用。
       </p>
 
       <div className="mt-4 flex gap-2 font-mono text-xs">
@@ -236,6 +236,7 @@ export function ServerKeyPanel() {
             setInput(e.target.value)
             resetTest()
           }}
+          aria-label="API Key"
           placeholder={provider === 'anthropic' ? 'sk-ant-…（轮换或首次设置）' : '对应服务商的 API Key（Ollama 本地可留空）'}
           className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
         />

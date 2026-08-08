@@ -103,8 +103,7 @@ export function CdkPanel() {
         </span>
       </h2>
       <p className="mt-1 text-xs text-text-muted">
-        批量生成 → 分发 → 用户在设置页兑换。匿名兑换会自动签发游客身份，次数落到访客各自头上，
-        不会进共享匿名桶被陌生人分掉。兑换接口有 10 次/分钟的防枚举限流。
+        批量生成兑换码，用户在设置页兑换后获得评审次数。兑换接口有 10 次/分钟的防枚举限流。
       </p>
 
       {error && <p className="mt-3 font-mono text-xs text-severity-critical">{error}</p>}
@@ -118,6 +117,7 @@ export function CdkPanel() {
             min={1}
             max={500}
             value={genCount}
+            aria-label="生成数量"
             onChange={(e) => setGenCount(Math.max(1, Number(e.target.value) || 1))}
             className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-2 py-1.5 font-mono text-sm text-text-primary outline-none focus:border-warm-orange transition-colors"
           />
@@ -129,6 +129,7 @@ export function CdkPanel() {
             min={1}
             max={10000}
             value={genCredits}
+            aria-label="每码次数"
             onChange={(e) => setGenCredits(Math.max(1, Number(e.target.value) || 1))}
             className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-2 py-1.5 font-mono text-sm text-text-primary outline-none focus:border-warm-orange transition-colors"
           />
@@ -139,6 +140,7 @@ export function CdkPanel() {
             type="number"
             min={1}
             value={genMaxUses}
+            aria-label="可兑换人数"
             onChange={(e) => setGenMaxUses(Math.max(1, Number(e.target.value) || 1))}
             className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-2 py-1.5 font-mono text-sm text-text-primary outline-none focus:border-warm-orange transition-colors"
           />
@@ -150,6 +152,7 @@ export function CdkPanel() {
             min={1}
             placeholder="留空=永久"
             value={genExpireDays}
+            aria-label="有效期（天）"
             onChange={(e) => setGenExpireDays(e.target.value === '' ? '' : Math.max(1, Number(e.target.value) || 1))}
             className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-2 py-1.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-warm-orange transition-colors"
           />

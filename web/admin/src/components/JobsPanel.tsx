@@ -77,7 +77,15 @@ export function JobsPanel() {
         {jobs.map((j) => (
           <li
             key={j.id}
+            role="button"
+            tabIndex={0}
             onClick={() => void openDetail(j.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                void openDetail(j.id)
+              }
+            }}
             className="cursor-pointer rounded-md border border-border bg-bg-primary/60 px-3 py-2 font-mono text-xs hover:border-brand-primary/30 transition-colors"
           >
             <div className="flex items-center gap-2">
