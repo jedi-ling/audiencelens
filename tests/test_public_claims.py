@@ -478,3 +478,46 @@ def test_cli_run_passes_skill_hint_down_to_run_panel(tmp_path, monkeypatch):
     assert any(t.startswith("[评审技能：red-team-audience]") for t in texts), (
         f"--skill 没有进到 run_panel 的材料里：{texts}"
     )
+
+
+# --------------------------------------------------------------------------
+# 隐私政策的「删除清单」得和真实的删除实现对得上
+# --------------------------------------------------------------------------
+
+
+def test_privacy_deletion_list_covers_conversations():
+    """这条清单是手写的，只要新增一张存用户内容的表就会悄悄失真。
+
+    对话持续化上线时就差点漏掉：那段内容此前只活在浏览器内存里、从不离开
+    设备，所以政策里本来没有它；改成落库之后如果不同步这一页，页面上写的
+    "删除我的账号与数据"列举的范围就小于真实存下来的范围——对用户是不实的。
+
+    两个方向都钉住，任何一边被改掉都会红：
+      · 实现还在删对话吗（少了就是删号留残留）
+      · 政策还写着对话吗（少了就是承诺范围小于实际存储范围）
+    """
+    svc_path = os.path.join(
+        REPO_ROOT, "web", "backend", "app", "services", "user_data_service.py"
+    )
+    page_path = os.path.join(REPO_ROOT, "web", "frontend", "src", "pages", "PrivacyPage.tsx")
+    with open(svc_path, "r", encoding="utf-8") as f:
+        svc = f.read()
+    with open(page_path, "r", encoding="utf-8") as f:
+        page = f.read()
+
+    assert "conversations_deleted" in svc, (
+        "delete_user_data 不再统计删除的对话数——要么级联被摘掉了（删号会留下"
+        "用户打过的字），要么统计口径改了名。两种都得同步改这条测试和隐私政策。"
+    )
+    assert "Conversation" in svc, "delete_user_data 已经不再引用 Conversation 模型"
+
+    # 政策里的删除清单必须提到对话
+    assert "对话记录" in page, (
+        "隐私政策的「删除我的账号与数据」清单里没有对话记录，"
+        "但服务器确实存着它、删号时也确实删了——清单漏项等于对用户少说了一类数据。"
+    )
+    # 收集说明里也得写明它存在服务器上，而不是只写"追问与回复"
+    assert "发起评审之前的澄清" in page, (
+        "隐私政策的「我们收集的数据」没写明评审之前那段对话也会存到服务器。"
+        "用户看到的是「追问与回复」，会以为只有评审之后的内容被保存。"
+    )
