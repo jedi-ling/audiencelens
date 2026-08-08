@@ -71,10 +71,15 @@ def compute_coverage_score(persona_outputs: List[dict]) -> dict:
     pairwise_distances = {}
 
     if len(ids) < 2:
+        # 覆盖度是"人格之间"的两两距离，n<2 时这个指标在数学上就不存在。
+        # 以前这里返回 0.0，单人格面板的导出件会打印「视角覆盖度 0.0 / 合格线 ≥0.3 /
+        # 未通过」——把"无定义"伪装成"很差"。无定义就得说无定义：值给 None，
+        # 并带 not_applicable 标记让渲染层和 overall_pass 都能识别。
         return {
             "pairwise_distances": pairwise_distances,
-            "average_distance": 0.0,
-            "min_distance": 0.0,
+            "average_distance": None,
+            "min_distance": None,
+            "not_applicable": True,
         }
 
     for id1, id2 in combinations(ids, 2):
@@ -190,9 +195,13 @@ def run_calibration_check(
     if previous_outputs is not None:
         stability = compute_rerun_stability(previous_outputs, persona_outputs)
 
-    overall_pass = (
-        role_consistency["average"] >= 0.8 and coverage["average_distance"] >= 0.3
-    )
+    # 覆盖度在 n<2 时无定义（not_applicable）：不适用不能算失败，否则单人格评审
+    # 永远"校准未通过"，把指标缺席伪装成质量问题。此时总判定只看角色一致性。
+    if coverage.get("not_applicable"):
+        coverage_ok = True
+    else:
+        coverage_ok = coverage["average_distance"] >= 0.3
+    overall_pass = role_consistency["average"] >= 0.8 and coverage_ok
 
     return {
         "role_consistency": role_consistency,

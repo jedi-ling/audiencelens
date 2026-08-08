@@ -130,19 +130,32 @@ def create_review(
     # 用户换个端点就能无限用高级技能——"v2 修了 v1 没修"是这个仓库最大的洞源。
     from app.services import skill_quota_service
 
-    skill_type, _red, _degraded = skill_quota_service.apply(
-        session, identity.user_id, resolved.source, data.skill_type, False
+    skill_type, enable_red_team, degraded = skill_quota_service.apply(
+        session, identity.user_id, resolved.source, data.skill_type, data.enable_red_team
     )
+
+    # 红队开关与技能选择正交（选了受众面板也能叠红队），所以提示语要在
+    # create_review 内部那次 apply_skill_hint(skill_type) 之外再叠一层。
+    # skill_type 本身就是红队时不重复叠——同一段提示语插两遍只是浪费上下文。
+    # 这段与 v2（platform.create_review_v2）逐字同构：v1 只落库 enable_red_team
+    # 却不改 prompt 的话，"这次开了红队"在库里为真、在报告里没有任何体现。
+    from app.services import apply_skill_hint
+
+    bundle = data.artifact_bundle
+    if enable_red_team and skill_type != "red_team_audience":
+        bundle = apply_skill_hint(bundle, "red_team_audience")
 
     svc = ReviewService(session)
     review = svc.create_review(
         task_type=data.task_type,
-        artifact_bundle=data.artifact_bundle,
+        artifact_bundle=bundle,
         persona_pack=data.persona_pack,
         selected_personas=data.selected_personas,
         mode=data.mode.value if hasattr(data.mode, 'value') else data.mode,
         user_id=identity.user_id,
         skill_type=skill_type,   # 降级后的值
+        enable_red_team=enable_red_team,  # 同上，必须是降级后的值
+        enable_evaluation=data.enable_evaluation,
         project_key=data.project_key,
         # v1 也要落这两个字段。只改 v2 的话，从 v1 入口发起的评审在技能计次里
         # 完全看不见——用户走那条路就能无限用高级技能。这个仓库反复出现的
@@ -194,7 +207,12 @@ def create_review(
             )
         raise HTTPException(status_code=500, detail="评审任务入队失败，请稍后重试") from exc
 
-    return review
+    # 降级说明必须随响应回去。它不是 Review 的列，所以要显式贴上——
+    # v2 一直回 skill_degraded，v1 此前把它丢进一个下划线变量就扔了，
+    # 走 v1 的调用方会以为红队/高级技能正常跑了。
+    return ReviewResponse.model_validate(review).model_copy(
+        update={"skill_degraded": degraded}
+    )
 
 
 def _check_review_owner(review: Review, identity: Identity) -> None:
@@ -358,6 +376,7 @@ def get_report(
         report_json=report_json,
         report_markdown=report_markdown,
         calibration=review.calibration,
+        error_message=review.error_message,
     )
 
 
@@ -383,19 +402,59 @@ def get_review_result(
         report_md = report_gating.gate_markdown_for_anonymous(report_md)
 
     report_html = None
-    if report_json:
-        try:
-            html_template_path = os.path.join(PROJECT_ROOT, "src", "templates", "report-template.html")
-            if os.path.isfile(html_template_path):
-                from runner.html_report import generate_html_report
-                report_html = generate_html_report(report_json, html_template_path)
-        except Exception:
-            pass
+    html_error = None
+    if report_json and identity.is_anonymous:
+        # 匿名不渲染 HTML，并且如实说明原因。
+        # 两个理由：
+        #   1. HTML 报告就是整份报告的可视化镜像，渲染出来发给匿名用户等于
+        #      从侧门绕过登录墙——上面刚把 json/markdown 裁过；
+        #   2. 就算想发，也发不出来：render_html_report 用 report["consensus"]
+        #      这类**硬下标**取七个顶层键，而裁剪后的 json 只剩执行摘要和
+        #      第一条修复项，必定 KeyError。
+        # 以前这里是"照样尝试渲染 → KeyError → except pass → None"，
+        # 用户看到的是一片空白，看不出是"要登录"还是"报告坏了"。
+        #
+        # 文案必须按 settings.auth_enabled 分支：AL_AUTH_ENABLED=false 的单机
+        # 形态下页面根本没有登录入口，"登录后可查看"是一条走不通的指路。
+        # 为什么不干脆在关认证时放行完整 HTML：报告裁剪被有意设计成只看
+        # "当前请求是不是已登录身份"、不看认证开关（由
+        # test_auth_disabled_anonymous_still_gated_by_default 钉住），HTML 是
+        # 整份报告的镜像，从这里放行等于给同一道墙开侧门——json/markdown
+        # 裁了、HTML 全给。所以这里只把话说诚实，不改门禁本身。
+        if settings.auth_enabled:
+            html_error = "HTML 可视化报告是完整报告的镜像，登录后可查看"
+        else:
+            html_error = (
+                "该实例未开启账号体系（AL_AUTH_ENABLED=false），"
+                "HTML 导出在此形态下不可用"
+            )
+    elif report_json:
+        html_template_path = os.path.join(
+            PROJECT_ROOT, "src", "templates", "report-template.html"
+        )
+        if not os.path.isfile(html_template_path):
+            html_error = "服务端缺少 HTML 报告模板文件，无法生成可视化报告"
+            logger.error("HTML 报告模板不存在：%s", html_template_path)
+        else:
+            try:
+                # 模块名一度写成 runner.html_report——仓库里从来没有这个模块，
+                # 真实实现是 runner.aggregator.render_html_report。ImportError 被
+                # 下面那个 except 吞掉，于是 report_html 恒为 None，而前端仍照常
+                # 摆着「导出 HTML」按钮、下发一张写着"尚未生成"的白页。
+                # 这个 bug 能活这么久，靠的就是 `except Exception: pass`：
+                # 所以这里既不裸吞，也把原因回给调用方（见 ReviewResult.html_error）。
+                from runner.aggregator import render_html_report
+
+                report_html = render_html_report(report_json, html_template_path)
+            except Exception as exc:
+                html_error = f"HTML 报告渲染失败：{exc}"
+                logger.exception("review %s 的 HTML 报告渲染失败", review.id)
     return ReviewResult(
         session_id=review.id,
         report_json=report_json,
         report_md=report_md,
         report_html=report_html,
+        html_error=html_error,
     )
 
 

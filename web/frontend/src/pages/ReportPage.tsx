@@ -94,6 +94,47 @@ interface RealDegradation {
   notice?: string
 }
 
+/** 预算刹车（src/runner/cli.py 写进 report["budget"]）。
+ *  人格并发跑到一半刹不住车，但交叉质询是之后才发起的额外付费调用——超预算就跳过。
+ *  跳过之后「交叉质询」整节从页面上消失，页面上没有任何差别可看：
+ *  用户会理解成"这次没什么争议"，真相是"钱到顶了，辩论根本没跑"。 */
+interface RealBudget {
+  max_cost_per_run_usd?: number
+  persona_cost_usd?: number
+  exceeded?: boolean
+  skipped_stages?: string[]
+  notice?: string
+}
+
+/** 三层校验的门控结果（src/runner/cli.py 写进 report["validation"]）。
+ *  gated_out 里是"跑出来了但没过校验、因此不计入结论"的人格。
+ *  不渲染的话，用户只会觉得"我选了 8 个人怎么只出来 5 个"。 */
+interface RealValidation {
+  gated_out?: Array<{ persona_id?: string; failure_reason?: string }>
+}
+
+/** 显式点名人格的匹配结果（src/runner/cli.py 只在用户点名了人格时写这个键）。
+ *  notice 里是"你点名的角色有 N 个没参与"这类事实，不渲染的话用户会以为
+ *  自己点的人全都上场了。 */
+interface RealPanelSelection {
+  requested?: string[]
+  matched?: string[]
+  missing?: string[]
+  fell_back_to_auto?: boolean
+  notice?: string
+}
+
+/** 共识判定的明细（aggregator.compute_consensus 的 shared_concerns）：
+ *  谁提的、几人提的、合并了哪些措辞。给出来是让读者自己核对
+ *  "这几条真是同一件事吗"，而不是只看一个光秃秃的计数。 */
+interface RealSharedConcern {
+  issue?: string
+  personas?: string[]
+  persona_count?: number
+  is_consensus?: boolean
+  title_variants?: string[]
+}
+
 interface RealReport {
   /** 评审失败时 report_json 就是 {"error": ...}（v1 对外契约，见后端
    *  api/__init__.py::_report_json_for 与 services/report_gating.py：这个键被
@@ -109,18 +150,35 @@ interface RealReport {
     caveats?: string[]
   } | null
   executive_summary?: { primary_recommendation?: string; release_risk?: string; evidence_quality?: string } | null
-  consensus?: { agreed_points?: string[]; questioned_points?: string[] } | null
+  consensus?: {
+    agreed_points?: string[]
+    questioned_points?: string[]
+    shared_concerns?: RealSharedConcern[]
+    persona_count?: number
+    threshold?: number
+    min_personas_for_agreement?: number
+  } | null
   major_disagreements?: RealDisagreement[]
   priority_fixes?: RealPriorityFix[]
   persona_notes?: RealPersonaNote[]
   information_gaps?: string[]
-  next_human_test?: { suggested_tasks?: string[]; recruit_types?: string[]; next_materials?: string[] } | null
+  next_human_test?: {
+    suggested_tasks?: string[]
+    /** 引擎给的是本次面板的真实受众特征串（"25-32 · 中国华东 · 核心 · PC/Switch"），
+     *  不是人格名，也不是引擎推断的招募建议——标题文案必须按这个口径写 */
+    recruit_types?: string[]
+    recruit_types_basis?: string
+    next_materials?: string[]
+  } | null
   /** 库里同时存在三代形状（新 dict / 老 dict / 老 v1 的原始数组），所以保持
    *  unknown，一律经 toCrossExamView() 运行时收敛，不在类型层面撒谎。 */
   cross_examination?: unknown
   compliance?: { status?: string; ethics_score?: number; recommended_steps?: string[] } | null
   simulation_notice?: string | null
   degradation?: RealDegradation | null
+  budget?: RealBudget | null
+  validation?: RealValidation | null
+  panel_selection?: RealPanelSelection | null
   is_gated?: boolean
   gated_counts?: { priority_fixes_hidden?: number; persona_notes_hidden?: number }
 }
@@ -163,6 +221,17 @@ const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string;
 }
 
 const VALID_SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low']
+
+/** 评估记分卡的单维度满分。后端 evaluation_service.py 每个维度只产出 {0,1,2,3}，
+ *  passed = score >= 2；只有 scorecard.overall_score 是 0–100。
+ *  柱状图 Y 轴此前写死 0–100，于是满分 3 分的柱子恒定贴着地面，
+ *  整块看起来像"每个维度都接近零分"。 */
+const DIMENSION_MAX_SCORE = 3
+
+/** 维度 id 不在本地词表里时明说不认识，不把 snake_case 当正常标题直出 */
+function dimensionLabel(id: string, name?: string): string {
+  return name ?? `${id}（未知维度）`
+}
 
 function noteStance(note: RealPersonaNote): string {
   return note.stance ?? note.primary_stance ?? '未表态'
@@ -218,6 +287,134 @@ function DegradationNotice({ degradation }: { degradation?: RealDegradation | nu
             <p className="mt-1.5 text-sm text-text-primary">未完成的人格：{failedLabels.join('、')}</p>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** 校验门控：这些人格跑出来了，但输出没过 schema / 角色一致性 / 证据核对，
+ *  所以**不计入**下面任何结论。引擎只回传英文的失败类型枚举
+ *  （src/runner/cli.py 的 RETRY_SCHEMA / RETRY_ROLE_DRIFT / RETRY_HALLUCINATION），
+ *  这里逐条翻译；认不出的枚举原样显示，不猜、也不吞。 */
+const GATE_REASON_LABELS: Record<string, string> = {
+  schema_failure: '输出结构不合格（关键字段缺失或格式不对）',
+  role_drift: '角色漂移（没有按这个人格的设定作答）',
+  hallucination: '证据核对不通过（引用的原文在材料里找不到）',
+}
+
+function ValidationGateNotice({ validation }: { validation?: RealValidation | null }) {
+  const gatedOut = (validation?.gated_out ?? []).filter((g) => g.persona_id)
+  if (gatedOut.length === 0) return null
+  return (
+    <div className="mb-4 rounded-xl border border-warm-orange/50 bg-warm-orange/5 p-4">
+      <div className="flex items-start gap-3">
+        <Shield className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-warm-orange">
+            有 {gatedOut.length} 位人格的输出没通过质量校验，已被排除在下面的结论之外
+          </p>
+          <ul className="mt-2 space-y-1">
+            {gatedOut.map((g, i) => (
+              <li key={`${g.persona_id}-${i}`} className="text-sm text-text-primary">
+                <span className="font-mono text-xs text-text-muted">{g.persona_id}</span>
+                <span className="mx-1.5 text-text-muted">·</span>
+                {g.failure_reason
+                  ? GATE_REASON_LABELS[g.failure_reason] ?? `未知失败类型（${g.failure_reason}）`
+                  : '引擎没有回传失败类型'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 显式点名人格的匹配结果提示。引擎只在用户点名了人格时写 panel_selection，
+ *  有 notice（"你点名的角色有 N 个没参与"）就必须让用户不滚动也能看到——
+ *  否则用户会把结论当成"我点的那几个人的意见"。missing 为空时 notice 也为空，
+ *  这时不渲染，不给页面塞一条"一切正常"的废话。 */
+function PanelSelectionNotice({ panelSelection }: { panelSelection?: RealPanelSelection | null }) {
+  const notice = panelSelection?.notice?.trim()
+  if (!notice) return null
+  return (
+    <div className="mb-4 rounded-xl border border-warm-orange/50 bg-warm-orange/5 p-4">
+      <div className="flex items-start gap-3">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-warm-orange">你点名的人格没有全部参与本次评审</p>
+          <p className="mt-1.5 text-sm text-text-primary">{notice}</p>
+          {(panelSelection?.matched ?? []).length > 0 && (
+            <p className="mt-1.5 text-xs text-text-muted">
+              实际参与：{(panelSelection?.matched ?? []).join('、')}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 预算刹车提示。只在引擎明确写了 exceeded 时出现，数字全部取自 report.budget，
+ *  没有 notice 就用两个真实金额自己组一句——不编造任何金额或"节省了多少"。 */
+function BudgetNotice({ budget }: { budget?: RealBudget | null }) {
+  if (!budget?.exceeded) return null
+  const cap = budget.max_cost_per_run_usd
+  const spent = budget.persona_cost_usd
+  const fallback =
+    typeof cap === 'number' && typeof spent === 'number'
+      ? `本次评审在人格环节已花费约 $${spent.toFixed(2)}，达到单次上限 $${cap.toFixed(2)}（budget.yaml 的 max_cost_per_run_usd）。`
+      : '本次评审达到了单次成本上限。'
+  const stages = budget.skipped_stages ?? []
+  return (
+    <div className="mb-4 rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-warm-orange md:text-base">
+            成本达到单次上限，本次少跑了环节
+          </p>
+          <p className="mt-1.5 text-sm text-text-primary">{budget.notice?.trim() || fallback}</p>
+          {stages.includes('cross_examination') && (
+            <p className="mt-1.5 text-sm text-text-primary">
+              交叉质询未执行。下面没有「交叉质询」这一节，不代表人格之间没有分歧，
+              只代表这一轮没有跑辩论。
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 报告里根本没有交叉质询区块时的说明。
+ *
+ * 以前这里什么都不渲染，整节凭空消失，页面上和"跑过辩论、大家没分歧"长得一模一样。
+ * 缺席的原因引擎并没有逐条记进报告（可能是模式不含反驳环节、可能是没有真分歧、
+ * 也可能是预算刹车），所以这里只在 budget.exceeded 时点名成本原因，其余情况
+ * 如实说"报告没有记录原因"——猜一个具体理由和之前一声不吭同样是误导。
+ */
+function CrossExamAbsentNotice({ budget }: { budget?: RealBudget | null }) {
+  const skippedForCost = budget?.exceeded === true && (budget.skipped_stages ?? []).includes('cross_examination')
+  return (
+    <div className="mb-6">
+      <div className="mb-4 flex items-center gap-2">
+        <Swords className="h-5 w-5 text-text-muted" strokeWidth={1.25} />
+        <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+      </div>
+      <div className="rounded-xl border border-border bg-bg-secondary/40 p-4 text-sm text-text-secondary md:p-5">
+        {skippedForCost ? (
+          <p>
+            本次没有执行交叉质询：人格环节的花费已达到单次成本上限，为免继续加钱而跳过（详见页面顶部的成本提示）。
+            这不代表人格之间没有分歧，只代表这一轮没有跑辩论。
+          </p>
+        ) : (
+          <p>
+            这份报告里没有交叉质询记录。报告没有写明原因，可能是这一档评审模式不包含反驳环节，
+            也可能是人格之间没有出现值得反驳的对立观点。请不要把它读成"大家意见一致"。
+          </p>
+        )}
       </div>
     </div>
   )
@@ -827,6 +1024,10 @@ export default function ReportPage() {
   const [calibration, setCalibration] = useState<RealCalibration | null>(null)
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null)
   const [reportHtml, setReportHtml] = useState<string | null>(null)
+  /** HTML 版本为什么没有。以前 /result 的失败是 `.catch(() => {})`，HTML 按钮
+   *  照样亮着，点下去下载一张只写着「HTML报告尚未生成」的白页——用户会以为
+   *  自己的报告内容丢了。现在原因如实留着，按钮也不再假装可用。 */
+  const [htmlUnavailable, setHtmlUnavailable] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   // 加载失败必须留痕：以前 catch 里什么都不存，网络错误/403/500 全落到
   // "报告尚未生成"那一句上，用户既不知道原因也没法重试。
@@ -924,10 +1125,25 @@ export default function ReportPage() {
     // 里面 !reportMarkdown 的守卫是为了不覆盖上方 loadData 已取到的 markdown。
     fetchReviewResult(id)
       .then((result) => {
-        if (result.report_html) setReportHtml(result.report_html)
+        // html_error 是后端 ReviewResult schema 里真实存在的字段（渲染失败的原因），
+        // 但前端的 ReviewResultData 类型里还没有它，所以在这里就地放宽——
+        // 那个类型定义在 lib/mock-data.ts，不归本次改动范围。
+        const withError = result as typeof result & { html_error?: string | null }
+        if (result.report_html) {
+          setReportHtml(result.report_html)
+          setHtmlUnavailable(null)
+        } else {
+          setHtmlUnavailable(
+            withError.html_error?.trim() || '后端没有回传这份报告的 HTML 版本（也没有说明原因）。'
+          )
+        }
         if (result.report_md && !reportMarkdown) setReportMarkdown(result.report_md)
       })
-      .catch(() => {})
+      .catch((error: unknown) => {
+        setHtmlUnavailable(
+          `取 HTML 版本失败：${error instanceof Error ? error.message : String(error)}`
+        )
+      })
   }, [id])
 
   useEffect(() => {
@@ -1017,7 +1233,10 @@ export default function ReportPage() {
       mimeType = 'application/json'
       ext = 'json'
     } else if (format === 'html') {
-      content = reportHtml ?? '<!DOCTYPE html><html><body><p>HTML报告尚未生成</p></body></html>'
+      // 没有 HTML 就什么都不下载。造一张写着"尚未生成"的白页当报告发出去，
+      // 用户拿到的是一个看起来像损坏文件的东西，还会以为内容丢了。
+      if (!reportHtml) return
+      content = reportHtml
       mimeType = 'text/html'
       ext = 'html'
     } else {
@@ -1046,6 +1265,9 @@ export default function ReportPage() {
         </div>
       )}
       <DegradationNotice degradation={report.degradation} />
+      <ValidationGateNotice validation={report.validation} />
+      <BudgetNotice budget={report.budget} />
+      <PanelSelectionNotice panelSelection={report.panel_selection} />
 
       <div className="flex items-center gap-3 mb-6">
         <Link to={`/review/${id}`} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
@@ -1080,13 +1302,32 @@ export default function ReportPage() {
           </button>
           <button
             onClick={() => handleExport('html')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-warm-orange/30 hover:text-warm-orange transition-all"
+            disabled={!reportHtml}
+            title={reportHtml ? undefined : htmlUnavailable ?? 'HTML 版本还在生成中'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all',
+              reportHtml
+                ? 'bg-bg-card border-border text-text-secondary hover:border-warm-orange/30 hover:text-warm-orange'
+                : 'bg-bg-secondary border-border text-text-muted cursor-not-allowed'
+            )}
           >
             <Globe className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">HTML</span>
           </button>
         </div>
       </div>
+
+      {/* HTML 版本缺席要说原因。禁用按钮的 title 只有把鼠标停上去才看得到，
+          而这件事（"这份报告没有 HTML 版"还是"渲染坏了"）用户有权直接读到。 */}
+      {!reportHtml && htmlUnavailable && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-border bg-bg-secondary/40 p-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" strokeWidth={1.5} />
+          <p className="text-xs text-text-secondary break-all">
+            这份报告没有 HTML 可视化版本：{htmlUnavailable}
+            上面的网页内容和 JSON / Markdown 导出不受影响。
+          </p>
+        </div>
+      )}
 
       {reportHtml && (
         <div className="mb-6">
@@ -1150,7 +1391,11 @@ export default function ReportPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-text-muted">共识点 / 存疑点</dt>
+            {/* 口径跟 aggregator.compute_consensus 的 docstring 对齐：
+                agreed_points = 至少两位人格各自提到的同一议题；
+                questioned_points = 只有个别人格提出的关切，不是"大家共同质疑"。
+                写成"存疑点"会被读反。 */}
+            <dt className="text-xs text-text-muted">共识议题 / 个别人格单独提出</dt>
             {/* 报告压根没有 consensus 区块时显示「—」：0/0 会被读成"跑过了、没找到共识问题"，
                 和"这一节根本没产出"是两回事 */}
             <dd className="mt-1 font-medium text-text-primary">
@@ -1158,6 +1403,15 @@ export default function ReportPage() {
                 ? `${report.consensus.agreed_points?.length ?? 0} / ${report.consensus.questioned_points?.length ?? 0}`
                 : '—'}
             </dd>
+            {/* 判定口径来自引擎的 min_personas_for_agreement，不在前端重算——
+                引擎改阈值时这里自动跟着变，两套口径并存正是要避免的坑 */}
+            {typeof report.consensus?.min_personas_for_agreement === 'number' &&
+              report.consensus.min_personas_for_agreement > 0 && (
+                <p className="mt-0.5 text-xs text-text-muted">
+                  判定口径：同一议题被 ≥{report.consensus.min_personas_for_agreement}/
+                  {report.consensus.persona_count ?? '?'} 位人格各自独立提出
+                </p>
+              )}
           </div>
         </dl>
       </div>
@@ -1210,11 +1464,29 @@ export default function ReportPage() {
           <h3 className="text-sm font-medium text-text-muted mb-4">校准指标</h3>
           {calibration ? (
             <>
-              <div className="flex justify-around">
-                <CalibrationGauge label="角色一致性" value={calibration.role_consistency?.average ?? 0} />
-                <CalibrationGauge label="视角覆盖度" value={calibration.coverage?.average_distance ?? 0} />
+              {/* 合格线全部来自 src/runner/calibration.py::run_calibration_check：
+                  overall_pass = role_consistency.average >= 0.8 且 coverage.average_distance >= 0.3。
+                  无幻觉率**没有**参与 overall_pass，引擎里只有"单个人格幻觉率 > 0.5 记为高风险"
+                  这一条，跟这里的平均值不是同一个量，所以不给它安合格线——
+                  给一条编出来的线，就等于凭空判一个指标合格或不合格。 */}
+              <div className="flex flex-wrap justify-around gap-2">
+                <CalibrationGauge
+                  label="角色一致性"
+                  value={calibration.role_consistency?.average}
+                  passLine={0.8}
+                />
+                <CalibrationGauge
+                  label="视角覆盖度"
+                  value={calibration.coverage?.average_distance}
+                  passLine={0.3}
+                />
                 {calibration.hallucination != null && (
-                  <CalibrationGauge label="无幻觉率" value={1 - (calibration.hallucination.average ?? 0)} />
+                  <CalibrationGauge
+                    label="无幻觉率"
+                    value={
+                      calibration.hallucination.average == null ? null : 1 - calibration.hallucination.average
+                    }
+                  />
                 )}
               </div>
               {calibration.overall_pass != null && (
@@ -1361,6 +1633,58 @@ export default function ReportPage() {
         </div>
       )}
 
+      {/* ---------- 共识明细（引擎的 shared_concerns：谁提的、几人提的） ----------
+          给出明细是让读者自己核对"这几条真是同一件事吗"，
+          而不是只看执行摘要里一个光秃秃的计数 */}
+      {(report.consensus?.shared_concerns?.length ?? 0) > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
+            <h3 className="text-lg font-semibold text-text-primary">议题共识明细</h3>
+            {typeof report.consensus?.min_personas_for_agreement === 'number' &&
+              report.consensus.min_personas_for_agreement > 0 && (
+                <span className="text-xs text-text-muted">
+                  共识 = 同一议题被 ≥{report.consensus.min_personas_for_agreement}/
+                  {report.consensus.persona_count ?? '?'} 位人格各自独立提出
+                </span>
+              )}
+          </div>
+          <div className="flex flex-col gap-2">
+            {report.consensus!.shared_concerns!.map((c, i) => (
+              <div key={i} className="rounded-xl border border-border bg-bg-card p-3 md:p-4">
+                <div className="flex items-start gap-2">
+                  <span
+                    className={cn(
+                      'shrink-0 px-1.5 py-0.5 rounded text-xs font-medium',
+                      c.is_consensus
+                        ? 'bg-brand-primary/10 text-brand-primary'
+                        : 'bg-bg-secondary text-text-muted'
+                    )}
+                  >
+                    {c.is_consensus ? '共识' : '个别提出'}
+                  </span>
+                  <p className="text-sm text-text-primary min-w-0">{c.issue}</p>
+                  <span className="ml-auto shrink-0 text-xs text-text-muted">
+                    {c.persona_count ?? c.personas?.length ?? '?'} 人提出
+                  </span>
+                </div>
+                {(c.personas?.length ?? 0) > 0 && (
+                  <p className="mt-1.5 text-xs font-mono text-text-muted">
+                    {c.personas!.join('、')}
+                  </p>
+                )}
+                {/* 合并了不同措辞时把原话列出来，读者才能核对聚类是否靠谱 */}
+                {(c.title_variants?.length ?? 0) > 1 && (
+                  <p className="mt-1 text-xs text-text-muted">
+                    合并的措辞：{c.title_variants!.join(' / ')}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ---------- 主要分歧 ---------- */}
       {disagreements.length > 0 && (
         <div className="mb-6">
@@ -1393,7 +1717,7 @@ export default function ReportPage() {
       )}
 
       {/* ---------- 交叉质询（争议点 / 反驳 / 改票）---------- */}
-      {crossExam && <CrossExamSection view={crossExam} />}
+      {crossExam ? <CrossExamSection view={crossExam} /> : <CrossExamAbsentNotice budget={report.budget} />}
 
       {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -1425,10 +1749,18 @@ export default function ReportPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-text-muted mb-1">建议招募的人群</dt>
+                {/* 标题不能写"建议招募的人群"：recruit_types 是本次 AI 面板覆盖的
+                    受众特征串（取自人格档案的真实属性），引擎并没有算"你该找谁"。
+                    写成招募建议就是把没算过的东西说成算过了。 */}
+                <dt className="text-xs text-text-muted mb-1">本次面板覆盖的受众特征</dt>
                 <dd className="text-text-secondary">
                   {(report.next_human_test.recruit_types ?? []).join('、') || '—'}
                 </dd>
+                {report.next_human_test.recruit_types_basis?.trim() && (
+                  <p className="mt-1 text-xs text-text-muted">
+                    {report.next_human_test.recruit_types_basis}
+                  </p>
+                )}
               </div>
               <div>
                 <dt className="text-xs text-text-muted mb-1">需要补充的材料</dt>
@@ -1498,7 +1830,8 @@ export default function ReportPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
             <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-              <h4 className="text-sm font-medium text-text-muted mb-4">总体评分</h4>
+              {/* 标出满分：右边那块维度分是 0–3，不写清楚两个数看起来是同一把尺子 */}
+              <h4 className="text-sm font-medium text-text-muted mb-4">总体评分（满分 100）</h4>
               <div className="flex items-center gap-4">
                 <div className={cn(
                   'w-20 h-20 rounded-full flex items-center justify-center border-4',
@@ -1538,19 +1871,19 @@ export default function ReportPage() {
             </div>
 
             <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-              <h4 className="text-sm font-medium text-text-muted mb-4">维度评分</h4>
+              <h4 className="text-sm font-medium text-text-muted mb-4">维度评分（每项满分 3，合格线 2）</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={evaluationScorecard.results.map((r) => {
                   const dim = EVALUATION_DIMENSIONS.find((d) => d.id === r.dimension)
                   return {
-                    name: dim?.name ?? r.dimension,
+                    name: dimensionLabel(r.dimension, dim?.name),
                     score: r.score,
                     fill: r.passed ? '#0071e3' : '#ff3355',
                   }
                 })}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#86868b' }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#86868b' }} />
+                  <YAxis domain={[0, DIMENSION_MAX_SCORE]} ticks={[0, 1, 2, 3]} tick={{ fontSize: 10, fill: '#86868b' }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
                   itemStyle={{ color: '#ffffff' }}
@@ -1579,13 +1912,13 @@ export default function ReportPage() {
                     className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-bg-card-hover transition-colors"
                   >
                     <div className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono',
+                      'w-10 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono',
                       result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                     )}>
-                      {result.score}
+                      {result.score}/{DIMENSION_MAX_SCORE}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-text-primary">{dim?.name ?? result.dimension}</span>
+                      <span className="text-sm font-medium text-text-primary">{dimensionLabel(result.dimension, dim?.name)}</span>
                       <span className={cn(
                         'ml-2 text-xs px-1.5 py-0.5 rounded',
                         result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
@@ -1601,7 +1934,7 @@ export default function ReportPage() {
                   </button>
                   {expanded && (
                     <div className="px-4 pb-3 border-t border-border pt-2">
-                      <p className="text-xs text-text-muted mb-1">{dim?.description}</p>
+                      <p className="text-xs text-text-muted mb-1">{dim?.description ?? '本地词表里没有这个维度的说明'}</p>
                       <p className="text-sm text-text-secondary">{result.details}</p>
                     </div>
                   )}
@@ -1921,6 +2254,33 @@ function generateMarkdown(report: RealReport): string {
     lines.push(`> **⚠️ ${report.degradation.notice}**`)
     lines.push('')
   }
+  // 导出件同样是"一份报告"：网页上置顶的两条坏消息（谁被校验拦下、
+  // 有没有因为预算跳过环节）不能只存在于网页里
+  const gatedOut = (report.validation?.gated_out ?? []).filter((g) => g.persona_id)
+  if (gatedOut.length) {
+    lines.push(`> **⚠️ 有 ${gatedOut.length} 位人格的输出没通过质量校验，未计入以下结论：**`)
+    for (const g of gatedOut) {
+      const reason = g.failure_reason
+        ? GATE_REASON_LABELS[g.failure_reason] ?? `未知失败类型（${g.failure_reason}）`
+        : '引擎没有回传失败类型'
+      lines.push(`> - ${g.persona_id}：${reason}`)
+    }
+    lines.push('')
+  }
+  if (report.budget?.exceeded) {
+    const notice = report.budget.notice?.trim() || '本次评审达到了单次成本上限。'
+    lines.push(`> **⚠️ ${notice}**`)
+    if ((report.budget.skipped_stages ?? []).includes('cross_examination')) {
+      lines.push('> 交叉质询未执行——本报告没有这一节，不代表人格之间没有分歧。')
+    }
+    lines.push('')
+  }
+  // 点名人格没全部参与也是坏消息之一，导出件里同样不能只字不提
+  const panelNotice = report.panel_selection?.notice?.trim()
+  if (panelNotice) {
+    lines.push(`> **⚠️ ${panelNotice}**`)
+    lines.push('')
+  }
   if (summary) {
     lines.push(`## 发布风险：${RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '未知'}`)
     lines.push('')
@@ -1963,6 +2323,16 @@ function generateMarkdown(report: RealReport): string {
         lines.push(`- 过程中有 ${crossExam.failures.length} 条失败：${crossExam.failures.map((f) => f.error).join('；')}`)
       }
     }
+    lines.push('')
+  } else {
+    // 整节缺席也要写出来：导出件里少一节，读者只会当"这次没什么争议"
+    lines.push('## 交叉质询')
+    lines.push('')
+    lines.push(
+      report.budget?.exceeded && (report.budget.skipped_stages ?? []).includes('cross_examination')
+        ? '本次没有执行交叉质询：成本已达单次上限，为免继续加钱而跳过。这不代表人格之间没有分歧。'
+        : '这份报告里没有交叉质询记录，报告也没有写明原因（可能是这一档评审模式不包含反驳环节，也可能是没有出现值得反驳的对立观点）。请不要读成"大家意见一致"。'
+    )
     lines.push('')
   }
   const gaps = report.information_gaps ?? []

@@ -256,7 +256,10 @@
       <span class="sep">|</span>
       <span>👤 {{persona_count}} 位模拟评审员</span>
       <span class="sep">|</span>
-      <span>📦 v{{meta.build_version}}</span>
+      {# 版本号取不到就整个不显示。以前这里恒定打印 "📦 v0.1.0"，而真实包版本
+         早就不是 0.1.0：用户按它追溯"这份结论是哪个引擎跑的"会追错对象。 #}
+      {% if meta.build_version %}<span>📦 v{{meta.build_version}}</span>{% endif %}
+      {% if meta.persona_pack_version %}<span class="sep">|</span><span>🎭 {{meta.persona_pack_version}}</span>{% endif %}
     </div>
   </div>
 
@@ -276,38 +279,70 @@
     </div>
   </div>
 
-  <!-- Validation Badge -->
-  {% if validation and validation.harness_score is defined %}
+  <!-- 校准指标 -->
+  {# 这里原来是三张 Harness 评分 / 证据接地率 / Persona 差异化度的卡片，等的是
+     validation.harness_score / grounding_rate / divergence_score —— 引擎从来没有
+     任何地方写过这三个字段，整块永远不渲染，等于承诺了一项不存在的能力。
+     现在改读引擎真算得出来的 calibration（src/runner/calibration.py，由
+     cli.run_panel 挂进 report["validation"]["calibration"]）。
+     阈值写在卡片上：一个没有基准的小数会被读者自己脑补成好或坏。 #}
+  {% if validation and validation.calibration %}
+  {% set cal = validation.calibration %}
   <div class="summary-hud">
-    <div class="hud-card harness">
-      <div class="hud-label">Harness 评分</div>
-      <div class="hud-value" style="color:var(--green)">{{validation.harness_score}}<span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono)">/40</span></div>
-      <div class="validation-status {{'pass' if validation.harness_score >= 28 else 'fail'}}">{{'PASS' if validation.harness_score >= 28 else 'FAIL'}}</div>
-      <div class="hud-sub">阈值 28/40</div>
+    <div class="hud-card">
+      <div class="hud-label">角色一致性</div>
+      <div class="hud-value" style="color:var(--green)">{{cal.role_consistency.average | round(4)}}</div>
+      <div class="hud-sub">合格线 ≥0.8</div>
     </div>
-    <div class="hud-card grounding">
-      <div class="hud-label">证据接地率</div>
-      <div class="hud-value" style="color:var(--cyan)">{{validation.grounding_rate}}<span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono)">%</span></div>
-      <div class="hud-sub">direct 证据占比</div>
+    <div class="hud-card">
+      <div class="hud-label">视角覆盖度</div>
+      {# n<2 时覆盖度无定义（not_applicable）：如实写"不适用"，不许打印 0.0
+         再让读者以为覆盖度极差——与 Markdown 模板同一口径。 #}
+      {% if cal.coverage.not_applicable %}
+      <div class="hud-value" style="color:var(--cyan)">不适用</div>
+      <div class="hud-sub">单人格无覆盖度指标</div>
+      {% else %}
+      <div class="hud-value" style="color:var(--cyan)">{{cal.coverage.average_distance | round(4)}}</div>
+      <div class="hud-sub">人格间平均距离，合格线 ≥0.3</div>
+      {% endif %}
     </div>
-    <div class="hud-card divergence">
-      <div class="hud-label">Persona 差异化度</div>
-      <div class="hud-value" style="color:var(--magenta)">{{validation.divergence_score}}</div>
-      <div class="hud-sub">Jaccard 距离均值</div>
+    {% if cal.hallucination %}
+    <div class="hud-card">
+      <div class="hud-label">幻觉率</div>
+      <div class="hud-value" style="color:var(--magenta)">{{cal.hallucination.average | round(4)}}</div>
+      <div class="hud-sub">越低越好</div>
     </div>
+    {% endif %}
   </div>
+  <div class="validation-status {{'pass' if cal.overall_pass else 'fail'}}">{{'校准通过' if cal.overall_pass else '校准未通过'}}</div>
   {% endif %}
 
   <!-- Consensus -->
   <div class="section-card">
-    <div class="section-title"><span class="icon">🤝</span> 共识</div>
+    {# 这一节统计的是**议题**：各人格的 key_issues 按相似度聚类后，看同一件事被
+       多少位人格各自独立提到。以前列的是立场标签（"加愿望单"这种词）的频次分布，
+       却挂在"共识"标题下，读者会当成引擎找到了 N 个共识点。判定口径必须写出来，
+       否则"3 条共识"这种数字既无法核对也无法证伪。 #}
+    <div class="section-title"><span class="icon">🤝</span> 共识（按议题）</div>
+    {% if consensus.persona_count %}
+    <div style="font-size:12px;opacity:.8;margin-bottom:10px">
+      判定口径：同一议题被 ≥{{consensus.min_personas_for_agreement}}/{{consensus.persona_count}} 位人格各自独立提出。
+    </div>
+    {% endif %}
+    <div class="sub-title">多数 persona 共同提出的议题</div>
+    {% if consensus.agreed_points %}
     <ul class="point-list agree">
       {% for point in consensus.agreed_points %}
       <li><span class="dot"></span>{{point}}</li>
       {% endfor %}
     </ul>
+    {% else %}
+    <div style="font-size:12px;opacity:.8">本次没有任何议题达到共识门槛。</div>
+    {% endif %}
     {% if consensus.questioned_points %}
-    <ul class="point-list question" style="margin-top:12px">
+    {# 旧标题是"共同质疑的点"，装的却是少数派：少数人持有某看法 ≠ 大家共同质疑它 #}
+    <div class="sub-title" style="margin-top:12px">仅个别 persona 提出的议题</div>
+    <ul class="point-list question">
       {% for point in consensus.questioned_points %}
       <li><span class="dot"></span>{{point}}</li>
       {% endfor %}
@@ -328,7 +363,11 @@
         <span class="stance-text">{{ps.stance}} — {{ps.evidence}}</span>
       </div>
       {% endfor %}
+      {# 引擎不再产出 resolution_suggestion（原来是把标题回填进一句英文套话），
+         所以这里必须加守卫，否则渲染出一个空的"调解建议"框，看起来像算过但没结论。 #}
+      {% if d.resolution_suggestion %}
       <div class="disagreement-resolution">{{d.resolution_suggestion}}</div>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
@@ -596,8 +635,15 @@
       </div>
       {% endif %}
       {% if next_human_test.recruit_types %}
+      {# 标题不能再叫"建议招募类型"：引擎没有推断"下一步该招募谁"，它能给出的
+         只有"本次面板覆盖了哪些受众特征"（取自人格档案的真实属性）。旧版这里
+         逐条列本次跑过的 AI 人格名字，等于把合成人格清单当真人受众画像发出去，
+         与报告顶部的合成声明和 ETHICS.md 直接冲突。 #}
       <div class="next-step-card">
-        <div class="sub-title">建议招募类型</div>
+        <div class="sub-title">本次面板覆盖的受众特征</div>
+        {% if next_human_test.recruit_types_basis %}
+        <div style="font-size:12px;opacity:.8;margin-bottom:6px">{{next_human_test.recruit_types_basis}}</div>
+        {% endif %}
         <ul>
           {% for rt in next_human_test.recruit_types %}
           <li>{{rt}}</li>
@@ -620,6 +666,21 @@
   {% endif %}
 
 
+  <!-- Limitations & Caveats -->
+  {# HTML 报告此前完全没有这一节，Markdown 有标题但恒为空（引擎从不汇总 caveats）。
+     人格提示词要求每个人格至少声明一条限制条件，这些声明是读者判断"这份结论能
+     用到什么程度"的唯一依据，丢掉它等于让报告显得比实际更可靠。 #}
+  {% if meta.caveats %}
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚠️</span> 各人格声明的限制条件</div>
+    <ul class="point-list question">
+      {% for caveat in meta.caveats %}
+      <li><span class="dot"></span>{{caveat}}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <!-- Compliance Banner -->
   {% if compliance %}
   <div class="compliance-banner">
@@ -628,11 +689,16 @@
       <div class="compliance-status {{compliance.status_class}}">{{compliance.status}}</div>
     </div>
     <div class="compliance-body">
+      {# 这个分数唯一的输入是身份-行为解耦检查的违规条数（100 − 10×条数），
+         与隐私、刻板印象、材料合规等维度无关。原来它顶着"伦理合规评分"的名字、
+         配一条百分比进度条：读者会把"100"理解成通过了一整套伦理审查。
+         改成如实写检查项名称和违规条数，分数保留但把公式摆出来。 #}
       <div class="compliance-score-block">
-        <div class="compliance-score-label">伦理合规评分</div>
-        <div class="compliance-score-value score-{{compliance.score_class}}">{{compliance.ethics_score}}</div>
-        <div class="compliance-score-bar">
-          <div class="compliance-score-bar-fill {{compliance.score_class}}" style="width:{{compliance.ethics_score}}%"></div>
+        <div class="compliance-score-label">{{compliance.scope_label or "身份-行为解耦检查"}}</div>
+        <div class="compliance-score-value score-{{compliance.score_class}}">{{compliance.violation_count}} 项违规</div>
+        <div style="font-size:12px;opacity:.8;margin-top:8px">
+          得分 {{compliance.ethics_score}}（= 100 − 10 × 违规条数）。
+          本项<b>只</b>检查人格是否把身份直接当成行为理由，不覆盖隐私、刻板印象、材料合规等其它维度。
         </div>
       </div>
       <div class="compliance-steps-block">

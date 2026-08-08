@@ -22,16 +22,66 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     AuthToken,
+    CdkCode,
     CdkRedemption,
     Conversation,
     CreditLedger,
+    EthicsReport,
+    EvaluationResult,
+    EvaluationScorecard,
+    FeedbackAdoption,
     Job,
+    Judgment,
+    Outcome,
     Review,
     ReviewChatMessage,
+    ReviewFeedback,
+    UploadedFile,
     User,
     UserApiKey,
     UsageRecord,
 )
+
+
+# 「导出覆盖了哪些表」的唯一声明处，由 tests/test_user_data_rights.py 钉住：
+# 新加一张表而不在这两个集合之一里登记，测试立刻变红。
+#
+# 为什么要这么钉：导出功能天然会随时间腐化——加表的人只关心新功能，
+# 不会想起"删号前先导出留个备份"这句承诺。而腐化的表现是静默的：
+# 导出照样成功，只是少了几类内容，用户照做之后删号，那些内容永久消失
+# 且从未出现在备份里。没有护栏就没有任何人会发现。
+EXPORTED_TABLES = frozenset({
+    "users",
+    "user_api_keys",
+    "reviews",
+    "persona_outputs",
+    "review_chat_messages",
+    "conversations",
+    "conversation_messages",
+    "uploaded_files",
+    "evaluation_results",
+    "evaluation_scorecards",
+    "ethics_reports",
+    "judgments",
+    "outcomes",
+    "review_feedback",
+    "feedback_adoptions",
+    "usage_records",
+    "jobs",
+    "cdk_redemptions",
+    "credit_ledger",
+})
+
+# 明确不导出，每条都要有理由——"忘了"和"故意不给"必须能被区分开。
+EXPORT_EXEMPT_TABLES = {
+    # 邮箱验证/密码重置令牌的哈希。对用户零信息价值，写进一个会被随手
+    # 放进下载目录的文件里只是凭空多一个凭据泄露面。
+    "auth_tokens": "认证令牌哈希，对用户无信息价值且属于凭据",
+    # 平台侧库存/配置/审计，不是任何一个用户的内容。
+    "platform_settings": "平台运行时配置，非用户内容",
+    "cdk_codes": "平台兑换码库存；用户自己的兑换记录见 cdk_redemptions",
+    "admin_audit_log": "管理员操作审计流水，非用户内容",
+}
 
 
 def _iso(dt) -> str:
@@ -53,14 +103,53 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
         .all()
     )
 
+    # 评审的六类附属数据按 review_ids 一次性批量取回、内存里按 review_id 分组。
+    # 以前是每条评审 5~6 次独立查询：200 条评审 = 1000+ 次往返，而这个导出端点
+    # 是同步的——用户点一下"导出"，请求就挂在那里等一千次查询跑完。
+    # 排序沿用原来的口径（chat 按 created_at、judgment 按 predicted_at），
+    # 由 SQL 全局排序 + 稳定分组保证每组内部顺序不变，导出内容逐字节等价。
+    review_ids = [r.id for r in reviews]
+
+    chats_by_review: Dict[str, list] = {}
+    judgments_by_review: Dict[str, list] = {}
+    feedback_by_review: Dict[str, Any] = {}
+    evaluations_by_review: Dict[str, list] = {}
+    scorecard_by_review: Dict[str, Any] = {}
+    ethics_by_review: Dict[str, list] = {}
+    if review_ids:
+        for m in (
+            db.query(ReviewChatMessage)
+            .filter(ReviewChatMessage.review_id.in_(review_ids))
+            .order_by(ReviewChatMessage.created_at)
+        ):
+            chats_by_review.setdefault(m.review_id, []).append(m)
+        for j in (
+            db.query(Judgment)
+            .filter(Judgment.review_id.in_(review_ids))
+            .order_by(Judgment.predicted_at)
+        ):
+            judgments_by_review.setdefault(j.review_id, []).append(j)
+        # 语义与原来的 .first() 一致：一条评审至多取一份反馈，
+        # setdefault 保证有多行时只保留先出现的那行
+        for fb in db.query(ReviewFeedback).filter(ReviewFeedback.review_id.in_(review_ids)):
+            feedback_by_review.setdefault(fb.review_id, fb)
+        for e in db.query(EvaluationResult).filter(EvaluationResult.review_id.in_(review_ids)):
+            evaluations_by_review.setdefault(e.review_id, []).append(e)
+        # EvaluationScorecard 的主键就是 review_id（原来是 db.get(…, r.id)）
+        for sc in db.query(EvaluationScorecard).filter(EvaluationScorecard.review_id.in_(review_ids)):
+            scorecard_by_review[sc.review_id] = sc
+        for er in db.query(EthicsReport).filter(EthicsReport.review_id.in_(review_ids)):
+            ethics_by_review.setdefault(er.review_id, []).append(er)
+
     review_payload = []
     for r in reviews:
-        chats = (
-            db.query(ReviewChatMessage)
-            .filter(ReviewChatMessage.review_id == r.id)
-            .order_by(ReviewChatMessage.created_at)
-            .all()
-        )
+        chats = chats_by_review.get(r.id, [])
+        judgments = judgments_by_review.get(r.id, [])
+        feedback = feedback_by_review.get(r.id)
+        evaluations = evaluations_by_review.get(r.id, [])
+        scorecard = scorecard_by_review.get(r.id)
+        ethics = ethics_by_review.get(r.id, [])
+
         review_payload.append(
             {
                 "id": r.id,
@@ -69,15 +158,28 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
                 "project_key": r.project_key,
                 "mode": r.mode,
                 "status": r.status,
+                # 失败原因也要给。导出件里一条 status=failed 却不说为什么，
+                # 用户只会当成"我的评审不见了"。
+                "error_message": r.error_message,
                 "created_at": _iso(r.created_at),
                 "completed_at": _iso(r.completed_at),
                 "total_cost_usd": r.total_cost_usd,
                 "input_tokens": r.input_tokens,
                 "output_tokens": r.output_tokens,
+                # 这四项是用户自己选的评审参数。不带走的话，导出件只是一堆
+                # 结果文本，没法回答"这次是用哪个人格包、哪些人格、什么技能跑的"，
+                # 也就无法据此重建一次评审。
+                "persona_pack": r.persona_pack,
+                "selected_personas": r.selected_personas,
+                "skill_type": r.skill_type,
+                "enable_red_team": r.enable_red_team,
                 # 用户自己上传的原始材料——这是"我的东西"的核心，必须给全
                 "artifact_bundle": r.artifact_bundle,
                 "report_json": r.report_json,
                 "report_markdown": r.report_markdown,
+                # 置信度校准是报告页真的会显示给用户的一块内容，
+                # 缺了它导出件和用户在页面上看到的报告就不是同一份东西。
+                "calibration": r.calibration,
                 "persona_outputs": [
                     {
                         "persona_id": po.persona_id,
@@ -99,11 +201,118 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
                     }
                     for m in chats
                 ],
+                # 以下四块在 delete_user_data 的 docstring 里被明确列为
+                # "立即物理删除的用户内容"，删除侧逐项删、导出侧此前一条都没给。
+                # 用户被建议"删号前先导出留个备份"，照做之后这些内容永久消失
+                # 且从未出现在备份里——那是这个功能能犯的最严重的错。
+                "judgments": [
+                    {
+                        "id": j.id,
+                        "persona_id": j.persona_id,
+                        "claim": j.claim,
+                        "severity": j.severity,
+                        "confidence": j.confidence,
+                        "evidence": j.evidence,
+                        "predicted_at": _iso(j.predicted_at),
+                        # 事后验证结果与判断是一体的，分开导出等于把
+                        # "当时预测了什么"和"后来是否说中"割裂开，两边都失去意义
+                        "outcome": (
+                            {
+                                "verdict": j.outcome.verdict,
+                                "source": j.outcome.source,
+                                "note": j.outcome.note,
+                                "verified_at": _iso(j.outcome.verified_at),
+                            }
+                            if j.outcome
+                            else None
+                        ),
+                    }
+                    for j in judgments
+                ],
+                "feedback": (
+                    {
+                        "useful": feedback.useful,
+                        "decision_changed": feedback.decision_changed,
+                        "fixes_suggested": feedback.fixes_suggested,
+                        "fixes_adopted": feedback.fixes_adopted,
+                        "hours_saved": feedback.hours_saved,
+                        "willingness_to_pay_usd": feedback.willingness_to_pay_usd,
+                        "note": feedback.note,
+                        "created_at": _iso(feedback.created_at),
+                        "adoptions": [
+                            {"fix_title": a.fix_title, "created_at": _iso(a.created_at)}
+                            for a in feedback.adoptions
+                        ],
+                    }
+                    if feedback
+                    else None
+                ),
+                "evaluation": (
+                    {
+                        "overall_score": scorecard.overall_score,
+                        "passed": scorecard.passed,
+                        "critical_failures": scorecard.critical_failures_json or [],
+                        "created_at": _iso(scorecard.created_at),
+                    }
+                    if scorecard
+                    else None
+                ),
+                "evaluation_results": [
+                    {
+                        "dimension": e.dimension,
+                        "score": e.score,
+                        "passed": e.passed,
+                        "details": e.details,
+                        "evaluated_at": _iso(e.evaluated_at),
+                    }
+                    for e in evaluations
+                ],
+                "ethics_reports": [
+                    {
+                        "persona_id": er.persona_id,
+                        "passed": er.passed,
+                        "score": er.score,
+                        # violations_json 里含用户材料的摘录——正因为它是用户内容，
+                        # 删除侧才要物理删，导出侧也就必须给
+                        "violations": er.violations_json or [],
+                        "stereotype_risk": er.stereotype_risk,
+                        "created_at": _iso(er.created_at),
+                    }
+                    for er in ethics
+                ],
             }
         )
 
     keys = db.query(UserApiKey).filter(UserApiKey.user_id == user_id).all()
     usage = db.query(UsageRecord).filter(UsageRecord.user_id == user_id).all()
+    jobs = db.query(Job).filter(Job.user_id == user_id).order_by(Job.created_at).all()
+
+    # 上传的图片：只导元信息，不把字节 base64 进 JSON。
+    # 一张 1MB 截图 base64 之后是 1.37MB 文本，几十张就能让导出件大到打不开，
+    # 而用户真正想确认的是"我传过哪些图、还在不在"。
+    # 附带说明下载地址，让这份清单是可兑现的而不是一串没法用的 id。
+    uploads = (
+        db.query(UploadedFile)
+        .filter(UploadedFile.user_id == user_id)
+        .order_by(UploadedFile.created_at)
+        .all()
+    )
+
+    # 兑换与额度流水：删号时它们不被物理删除（财务事实源），只改写成墓碑 id。
+    # 正因为删号之后用户再也查不到自己兑换过什么，导出侧更必须给全。
+    redemptions = (
+        db.query(CdkRedemption, CdkCode.code)
+        .outerjoin(CdkCode, CdkCode.id == CdkRedemption.code_id)
+        .filter(CdkRedemption.user_id == user_id)
+        .order_by(CdkRedemption.created_at)
+        .all()
+    )
+    ledger = (
+        db.query(CreditLedger)
+        .filter(CreditLedger.user_id == user_id)
+        .order_by(CreditLedger.created_at)
+        .all()
+    )
 
     # 对话必须进导出：它不挂在 Review 上（一段对话可能没产出评审），
     # 上面按 Review 组装的 review_payload 一条都覆盖不到。少了它，
@@ -136,7 +345,9 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
     ]
 
     return {
-        "export_version": 1,
+        # 2：补齐了判断留档/反馈/伦理报告/评估/上传图片/兑换与额度流水。
+        # 版本号往上走而不是原地改，是为了让拿着老导出件的人能知道自己那份缺哪些块。
+        "export_version": 2,
         "exported_at": _iso(datetime.now(timezone.utc)),
         "account": (
             {
@@ -176,6 +387,49 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
                 "created_at": _iso(u.created_at),
             }
             for u in usage
+        ],
+        "uploaded_files": [
+            {
+                "id": f.id,
+                "filename": f.filename,
+                "media_type": f.media_type,
+                "byte_size": f.byte_size,
+                "sha256": f.sha256,
+                "created_at": _iso(f.created_at),
+                "download_path": f"/api/uploads/{f.id}",
+            }
+            for f in uploads
+        ],
+        "jobs": [
+            {
+                "id": j.id,
+                "kind": j.kind,
+                "ref_id": j.ref_id,
+                "status": j.status,
+                "progress": j.progress,
+                "error_message": j.error_message,
+                "created_at": _iso(j.created_at),
+                "started_at": _iso(j.started_at),
+                "finished_at": _iso(j.finished_at),
+            }
+            for j in jobs
+        ],
+        "cdk_redemptions": [
+            {
+                "code": code,
+                "credits": red.credits,
+                "created_at": _iso(red.created_at),
+            }
+            for red, code in redemptions
+        ],
+        "credit_ledger": [
+            {
+                "delta": e.delta,
+                "reason": e.reason,
+                "ref_id": e.ref_id,
+                "created_at": _iso(e.created_at),
+            }
+            for e in ledger
         ],
     }
 

@@ -79,6 +79,19 @@ def gate_report_for_anonymous(report: Optional[dict]) -> Optional[dict]:
                             但看起来正常"的空报告，连为什么失败都看不到）
       · degradation      —— "本次有 N 位人格没跑成，结论只据 M 位得出"
                             （字段名与引擎链路 runner/cli.py 一致，两条链路同一口径）
+      · panel_selection  —— "你点名的角色其实没参与/回落了预设面板"
+      · budget           —— "费用到顶，交叉质询没跑，这份结论不完整"
+      · validation       —— "谁被输出校验拦下了、这次配了哪些重试"
+                            （src/runner/cli.py 把这三块写进 report 本体的理由
+                            与 degradation 相同：不进本体，历史报告就看不见）
+
+    validation 里的 gated_out 含被拦人格的 persona_id 与 failure_reason，
+    评估后**不裁剪**：人格的存在与状态本来就对匿名可见
+    （见 gate_persona_outputs_for_anonymous——裁的是输出内容，不是名单），
+    failure_reason 是引擎侧的失败原因（校验没过/超时），不含用户材料摘录，
+    藏起来只会让"6 位角色只有 4 份意见"变成无法解释的怪象。
+    validation.calibration（角色一致性/覆盖度/无幻觉率）同样透出：它回答的是
+    "这份报告本身可不可信"，是关于报告质量的元信息，不是报告卖的评审内容。
 
     把坏消息裁掉、只留好看的部分，那不叫体验版，那叫误导。付费墙可以挡"价值"，
     不能挡"真相"。
@@ -96,6 +109,9 @@ def gate_report_for_anonymous(report: Optional[dict]) -> Optional[dict]:
         "simulation_notice": report.get("simulation_notice"),
         "error": report.get("error"),
         "degradation": report.get("degradation"),
+        "panel_selection": report.get("panel_selection"),
+        "budget": report.get("budget"),
+        "validation": report.get("validation"),
         "priority_fixes": priority_fixes[:1],
         "persona_notes": [],
         "consensus": None,

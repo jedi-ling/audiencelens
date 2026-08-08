@@ -219,6 +219,12 @@ class TestComputeDisagreements:
         assert len(result) >= 1
         topic_found = any("UI lag" in d["topic"] for d in result)
         assert topic_found
+        # resolution_suggestion 的删除必须两个分支都钉住：test_basic_disagreement
+        # 只覆盖立场两两配对分支，这里补上 controversial_issues 主分支——
+        # 变异实测过：把 f"Further investigation needed on {title}" 加回主分支，
+        # 没有这条断言时整个测试文件仍然全绿。
+        for d in result:
+            assert "resolution_suggestion" not in d
 
     def test_disagreement_persona_stances_structure(self):
         personas = [

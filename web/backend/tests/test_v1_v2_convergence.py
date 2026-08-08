@@ -521,3 +521,112 @@ class TestNonGameTaskTypesActuallyWork:
         detail = _wait_terminal(client, r.json()["id"])
         assert detail["status"] == "completed", detail.get("error_message")
         assert calls[0]["task_type"] == "pitch_review"
+
+
+class TestV1CarriesTheSameContractFieldsAsV2:
+    """v1 的**响应/请求形状**也不能比 v2 少东西。
+
+    执行路径已经收敛（上面那组钉住了），但契约层的"v2 修了 v1 没修"是另一种：
+    v2 回 skill_degraded、收 enable_red_team/enable_evaluation，v1 的 schema 里
+    一个都没有。pydantic 对未声明字段默认丢弃、对多余返回值默认裁掉，两侧都是
+    静默的——请求 200、评审照跑，只是用户以为开了的东西没开、被降级了没人说。
+    """
+
+    def test_v1_accepts_and_honours_enable_red_team(self, client, db, anon_key, monkeypatch):
+        """开关要真的作用到 prompt 与落库，而不只是被 schema 收下。"""
+        from app.config import settings
+        from app.models import Review
+
+        # 关掉免费次数限制，否则这条测的就是降级而不是透传
+        monkeypatch.setattr(settings, "premium_skills", set())
+
+        calls = []
+        _patch_engine(monkeypatch, calls)
+
+        r = _post_v1(client, enable_red_team=True)
+        assert r.status_code == 200, r.text
+        rid = r.json()["id"]
+        _wait_terminal(client, rid)
+
+        db.expire_all()
+        row = db.query(Review).filter(Review.id == rid).first()
+        assert row.enable_red_team is True, "开关没落库：事后无法归因也无法计次"
+        # 红队提示语必须真的进了喂给引擎的材料。只落库不改 prompt 的话，
+        # 库里写着"这次开了红队"，报告里却没有任何对抗视角。
+        materials = str(calls[0]["artifact_bundle"]["materials"])
+        assert "red_team_audience" in materials
+
+    def test_v1_accepts_enable_evaluation(self, client, db, anon_key, monkeypatch):
+        from app.models import Review
+
+        calls = []
+        _patch_engine(monkeypatch, calls)
+
+        r = _post_v1(client, enable_evaluation=True)
+        assert r.status_code == 200, r.text
+        rid = r.json()["id"]
+        _wait_terminal(client, rid)
+
+        db.expire_all()
+        row = db.query(Review).filter(Review.id == rid).first()
+        assert row.enable_evaluation is True, (
+            "开关被 schema 静默丢弃：用户勾了'启用评估'，报告页却显示'暂无评估结果'"
+        )
+
+    def test_v1_response_reports_skill_degradation(self, client, db, anon_key, monkeypatch):
+        """降级必须说出来——这是 v2 明确做到、v1 此前整个丢掉的那件事。"""
+        from app.config import settings
+        from app.models import Review
+
+        monkeypatch.setattr(settings, "premium_skills", {"red_team_audience"})
+        monkeypatch.setattr(settings, "skill_free_uses", 0)
+        # anon_key 让 key_source=byok，而 BYOK 是豁免的；这里要测的是平台垫付档
+        monkeypatch.setattr(
+            skill_quota_service_module(), "_exempt", lambda user_id, key_source: False
+        )
+
+        calls = []
+        _patch_engine(monkeypatch, calls)
+
+        r = _post_v1(client, skill_type="red_team_audience")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["skill_degraded"], "降级了却在响应里一个字都不说，正是静默降级"
+
+        db.expire_all()
+        row = db.query(Review).filter(Review.id == body["id"]).first()
+        assert row.skill_type is None, "落库的必须是降级后的值，否则就是'说降了没真降'"
+
+    def test_v1_detail_exposes_failure_reason_and_tokens(self, client, db):
+        """失败原因和 token 数不能只在列表接口/v2 里有——且必须是**真实值**。
+
+        旧写法只断言 `field in detail`：成功评审里这三个字段本来就在
+        （error_message=None），把 schema 改坏成永远返回 None 它照样绿。
+        所以这里构造一条真实失败的评审，断言具体内容原样到达响应。
+        """
+        from app.models import Review
+
+        review = Review(
+            user_id=ANON,
+            task_type="concept_review",
+            artifact_bundle={},
+            status="failed",
+            error_message="引擎在第 2 位人格处抛出 TimeoutError",
+            input_tokens=4200,
+            output_tokens=1800,
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+
+        detail = client.get(f"/api/reviews/{review.id}").json()
+        assert detail["status"] == "failed"
+        assert detail["error_message"] == "引擎在第 2 位人格处抛出 TimeoutError"
+        assert detail["input_tokens"] == 4200
+        assert detail["output_tokens"] == 1800
+
+
+def skill_quota_service_module():
+    from app.services import skill_quota_service
+
+    return skill_quota_service

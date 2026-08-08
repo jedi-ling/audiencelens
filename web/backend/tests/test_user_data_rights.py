@@ -181,7 +181,7 @@ class TestExport:
         review_id = _make_review(user_client, db, monkeypatch)
 
         data = user_client.get("/api/auth/me/export").json()
-        assert data["export_version"] == 1
+        assert data["export_version"] == 2
         ids = [r["id"] for r in data["reviews"]]
         assert review_id in ids
         mine = next(r for r in data["reviews"] if r["id"] == review_id)
@@ -231,6 +231,128 @@ class TestExport:
         assert "我的追问" in contents
         # 导出给本人看，不该套用匿名体验版的裁剪
         assert "回复内容" in contents
+
+
+class TestExportCoverage:
+    """钉住"导出覆盖了哪些表"。
+
+    为什么要有这一组：导出功能腐化的方式是静默的。加表的人只关心新功能，
+    不会想起隐私页那句"删号前先导出留个备份"；而漏了一张表，导出照样返回 200，
+    只是少了几类内容——用户照做之后删号，那些内容永久消失且从未出现在备份里。
+    历史上这里就漏了判断留档、反馈、伦理报告、评估、上传图片、兑换与额度流水
+    六大类，而当时的测试全绿。
+    """
+
+    def test_every_table_is_either_exported_or_explicitly_exempt(self):
+        """新加一张表就必须在这里做一次显式决定，不能默默漏掉。
+
+        这条断言的价值全在"新表默认是红的"：如果只断言
+        EXPORTED_TABLES ⊆ 全部表，加表的人什么都不会察觉。
+        """
+        from app.models import Base
+        from app.services import user_data_service as uds
+
+        all_tables = set(Base.metadata.tables)
+        declared = set(uds.EXPORTED_TABLES) | set(uds.EXPORT_EXEMPT_TABLES)
+
+        undeclared = all_tables - declared
+        assert not undeclared, (
+            f"这些表既没进导出也没登记豁免：{sorted(undeclared)}。"
+            "如果是用户内容就补进 export_user_data 并加入 EXPORTED_TABLES；"
+            "如果不该导出，请在 EXPORT_EXEMPT_TABLES 里写明理由。"
+        )
+        stale = declared - all_tables
+        assert not stale, f"这些表已不存在，请从声明里删掉：{sorted(stale)}"
+
+    def test_exported_tables_actually_appear_in_the_payload(
+        self, user_client, db, monkeypatch
+    ):
+        """光有名单不算数——每一类都要能在真实导出件里找到自己那行数据。
+
+        用"造一行 → 断言它出现在导出里"的形式，而不是断言 key 存在：
+        后者在实现退化成 `"judgments": []` 时依然是绿的，等于什么都没保证。
+        """
+        from app.models import (
+            CdkCode,
+            CdkRedemption,
+            CreditLedger,
+            EthicsReport,
+            EvaluationResult,
+            EvaluationScorecard,
+            FeedbackAdoption,
+            Judgment,
+            Outcome,
+            ReviewFeedback,
+            UploadedFile,
+        )
+
+        review_id = _make_review(user_client, db, monkeypatch)
+        uid = user_client.user_id
+
+        judgment = Judgment(
+            review_id=review_id, user_id=uid, claim="判断留档的独特内容",
+            severity="high", confidence=0.8,
+        )
+        db.add(judgment)
+        db.commit()
+        db.add(Outcome(judgment_id=judgment.id, verdict="hit", note="事后验证的独特内容"))
+
+        fb = ReviewFeedback(review_id=review_id, user_id=uid, useful=True, note="反馈的独特内容")
+        db.add(fb)
+        db.commit()
+        db.add(FeedbackAdoption(feedback_id=fb.id, fix_title="被采纳建议的独特内容"))
+
+        db.add(EvaluationResult(
+            review_id=review_id, dimension="input_grounding", score=3,
+            passed=True, details="评估细节的独特内容",
+        ))
+        db.add(EvaluationScorecard(review_id=review_id, overall_score=88, passed=True))
+        db.add(EthicsReport(
+            review_id=review_id, persona_id="P01", passed=False, score=40,
+            violations_json=[{"quote": "伦理摘录的独特内容"}],
+        ))
+        db.add(UploadedFile(
+            user_id=uid, filename="上传图片的独特内容.png",
+            media_type="image/png", ext=".png", byte_size=123,
+        ))
+
+        code = CdkCode(code="EXPORT-COVERAGE-CODE", credits=5)
+        db.add(code)
+        db.commit()
+        db.add(CdkRedemption(code_id=code.id, user_id=uid, credits=5))
+        db.add(CreditLedger(user_id=uid, delta=5, reason="cdk_redeem", ref_id=code.id))
+        db.commit()
+
+        raw = user_client.get("/api/auth/me/export").text
+        for needle in [
+            "判断留档的独特内容",
+            "事后验证的独特内容",
+            "反馈的独特内容",
+            "被采纳建议的独特内容",
+            "评估细节的独特内容",
+            "伦理摘录的独特内容",
+            "上传图片的独特内容.png",
+            "EXPORT-COVERAGE-CODE",
+        ]:
+            assert needle in raw, f"导出件里找不到 {needle}"
+
+        data = user_client.get("/api/auth/me/export").json()
+        mine = next(r for r in data["reviews"] if r["id"] == review_id)
+        assert mine["evaluation"]["overall_score"] == 88
+        assert data["credit_ledger"], "额度流水一条都没有"
+        # 评审参数：没有它们，导出件无法回答"这次是怎么跑的"
+        assert "persona_pack" in mine and "selected_personas" in mine
+
+    def test_export_still_hides_credential_material(self, user_client, db, monkeypatch):
+        """补齐导出范围不能顺手把凭据也导出去——auth_tokens 是明确豁免的。"""
+        from app.services import user_data_service as uds
+
+        assert "auth_tokens" in uds.EXPORT_EXEMPT_TABLES
+        assert "auth_tokens" not in uds.EXPORTED_TABLES
+
+        _make_review(user_client, db, monkeypatch)
+        data = user_client.get("/api/auth/me/export").json()
+        assert "auth_tokens" not in data
 
 
 class TestDeleteAccount:

@@ -8,53 +8,121 @@
 |---|---|
 | task_type | {{task_type}} |
 | target | {{target}} |
-| build_version | {{build_version}} |
-| prompt_version | {{prompt_version}} |
-| persona_pack_version | {{persona_pack_version}} |
-| generated_at | {{generated_at}} |
+{# 版本号只在引擎取到真值时才列。以前这里恒定打印 build_version=0.1.0 /
+   prompt_version=0.1.0 / persona_pack_version=0.1.0，而包版本早就不是 0.1.0，
+   人格包也分十来个：用户拿这三行做复现会追到完全不存在的那一版。
+   prompt_version 已整项删除，仓库里没有任何东西给提示词模板打版本号。 #}
+{% if build_version %}| build_version | {{build_version}} |
+{% endif %}{% if persona_pack_version %}| persona_pack_version | {{persona_pack_version}} |
+{% endif %}| generated_at | {{generated_at}} |
 
 ## Executive Summary
-- **Primary Recommendation**: {{primary_recommendation}}
-- **Release Risk**: {{release_risk}}
-- **Evidence Quality**: {{evidence_quality}}
+- **Primary Recommendation**: {{primary_recommendation or "—"}}
+- **Release Risk**: {{release_risk or "—"}}
+- **Evidence Quality**: {{evidence_quality or "—（各人格均未给出证据充分度）"}}
 
 ## Consensus
-### 大多数 persona 共同认可的点
-{% for point in consensus.agreed_points %}
+{# 这一节统计的是**议题**：把各人格的 key_issues 按相似度聚类后，看同一件事被多少
+   位人格各自独立提到。以前这里列的是立场标签（"加愿望单"这种词）的频次分布，
+   却挂在"共同认可的点"标题下，读者会把它当成找到了 N 个共识点。 #}
+{% if consensus.persona_count %}> 共识判定口径：同一议题被 ≥{{consensus.min_personas_for_agreement}}/{{consensus.persona_count}} 位人格各自独立提出。
+{% endif %}
+### 多数 persona 共同提出的议题
+{% if consensus.agreed_points %}{% for point in consensus.agreed_points %}
 - {{point}}
-{% endfor %}
+{% endfor %}{% else %}
+- （本次没有任何议题达到共识门槛）
+{% endif %}
 
-### 大多数 persona 共同质疑的点
-{% for point in consensus.questioned_points %}
+### 仅个别 persona 提出的议题
+{# 名字曾经叫"大多数 persona 共同质疑的点"，装的却是少数派立场：
+   少数人持有某个看法，不等于大家共同质疑它，语义整个是反的。 #}
+{% if consensus.questioned_points %}{% for point in consensus.questioned_points %}
 - {{point}}
+{% endfor %}{% else %}
+- （无）
+{% endif %}
+
+{% if consensus.stance_distribution %}
+### 立场分布
+{% for stance, count in consensus.stance_distribution.items() %}
+- {{stance}}：{{count}} 人
 {% endfor %}
+{% endif %}
 
 ## Major Disagreements
 {% for d in major_disagreements %}
 ### {{d.topic}}
 | Persona | Stance | Key Evidence |
 |---|---|---|
-{% for ps in d.persona_stances %}
-| {{ps.persona_id}} | {{ps.stance}} | {{ps.evidence}} |
+{% for ps in d.persona_stances %}| {{ps.persona_id}} | {{ps.stance}} | {{ps.evidence}} |
 {% endfor %}
-**Resolution Suggestion**: {{d.resolution_suggestion}}
 {% endfor %}
 
 ## Priority Fixes
 | Priority | Issue | Severity | Why it matters | Affected personas | Suggested fix |
 |---|---|---|---|---|---|
-{% for pf in priority_fixes %}
-| {{pf.priority}} | {{pf.issue}} | {{pf.severity}} | {{pf.why_it_matters}} | {{pf.affected_personas}} | {{pf.suggested_fix}} |
+{% for pf in priority_fixes %}| {{pf.priority}} | {{pf.issue}} | {{pf.severity}} | {{pf.why_it_matters}} | {{pf.affected_personas | join('、')}} | {{pf.suggested_fix}} |
 {% endfor %}
+
+{% if cross_examination %}
+## 交叉质询
+{# 这一节 HTML 模板一直有、Markdown 一直没有。少了它，读者会把 derived_summary
+   （从既有输出里派生的争议摘要，人格之间没有发生任何实时反驳）当成一场真辩论。
+   两份导出件必须说同样的话。 #}
+{% if cross_examination.mode == 'multi_agent_rebuttal' %}
+**模式**：多智能体反驳（每位涉事人格各自重新发言一轮）
+{% elif cross_examination.mode == 'moderated_rebuttal' %}
+**模式**：仲裁式反驳（一次调用代双方各写一轮，非各自独立发言）
+{% else %}
+**模式**：派生摘要，**这不是一场辩论**。下面的正反论据是从各人格已经产出的评审意见中
+挑出分歧最大的争议点、把持相反立场的两位人格的原话并排摆出；
+人格之间没有发生任何实时反驳，也没有任何人因此改变立场。
+（引擎输出标记：`mode: "derived_summary"`、`is_live_debate: false`）
+{% endif %}
+{% if cross_examination.limitation %}
+> {{cross_examination.limitation}}
+{% endif %}
+{% for d in cross_examination.disputes or [] %}
+### {{d.topic}}
+{% if d.rebuttal_status and d.rebuttal_status != 'ok' %}
+> ⚠️ {% if d.rebuttal_status == 'partial' %}本争议点只有一方产出了反驳{% elif d.rebuttal_status == 'failed' %}本争议点交叉质询未完成{% else %}本争议点未进行反驳{% endif %}{% if d.rebuttal_error %}（{{d.rebuttal_error}}）{% endif %}
+{% endif %}
+**正方**
+{% for arg in d.pro_args or [] %}
+- {{arg.point}} — {{arg.persona_id}}
+{% endfor %}
+**反方**
+{% for arg in d.con_args or [] %}
+- {{arg.point}} — {{arg.persona_id}}
+{% endfor %}
+{% endfor %}
+{% if cross_examination.vote_changes %}
+### 改票记录
+{% for v in cross_examination.vote_changes %}
+- {{v.persona_id}}：{{v.before}} → {{v.after}}{% if v.reason %}（{{v.reason}}）{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
 
 ## Persona-by-Persona Notes
 {% for pn in persona_notes %}
 ### {{pn.persona_id}} {{pn.persona_name}}
 - **Stance**: {{pn.stance}}
-- **Top Evidence**: {{pn.evidence_top3}}
-- **Top Issues**: {{pn.top_issues}}
-- **Continue Triggers**: {{pn.continue_triggers}}
-- **Quit Triggers**: {{pn.quit_triggers}}
+{# 这四项以前直接 {{pn.evidence_top3}} 打印 Python 列表 repr，导出的 .md 里长成
+   ['xxx', 'yyy'] 这种带引号方括号的样子。数据是真的，但导出件是要发给别人看的。 #}
+- **Top Evidence**:
+{% for e in pn.evidence_top3 %}  - {{e}}
+{% endfor %}
+- **Top Issues**:
+{% for i in pn.top_issues %}  - {{i}}
+{% endfor %}
+- **Continue Triggers**:
+{% for t in pn.continue_triggers %}  - {{t}}
+{% endfor %}
+- **Quit Triggers**:
+{% for t in pn.quit_triggers %}  - {{t}}
+{% endfor %}
 {% endfor %}
 
 ## Information Gaps
@@ -64,24 +132,87 @@
 
 ## What to Test with Real Players Next
 ### Suggested Playtest Tasks
-{% for task in next_human_test.suggested_tasks %}
+{% if next_human_test.suggested_tasks %}{% for task in next_human_test.suggested_tasks %}
 - {{task}}
-{% endfor %}
+{% endfor %}{% else %}
+- （本次未产出验证任务：没有检测到人格之间的争议点）
+{% endif %}
 
-### Suggested Recruit Types
+### 本次面板覆盖的受众特征
+{# 章节名不能再叫 "Suggested Recruit Types"：引擎并没有推断"下一步该招募谁"，
+   它能给出的只有"本次面板覆盖了哪些受众特征"（取自人格档案的真实属性）。
+   旧版这里逐条列出本次跑过的 AI 人格名字，等于把合成人格清单当真人受众画像
+   发出去，与报告顶部的合成声明和 ETHICS.md 直接冲突。 #}
+{% if next_human_test.recruit_types %}
+> {{next_human_test.recruit_types_basis}}
 {% for rt in next_human_test.recruit_types %}
 - {{rt}}
-{% endfor %}
+{% endfor %}{% else %}
+- （无法给出：本次未取到人格档案的受众字段）
+{% endif %}
 
 ### Suggested Next Materials
-{% for nm in next_human_test.next_materials %}
+{% if next_human_test.next_materials %}{% for nm in next_human_test.next_materials %}
 - {{nm}}
+{% endfor %}{% else %}
+- （本次未产出：没有人格报告信息缺口）
+{% endif %}
+
+{% if validation and validation.calibration %}
+## 校准指标
+{# 引擎真算出来的三个数（src/runner/calibration.py），以前只从 run_panel 顶层返回，
+   导出件里一个都没有。阈值一并写出来，免得读者拿一个没有基准的小数自己脑补。 #}
+{% set cal = validation.calibration %}
+| 指标 | 数值 | 合格线 |
+|---|---|---|
+| 角色一致性 | {{cal.role_consistency.average | round(4)}} | ≥0.8 |
+{# n<2 时覆盖度无定义（not_applicable）：如实写"单人格无覆盖度指标"，
+   不许打印 0.0 再判未通过——那是把"无定义"伪装成"很差"。 #}
+{% if cal.coverage.not_applicable %}| 视角覆盖度（人格间平均距离） | 单人格无覆盖度指标 | 不适用 |
+{% else %}| 视角覆盖度（人格间平均距离） | {{cal.coverage.average_distance | round(4)}} | ≥0.3 |
+{% endif %}
+{# 口径与 HTML 模板统一为"幻觉率"（越低越好）：以前这里打 1-x 标"无幻觉率"、
+   HTML 打 x 标"幻觉率"，同一指标两份导出件方向相反；且 1-x 不 round 会打出
+   0.9500000000000001 这种浮点尾巴。 #}
+{% if cal.hallucination %}| 幻觉率 | {{cal.hallucination.average | round(4)}} | 越低越好 |
+{% endif %}
+
+校准总判定：{{"通过" if cal.overall_pass else "未通过"}}
+{% endif %}
+
+{% if validation and validation.gated_out %}
+## 被校验拦下的人格
+{% for g in validation.gated_out %}
+- {{g.persona_id}}：{{g.failure_reason}}
+{% endfor %}
+{% endif %}
+
+{% if compliance %}
+## 合规检查
+{# 这一节 HTML 模板一直有、Markdown 一直没有。分数的口径必须写清楚：
+   它唯一的输入是身份-行为解耦检查的违规条数（100 − 10×条数），
+   与隐私、刻板印象、材料合规等维度无关。不写清楚，"100 分"会被读成
+   "通过了一整套伦理审查"。 #}
+- **检查项**：{{compliance.scope_label or compliance.scope}}（唯一口径，不覆盖隐私/刻板印象/材料合规等其它维度）
+- **结论**：{{compliance.status}}
+- **违规条数**：{{compliance.violation_count}}
+- **得分**：{{compliance.ethics_score}}（= 100 − 10 × 违规条数）
+- **建议步骤**：
+{% for step in compliance.recommended_steps %}  - {{step}}
 {% endfor %}
 
+本报告全部由 AI 人格模拟生成，非真人研究数据。任何决策前须经过真人验证。
+{% endif %}
+
 ## Limitations & Caveats
-{% for caveat in meta.caveats %}
+{# caveats 来自各人格自己声明的限制条件（persona 输出的 meta.caveats 去重汇总）。
+   以前 aggregate_report 从不收集它，这一节永远是空标题：最该出现的免责内容
+   一条都没有，读者会以为这份合成评审没有已知局限。 #}
+{% if meta.caveats %}{% for caveat in meta.caveats %}
 - {{caveat}}
-{% endfor %}
+{% endfor %}{% else %}
+- （各人格均未声明限制条件；这本身就是一条应当留意的信号）
+{% endif %}
 
 ---
 *Generated by AudienceLens Synthetic Playtest. This is NOT human research data.*

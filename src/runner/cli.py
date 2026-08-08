@@ -852,7 +852,9 @@ def run_panel(
         panel_selected = panel["selected"]
         panel_skipped = panel["skipped"]
 
-    missing_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
+    # 点名的 id 在人格包里根本不存在的那部分，单独记下来：它和"存在但被截断/预检
+    # 跳过"是两种不同的缺席原因，notice 里要分开说。
+    unknown_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
 
     mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
     if mode_config:
@@ -860,6 +862,22 @@ def run_panel(
 
     precheck = precheck_panel(panel_selected, artifact_bundle)
     valid_personas = precheck["valid_personas"]
+
+    # matched 必须在截断与预检**之后**才能定稿：以前它在 truncate_panel 之前算好
+    # 就不再动了，点名 5 人但 mode 限 3 人时，报告会说 5 个全参与、missing 为空——
+    # 用户以为自己点的角色都发过言。这里按真正进入评审的名单收敛一遍，
+    # 被 mode 上限截掉的单独记 truncated_by_mode，在 notice 里如实说明。
+    truncated_by_mode_ids = []
+    if matched_persona_ids:
+        participating_ids = {p["id"] for p in valid_personas}
+        panel_ids_after_truncate = {p["id"] for p in panel_selected}
+        truncated_by_mode_ids = [
+            pid for pid in matched_persona_ids if pid not in panel_ids_after_truncate
+        ]
+        matched_persona_ids = [
+            pid for pid in matched_persona_ids if pid in participating_ids
+        ]
+    missing_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
     skipped_count = len(panel_skipped) + len(precheck["skipped_personas"])
 
     config = {
@@ -1077,17 +1095,27 @@ def run_panel(
     # 只放返回值顶层的话，重新打开历史报告就看不见"你点的角色其实没参与"）。
     # 没有显式点名时整键不写，免得给报告塞一堆恒为空的字段。
     if requested_personas:
+        # notice 按缺席原因分开说：id 不存在（unknown）和被评审模式人数上限截掉
+        # （truncated_by_mode）是两回事，混在一句"不存在"里会让用户去查一个
+        # 明明存在的 id。missing 仍是"点名了但没参与"的总集，供程序方消费。
+        notice_parts = []
+        if unknown_persona_ids:
+            notice_parts.append(
+                "你指定的人格 " + "、".join(unknown_persona_ids) + " 在本次人格包中不存在，"
+                + ("已改用任务类型的预设面板。" if fell_back_to_auto else "未参与本次评审。")
+            )
+        if truncated_by_mode_ids:
+            notice_parts.append(
+                "你指定的人格 " + "、".join(truncated_by_mode_ids)
+                + " 因评审模式的人数上限被截断，未参与本次评审。"
+            )
         report["panel_selection"] = {
             "requested": requested_personas,
             "matched": matched_persona_ids,
             "missing": missing_persona_ids,
+            "truncated_by_mode": truncated_by_mode_ids,
             "fell_back_to_auto": fell_back_to_auto,
-            "notice": (
-                "你指定的人格 " + "、".join(missing_persona_ids) + " 在本次人格包中不存在，"
-                + ("已改用任务类型的预设面板。" if fell_back_to_auto else "未参与本次评审。")
-                if missing_persona_ids
-                else ""
-            ),
+            "notice": "".join(notice_parts),
         }
 
     calibration_enabled = mode_config["calibration"] if mode_config else True
@@ -1106,8 +1134,9 @@ def run_panel(
         #   · CLI：跑完整场评审，最后一步写文件 TypeError，报告全丢
         #   · web：SQLAlchemy flush 时崩，整条 UPDATE 失败，评审 100% 标 failed，
         #          而且报错是一句与评审内容毫无关系的 "keys must be str"
-        # 只要成功人格 ≥2 就必现（<2 时 compute_coverage_score 提前返回空 dict，
-        # 元组键根本不生成——这正是单人格的模拟模式测不出它的原因）。
+        # 只要成功人格 ≥2 就必现（<2 时 compute_coverage_score 返回带
+        # not_applicable 标记的 dict，pairwise_distances 为空，元组键根本不生成，
+        # 这正是单人格的模拟模式测不出它的原因）。
         report["validation"]["calibration"] = _json_safe(calibration)
 
     # markdown / html 两处横幅都要用，所以在两个分支之外算一次

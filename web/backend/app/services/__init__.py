@@ -580,15 +580,24 @@ class PersonaService:
         for s in skills:
             if s["skill_type"] == skill_type:
                 detail = dict(s)
+                # task_types 的事实源：创建评审入口（v1/v2）只校验
+                # task_type ∈ VALID_TASK_TYPES，与 skill_type 完全正交——
+                # skill 只改 prompt 取向（见 _SKILL_PROMPT_HINTS），不限制任务类型。
+                # 所以三个评审类技能都返回注册表全量；此前只有 synthetic_playtest
+                # 填值，另两个返回 null，前端只能把"没答"当"不支持"。
+                # persona_generate 不是评审（生成人格定义，不吃 task_type），
+                # 返回空列表明确表示"适用零种任务类型"，而不是 null 的"没回答"。
+                if st == SkillType.PERSONA_GENERATE:
+                    detail["task_types"] = []
+                    detail["parameters"] = ["domain", "audience", "goals", "count"]
+                else:
+                    detail["task_types"] = [tt["task_type"] for tt in cls.get_task_types()]
                 if st == SkillType.SYNTHETIC_PLAYTEST:
                     detail["available_packs"] = [p["panel_id"] for p in cls.list_packs()]
-                    detail["task_types"] = [tt["task_type"] for tt in cls.get_task_types()]
-                elif st == SkillType.AUDIENCE_PANEL:
-                    detail["supported_domains"] = ["product", "service", "content", "brand"]
-                elif st == SkillType.RED_TEAM_AUDIENCE:
-                    detail["attack_surfaces"] = ["claims", "ux_friction", "trust_gaps", "value_proposition"]
-                elif st == SkillType.PERSONA_GENERATE:
-                    detail["parameters"] = ["domain", "audience", "goals", "count"]
+                # 曾经这里给 audience_panel 编过 supported_domains、给 red_team_audience
+                # 编过 attack_surfaces——四个词全仓只出现在那两行，没有任何代码按它分支，
+                # 引擎的红队提示语里也没有对应物。那是编造的能力承诺，已删；
+                # 若将来真按领域/攻击面分支了 prompt 或 rubric，再从那份事实源派生。
                 return detail
         return None
 
@@ -757,6 +766,7 @@ class ReviewService:
         skill_type: Optional[str] = None,
         project_key: Optional[str] = None,
         enable_red_team: bool = False,
+        enable_evaluation: bool = False,
         key_source: Optional[str] = None,
     ) -> Review:
         review = Review(
@@ -770,6 +780,10 @@ class ReviewService:
             skill_type=skill_type,
             project_key=project_key,
             enable_red_team=enable_red_team,
+            # 不落这一列的话，review_service 那句 `if review.enable_evaluation`
+            # 永远是 False——用户在 v1 打开的"启用评估"开关不会有任何效果，
+            # 而报告页会显示"暂无评估结果"，看起来像是评估跑失败了。
+            enable_evaluation=enable_evaluation,
             key_source=key_source,
             mode=mode,
             status="pending",

@@ -134,6 +134,50 @@ class TestReportGatingLegacyEndpoint:
         assert len(report["priority_fixes"]) == 2
         assert len(report["persona_notes"]) == 1
 
+    def test_gating_passes_through_honesty_signals(self):
+        """panel_selection / budget / validation 是坏消息（点名的角色没参与、
+        钱到顶没跑交叉质询、谁被校验拦下），必须原样透给匿名用户——
+        与 simulation_notice / error / degradation 同理，付费墙挡价值不挡真相。"""
+        from app.services import report_gating
+
+        report = dict(REPORT_JSON)
+        report["panel_selection"] = {
+            "requested": ["P99"], "matched": [], "missing": ["P99"],
+            "fell_back_to_auto": True, "notice": "你指定的人格 P99 不存在",
+        }
+        report["budget"] = {"exceeded": True, "skipped_stages": ["cross_examination"]}
+        report["validation"] = {
+            "retry": {"max_attempts": 2},
+            "gated_out": [{"persona_id": "P02", "failure_reason": "validation_failed"}],
+            "calibration": {"coverage_score": 0.7},
+        }
+        gated = report_gating.gate_report_for_anonymous(report)
+        assert gated["is_gated"] is True
+        assert gated["panel_selection"] == report["panel_selection"]
+        assert gated["budget"] == report["budget"]
+        # validation 整块透出：gated_out 的人格名单本就对匿名可见（persona_outputs
+        # 保留了存在与状态），calibration 是"这份报告可不可信"的元信息
+        assert gated["validation"] == report["validation"]
+        # 顺手确认价值内容仍然被裁着——透出诚实信号不等于拆墙
+        assert gated["persona_notes"] == []
+
+    def test_html_error_copy_matches_auth_mode(self, client, db, monkeypatch):
+        """匿名拿不到 HTML 的解释必须按认证开关分支：开认证说"登录后可查看"，
+        关认证（单机形态，页面没有登录入口）不能指一条走不通的路。"""
+        review = self._make_review(db)
+
+        _enable_auth(monkeypatch)
+        r = client.get(f"/api/reviews/{review.id}/result")
+        assert r.status_code == 200
+        assert "登录后可查看" in r.json()["html_error"]
+
+        monkeypatch.setattr(settings, "auth_enabled", False)
+        r = client.get(f"/api/reviews/{review.id}/result")
+        assert r.status_code == 200
+        body = r.json()
+        assert "登录" not in body["html_error"], "关认证时不能再让用户去找不存在的登录入口"
+        assert "未开启账号体系" in body["html_error"]
+
     def test_auth_disabled_anonymous_still_gated_by_default(self, client, db):
         """AL_AUTH_ENABLED=false（默认）时也一律匿名，同样只看体验版——
         gating 不依赖认证开关，只依赖"当前请求是不是已登录身份"。"""

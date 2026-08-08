@@ -35,6 +35,32 @@ function formatTime(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('zh-CN')
 }
 
+/** 单维度满分。后端 evaluation_service.py 每个 _eval_* 都只产出 {0,1,2,3}，
+ *  passed = score >= 2，只有 scorecard.overall_score 才是 0–100
+ *  （_calculate_overall_score = 总分 / (维度数 * 3) * 100）。
+ *  这两个量纲混在同一页上，此前整页按 0–100 渲染：满分 3 分被写成「3/100」、
+ *  进度条 3%、颜色阈值 >70 永远不成立，于是每个维度都涂成红色，
+ *  而同页的总体评分显示 100 分且「评估通过」。用户看到的是自相矛盾的一页。 */
+const DIMENSION_MAX_SCORE = 3
+
+/** 维度分的配色一律跟 passed 走，不再自造分数阈值：
+ *  合格线是后端定的（>=2），前端再定一套只会和「通过/未通过」徽标打架。 */
+function dimensionScoreClass(result: { score: number; passed: boolean }): string {
+  if (result.passed) return 'text-brand-primary'
+  return result.score >= 1 ? 'text-severity-medium' : 'text-severity-critical'
+}
+
+function dimensionBarClass(result: { score: number; passed: boolean }): string {
+  if (result.passed) return 'bg-brand-primary'
+  return result.score >= 1 ? 'bg-severity-medium' : 'bg-severity-critical'
+}
+
+/** 维度 id 在本地词表里找不到时要说「不认识这个 id」，不能把 snake_case 原样
+ *  当成正常标题直出——那看起来像是产品本来就长这样，没人会去查为什么。 */
+function dimensionLabel(id: string, name?: string): string {
+  return name ?? `${id}（未知维度）`
+}
+
 export default function EvaluationPage() {
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
@@ -141,9 +167,9 @@ export default function EvaluationPage() {
   const radarData = scorecard.results.map((r) => {
     const dim = EVALUATION_DIMENSIONS.find((d) => d.id === r.dimension)
     return {
-      dimension: dim?.name ?? r.dimension,
+      dimension: dimensionLabel(r.dimension, dim?.name),
       score: r.score,
-      fullMark: 100,
+      fullMark: DIMENSION_MAX_SCORE,
     }
   })
 
@@ -192,6 +218,9 @@ export default function EvaluationPage() {
           <p className="text-xs text-text-muted mt-2">
             {scorecard.results.filter((r) => r.passed).length}/{scorecard.results.length} 维度通过
           </p>
+          {/* 明说总体评分是 0–100：同一页下面的维度分是 0–3，不标满分的话
+              两个量纲长得一样，用户会把「2」当成极低分 */}
+          <p className="text-xs text-text-muted mt-0.5">满分 100</p>
         </div>
 
         <div className="lg:col-span-2 rounded-xl border border-border bg-bg-card p-6">
@@ -200,7 +229,9 @@ export default function EvaluationPage() {
             <RadarChart data={radarData}>
               <PolarGrid stroke="#e5e5ea" />
               <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#86868b' }} />
-              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#86868b' }} />
+              {/* 轴上限 = 单维度满分 3，不是 0–100：按 100 画会把满分压成一个贴着
+                  圆心的点，整张雷达图恒定塌陷成一团 */}
+              <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#86868b' }} />
               <Radar
                 name="评分"
                 dataKey="score"
@@ -255,14 +286,14 @@ export default function EvaluationPage() {
                   className="w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-bg-card-hover transition-colors"
                 >
                   <div className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono',
+                    'w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold font-mono',
                     result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
-                    {result.score}
+                    {result.score}/{DIMENSION_MAX_SCORE}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-text-primary">{dim?.name ?? result.dimension}</span>
+                      <span className="text-sm font-medium text-text-primary">{dimensionLabel(result.dimension, dim?.name)}</span>
                       <span className={cn(
                         'text-xs px-1.5 py-0.5 rounded',
                         result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
@@ -280,25 +311,19 @@ export default function EvaluationPage() {
                 </button>
                 {expanded && (
                   <div className="px-4 pb-4 border-t border-border pt-3">
-                    <p className="text-xs text-text-muted mb-2">{dim?.description}</p>
+                    <p className="text-xs text-text-muted mb-2">{dim?.description ?? '本地词表里没有这个维度的说明'}</p>
                     <p className="text-sm text-text-secondary leading-relaxed">{result.details}</p>
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                        <span>评分</span>
-                        <span className={cn(
-                          'font-mono font-bold',
-                          result.score > 70 ? 'text-brand-primary' : result.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
-                        )}>
-                          {result.score}/100
+                        <span>评分（合格线 2 分）</span>
+                        <span className={cn('font-mono font-bold', dimensionScoreClass(result))}>
+                          {result.score}/{DIMENSION_MAX_SCORE}
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-bg-secondary overflow-hidden">
                         <div
-                          className={cn(
-                            'h-full rounded-full transition-all',
-                            result.score > 70 ? 'bg-brand-primary' : result.score >= 50 ? 'bg-severity-medium' : 'bg-severity-critical'
-                          )}
-                          style={{ width: `${result.score}%` }}
+                          className={cn('h-full rounded-full transition-all', dimensionBarClass(result))}
+                          style={{ width: `${(result.score / DIMENSION_MAX_SCORE) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -316,8 +341,9 @@ export default function EvaluationPage() {
         <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
           <p className="text-xs text-text-secondary break-all">
+            {/* 别写死"8 维"：维度条数来自 scorecard.results，后端 rubric 改了这句就成假话 */}
             伦理摘要没能加载（{errMessage(ethicsError)}）——不代表没有伦理问题，只是这一块没取到。
-            上面的 8 维评分不受影响。
+            上面的 {scorecard.results.length} 项维度评分不受影响。
           </p>
         </div>
       )}

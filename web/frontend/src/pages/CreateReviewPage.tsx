@@ -1,14 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
-import { TASK_TYPES, PACK_ICONS, TASK_MATERIALS, TASK_TYPE_CATEGORIES, REVIEW_MODES, SKILLS } from '@/lib/mock-data'
+import { TASK_TYPES, PACK_ICONS, TASK_MATERIALS, TASK_TYPE_CATEGORIES, REVIEW_MODES, EVALUATION_DIMENSIONS } from '@/lib/mock-data'
 import type { Persona, TaskMaterialField, Example, ReviewMode, SkillType } from '@/lib/mock-data'
 import { extractMaterials } from '@/lib/api'
 import { usePersonaStore } from '@/store/persona-store'
 import { useReviewStore } from '@/store/review-store'
+import { loadSkillTruth, NON_REVIEW_SKILL_TYPES } from '@/lib/skills'
+import type { SkillTruth } from '@/lib/skills'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
-import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw } from 'lucide-react'
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5
 /**
@@ -37,29 +39,55 @@ const modeConfig: Record<ReviewMode, { label: string; color: string; bg: string;
  * SKILLS[].icon 存的是**图片路径**（'/skills/skill-game.png'），不是 emoji。
  * 这三处以前写成 <span className="text-2xl">{skill.icon}</span>，页面上直接
  * 显示出那串路径文本。渲染方式与 SkillSelectPage 统一成 <img>。
+ *
+ * deco 可能缺席（后端新增了技能而前端还没配图），此时不画图标而不是画一张碎图。
  */
-function SkillIcon({ skill, className }: { skill: (typeof SKILLS)[number]; className?: string }) {
+function SkillIcon({ skill, className }: { skill: SkillTruth; className?: string }) {
+  if (!skill.deco) return null
   return (
     <img
-      src={skill.icon}
-      alt={skill.name}
+      src={skill.deco.icon}
+      alt=""
       className={cn('object-contain', className)}
       loading="lazy"
     />
   )
 }
 
+/**
+ * 任务类型在 TASK_MATERIALS 里没有字段定义时的兜底。
+ *
+ * 曾经的表现是：currentFields 落到 `?? []`，第 2 步渲染成一个输入框都没有的空页，
+ * requiredFields 为空又让 canNext() 只校验标题非空——用户只填一句标题就能一路启动，
+ * 拿回一份基于一句话生成的报告，还以为自己填完了。mock-data 那边已经把 4 个漏掉的
+ * 任务类型补齐，但那是「这次补上了」，不是「以后不会再漏」：新增任务类型时同样会漏。
+ * 所以这里留一道结构性兜底，宁可问一个笼统的问题，也不能让人交白卷。
+ */
+const GENERIC_MATERIAL_FIELD: TaskMaterialField = {
+  key: '材料正文',
+  label: '材料正文',
+  placeholder: '粘贴要评审的材料全文（这个任务类型还没有配置分项字段，先整段贴进来）...',
+  required: true,
+}
+
 export default function CreateReviewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const preselectedSkill = searchParams.get('skill') as SkillType | null
+  // 技能 id 是后端的字符串，不做 `as SkillType` 断言：断言只是让类型检查闭嘴，
+  // 并不能让一个后端新增的技能真的属于这个前端联合类型（同 SkillSelectPage 的口径）。
+  const requestedSkill = searchParams.get('skill')
+  // 不接受不能创建评审的技能（如 persona_generate）：老链接/收藏夹还会带着它进来，
+  // 照单全收就等于把刚关掉的那个假入口从后门放回来。
+  const preselectedSkill =
+    requestedSkill && !NON_REVIEW_SKILL_TYPES.includes(requestedSkill) ? requestedSkill : null
+  const droppedSkill = requestedSkill && !preselectedSkill ? requestedSkill : null
   const requestedTask = searchParams.get('task')
   const preselectedTask = TASK_TYPES.some((task) => task.id === requestedTask) ? requestedTask : null
-  const inferredSkill = preselectedTask
-    ? SKILLS.find((skill) => skill.task_types.includes(preselectedTask))?.type ?? null
-    : null
+  // 这里曾经用本地 SKILLS[].task_types 反推「这个任务类型属于哪个技能」。那份映射
+  // 在后端不存在（skill_type × task_type 零校验），推出来的技能是猜的，却会被当成
+  // 用户的选择提交上去。猜不出来就不猜：技能留空，用户想选自己回第 0 步选。
   const [step, setStep] = useState<Step>(preselectedTask ? 2 : preselectedSkill ? 1 : 0)
-  const [selectedSkillType, setSelectedSkillType] = useState<SkillType | null>(preselectedSkill ?? inferredSkill)
+  const [selectedSkillType, setSelectedSkillType] = useState<string | null>(preselectedSkill)
   const [selectedTaskType, setSelectedTaskType] = useState<string | null>(preselectedTask)
   const [selectedCategory, setSelectedCategory] = useState<string>('development')
   const [selectedMode, setSelectedMode] = useState<ReviewMode>('standard')
@@ -77,6 +105,11 @@ export default function CreateReviewPage() {
   const [extractError, setExtractError] = useState<string | null>(null)
   const [enableEvaluation, setEnableEvaluation] = useState(false)
   const [enableRedTeam, setEnableRedTeam] = useState(false)
+  // 技能清单以 /api/skills 为唯一事实源。以前第 0 步的名称/描述读的是本地 SKILLS，
+  // 后端改了文案这一页不会跟，同一个技能在技能中心和创建页会显示两种说法。
+  const [skills, setSkills] = useState<SkillTruth[] | null>(null)
+  const [skillsError, setSkillsError] = useState<string | null>(null)
+  const [skillsLoading, setSkillsLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { personas, packs, initPersonas, initialized } = usePersonaStore()
@@ -89,6 +122,29 @@ export default function CreateReviewPage() {
   useEffect(() => {
     fetchExamplesList()
   }, [fetchExamplesList])
+
+  const loadSkills = useCallback(() => {
+    setSkillsLoading(true)
+    setSkillsError(null)
+    loadSkillTruth()
+      .then((list) => {
+        // 摘掉不能创建评审的技能：这一页的每张卡都通向「发起评审」，
+        // 放一个点了不改变任何行为的技能进来就是在卖一个不存在的东西。
+        setSkills(list.filter((s) => !NON_REVIEW_SKILL_TYPES.includes(s.type)))
+        setSkillsLoading(false)
+      })
+      .catch((e: unknown) => {
+        // 不回落本地 SKILLS：那份清单可能已经和后端不一致，拿它假装加载成功，
+        // 用户会挑一个后端根本没有的技能。取不到就说取不到。
+        setSkills(null)
+        setSkillsError(e instanceof Error ? e.message : '加载技能列表失败')
+        setSkillsLoading(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    loadSkills()
+  }, [loadSkills])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -105,15 +161,39 @@ export default function CreateReviewPage() {
     setMaterialFields(fields)
   }
 
-  const currentFields: TaskMaterialField[] = selectedTaskType
+  const selectedSkill = skills?.find((s) => s.type === selectedSkillType) ?? null
+
+  const definedFields: TaskMaterialField[] = selectedTaskType
     ? TASK_MATERIALS[selectedTaskType] ?? []
     : []
+  /** 真正渲染与校验用的字段。没有定义时退回一个必填的通用正文框，见 GENERIC_MATERIAL_FIELD。 */
+  const currentFields: TaskMaterialField[] =
+    selectedTaskType && definedFields.length === 0 ? [GENERIC_MATERIAL_FIELD] : definedFields
 
-  const filteredTaskTypes = selectedSkillType
-    ? TASK_TYPES.filter((tt) => {
-        const skill = SKILLS.find((s) => s.type === selectedSkillType)
-        return skill ? skill.task_types.includes(tt.id) : true
-      })
+  /**
+   * AI 从上传文件里提取出来、但不在 currentFields 里的键。
+   *
+   * handleFileUpload 把 /api/extract-materials 返回的键全部写进 materialFields，
+   * 提交时也全量提交，但界面只按 currentFields 渲染——后端多提取出一个键，
+   * 那段内容就会被悄悄发给评审引擎，用户在页面上看不见、改不了、删不掉。
+   * 这里把它们一并列出来，用户至少知道自己交了什么。
+   */
+  const extraFieldKeys = Object.keys(materialFields).filter(
+    (k) => !currentFields.some((f) => f.key === k) && (materialFields[k] ?? '').trim() !== ''
+  )
+
+  /**
+   * 任务类型列表只按后端声明的 task_types 过滤。
+   *
+   * 这里以前用本地 SKILLS[].task_types 裁选项，而后端对 skill_type × task_type
+   * 的组合没有任何校验——等于前端凭空造了一条约束，把用户想选的类型藏起来，
+   * 用户会以为「这个技能不支持我要评的东西」而放弃。
+   * taskTypes 为 null 表示后端没对这个技能声明任务类型（不是「一个都不支持」），
+   * 这种情况下不裁：宁可多给选项，也不能替后端发明限制。
+   */
+  const skillTaskTypes = selectedSkill?.taskTypes ?? null
+  const filteredTaskTypes = skillTaskTypes
+    ? TASK_TYPES.filter((tt) => skillTaskTypes.includes(tt.id))
     : TASK_TYPES
 
   const requiredFields = currentFields.filter((f) => f.required)
@@ -160,7 +240,11 @@ export default function CreateReviewPage() {
     if (step === 1) return selectedTaskType !== null
     if (step === 2) {
       if (target.trim() === '') return false
-      return requiredFields.every((f) => (materialFields[f.key] ?? '').trim() !== '')
+      if (!requiredFields.every((f) => (materialFields[f.key] ?? '').trim() !== '')) return false
+      // 最后一道：一份材料都没有的评审不该发得出去。requiredFields 现在恒不为空
+      // （没有字段定义时会退到 GENERIC_MATERIAL_FIELD），但将来若有人把某个任务类型的
+      // 字段全设成选填，这里仍然拦得住——只填标题就启动，跑出来的是一份基于一句话的报告。
+      return Object.values(materialFields).some((v) => v.trim() !== '')
     }
     // 会被后端静默改写的组合一律不放行——原因就在按钮上方的横幅里写着
     if (step === 3) return selectedPersonaIds.size > 0 && !packConflict && !overModeMax && effectivePack !== null
@@ -185,12 +269,19 @@ export default function CreateReviewPage() {
       setStep(3)
       return
     }
+    const materials = Object.entries(materialFields)
+      .filter(([, value]) => value.trim() !== '')
+      .map(([type, description]) => ({ type, description }))
+    // 空材料的评审不发出去：引擎只能拿标题当全部输入，跑出来是一份看着正常
+    // 却什么都没读过的报告，用户没法从结果里看出自己漏交了东西。
+    if (materials.length === 0) {
+      setLaunchError('还没有填写任何评审材料，请返回第 2 步补充后再启动')
+      setStep(2)
+      return
+    }
     setLaunching(true)
     setLaunchError(null)
     try {
-      const materials = Object.entries(materialFields)
-        .filter(([, value]) => value.trim() !== '')
-        .map(([type, description]) => ({ type, description }))
 
       const artifactBundle: Record<string, unknown> = {
         title: target,
@@ -209,7 +300,10 @@ export default function CreateReviewPage() {
         artifact_bundle: artifactBundle,
         selected_personas: Array.from(selectedPersonaIds),
         mode: selectedMode,
-        skill_type: selectedSkillType ?? undefined,
+        // review-store 把 skill_type 声明成前端联合类型 SkillType，而这个值来自后端
+        // /api/skills（后端新增技能时它可以是联合里没有的字符串）。这里只是原样透传，
+        // 不做校验，断言只是为了穿过那个过窄的类型——正解是 review-store 改成 string。
+        skill_type: (selectedSkillType ?? undefined) as SkillType | undefined,
         // 这两个开关此前从 UI 传到后端被 schema 静默丢弃、从未生效——现在真接上了：
         // enable_evaluation 评审完成后自动跑 8 维评估，enable_red_team 叠加对抗视角提示
         enable_evaluation: enableEvaluation,
@@ -245,8 +339,12 @@ export default function CreateReviewPage() {
         }
         return next
       })
-    } catch {
-      setExtractError('AI 提取失败，请手动填写材料')
+    } catch (e) {
+      // 原因必须如实透出：后端会告诉你是文件太大、格式不支持、没配 API key、限流还是
+      // 鉴权失败，这些用户改一下就能过。一律替换成「AI 提取失败」，用户会以为是模型不行，
+      // 于是放弃这个功能。后半句保留手填这条退路。
+      const reason = e instanceof Error && e.message ? e.message : '未知原因'
+      setExtractError(`AI 提取失败：${reason}。你也可以直接手动填写下面的材料字段。`)
     } finally {
       setExtracting(false)
     }
@@ -340,8 +438,50 @@ export default function CreateReviewPage() {
             <h2 className="text-xl font-semibold text-text-primary mb-2">选择评审技能</h2>
             <p className="text-sm text-text-secondary mb-6">不同技能对应不同的评审视角和侧重点</p>
 
+            {droppedSkill && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
+                <div className="text-xs text-text-secondary leading-relaxed">
+                  <p className="text-warm-orange font-medium mb-1">
+                    「{droppedSkill}」还不能用来创建评审
+                  </p>
+                  <p>它目前不会改变评审的跑法，选了也等于没选，所以这里没有替你选上。请另选一个技能。</p>
+                </div>
+              </div>
+            )}
+
+            {skillsLoading && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-40 rounded-xl border-2 border-border bg-bg-card animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {/* 加载失败不能表现成「一个技能都没有」——用户会以为技能被停用了 */}
+            {!skillsLoading && skillsError && (
+              <div className="rounded-xl border-2 border-severity-critical/30 bg-severity-critical/5 p-6 text-center">
+                <AlertTriangle className="w-7 h-7 mx-auto mb-2 text-severity-critical" strokeWidth={1.25} />
+                <p className="text-sm text-text-primary font-medium mb-1">技能列表没能加载出来</p>
+                <p className="text-xs text-text-secondary mb-4">{skillsError}</p>
+                <button
+                  onClick={loadSkills}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dim transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
+                  重新加载
+                </button>
+              </div>
+            )}
+
+            {!skillsLoading && !skillsError && skills?.length === 0 && (
+              <div className="rounded-xl border border-border bg-bg-card p-6 text-center text-sm text-text-secondary">
+                当前账号下没有可用于创建评审的技能。
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {SKILLS.map((skill) => (
+              {(skills ?? []).map((skill) => (
                 <button
                   key={skill.type}
                   onClick={() => setSelectedSkillType(skill.type)}
@@ -349,7 +489,7 @@ export default function CreateReviewPage() {
                     'flex flex-col p-5 rounded-xl border-2 transition-all cursor-pointer text-left',
                     'bg-bg-card hover:bg-bg-card-hover',
                     selectedSkillType === skill.type
-                      ? `${skill.border} ${skill.bg}`
+                      ? `${skill.deco?.border ?? 'border-brand-primary/30'} ${skill.deco?.bg ?? 'bg-brand-primary/10'}`
                       : 'border-border hover:border-border-hover'
                   )}
                 >
@@ -358,40 +498,47 @@ export default function CreateReviewPage() {
                       <SkillIcon skill={skill} className="h-6 w-6" />
                     </span>
                     <div>
-                      <h3 className={cn('font-bold font-display', skill.color)}>{skill.name}</h3>
+                      {/* 名称与描述都用后端返回的那份：本地再存一份必然和引擎实际读的漂移，
+                          表现是同一个技能在技能中心和这一页显示两种说法 */}
+                      <h3 className={cn('font-bold font-display', skill.deco?.color ?? 'text-brand-primary')}>{skill.name}</h3>
                       <span className="text-xs text-text-muted font-mono">{skill.type}</span>
                     </div>
                   </div>
-                  <p className="text-sm text-text-secondary leading-relaxed mb-3">{skill.description_zh}</p>
+                  <p className="text-sm text-text-secondary leading-relaxed mb-3">{skill.description}</p>
                   {/* 这里原本还显示"{skill.persona_count} 个角色"。那个数是本地常量里
                       写死的（6/8/5/10），没有任何事实源，而且 persona_generate 标的 10
                       超过了所有评审模式的人数上限 8——是个可以被当场证伪的数。
                       技能中心那一页已经删掉它，这一页漏了，同一个假数还在站内另一处显示。
-                      不拿别的数补位：卡片上少一个数字，好过多一个假的。 */}
-                  <div className="flex items-center gap-3 text-xs text-text-muted">
-                    <span>{skill.task_types.length} 种任务</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {skill.use_cases.slice(0, 3).map((uc) => (
-                      <span key={uc} className="px-1.5 py-0.5 rounded text-[10px] bg-bg-secondary text-text-secondary">{uc}</span>
-                    ))}
-                  </div>
+                      不拿别的数补位：卡片上少一个数字，好过多一个假的。
+
+                      "N 种任务"同理：以前数的是本地手写的 task_types，后端根本没有这条
+                      约束。现在只在后端真的声明了 task_types 时才报数，没声明就不显示。 */}
+                  {skill.taskTypes && (
+                    <div className="flex items-center gap-3 text-xs text-text-muted">
+                      <span>{skill.taskTypes.length} 种任务</span>
+                    </div>
+                  )}
+                  {skill.deco && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {skill.deco.use_cases.slice(0, 3).map((uc) => (
+                        <span key={uc} className="px-1.5 py-0.5 rounded text-[10px] bg-bg-secondary text-text-secondary">{uc}</span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
 
-            {selectedSkillType && (() => {
-              const skill = SKILLS.find((s) => s.type === selectedSkillType)
-              if (!skill) return null
-              return (
-                <div className={cn('mt-6 rounded-xl border p-4', skill.border, skill.bg)}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <SkillIcon skill={skill} className="h-5 w-5" />
-                    <span className={cn('font-medium text-sm', skill.color)}>{skill.name}</span>
-                  </div>
-                  <p className="text-sm text-text-secondary">{skill.description_zh}</p>
+            {selectedSkill && (
+              <div className={cn('mt-6 rounded-xl border p-4', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
+                <div className="flex items-center gap-2 mb-2">
+                  <SkillIcon skill={selectedSkill} className="h-5 w-5" />
+                  <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkill.name}</span>
+                </div>
+                <p className="text-sm text-text-secondary">{selectedSkill.description}</p>
+                {selectedSkill.taskTypes && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {skill.task_types.map((tt) => {
+                    {selectedSkill.taskTypes.map((tt) => {
                       const taskType = TASK_TYPES.find((t) => t.id === tt)
                       return taskType ? (
                         <span key={tt} className="px-2 py-0.5 rounded text-xs bg-bg-secondary text-text-secondary">
@@ -400,9 +547,9 @@ export default function CreateReviewPage() {
                       ) : null
                     })}
                   </div>
-                </div>
-              )
-            })()}
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -410,8 +557,12 @@ export default function CreateReviewPage() {
           <div>
             <h2 className="text-xl font-semibold text-text-primary mb-2">选择任务类型</h2>
             <p className="text-sm text-text-secondary mb-6">
-              {selectedSkillType
-                ? `当前技能：${SKILLS.find((s) => s.type === selectedSkillType)?.name} · 以下为该技能支持的任务类型`
+              {/* 只有后端真的声明了 task_types 时才说「该技能支持的任务类型」，
+                  否则这句话是在替后端发明一条它没有的限制 */}
+              {selectedSkill
+                ? selectedSkill.taskTypes
+                  ? `当前技能：${selectedSkill.name} · 以下为该技能声明支持的任务类型`
+                  : `当前技能：${selectedSkill.name} · 它没有限定任务类型，下面全部可选`
                 : '选择你要评审的内容类型'}
             </p>
 
@@ -694,6 +845,29 @@ export default function CreateReviewPage() {
                   </div>
                 )
               })}
+
+              {/* AI 从文件里提取出来、但当前任务类型没有对应字段的内容。
+                  以前这些键只存在于 state 里：界面不渲染、确认页不统计，提交时却照发，
+                  用户看不见也删不掉自己交上去的东西。 */}
+              {extraFieldKeys.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs text-text-muted mb-2">
+                    以下内容是从文件里提取出来的，不属于「{TASK_TYPES.find((t) => t.id === selectedTaskType)?.name ?? '当前任务类型'}」的标准字段，
+                    但会一并提交给评审员。不需要的话清空即可。
+                  </p>
+                  {extraFieldKeys.map((key) => (
+                    <div key={key} className="mb-3">
+                      <label className="block text-sm font-medium text-text-secondary mb-1.5">{key}</label>
+                      <textarea
+                        value={materialFields[key] ?? ''}
+                        onChange={(e) => updateField(key, e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors resize-y"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -851,13 +1025,18 @@ export default function CreateReviewPage() {
                       启用评估报告
                     </span>
                   </div>
+                  {/* 维度名与个数都取自 EVALUATION_DIMENSIONS（它的 id 逐字对齐后端
+                      evaluation_service.RUBRIC_DIMENSIONS，有 parity 测试钉着）。
+                      这里以前写死了另一套词表——覆盖度/深度/一致性/证据质量/偏见检测/新颖性/伦理安全，
+                      与后端真正评的维度只有「可行动性」一条重合：用户在这里被承诺评 A，
+                      报告里拿到的是 B。个数同理，写死的 8 会在后端加减维度时变成假数。 */}
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    评审完成后自动运行 8 维度评估，生成评分卡和伦理报告。评估覆盖覆盖度、深度、一致性、可行动性、证据质量、偏见检测、新颖性、伦理安全等维度。
+                    评审完成后自动运行 {EVALUATION_DIMENSIONS.length} 维度评估，生成评分卡和伦理报告。
                   </p>
                   {enableEvaluation && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {['覆盖度', '深度', '一致性', '可行动性', '证据质量', '偏见检测', '新颖性', '伦理安全'].map((d) => (
-                        <span key={d} className="px-2 py-0.5 rounded text-xs bg-cyan/10 text-cyan">{d}</span>
+                      {EVALUATION_DIMENSIONS.map((d) => (
+                        <span key={d.id} className="px-2 py-0.5 rounded text-xs bg-cyan/10 text-cyan">{d.name}</span>
                       ))}
                     </div>
                   )}
@@ -909,19 +1088,15 @@ export default function CreateReviewPage() {
             <p className="text-sm text-text-secondary mb-6">检查以下信息，确认无误后启动评审</p>
 
             <div className="space-y-3">
-              {selectedSkillType && (() => {
-                const skill = SKILLS.find((s) => s.type === selectedSkillType)
-                if (!skill) return null
-                return (
-                  <div className={cn('rounded-xl border p-4 md:p-5', skill.border, skill.bg)}>
-                    <h3 className="text-sm font-medium text-text-muted mb-2">评审技能</h3>
-                    <div className="flex items-center gap-2">
-                      <SkillIcon skill={skill} className="h-5 w-5" />
-                      <span className={cn('font-medium text-sm', skill.color)}>{skill.name}</span>
-                    </div>
+              {selectedSkill && (
+                <div className={cn('rounded-xl border p-4 md:p-5', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
+                  <h3 className="text-sm font-medium text-text-muted mb-2">评审技能</h3>
+                  <div className="flex items-center gap-2">
+                    <SkillIcon skill={selectedSkill} className="h-5 w-5" />
+                    <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkill.name}</span>
                   </div>
-                )
-              })()}
+                </div>
+              )}
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
                 <h3 className="text-sm font-medium text-text-muted mb-2">任务类型</h3>
@@ -963,8 +1138,10 @@ export default function CreateReviewPage() {
                 >
                   <h3 className="text-sm font-medium text-text-muted">
                     评审材料
+                    {/* 分母要把「额外字段」算进去，否则会出现已填 5 / 共 3 项这种数
+                        （提取出来的键不在标准字段里时），或者反过来把用户真交了的东西不计数 */}
                     <span className="ml-2 text-brand-primary">{filledMaterialsCount}</span>
-                    <span className="text-text-muted"> / {currentFields.length} 项已填写</span>
+                    <span className="text-text-muted"> / {currentFields.length + extraFieldKeys.length} 项已填写</span>
                   </h3>
                   {materialsExpanded
                     ? <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
@@ -973,6 +1150,12 @@ export default function CreateReviewPage() {
                 </button>
                 {materialsExpanded && (
                   <div className="mt-3 space-y-2">
+                    {extraFieldKeys.map((key) => (
+                      <div key={key} className="flex items-start gap-2 text-sm">
+                        <span className="text-text-secondary shrink-0">{key}：</span>
+                        <span className="text-text-primary line-clamp-3">{materialFields[key]}</span>
+                      </div>
+                    ))}
                     {currentFields.map((field) => {
                       const value = materialFields[field.key]
                       if (!value || value.trim() === '') {
@@ -1041,44 +1224,21 @@ export default function CreateReviewPage() {
                 </div>
               )}
 
+              {/* 这里原本是一块「预估成本 $X.XX」。
+                  它由一张写死在本文件里的每任务类型单价表算出（0.04~0.10 美元/角色，
+                  外加评估 $0.05、红队 $0.08），这些数字追溯不到任何事实源：真实成本由
+                  实际消耗的 token 数 × 所用模型的定价决定（引擎侧 runner.persona_agent.estimate_cost
+                  读 budget.yaml 的定价表），而 token 数取决于材料长度和模型输出，
+                  发起之前谁都不知道。材料贴一万字和贴一句话在这张表里是同一个价。
+                  后端也没有任何「预估」端点可以调。
+                  所以整块删掉，只说清楚真实成本什么时候能看到——写一个精确到分的假数，
+                  比不写更糟：用户会拿它做预算，然后在账单上看到完全不同的数字。 */}
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">预估成本</h3>
-                {(() => {
-                  const baseCostMap: Record<string, number> = {
-                    concept_review: 0.06,
-                    demo_first_play: 0.10,
-                    steam_page_review: 0.08,
-                    kickstarter_review: 0.09,
-                    discord_community_review: 0.07,
-                    devlog_review: 0.05,
-                    monetization_review: 0.08,
-                    update_announcement_review: 0.06,
-                    localization_review: 0.07,
-                    looking_for_party_post: 0.04,
-                    app_store_review: 0.08,
-                    social_media_post: 0.06,
-                    video_ad_review: 0.07,
-                    landing_page_review: 0.07,
-                  }
-                  const baseCost = baseCostMap[selectedTaskType ?? ''] ?? 0.08
-                  const totalCost = selectedPersonas.length * baseCost
-                  const evalCost = enableEvaluation ? 0.05 : 0
-                  const redTeamCost = enableRedTeam ? 0.08 : 0
-                  const finalCost = totalCost + evalCost + redTeamCost
-                  const taskName = TASK_TYPES.find((t) => t.id === selectedTaskType)?.name ?? selectedTaskType
-                  return (
-                    <>
-                      <p className="font-display text-brand-primary text-lg">
-                        ${finalCost.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-text-muted mt-1">
-                        {selectedPersonas.length} 个角色 × ${baseCost.toFixed(2)}/角色（{taskName}）
-                        {enableEvaluation && ` + $${evalCost.toFixed(2)} 评估`}
-                        {enableRedTeam && ` + $${redTeamCost.toFixed(2)} 红队`}
-                      </p>
-                    </>
-                  )
-                })()}
+                <h3 className="text-sm font-medium text-text-muted mb-2">成本</h3>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  实际成本取决于材料长度、角色数量和所用模型，发起前无法准确预估。
+                  评审跑完后，报告页与评审记录里会显示这次真实消耗的 token 与费用。
+                </p>
               </div>
             </div>
           </div>

@@ -101,6 +101,22 @@ def load_personas(yaml_path: str) -> List[dict]:
     return personas
 
 
+def load_persona_pack_meta(yaml_path: str) -> dict:
+    """读人格包顶部的 panel_id / version，供报告 meta.persona_pack_version 使用。
+
+    单独一个函数而不是让 load_personas 多返回一个值：load_personas 有一堆调用方，
+    改签名会波及测试和 web 后端。读两次 YAML 的代价（几十 KB）远小于那个风险。
+    文件读不出来时返回空 dict——报告那边的规则是"取不到就不写这个键"，
+    绝不能在这里编一个版本号回去。
+    """
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    return {"pack_id": data.get("panel_id"), "version": data.get("version")}
+
+
 def load_presets(yaml_path: str) -> dict:
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)

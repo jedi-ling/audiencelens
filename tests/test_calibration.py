@@ -152,7 +152,27 @@ class TestComputeCoverageScore:
             ]),
         ]
         result = compute_coverage_score(personas)
-        assert result["average_distance"] == 0.0
+        # n<2 时覆盖度无定义：必须是 None + not_applicable，不许伪装成 0.0
+        # （0.0 会被模板渲染成「0.0 / 合格线 ≥0.3 / 未通过」）
+        assert result["average_distance"] is None
+        assert result["min_distance"] is None
+        assert result["not_applicable"] is True
+
+    def test_single_persona_overall_pass_ignores_coverage(self):
+        """单人格时 overall_pass 不许把"覆盖度不适用"算成失败：
+        角色一致性达标就该通过。"""
+        personas = [
+            _make_persona(
+                "p1",
+                must_comment_on_check={"a": True, "b": True},
+                key_issues=[
+                    {"severity": "high", "title": "Bug A", "why_it_matters": "bad", "suggested_fix": "fix"},
+                ],
+            ),
+        ]
+        result = run_calibration_check(personas)
+        assert result["coverage"]["not_applicable"] is True
+        assert result["overall_pass"] is True
 
     def test_too_similar_flag(self):
         personas = [

@@ -137,9 +137,11 @@ def list_plans_admin(db: Session) -> List[dict]:
         effective["overridden_fields"] = overridden
         effective["editable_fields"] = list(_overridable_fields_for(pid))
         effective["env_default"] = {f: base[f] for f in _overridable_fields_for(pid)}
-        if pid == "free":
-            # 面板据此提示「这两项去『设置』页调」，键名与 ADJUSTABLE 一致
-            effective["limits_managed_by_settings"] = dict(_FREE_LIMIT_SETTINGS)
+        # 曾经 free 档还带一个 limits_managed_by_settings 字段（想让面板提示
+        # 「这两项去『设置』页调」），但 admin 前端从未消费它，全仓唯一引用就是
+        # 这里的赋值——算了没人用，删掉。面板要做这个提示时，用
+        # editable_fields 里没有 reviews_per_day / cost_usd_per_day 这一事实
+        # 就足以推断，不需要后端另发一份映射。
         out.append(effective)
     return out
 

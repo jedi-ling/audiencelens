@@ -11,6 +11,12 @@ interface ReviewState {
   reviewModes: ReviewModeConfig[]
   taskTypes: TaskTypeDetail[]
   loading: boolean
+  /** 评审列表加载失败的原因。有它页面才能把"你还没有评审"和"没拉到"分开说，
+   *  否则一次 401 或后端没起就长得像"我的评审全没了"。 */
+  reviewsError: string | null
+  /** 示例列表加载失败的原因。示例区块此前是 `examples.length > 0 &&`：
+   *  拉失败就整块消失，用户既看不到入口也不知道它本该存在。 */
+  examplesError: string | null
   setReviews: (reviews: ReviewListItem[]) => void
   setCurrentReview: (review: Review | null) => void
   setLoading: (loading: boolean) => void
@@ -34,6 +40,13 @@ interface ReviewState {
     enable_evaluation?: boolean
     enable_red_team?: boolean
   }) => Promise<string>
+  /** 后端在免费次数用完时会把高级技能/红队降级，并回一句 skill_degraded 说明。
+   *  这句话必须让用户看见：否则他以为红队正常跑了，实际拿到的是普通模式的报告。
+   *  createNewReview 的返回值签名保持 string（调用方只关心 review_id），
+   *  降级说明放这里，由页面在跳转前读出来展示。每次创建都会覆写（成功且未降级
+   *  时置 null），不会把上一次的提示留到下一次。 */
+  lastSkillDegraded: string | null
+  clearSkillDegraded: () => void
   deleteReviewById: (id: string) => Promise<void>
   fetchExamplesList: () => Promise<void>
   fetchReviewModesList: () => Promise<void>
@@ -47,6 +60,10 @@ export const useReviewStore = create<ReviewState>((set) => ({
   reviewModes: [],
   taskTypes: [],
   loading: false,
+  reviewsError: null,
+  examplesError: null,
+  lastSkillDegraded: null,
+  clearSkillDegraded: () => set({ lastSkillDegraded: null }),
   setReviews: (reviews) => set({ reviews }),
   setCurrentReview: (currentReview) => set({ currentReview }),
   setLoading: (loading) => set({ loading }),
@@ -54,12 +71,13 @@ export const useReviewStore = create<ReviewState>((set) => ({
    *  只拿得到后端默认的最近 20 条，第 21 条以后的评审在界面上等于消失）。
    *  需要"分页 + 加载更多"的界面请直接用 fetchReviewsPage()，别用这个。 */
   initReviews: async () => {
-    set({ loading: true })
+    set({ loading: true, reviewsError: null })
     try {
       const reviews = await fetchReviews()
-      set({ reviews, loading: false })
-    } catch {
-      set({ loading: false })
+      set({ reviews, loading: false, reviewsError: null })
+    } catch (e) {
+      // 不清空 reviews：拉失败时把上一次的列表留着，比当场变成"空空如也"更诚实。
+      set({ loading: false, reviewsError: e instanceof Error ? e.message : '评审列表加载失败' })
     }
   },
   fetchReviewById: async (id: string) => {
@@ -88,6 +106,9 @@ export const useReviewStore = create<ReviewState>((set) => ({
       enable_evaluation: data.enable_evaluation ?? false,
       enable_red_team: data.enable_red_team ?? false,
     })
+    // 显式写 null 而不是"有值才写"：不覆盖的话，上一次降级的提示会挂在
+    // store 上，下一次正常创建时被页面当成本次的降级又弹一遍。
+    set({ lastSkillDegraded: res.skill_degraded ?? null })
     return res.review_id
   },
   /** 删除失败要往上抛：以前这里 catch {} 吞掉异常，界面上表现为"点了删除，
@@ -99,19 +120,28 @@ export const useReviewStore = create<ReviewState>((set) => ({
   fetchExamplesList: async () => {
     try {
       const examples = await fetchExamples()
-      set({ examples })
-    } catch {}
+      set({ examples, examplesError: null })
+    } catch (e) {
+      set({ examplesError: e instanceof Error ? e.message : '示例加载失败' })
+    }
   },
+  // 下面两个是 UI 配置项（模式说明、任务类型说明），页面都有静态兜底文案，
+  // 拉不到不会让用户误以为"自己的东西没了"，所以不单开 error 字段；
+  // 但仍要在控制台留痕，否则线上排查时连"请求失败过"都看不出来。
   fetchReviewModesList: async () => {
     try {
       const reviewModes = await fetchReviewModes()
       set({ reviewModes })
-    } catch {}
+    } catch (e) {
+      console.warn('[review-store] 评审模式配置加载失败，页面将使用内置兜底文案', e)
+    }
   },
   fetchTaskTypesList: async () => {
     try {
       const taskTypes = await fetchTaskTypes()
       set({ taskTypes })
-    } catch {}
+    } catch (e) {
+      console.warn('[review-store] 任务类型配置加载失败，页面将使用内置兜底文案', e)
+    }
   },
 }))

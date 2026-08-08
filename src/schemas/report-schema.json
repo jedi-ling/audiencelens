@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "report-schema",
   "title": "Aggregated Review Report Schema",
-  "description": "聚合评审报告的 JSON Schema",
+  "description": "聚合评审报告的 JSON Schema。文档性质：全仓当前没有运行时校验调用点，本文件的职责是如实描述 aggregate_report + run_panel 实际产出的结构，供人和外部工具查阅。与实现不一致时以实现为准并回来改这里。",
   "type": "object",
   "required": [
     "meta",
@@ -17,70 +17,50 @@
   "properties": {
     "meta": {
       "type": "object",
-      "required": [
-        "task_type",
-        "target",
-        "build_version",
-        "prompt_version",
-        "persona_pack_version",
-        "generated_at",
-        "is_synthetic"
-      ],
+      "required": ["task_type", "target", "generated_at", "is_synthetic"],
       "properties": {
-        "task_type": {
-          "type": "string",
-          "description": "任务类型"
-        },
-        "target": {
-          "type": "string",
-          "description": "评审目标"
-        },
+        "task_type": { "type": "string", "description": "任务类型" },
+        "target": { "type": "string", "description": "评审目标" },
         "build_version": {
           "type": "string",
-          "description": "构建版本"
-        },
-        "prompt_version": {
-          "type": "string",
-          "description": "Prompt 版本"
+          "description": "构建版本。仅在能从 pyproject.toml 取到真值时存在；取不到就整键不写，不允许写死占位版本号"
         },
         "persona_pack_version": {
           "type": "string",
-          "description": "Persona 包版本"
+          "description": "人格包版本，形如 pack_id@version；仅在人格包 YAML 声明了版本时存在"
         },
-        "generated_at": {
+        "persona_pack": {
           "type": "string",
-          "description": "生成时间"
+          "description": "人格包 id。仅在包只有 id 没有版本号时作为退路存在"
         },
+        "generated_at": { "type": "string", "description": "生成时间（UTC ISO8601）" },
         "is_synthetic": {
           "type": "boolean",
           "const": true,
           "description": "标记为合成报告（恒为 true）"
+        },
+        "caveats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "各人格自己声明的限制条件去重汇总（persona 输出的 meta.caveats）"
         }
       },
       "additionalProperties": false
     },
     "executive_summary": {
       "type": "object",
-      "required": [
-        "primary_recommendation",
-        "release_risk",
-        "evidence_quality"
-      ],
+      "required": ["primary_recommendation", "release_risk", "evidence_quality"],
       "properties": {
-        "primary_recommendation": {
-          "type": "string",
-          "minLength": 1,
-          "description": "主要建议"
-        },
+        "primary_recommendation": { "type": "string", "description": "主要建议（多数立场）" },
         "release_risk": {
           "type": "string",
           "enum": ["low", "medium", "high", "critical"],
-          "description": "发布风险等级"
+          "description": "发布风险等级，按去重后的 priority_fixes 严重度计算"
         },
         "evidence_quality": {
-          "type": "string",
-          "enum": ["strong", "medium", "weak", "insufficient"],
-          "description": "证据质量"
+          "type": ["string", "null"],
+          "enum": ["strong", "medium", "weak", "insufficient", null],
+          "description": "证据质量。所有人格都缺 evidence_sufficiency 时为 null（无定义，不伪装成 insufficient）"
         }
       },
       "additionalProperties": false
@@ -91,17 +71,40 @@
       "properties": {
         "agreed_points": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "共识点"
+          "items": { "type": "string" },
+          "description": "达到共识门槛（≥min_personas_for_agreement 位人格独立提出）的议题"
         },
         "questioned_points": {
           "type": "array",
+          "items": { "type": "string" },
+          "description": "仅个别人格提出的议题"
+        },
+        "shared_concerns": {
+          "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "required": ["issue", "personas", "persona_count", "is_consensus", "title_variants"],
+            "properties": {
+              "issue": { "type": "string" },
+              "personas": { "type": "array", "items": { "type": "string" } },
+              "persona_count": { "type": "integer" },
+              "is_consensus": { "type": "boolean" },
+              "title_variants": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
           },
-          "description": "存疑点"
+          "description": "议题聚类明细（谁提的、几人提的、合并了哪些措辞）"
+        },
+        "stance_distribution": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "各立场的人格数"
+        },
+        "persona_count": { "type": "integer", "description": "参与聚合的人格总数" },
+        "threshold": { "type": "number", "description": "共识阈值（aggregation-rules.yaml）" },
+        "min_personas_for_agreement": {
+          "type": "integer",
+          "description": "共识判定的最少人数：max(2, ceil(threshold × persona_count))"
         }
       },
       "additionalProperties": false
@@ -110,48 +113,32 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["topic", "persona_stances", "resolution_suggestion"],
+        "required": ["topic", "persona_stances"],
         "properties": {
-          "topic": {
-            "type": "string",
-            "minLength": 1,
-            "description": "分歧主题"
-          },
+          "topic": { "type": "string", "minLength": 1, "description": "分歧主题" },
           "persona_stances": {
             "type": "array",
             "items": {
               "type": "object",
               "required": ["persona_id", "stance", "evidence"],
               "properties": {
-                "persona_id": {
-                  "type": "string",
-                  "description": "Persona 标识"
-                },
-                "stance": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "立场"
-                },
-                "evidence": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "支撑证据"
-                }
+                "persona_id": { "type": "string" },
+                "stance": { "type": "string", "minLength": 1 },
+                "evidence": { "type": "string" }
               },
               "additionalProperties": false
             },
             "minItems": 2,
             "description": "各 Persona 立场，至少2方"
           },
-          "resolution_suggestion": {
+          "dedup_method": {
             "type": "string",
-            "minLength": 1,
-            "description": "解决建议"
+            "description": "议题聚类使用的相似度方法（exact/embedding 等）"
           }
         },
         "additionalProperties": false
       },
-      "description": "重大分歧列表"
+      "description": "重大分歧列表。resolution_suggestion 已删除：引擎没有任何调解逻辑，不允许用套话冒充引擎算出的调解方案；真正的仲裁结论在 cross_examination 里"
     },
     "priority_fixes": {
       "type": "array",
@@ -159,43 +146,20 @@
         "type": "object",
         "required": ["priority", "issue", "severity", "why_it_matters", "affected_personas", "suggested_fix"],
         "properties": {
-          "priority": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "优先级排序"
-          },
-          "issue": {
-            "type": "string",
-            "minLength": 1,
-            "description": "问题描述"
-          },
-          "severity": {
-            "type": "string",
-            "enum": ["low", "medium", "high", "critical"],
-            "description": "严重程度"
-          },
-          "why_it_matters": {
-            "type": "string",
-            "minLength": 1,
-            "description": "为何重要"
-          },
+          "priority": { "type": "integer", "minimum": 1 },
+          "issue": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "why_it_matters": { "type": "string" },
           "affected_personas": {
             "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "description": "受影响的 Persona 列表"
+            "items": { "type": "string" },
+            "minItems": 1
           },
-          "suggested_fix": {
-            "type": "string",
-            "minLength": 1,
-            "description": "建议修复方式"
-          }
+          "suggested_fix": { "type": "string" }
         },
-        "additionalProperties": false
+        "additionalProperties": true
       },
-      "description": "优先修复列表"
+      "description": "优先修复列表（按影响人数 × severity 加成排序）"
     },
     "persona_notes": {
       "type": "array",
@@ -203,49 +167,17 @@
         "type": "object",
         "required": ["persona_id", "persona_name", "stance", "evidence_top3", "top_issues", "continue_triggers", "quit_triggers"],
         "properties": {
-          "persona_id": {
-            "type": "string",
-            "description": "Persona 标识"
-          },
-          "persona_name": {
-            "type": "string",
-            "description": "Persona 名称"
-          },
-          "stance": {
-            "type": "string",
-            "minLength": 1,
-            "description": "立场"
-          },
+          "persona_id": { "type": "string" },
+          "persona_name": { "type": "string" },
+          "stance": { "type": "string" },
           "evidence_top3": {
             "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "maxItems": 3,
-            "description": "前3条证据"
+            "items": { "type": "string" },
+            "maxItems": 3
           },
-          "top_issues": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "首要问题"
-          },
-          "continue_triggers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "继续触发条件"
-          },
-          "quit_triggers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "放弃触发条件"
-          }
+          "top_issues": { "type": "array", "items": { "type": "string" } },
+          "continue_triggers": { "type": "array", "items": { "type": "string" } },
+          "quit_triggers": { "type": "array", "items": { "type": "string" } }
         },
         "additionalProperties": false
       },
@@ -253,10 +185,8 @@
     },
     "information_gaps": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "信息缺口列表"
+      "items": { "type": "string" },
+      "description": "信息缺口列表（各人格 missing_information 去重）"
     },
     "next_human_test": {
       "type": "object",
@@ -264,27 +194,61 @@
       "properties": {
         "suggested_tasks": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "建议的后续测试任务"
+          "items": { "type": "string" },
+          "description": "建议的后续真人测试任务，仅由真实争议点推导，推不出就为空"
         },
         "recruit_types": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "建议招募的用户类型"
+          "items": { "type": "string" },
+          "description": "本次面板覆盖的受众特征（取自人格档案真实属性），不是引擎推断的招募建议"
+        },
+        "recruit_types_basis": {
+          "type": "string",
+          "description": "recruit_types 的口径说明；recruit_types 为空时为空串"
         },
         "next_materials": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "下次评审需要的材料"
+          "items": { "type": "string" },
+          "description": "下次评审需要补充的材料，由 information_gaps 推导"
         }
       },
       "additionalProperties": false
+    },
+    "cross_examination": {
+      "type": ["object", "null"],
+      "description": "交叉质询结果。未跑（quick 档 / 无争议点 / 预算刹车）时为 null。mode 为 derived_summary 时 is_live_debate=false，表示只是派生摘要不是真辩论"
+    },
+    "compliance": {
+      "type": "object",
+      "description": "身份-行为解耦检查结果（唯一口径，不覆盖隐私/刻板印象等其它伦理维度）。含 status/ethics_score/violation_count/scope/recommended_steps 等"
+    },
+    "degradation": {
+      "type": "object",
+      "description": "run_panel 挂上的降级留痕：attempted/succeeded/failed 人数、failed_personas 明细与 notice"
+    },
+    "validation": {
+      "type": "object",
+      "description": "run_panel 挂上的校验留痕：retry 配置、gated_out（被三层校验拦下的人格）、calibration（角色一致性/视角覆盖度/幻觉率；coverage 在 n<2 时 average_distance=null 且 not_applicable=true）。calibration 已经 _json_safe 拍平（pairwise_distances 的元组键变成 'id1|id2' 字符串）"
+    },
+    "budget": {
+      "type": "object",
+      "description": "run_panel 挂上的单次成本护栏留痕：max_cost_per_run_usd/persona_cost_usd/exceeded/skipped_stages/notice"
+    },
+    "panel_selection": {
+      "type": "object",
+      "description": "显式点名人格时 run_panel 挂上的匹配留痕：requested/matched（截断与预检之后真正参与的）/missing/truncated_by_mode/fell_back_to_auto/notice。未点名时整键不存在",
+      "properties": {
+        "requested": { "type": "array", "items": { "type": "string" } },
+        "matched": { "type": "array", "items": { "type": "string" } },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "truncated_by_mode": { "type": "array", "items": { "type": "string" } },
+        "fell_back_to_auto": { "type": "boolean" },
+        "notice": { "type": "string" }
+      }
+    },
+    "simulation_notice": {
+      "type": "string",
+      "description": "模拟模式（无 API key）时 run_panel 挂上的警示文案"
     }
   },
   "additionalProperties": false
