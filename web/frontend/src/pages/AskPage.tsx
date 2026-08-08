@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import AmbientMotes from '@/components/AmbientMotes'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviewsAll, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
+import { rememberPendingConversation } from '@/lib/apiClient'
 import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
@@ -31,7 +32,10 @@ const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
 interface ImageAttachment {
   id: string
   filename: string
+  /** data URI。发消息时用它（模型链路要的是 image_url） */
   image_data: string
+  /** 落盘后的文件 id。持久化与重放走这个，不把 base64 存进库 */
+  fileId?: string
 }
 
 const EXAMPLES = [
@@ -146,6 +150,9 @@ export default function AskPage() {
   // 当前对话在服务端的 id。惰性创建：用户只是打开页面看看、一个字没发时
   // 不该在库里留下空对话。第一条消息落库时才真正建。
   const conversationIdRef = useRef<string | null>(null)
+  // 本轮用户消息附带的图片 file_id。persistMessage 从这里取——
+  // appendMessage 的入参类型里没有附件信息，而改那个联合类型会牵动十几处渲染。
+  const pendingImageIdsRef = useRef<string[]>([])
   // 建对话的在途 Promise。没有它的话，用户快速连发两条消息会并发触发两次
   // createConversation，第二条消息落进一段全新的空对话里，聊天记录被劈成两半。
   const creatingConvRef = useRef<Promise<string | null> | null>(null)
@@ -449,9 +456,19 @@ export default function AskPage() {
           conversationIdRef.current = conv.id
           const restored: ChatMessage[] = conv.messages.map((m) => {
             const ts = m.created_at ? new Date(m.created_at).getTime() : Date.now()
-            const meta = (m.meta || {}) as { kind?: string; reviewId?: string | null }
+            const meta = (m.meta || {}) as { kind?: string; reviewId?: string | null; fileIds?: string[] }
             if (m.role === 'user') {
-              return { id: nextId(), role: 'user', text: m.content, ts }
+              // 图片按 file_id 还原成 <img src="/api/uploads/{id}">。
+              // 存的是引用不是 base64，所以这一步要向服务器取字节——
+              // 取回接口带归属校验，别人的 id 拿不到东西。
+              const ids = Array.isArray(meta.fileIds) ? (meta.fileIds as string[]) : []
+              return {
+                id: nextId(),
+                role: 'user',
+                text: m.content,
+                images: ids.length ? ids.map((fid) => `/api/uploads/${fid}`) : undefined,
+                ts,
+              }
             }
             // 评审卡片按原样还原成卡片，而不是退化成一句文字
             if (meta.kind === 'review' && meta.reviewId) {
@@ -503,6 +520,10 @@ export default function AskPage() {
       .createConversation()
       .then((c) => {
         conversationIdRef.current = c.id
+        // 匿名期开的对话记在本地，登录时一并认领到账号名下。
+        // 这不是"匿名跨设备"（匿名身份本就无法跨设备识别），
+        // 是"登录后归入账号，此后跨设备可见"。
+        rememberPendingConversation(c.id)
         // 写进 URL：刷新后靠它把对话捞回来。用 replace 不留历史记录，
         // 否则用户按后退键会在同一段对话的不同阶段之间来回跳。
         const next = new URLSearchParams(searchParams)
@@ -532,6 +553,10 @@ export default function AskPage() {
     if (m.role === 'user') {
       role = 'user'
       content = m.text
+      // 图片只存 file_id。把 data URI 塞进 meta 等于把 base64 存进数据库：
+      // 一张 1MB 截图会变成 1.37MB 文本，且每次读这条消息都要把整张图拖进内存。
+      const ids = pendingImageIdsRef.current
+      if (ids.length) meta = { kind: 'images', fileIds: ids }
     } else {
       switch (m.kind) {
         case 'text':
@@ -591,6 +616,8 @@ export default function AskPage() {
     // 丢弃（附件还挂在栏里，用户以为发出去了）。发送成功与否都先清空附件栏，
     // 跟"开新评审"链路的行为一致：一条消息带一批图，不粘到下一条。
     const imagePayload = attachments.map((a) => a.image_data)
+    // 落库存 id 不存 base64（见 persistMessage）
+    pendingImageIdsRef.current = attachments.map((a) => a.fileId).filter((x): x is string => !!x)
     setAttachments([])
     appendMessage({
       id: nextId(),
@@ -643,6 +670,8 @@ export default function AskPage() {
     // 同时并入跨轮次的累积区——用户可能先发图被追问，几句之后才凑出
     // confirm 卡片，图不能因为这条消息"发送"了就在评审真正建出来之前被丢掉。
     const imagesForBubble = attachments.map((a) => a.image_data)
+    // 落库存 id 不存 base64（见 persistMessage）
+    pendingImageIdsRef.current = attachments.map((a) => a.fileId).filter((x): x is string => !!x)
     sessionImagesRef.current = [...sessionImagesRef.current, ...attachments]
     setAttachments([])
     appendMessage({
@@ -718,7 +747,12 @@ export default function AskPage() {
                 ? prev
                 : [
                     ...prev,
-                    { id: attachmentId, filename: result.filename, image_data: result.image_data },
+                    {
+                      id: attachmentId,
+                      filename: result.filename,
+                      image_data: result.image_data,
+                      fileId: result.file_id,
+                    },
                   ]
             )
           } else {

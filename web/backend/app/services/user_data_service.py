@@ -228,6 +228,14 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
     for c in conversations:
         db.delete(c)
 
+    # 上传的图片：磁盘上的字节也要删。只删库会留下永远没人认领的文件——
+    # 已经没有任何记录指向它们，连"这是谁的"都查不出来。
+    from app.services import file_store
+
+    files_deleted, bytes_freed = file_store.delete_for_user(db, user_id)
+    stats["uploaded_files_deleted"] = files_deleted
+    stats["uploaded_bytes_freed"] = bytes_freed
+
     stats["api_keys_deleted"] = (
         db.query(UserApiKey).filter(UserApiKey.user_id == user_id).delete(synchronize_session=False)
     )

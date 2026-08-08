@@ -56,17 +56,17 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
 
   // 按深度淡出，代替 fog —— 自定义着色器拿不到 three 的 fog 宏
-  vFade = smoothstep(34.0, 9.0, -mv.z);
+  vFade = smoothstep(48.0, 12.0, -mv.z);
 
   gl_Position = projectionMatrix * mv;
-  // 透视衰减：远小近大。系数配合相机 z≈13。
+  // 透视衰减：远小近大。系数配合相机 z≈28。
   // 这个数是控制"糊成白块"的最强杠杆：屏幕重叠面积正比于直径的平方，
   // 砍一半直径 = 重叠量降到四分之一，而单颗的亮度完全不受影响。
   // 相比之下砍粒子数量只是线性的，还会同时丢掉"海量"的观感。
   // 再加一个上限：没有它，近处粒子被透视放大成大光斑，少数几颗就堆满一片区域，
   // 逼着你砍总量——"海量"和"不糊"就变成了二选一。封住上限后两者可以同时成立。
-  float ps = aSize * uPixelRatio * (120.0 / max(-mv.z, 0.001));
-  gl_PointSize = min(ps, 2.6 * uPixelRatio);
+  float ps = aSize * uPixelRatio * (210.0 / max(-mv.z, 0.001));
+  gl_PointSize = min(ps, 4.2 * uPixelRatio);
 }
 `
 
@@ -116,10 +116,10 @@ export default function HeroScene() {
 
       // 粒子量按屏宽缩放：小笔记本没必要背满 3 万颗
       const q = Math.min(1, w() / 1600)
-      const SWARM_PER_NODE = Math.round(140 * (0.55 + q * 0.45))
-      const NEBULA = Math.round(12000 * (0.5 + q * 0.5))
-      const RING_PER = Math.round(1400 * (0.5 + q * 0.5))
-      const DUST = Math.round(5500 * (0.5 + q * 0.5))
+      const SWARM_PER_NODE = Math.round(130 * (0.55 + q * 0.45))
+      const NEBULA = Math.round(10000 * (0.5 + q * 0.5))
+      const RING_PER = Math.round(1200 * (0.5 + q * 0.5))
+      const DUST = Math.round(4500 * (0.5 + q * 0.5))
 
       const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
       // 海量粒子下关掉 MSAA：粒子本身就是软边圆点，抗锯齿没有可见收益、只有开销
@@ -129,8 +129,8 @@ export default function HeroScene() {
       host.appendChild(renderer.domElement)
 
       const scene = new THREE.Scene()
-      const camera = new THREE.PerspectiveCamera(38, w() / h(), 0.1, 200)
-      camera.position.set(0, 0.4, 17)
+      const camera = new THREE.PerspectiveCamera(45, w() / h(), 0.1, 260)
+      camera.position.set(0, 0.2, 28)
 
       const rig = new THREE.Group()
       rig.position.x = 0.8 // 微右移平衡视觉重心，粒子主体基本居中
@@ -167,10 +167,10 @@ export default function HeroScene() {
 
       // ---------- 1) 中心星云盘：被审视的材料 ----------
       for (let i = 0; i < NEBULA; i++) {
-        const r = Math.pow(Math.random(), 1.25) * 4.6 // 幂分布 → 内密外疏。相机后退后同步放大
+        const r = Math.pow(Math.random(), 1.25) * 8.5 // 幂分布 → 内密外疏。相机后退后同步放大
         const a = Math.random() * Math.PI * 2
-        const flat = 0.28 * (1 - r / 5.0) // 盘状：越靠外越薄
-        const t = Math.min(1, r / 4.0)
+        const flat = 0.32 * (1 - r / 9.0) // 盘状：越靠外越薄
+        const t = Math.min(1, r / 7.0)
         // 内圈偏白偏亮、外圈偏蓝偏暗——纵深感的主要来源
         push(
           Math.cos(a) * r + gauss() * 0.12,
@@ -183,7 +183,7 @@ export default function HeroScene() {
       }
 
       // ---------- 2) 72 个视角粒子团 ----------
-      const R = 7.2
+      const R = 12.5
       const golden = Math.PI * (3 - Math.sqrt(5))
       for (let i = 0; i < VIEWPOINT_COUNT; i++) {
         const yy = 1 - (i / (VIEWPOINT_COUNT - 1)) * 2
@@ -243,7 +243,7 @@ export default function HeroScene() {
       const dSpn: number[] = []
       const dSed: number[] = []
       for (let i = 0; i < DUST; i++) {
-        dPos.push((Math.random() - 0.5) * 56, (Math.random() - 0.5) * 32, (Math.random() - 0.5) * 32 - 6)
+        dPos.push((Math.random() - 0.5) * 110, (Math.random() - 0.5) * 62, (Math.random() - 0.5) * 62 - 8)
         const c = COLD.clone().lerp(CORE, Math.random() * 0.6)
         dCol.push(c.r, c.g, c.b)
         dSiz.push(0.3 + Math.random() * 0.5)

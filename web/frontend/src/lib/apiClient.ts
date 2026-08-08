@@ -43,6 +43,9 @@ import {
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
 const TOKEN_KEY = 'al.token'
 const PENDING_REVIEWS_KEY = 'al.pending_reviews'
+/** 匿名期开过的对话。与评审分开记：一段对话可能一条评审都没产出，
+ *  只记评审的话，"聊了半天还没开评审就去登录"那段内容永远归不到账号名下。 */
+const PENDING_CONVERSATIONS_KEY = 'al.pending_conversations'
 /** 本地待认领清单的条数上限——localStorage 不是数据库，超出丢最旧的 */
 const PENDING_REVIEWS_MAX = 20
 
@@ -139,10 +142,56 @@ export function forgetPendingReviews(ids: string[]): void {
 export async function claimPendingReviews(): Promise<string[]> {
   if (!getToken()) return []
   const pending = listPendingReviews()
-  if (!pending.length) return []
-  const res = await api.claimReviews(pending)
+  const pendingConvs = listPendingConversations()
+  if (!pending.length && !pendingConvs.length) return []
+  const res = await api.claimReviews(pending, pendingConvs)
   forgetPendingReviews([...res.claimed, ...res.rejected])
+  forgetPendingConversations([
+    ...(res.claimed_conversations || []),
+    ...(res.rejected_conversations || []),
+  ])
   return res.claimed
+}
+
+// ---- 匿名期的对话，同样只在本地记 id ----
+//
+// 说清楚这做到的是什么：**不是**"匿名跨设备"——匿名身份本就没有可信标识，
+// 换台机器谁也认不出你。它做到的是"登录后归入账号，此后跨设备可见"。
+
+export function listPendingConversations(): string[] {
+  try {
+    const raw = localStorage.getItem(PENDING_CONVERSATIONS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  } catch {
+    return []
+  }
+}
+
+function writePendingConversations(ids: string[]): void {
+  try {
+    localStorage.setItem(
+      PENDING_CONVERSATIONS_KEY,
+      JSON.stringify(ids.slice(0, PENDING_REVIEWS_MAX)),
+    )
+  } catch {
+    // 隐私模式 / 配额满：认领是尽力而为的补救，存不下不该阻断对话本身
+  }
+}
+
+/** 记下一段"匿名期开的对话"。已登录时什么都不做——它本来就归属明确。 */
+export function rememberPendingConversation(id: string): void {
+  if (!id || getToken()) return
+  const current = listPendingConversations()
+  if (current.includes(id)) return
+  writePendingConversations([id, ...current])
+}
+
+export function forgetPendingConversations(ids: string[]): void {
+  if (!ids.length) return
+  const drop = new Set(ids)
+  writePendingConversations(listPendingConversations().filter((id) => !drop.has(id)))
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -250,11 +299,19 @@ export const api = {
 
   /** 把登录前匿名跑的评审挂到当前账号下——不认领的话登录即 404（见文件顶部说明）。
    *  后端只放行"当前仍归属匿名桶"的评审，已属于别的账号的一律进 rejected。 */
-  claimReviews: (reviewIds: string[]) =>
-    request<{ claimed: string[]; rejected: string[]; claimed_count: number }>(
-      '/api/auth/me/claim-reviews',
-      { method: 'POST', body: JSON.stringify({ review_ids: reviewIds }) },
-    ),
+  claimReviews: (reviewIds: string[], conversationIds: string[] = []) =>
+    request<{
+      claimed: string[]
+      rejected: string[]
+      claimed_count: number
+      claimed_conversations?: string[]
+      rejected_conversations?: string[]
+    }>('/api/auth/me/claim-reviews', {
+      method: 'POST',
+      // 对话与评审走同一个端点：归属校验与并发条件 UPDATE 那套逻辑一模一样，
+      // 拆成两个接口必然会有一份先腐烂。
+      body: JSON.stringify({ review_ids: reviewIds, conversation_ids: conversationIds }),
+    }),
 
   /** 彻底删除我的内容与账号。confirm 必须是「删除我的账号」；已登录用户还要验密码。 */
   deleteMyAccount: (confirm: string, password?: string) =>
@@ -310,7 +367,18 @@ export const api = {
     fd.append('file', file)
     return request<
       | { filename: string; kind: 'text'; size: number; text: string }
-      | { filename: string; kind: 'image'; size: number; image_data: string }
+      | {
+          filename: string
+          kind: 'image'
+          size: number
+          /** data URI。发消息时仍用它——评审与追问链路一路把它当 image_url 传给模型 */
+          image_data: string
+          /** 落盘后的文件 id。**持久化时存这个**，不是把 base64 塞进数据库：
+           *  一张 1MB 截图 base64 之后是 1.37MB 文本，等于 175 段对话。 */
+          file_id: string
+          /** 取回地址，对话重放时给 <img src> 用 */
+          url: string
+        }
     >('/api/uploads', { method: 'POST', body: fd })
   },
 

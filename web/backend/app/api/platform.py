@@ -435,6 +435,10 @@ def _require_own_identity(identity: Identity) -> None:
 
 class ClaimReviewsRequest(BaseModel):
     review_ids: List[str] = Field(default_factory=list)
+    # 对话与评审是两套独立归属（一段对话可能一条评审都没产出），所以认领
+    # 评审并不会顺带把对话带过来。放在同一个端点而不是新开一个：
+    # 归属校验与并发条件 UPDATE 那套逻辑一模一样，抄一遍必然会有一份先腐烂。
+    conversation_ids: List[str] = Field(default_factory=list)
 
 
 # 一次最多认领多少条。上限的意义不是"够不够用"，而是别让这个接口变成
@@ -499,11 +503,11 @@ async def claim_reviews(
             wanted.append(rid)
     if len(wanted) > CLAIM_MAX_IDS:
         raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 条评审")
-    if not wanted:
-        return {"claimed": [], "rejected": [], "claimed_count": 0}
-
+    # 注意这里没有"评审为空就提前返回"：只带对话来认领是完全正常的情形
+    # （用户聊了半天还没开评审就去登录了）。之前那个 early return 会把
+    # 这种请求直接吞掉，对话永远归不到账号名下。
     anon = settings.anonymous_user_id
-    rows = db.query(Review).filter(Review.id.in_(wanted)).all()
+    rows = db.query(Review).filter(Review.id.in_(wanted)).all() if wanted else []
     claimed: List[str] = []
     for review in rows:
         if review.user_id and review.user_id != anon:
@@ -530,11 +534,57 @@ async def claim_reviews(
             ).update({"user_id": identity.user_id}, synchronize_session=False)
         db.commit()
 
+    # ---- 对话：同一套条件 UPDATE ----
+    wanted_convs = list(dict.fromkeys(body.conversation_ids or []))
+    if len(wanted_convs) > CLAIM_MAX_IDS:
+        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 段对话")
+    claimed_convs: List[str] = []
+    if wanted_convs:
+        from app.models import Conversation, UploadedFile
+
+        conv_rows = db.query(Conversation).filter(Conversation.id.in_(wanted_convs)).all()
+        for conv in conv_rows:
+            if conv.user_id and conv.user_id != anon:
+                continue  # 已属真实账号，绝不转移
+            updated = (
+                db.query(Conversation)
+                .filter(
+                    Conversation.id == conv.id,
+                    or_(Conversation.user_id.is_(None), Conversation.user_id == anon),
+                )
+                .update({"user_id": identity.user_id}, synchronize_session=False)
+            )
+            if updated == 1:
+                claimed_convs.append(conv.id)
+
+        if claimed_convs:
+            # 对话里引用的图片也要跟着改挂，否则重放时每张图都 404：
+            # 消息还在、file_id 还在，但那些文件仍归匿名桶，取回接口按归属校验
+            # 会拒绝。用户看到的是"登录之后图全丢了"。
+            file_ids: set = set()
+            for conv in conv_rows:
+                if conv.id not in claimed_convs:
+                    continue
+                for m in conv.messages:
+                    meta = m.meta_json or {}
+                    for fid in meta.get("fileIds") or []:
+                        if isinstance(fid, str):
+                            file_ids.add(fid)
+            if file_ids:
+                db.query(UploadedFile).filter(
+                    UploadedFile.id.in_(list(file_ids)),
+                    or_(UploadedFile.user_id == anon, UploadedFile.user_id.is_(None)),
+                ).update({"user_id": identity.user_id}, synchronize_session=False)
+            db.commit()
+
     claimed_set = set(claimed)
+    claimed_conv_set = set(claimed_convs)
     return {
         "claimed": claimed,
         "rejected": [rid for rid in wanted if rid not in claimed_set],
         "claimed_count": len(claimed),
+        "claimed_conversations": claimed_convs,
+        "rejected_conversations": [c for c in wanted_convs if c not in claimed_conv_set],
     }
 
 
@@ -939,10 +989,49 @@ _IMAGE_MEDIA_TYPES = {
 }
 
 
+@router.get("/uploads/{file_id}")
+async def get_uploaded_file(
+    file_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """取回自己上传的图片。对话重放时 <img src> 指向这里。
+
+    归属校验回 404 而不是 403：403 等于确认"该 id 存在但不是你的"，
+    可以被用来枚举他人上传的文件。
+    """
+    from fastapi.responses import Response
+
+    from app.services import file_store
+
+    row = file_store.get_owned(db, file_id, identity.user_id)
+    if row is None:
+        raise NotFound("文件不存在")
+    data = file_store.read_bytes(row)
+    if data is None:
+        # 库里有记录、磁盘上没字节。当成不存在处理，但要留日志——
+        # 静默返回空图会让"图片丢了"变成一个查不出原因的现象。
+        logger.warning("uploaded_file_missing_on_disk id=%s", file_id)
+        raise NotFound("文件不存在")
+    return Response(
+        content=data,
+        media_type=row.media_type,
+        headers={
+            # 私有内容，不能进任何共享缓存
+            "Cache-Control": "private, max-age=86400",
+            # 浏览器嗅探出的类型可能与声明的不一致，据此执行是 XSS 面
+            "X-Content-Type-Options": "nosniff",
+            # 即便有人上传了 SVG 之类，也不让它在本域下当文档执行
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
 @router.post("/uploads", dependencies=[Depends(rate_limit("upload", 20, 3600))])
 async def upload_file(
     file: UploadFile = File(...),
     identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
 ):
     """上传材料文件。文本类抽取成文字返回；图片类（截图/UI稿/BP页面）转成 data URI，
     前端把它塞进 material {type: "image", image_data: ...} 交给多模态模型直接"看"。"""
@@ -969,11 +1058,27 @@ async def upload_file(
 
         media_type = _IMAGE_MEDIA_TYPES.get(ext, "application/octet-stream")
         data_uri = f"data:{media_type};base64,{base64.b64encode(raw).decode('ascii')}"
+
+        # 落盘并登记。此前图片只以 data URI 形式活在浏览器内存里，刷新即消失，
+        # 对话重放时那些图就永远回不来了。
+        # 注意扩展名取的是白名单映射里的那个，不是用户传来的——用户可以把任意
+        # 内容叫成 .png，落盘名必须由服务端决定。
+        from app.services import file_store
+
+        stored = file_store.save_bytes(
+            db, identity.user_id, raw, media_type, ext, filename=file.filename
+        )
+
         return {
             "filename": file.filename,
             "kind": "image",
             "size": len(raw),
+            # data URI 继续返回：评审链路与追问链路一路把它当 image_url 传给模型
+            # （persona_agent.py:362 / chat_service.py:282），改成路径要动引擎，
+            # 这次不动。前端发消息时仍用它，只是**持久化时改存 file_id**。
             "image_data": data_uri,
+            "file_id": stored.id,
+            "url": f"/api/uploads/{stored.id}",
         }
 
     if ext not in settings.upload_allowed_ext:

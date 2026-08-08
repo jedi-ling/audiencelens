@@ -201,6 +201,38 @@ class ConversationMessage(Base):
     conversation = relationship("Conversation", back_populates="messages")
 
 
+class UploadedFile(Base):
+    """落盘的上传文件（目前只有图片）。库里只存元信息，字节在磁盘上。
+
+    为什么不把图片塞进数据库：一张 1MB 截图 base64 之后是 1.37MB 文本，
+    等于 175 段对话。JSON 列里塞 base64 会让每次读那一行都把整张图拖进内存，
+    备份体积也跟着爆。
+
+    为什么以前不落盘、现在又落盘：此前 /api/uploads 写下的
+    data/uploads/{uuid}.txt 从写下去那刻起就没有任何代码读过它（没有下载入口），
+    纯粹在攒垃圾——所以当时删掉写盘是对的。现在不同：对话要能重放，
+    图片必须有一个刷新之后还找得回来的落点，**存在真实的读取方**。
+
+    路径不入库，由 id 推导（storage_path()）。存任意路径字符串意味着
+    一旦某处能写这个字段，就能读写磁盘上任意位置。
+    """
+
+    __tablename__ = "uploaded_files"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    # 归属口径与 Review / Conversation 一致（匿名为 "anonymous"）
+    user_id = Column(String, index=True, nullable=True, default="anonymous")
+    # 原始文件名只用于展示，不参与任何路径拼接
+    filename = Column(String, nullable=True)
+    media_type = Column(String, nullable=False)
+    ext = Column(String, nullable=False)
+    byte_size = Column(Integer, nullable=False, default=0)
+    # 同一个人重复上传同一张图只落一份盘。截图被反复拖进来是常态，
+    # 去重在真实使用里能省掉可观的一块。
+    sha256 = Column(String, index=True, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 class EvaluationResult(Base):
     __tablename__ = "evaluation_results"
 

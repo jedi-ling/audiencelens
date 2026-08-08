@@ -59,7 +59,9 @@ curl http://localhost:8001/api/health
 ```bash
 python -m pytest tests/ -q                      # 核心引擎
 cd web/backend && python -m pytest tests/ -q    # 平台链路
-cd web/frontend && npx tsc --noEmit             # 用户产品前端类型检查
+cd web/frontend && npm run typecheck            # 用户产品前端类型检查（= tsc -b）
+#   注意别写成 npx tsc --noEmit：根 tsconfig 是 "files": [] + project references，
+#   --noEmit 检查的是空集，对任何错误都返回成功——看起来像"类型干净"，其实什么都没查。
 cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 ```
 
@@ -211,7 +213,7 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AL_UPLOAD_DIR` | `web/backend/data/uploads` | 上传落盘目录 |
+| `AL_UPLOAD_DIR` | `{backend_dir}/data/uploads` | 上传图片的落盘目录。**Docker 下必须在挂载卷内**，否则容器一重建，用户对话里的图全变 404（数据库记录还在，字节没了）。清理孤儿文件：`python scripts/cleanup_orphan_uploads.py`（默认只报告，加 `--apply` 才删） |
 | `AL_UPLOAD_MAX_BYTES` | `10485760`（10MB） | 文本类材料上限 |
 | `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | 这是"抽取成文字材料"的格式白名单 |
 | `AL_UPLOAD_ALLOWED_IMAGE_EXT` | `.png,.jpg,.jpeg,.webp,.gif` | 图片走独立分支：原样转 data URI 进多模态请求，不抽文字 |

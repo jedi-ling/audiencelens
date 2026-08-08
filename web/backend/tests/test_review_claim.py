@@ -197,7 +197,15 @@ class TestClaimSecurityBoundary:
             "/api/auth/me/claim-reviews", json={"review_ids": []}, headers=_headers(token)
         )
         assert r.status_code == 200
-        assert r.json() == {"claimed": [], "rejected": [], "claimed_count": 0}
+        # 断言逐字段而不是整个字典全等：这个端点后来又能认领对话，
+        # 返回里多了 claimed_conversations / rejected_conversations。
+        # 全等断言会把"新增字段"也判成失败，可新增字段对调用方是兼容的
+        # （前端忽略不认识的键），真正要守住的是"空清单不改动任何东西"。
+        body = r.json()
+        assert body["claimed"] == []
+        assert body["rejected"] == []
+        assert body["claimed_count"] == 0
+        assert body["claimed_conversations"] == []
 
     def test_duplicate_ids_counted_once(self, client, db, monkeypatch):
         _enable_auth(monkeypatch)
