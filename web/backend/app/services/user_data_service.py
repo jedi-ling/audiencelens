@@ -26,6 +26,7 @@ from app.models import (
     CdkRedemption,
     Conversation,
     CreditLedger,
+    Project,
     EthicsReport,
     EvaluationResult,
     EvaluationScorecard,
@@ -58,6 +59,7 @@ EXPORTED_TABLES = frozenset({
     "review_chat_messages",
     "conversations",
     "conversation_messages",
+    "projects",
     "uploaded_files",
     "evaluation_results",
     "evaluation_scorecards",
@@ -328,6 +330,7 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
             "id": c.id,
             "title": c.title,
             "review_id": c.review_id,
+            "project_id": c.project_id,
             "created_at": _iso(c.created_at),
             "updated_at": _iso(c.updated_at),
             "messages": [
@@ -344,10 +347,23 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
         for c in conversations
     ]
 
+    projects = (
+        db.query(Project).filter(Project.user_id == user_id).order_by(Project.created_at).all()
+    )
+    project_payload = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "created_at": _iso(p.created_at),
+            "updated_at": _iso(p.updated_at),
+        }
+        for p in projects
+    ]
+
     return {
-        # 2：补齐了判断留档/反馈/伦理报告/评估/上传图片/兑换与额度流水。
+        # 3：补上了 Project（对话分组）。
         # 版本号往上走而不是原地改，是为了让拿着老导出件的人能知道自己那份缺哪些块。
-        "export_version": 2,
+        "export_version": 3,
         "exported_at": _iso(datetime.now(timezone.utc)),
         "account": (
             {
@@ -375,6 +391,7 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
         ],
         "reviews": review_payload,
         "conversations": conversation_payload,
+        "projects": project_payload,
         "usage_records": [
             {
                 "kind": u.kind,
@@ -481,6 +498,13 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
     stats["conversation_messages_deleted"] = sum(len(c.messages) for c in conversations)
     for c in conversations:
         db.delete(c)
+
+    # 项目：对话已经删完了（不管是不是先删的项目，ON DELETE SET NULL
+    # 在 SQLite 下也不会自动生效），这里直接删项目记录本身即可，
+    # 不需要再显式解绑什么。
+    stats["projects_deleted"] = (
+        db.query(Project).filter(Project.user_id == user_id).delete(synchronize_session=False)
+    )
 
     # 上传的图片：磁盘上的字节也要删。只删库会留下永远没人认领的文件——
     # 已经没有任何记录指向它们，连"这是谁的"都查不出来。

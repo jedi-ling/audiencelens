@@ -38,6 +38,7 @@ import {
   type ConversationSummary,
   type ConversationDetail,
   type StoredConversationMessage,
+  type Project,
 } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
@@ -46,6 +47,10 @@ const PENDING_REVIEWS_KEY = 'al.pending_reviews'
 /** 匿名期开过的对话。与评审分开记：一段对话可能一条评审都没产出，
  *  只记评审的话，"聊了半天还没开评审就去登录"那段内容永远归不到账号名下。 */
 const PENDING_CONVERSATIONS_KEY = 'al.pending_conversations'
+/** 匿名期建的项目。与对话分开记，理由同上——而且是真正必须分开的一条：
+ *  只认领对话不认领项目，会留下"对话认领成功了，但它挂靠的项目还在
+ *  匿名桶里、新账号读不到"这个具体的坑（后端 test_projects.py 有实测）。 */
+const PENDING_PROJECTS_KEY = 'al.pending_projects'
 /** 本地待认领清单的条数上限——localStorage 不是数据库，超出丢最旧的 */
 const PENDING_REVIEWS_MAX = 20
 
@@ -143,13 +148,15 @@ export async function claimPendingReviews(): Promise<string[]> {
   if (!getToken()) return []
   const pending = listPendingReviews()
   const pendingConvs = listPendingConversations()
-  if (!pending.length && !pendingConvs.length) return []
-  const res = await api.claimReviews(pending, pendingConvs)
+  const pendingProjects = listPendingProjects()
+  if (!pending.length && !pendingConvs.length && !pendingProjects.length) return []
+  const res = await api.claimReviews(pending, pendingConvs, pendingProjects)
   forgetPendingReviews([...res.claimed, ...res.rejected])
   forgetPendingConversations([
     ...(res.claimed_conversations || []),
     ...(res.rejected_conversations || []),
   ])
+  forgetPendingProjects([...(res.claimed_projects || []), ...(res.rejected_projects || [])])
   return res.claimed
 }
 
@@ -192,6 +199,41 @@ export function forgetPendingConversations(ids: string[]): void {
   if (!ids.length) return
   const drop = new Set(ids)
   writePendingConversations(listPendingConversations().filter((id) => !drop.has(id)))
+}
+
+// ---- 匿名期建的项目，同样只在本地记 id ----
+
+export function listPendingProjects(): string[] {
+  try {
+    const raw = localStorage.getItem(PENDING_PROJECTS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  } catch {
+    return []
+  }
+}
+
+function writePendingProjects(ids: string[]): void {
+  try {
+    localStorage.setItem(PENDING_PROJECTS_KEY, JSON.stringify(ids.slice(0, PENDING_REVIEWS_MAX)))
+  } catch {
+    // 尽力而为，同 writePendingConversations
+  }
+}
+
+/** 记下一个"匿名期建的项目"。已登录时什么都不做——它本来就归属明确。 */
+export function rememberPendingProject(id: string): void {
+  if (!id || getToken()) return
+  const current = listPendingProjects()
+  if (current.includes(id)) return
+  writePendingProjects([id, ...current])
+}
+
+export function forgetPendingProjects(ids: string[]): void {
+  if (!ids.length) return
+  const drop = new Set(ids)
+  writePendingProjects(listPendingProjects().filter((id) => !drop.has(id)))
 }
 
 // ---- review_id → job_id 的本地映射 ----
@@ -341,18 +383,24 @@ export const api = {
 
   /** 把登录前匿名跑的评审挂到当前账号下——不认领的话登录即 404（见文件顶部说明）。
    *  后端只放行"当前仍归属匿名桶"的评审，已属于别的账号的一律进 rejected。 */
-  claimReviews: (reviewIds: string[], conversationIds: string[] = []) =>
+  claimReviews: (reviewIds: string[], conversationIds: string[] = [], projectIds: string[] = []) =>
     request<{
       claimed: string[]
       rejected: string[]
       claimed_count: number
       claimed_conversations?: string[]
       rejected_conversations?: string[]
+      claimed_projects?: string[]
+      rejected_projects?: string[]
     }>('/api/auth/me/claim-reviews', {
       method: 'POST',
-      // 对话与评审走同一个端点：归属校验与并发条件 UPDATE 那套逻辑一模一样，
-      // 拆成两个接口必然会有一份先腐烂。
-      body: JSON.stringify({ review_ids: reviewIds, conversation_ids: conversationIds }),
+      // 评审/对话/项目走同一个端点：归属校验与并发条件 UPDATE 那套逻辑一模一样，
+      // 拆成三个接口必然会有几份先腐烂。
+      body: JSON.stringify({
+        review_ids: reviewIds,
+        conversation_ids: conversationIds,
+        project_ids: projectIds,
+      }),
     }),
 
   /** 彻底删除我的内容与账号。confirm 必须是「删除我的账号」；已登录用户还要验密码。 */
@@ -513,8 +561,44 @@ export const api = {
       body: JSON.stringify({ review_id: reviewId }),
     }),
 
+  /** 把对话挂到某个项目，或传 null 移回"未分组"。
+   *  用的是同一个 PATCH 端点，body 显式带 project_id（哪怕是 null）——
+   *  后端靠 Pydantic 的 model_fields_set 区分"没传"与"传了 null"，
+   *  这里必须真的把键写进请求体，不能省略。 */
+  setConversationProject: (id: string, projectId: string | null) =>
+    request<ConversationSummary>(`/api/v2/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ project_id: projectId }),
+    }),
+
   deleteConversation: (id: string) =>
     request<{ ok: boolean }>(`/api/v2/conversations/${id}`, { method: 'DELETE' }),
+
+  // ---------------- 项目：对话的分组容器 ----------------
+
+  listProjects: () => request<{ projects: Project[] }>('/api/v2/projects'),
+
+  createProject: (name: string) =>
+    request<Project>('/api/v2/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }).then((p) => {
+      // 匿名期建的项目记下 id，登录后才认领得回来（同 rememberPendingReview 的道理）
+      rememberPendingProject(p.id)
+      return p
+    }),
+
+  renameProject: (id: string, name: string) =>
+    request<Project>(`/api/v2/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
+
+  /** 删除项目。归属的对话不会被删除，只是解除挂靠回到"未分组"。 */
+  deleteProject: (id: string) =>
+    request<{ ok: boolean; conversations_unlinked: number }>(`/api/v2/projects/${id}`, {
+      method: 'DELETE',
+    }),
 
   /** 手动对已完成评审运行 8 维质量评估（创建时没开 enable_evaluation 的补跑入口） */
   runEvaluation: (reviewId: string) =>

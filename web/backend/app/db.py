@@ -222,6 +222,13 @@ def _legacy_migrations() -> None:
         if "api_base" not in key_columns:
             patches.append("ALTER TABLE user_api_keys ADD COLUMN api_base VARCHAR")
 
+    if "conversations" in inspector.get_table_names():
+        conv_columns = {c["name"] for c in inspector.get_columns("conversations")}
+        if "project_id" not in conv_columns:
+            # 新建库 create_all 会带上这一列（Project 表也在同一批新建），
+            # 老库（本次上线前就已产生对话数据的实例）不会自动补，得靠这里。
+            patches.append("ALTER TABLE conversations ADD COLUMN project_id VARCHAR")
+
     if "users" in inspector.get_table_names():
         user_columns = {c["name"] for c in inspector.get_columns("users")}
         if "is_guest" not in user_columns:

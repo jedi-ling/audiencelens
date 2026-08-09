@@ -146,6 +146,26 @@ def link_review(db: Session, conv: Conversation, review_id: str) -> None:
     db.commit()
 
 
+def set_project(db: Session, conv: Conversation, project_id: Optional[str]) -> None:
+    """把对话挂到某个项目下，或传 None 移回"未分组"。
+
+    项目归属校验（project_id 是否存在、是否属于同一用户）由调用方
+    （API 层）负责——这里只管赋值，不重复查一次 Project 表。
+    """
+    conv.project_id = project_id
+    db.add(conv)
+    db.commit()
+
+
+def list_by_project(db: Session, user_id: Optional[str], project_id: Optional[str]) -> List[Conversation]:
+    """列出某个项目下（或 project_id=None 时"未分组"）的对话。"""
+    q = db.query(Conversation).filter(Conversation.user_id == _owner(user_id))
+    q = q.filter(Conversation.project_id.is_(None)) if project_id is None else q.filter(
+        Conversation.project_id == project_id
+    )
+    return q.order_by(Conversation.updated_at.desc()).all()
+
+
 def delete_conversation(db: Session, conv: Conversation) -> None:
     """删对话。走 ORM 的 delete 以触发 messages 的级联，
     批量 delete() 会绕过级联留下孤儿消息行。"""
@@ -158,6 +178,7 @@ def to_dict(conv: Conversation, with_messages: bool = False) -> Dict[str, Any]:
         "id": conv.id,
         "title": conv.title,
         "review_id": conv.review_id,
+        "project_id": conv.project_id,
         "created_at": conv.created_at.isoformat() if conv.created_at else None,
         "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
     }

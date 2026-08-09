@@ -24,7 +24,7 @@ import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
-import type { ConversationSummary, IntentResult, Material, ReviewDetail, WsEvent } from '@/lib/types'
+import type { ConversationSummary, IntentResult, Material, Project, ReviewDetail, WsEvent } from '@/lib/types'
 import type { Review, ReviewListItem } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
@@ -216,7 +216,6 @@ export default function AskPage() {
       .catch(() => setSkillQuota(null)) // 失败保持"没取到"，不伪装成"不受限"；不阻断选技能
   }, [])
   const [pinnedTaskType, setPinnedTaskType] = useState<{ id: string; name: string } | null>(null)
-  const [pinnedProject, setPinnedProject] = useState<string | null>(null)
   // 报告出来后的追问——钉在同一个对话里，不弹独立窗口：钉住后普通发送
   // 就路由去跟这条评审（或某个具体人格）聊，而不是走意图解析开新评审。
   const [activeChatContext, setActiveChatContext] = useState<{
@@ -226,17 +225,33 @@ export default function AskPage() {
   } | null>(null)
   const [skillPickerOpen, setSkillPickerOpen] = useState(false)
   const [typePickerOpen, setTypePickerOpen] = useState(false)
-  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [typeSearch, setTypeSearch] = useState('')
-  const [newProjectName, setNewProjectName] = useState('')
   const [dragging, setDragging] = useState(false) // 拖拽文件悬停在聊天区上方时的视觉反馈
 
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
-  // 还没产出评审的对话。此前它们在侧栏里**完全不可见**——侧栏读的是评审列表，
-  // 一条评审都还没建的对话就不存在于任何列表里，关掉页面等于永久消失。
-  const [draftConvs, setDraftConvs] = useState<ConversationSummary[]>([])
+  // 全部对话（不管有没有产出评审），CC Desktop 风格侧栏树的数据源。
+  // 此前这里只存"还没产出评审"的那些（draftConvs），一旦某段对话关联了评审
+  // 就从侧栏消失，只能从下面的"评审历史"里用伪造气泡打开——而这里的真实
+  // 消息记录本来就在，没必要退回去用那份近似值。
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  // 项目：对话的分组容器。null = 还没拉到（区分"加载中"与"确实没有项目"）。
+  const [projects, setProjects] = useState<Project[] | null>(null)
+  // 侧栏里展开的项目 id 集合。默认全部展开——项目数量通常不多，
+  // 折叠状态只有真的用得上的人会去点，不该默认藏起来。
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  // 正在被拖拽的对话 id；用于拖拽时的视觉反馈（拖出来的那一项半透明）
+  const [draggingConvId, setDraggingConvId] = useState<string | null>(null)
+  // 正在重命名的项目；空字符串合法（表示"存在但还没打字"），用 null 表示未在编辑
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  // 新建项目的常驻输入框是否展开（替代了原来悬浮在输入框工具栏里的弹窗——
+  // 那个位置太不起眼，容易被当成普通图标按钮忽略掉）
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [newProjectDraft, setNewProjectDraft] = useState('')
+  // 删除项目走同一套"页面内二次确认"（不用 window.confirm，理由同评审删除）
+  const [confirmingProjectId, setConfirmingProjectId] = useState<string | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // 正在等二次确认的那条（页面内确认，不用 window.confirm，理由见 askDeleteHistory）
@@ -269,13 +284,26 @@ export default function AskPage() {
       setReviewHistory(items)
       setHistoryRequiresLogin(requiresLogin)
       setHistoryError(null)
-      // 只列还没产出评审的对话：已经产出评审的那些，下面的评审历史里
-      // 已经有一条了，两边都列会变成同一段对话出现两次。
+      // 全部对话（不只是"还没产出评审"的那些）都要拉——见 conversations 状态
+      // 的注释，这里是 CC Desktop 风格侧栏树的唯一数据源。
       try {
-        const { conversations } = await api.listConversations()
-        setDraftConvs(conversations.filter((c) => !c.review_id))
+        const { conversations: convs } = await api.listConversations()
+        setConversations(convs)
       } catch {
         // 对话列表拉不到不该让评审历史也跟着空掉——两者是独立的失败面
+      }
+      try {
+        const { projects: rows } = await api.listProjects()
+        setProjects(rows)
+        // 默认展开全部项目——新出现的项目也要默认展开，而不是"只在首次加载展开"，
+        // 否则新建完项目立刻收起看不到刚拖进去的对话。
+        setExpandedProjects((prev) => {
+          const next = new Set(prev)
+          rows.forEach((p) => next.add(p.id))
+          return next
+        })
+      } catch {
+        setProjects(null)
       }
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : '加载失败')
@@ -307,11 +335,71 @@ export default function AskPage() {
     ])
     setPinnedSkill(null)
     setPinnedTaskType(null)
-    setPinnedProject(null)
     setActiveChatContext(null)
     searchParams.delete('review')
     searchParams.delete('c')
     setSearchParams(searchParams, { replace: true })
+  }
+
+  // ---------------------------------------------------------------------
+  // 项目：侧栏树的增删改 + 拖拽把对话移进/移出项目
+  // ---------------------------------------------------------------------
+
+  const handleCreateProject = async () => {
+    const name = newProjectDraft.trim()
+    if (!name) return
+    try {
+      const p = await api.createProject(name)
+      setProjects((prev) => [p, ...(prev ?? [])])
+      setExpandedProjects((prev) => new Set(prev).add(p.id))
+      setNewProjectDraft('')
+      setNewProjectOpen(false)
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : '创建项目失败')
+    }
+  }
+
+  const handleRenameProject = async (id: string, name: string) => {
+    const trimmed = name.trim()
+    setRenamingProjectId(null)
+    if (!trimmed) return // 空名字直接放弃这次改名，不提交也不报错——用户大概率是点错了
+    try {
+      const p = await api.renameProject(id, trimmed)
+      setProjects((prev) => (prev ?? []).map((x) => (x.id === id ? p : x)))
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : '重命名失败')
+    }
+  }
+
+  const handleDeleteProject = async (id: string) => {
+    setConfirmingProjectId(null)
+    try {
+      await api.deleteProject(id)
+      setProjects((prev) => (prev ?? []).filter((x) => x.id !== id))
+      // 被删项目下的对话回到未分组——本地也同步一份，不等下一次 loadHistory
+      // 用户就能看到它们已经出现在"未分组"里，而不是短暂地"消失"了。
+      setConversations((prev) =>
+        prev.map((c) => (c.project_id === id ? { ...c, project_id: null } : c)),
+      )
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : '删除项目失败')
+    }
+  }
+
+  /** 把一段对话挂到某个项目（projectId=null 移回未分组）。
+   *  乐观更新本地状态；失败就整体重新拉一次，不做手工回滚——
+   *  这个操作没有连带的复杂状态要维护，重新拉一次比手写回滚逻辑更不容易出错。 */
+  const moveConversationToProject = async (conversationId: string, projectId: string | null) => {
+    const prevSnapshot = conversations
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, project_id: projectId } : c)),
+    )
+    try {
+      await api.setConversationProject(conversationId, projectId)
+    } catch (e) {
+      setConversations(prevSnapshot)
+      setHistoryError(e instanceof Error ? e.message : '移动对话失败')
+    }
   }
 
   /** 点历史侧栏一条评审——不跳走、不弹窗，而是把这条评审"当年"对应的对话
@@ -333,7 +421,6 @@ export default function AskPage() {
     setShowExamples(false)
     setPinnedSkill(null)
     setPinnedTaskType(null)
-    setPinnedProject(null)
     setMessages([
       { id: nextId(), role: 'user', text: userText, ts: Date.now() },
       { id: nextId(), role: 'assistant', kind: 'review', reviewId: r.id, ts: Date.now() },
@@ -487,6 +574,21 @@ export default function AskPage() {
             // 把之前澄清过的信息全忘掉、再问一遍
             historyRef.current = conv.messages.filter((m) => m.role === 'user').map((m) => m.content)
           }
+          // 从分享链接/书签打开的老对话，可能不在 loadHistory() 拉到的
+          // 前 50 条里——upsert 一份进本地列表，否则侧栏树里找不到它，
+          // 用户想把它拖进项目都无从下手。
+          setConversations((prev) => {
+            const summary: ConversationSummary = {
+              id: conv.id,
+              title: conv.title,
+              review_id: conv.review_id,
+              project_id: conv.project_id,
+              created_at: conv.created_at,
+              updated_at: conv.updated_at,
+            }
+            const exists = prev.some((c) => c.id === conv.id)
+            return exists ? prev.map((c) => (c.id === conv.id ? summary : c)) : [summary, ...prev]
+          })
         })
         .catch(() => {
           // 对话被删了或不属于当前身份——静默回到开场白
@@ -516,6 +618,16 @@ export default function AskPage() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
+  /** 当前对话所在项目的名字，没有就 null。发起评审时把它桥接进
+   *  project_key（见调用点注释），侧栏头部的项目徽章也读它。 */
+  const activeProjectName = (): string | null => {
+    const convId = conversationIdRef.current
+    if (!convId) return null
+    const conv = conversations.find((c) => c.id === convId)
+    if (!conv || !conv.project_id) return null
+    return projects?.find((p) => p.id === conv.project_id)?.name ?? null
+  }
+
   /** 拿到（必要时创建）当前对话的服务端 id。并发安全见 creatingConvRef 的注释。 */
   const ensureConversation = async (): Promise<string | null> => {
     if (conversationIdRef.current) return conversationIdRef.current
@@ -533,6 +645,15 @@ export default function AskPage() {
         const next = new URLSearchParams(searchParams)
         next.set('c', c.id)
         setSearchParams(next, { replace: true })
+        // 新对话在它有第一条消息之前，侧栏树里原本完全不可见——旧的
+        // draftConvs 只在挂载和"创建评审后"这两个时机刷新，一段刚开口
+        // 但还没建评审的对话找不到自己在哪。现在对话树是主导航，这个
+        // 空窗必须补上：立刻插进本地状态，标题先用占位符，等首条消息
+        // 落库后台把真实标题回填时再靠下一次 loadHistory() 更新。
+        setConversations((prev) => [
+          { id: c.id, title: null, review_id: null, project_id: null, created_at: c.created_at, updated_at: c.updated_at },
+          ...prev,
+        ])
         return c.id
       })
       .catch(() => null)
@@ -592,6 +713,14 @@ export default function AskPage() {
     if (!content.trim()) return
     void ensureConversation().then((id) => {
       if (!id) return
+      // 首条用户消息顺手当标题，与后端 conversation_service.append_message
+      // 的规则镜像一致——不镜像的话，侧栏在下一次 loadHistory() 之前
+      // 会一直显示"未命名对话"，而新对话树是主导航，这个空窗比以前更显眼。
+      if (role === 'user') {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id && !c.title ? { ...c, title: content.slice(0, 40) } : c)),
+        )
+      }
       void api.appendConversationMessage(id, role, content, meta).catch(() => {
         // 静默：见上面的说明
       })
@@ -695,7 +824,12 @@ export default function AskPage() {
         ...parsed,
         task_type: pinnedTaskType ? (pinnedTaskType.id as IntentResult['task_type']) : parsed.task_type,
         skill_type: pinnedSkill ? (pinnedSkill.type as IntentResult['skill_type']) : parsed.skill_type,
-        project_key: pinnedProject ?? parsed.project_key,
+        // project_key 现在从"当前对话所在的项目"桥接过来，不再由用户在
+        // 输入框工具栏里另外打字命名——项目改由侧栏的真实 Project 实体管理
+        // （见 activeProjectName），这里只是把项目名顺手写进评审，让独立的
+        // 评审历史页（ReviewHistoryPage，仍按 project_key 分组）不用改动
+        // 就能继续正确归类由聊天产出的评审。
+        project_key: activeProjectName() ?? parsed.project_key,
         needs_clarification: pinnedTaskType ? false : parsed.needs_clarification,
       }
       if (intent.needs_clarification) {
@@ -907,7 +1041,38 @@ export default function AskPage() {
       <HistorySidebar
         open={sidebarOpen}
         history={reviewHistory}
-        drafts={draftConvs}
+        conversations={conversations}
+        projects={projects}
+        expandedProjects={expandedProjects}
+        onToggleProject={(id) =>
+          setExpandedProjects((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+          })
+        }
+        draggingConvId={draggingConvId}
+        onDragStartConv={setDraggingConvId}
+        onDragEndConv={() => setDraggingConvId(null)}
+        onMoveConversation={moveConversationToProject}
+        newProjectOpen={newProjectOpen}
+        newProjectDraft={newProjectDraft}
+        onNewProjectOpenChange={setNewProjectOpen}
+        onNewProjectDraftChange={setNewProjectDraft}
+        onCreateProject={handleCreateProject}
+        renamingProjectId={renamingProjectId}
+        renameDraft={renameDraft}
+        onStartRenameProject={(id, current) => {
+          setRenamingProjectId(id)
+          setRenameDraft(current)
+        }}
+        onRenameDraftChange={setRenameDraft}
+        onCommitRenameProject={handleRenameProject}
+        confirmingProjectId={confirmingProjectId}
+        onAskDeleteProject={setConfirmingProjectId}
+        onConfirmDeleteProject={handleDeleteProject}
+        onCancelDeleteProject={() => setConfirmingProjectId(null)}
         activeConversationId={searchParams.get('c')}
         onOpenConversation={(id) => {
           // 走 URL 而不是直接 setMessages：挂载时那段恢复逻辑已经能按 ?c=
@@ -1081,8 +1246,8 @@ export default function AskPage() {
         </div>
       )}
 
-      {(pinnedSkill || pinnedTaskType || pinnedProject) && (
-        <div className="mt-3 flex flex-wrap gap-2 shrink-0">
+      {(pinnedSkill || pinnedTaskType || conversationIdRef.current) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
           {pinnedSkill && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
               <Zap className="h-3 w-3" strokeWidth={2} />
@@ -1101,13 +1266,45 @@ export default function AskPage() {
               </button>
             </span>
           )}
-          {pinnedProject && (
+          {/* 项目归属不再靠在这里打字命名——现在挂到某个项目是侧栏里一个
+              真实存在的实体（拖拽，或这里选一个）。有对话就露出这个控件：
+              已经在某个项目里就显示徽章 + 移出按钮；还没有就是个下拉选择。 */}
+          {conversationIdRef.current && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
-              <FolderOpen className="h-3 w-3" strokeWidth={2} />
-              项目 · {pinnedProject}
-              <button onClick={() => setPinnedProject(null)} className="hover:text-text-primary transition-colors" aria-label="取消项目">
-                <X className="h-3 w-3" strokeWidth={2} />
-              </button>
+              <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={2} />
+              {activeProjectName() ? (
+                <>
+                  项目 · {activeProjectName()}
+                  <button
+                    onClick={() => {
+                      const cid = conversationIdRef.current
+                      if (cid) void moveConversationToProject(cid, null)
+                    }}
+                    className="hover:text-text-primary transition-colors"
+                    aria-label="移出项目"
+                    title="移回未分组"
+                  >
+                    <X className="h-3 w-3" strokeWidth={2} />
+                  </button>
+                </>
+              ) : (projects && projects.length > 0) ? (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const cid = conversationIdRef.current
+                    if (cid && e.target.value) void moveConversationToProject(cid, e.target.value)
+                  }}
+                  className="bg-transparent text-xs text-warm-orange outline-none"
+                  aria-label="移到项目"
+                >
+                  <option value="" disabled>移到项目…</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-warm-orange/70">还没有项目，去侧栏新建一个</span>
+              )}
             </span>
           )}
         </div>
@@ -1247,81 +1444,10 @@ export default function AskPage() {
           )}
         </div>
 
-        {/* 选/建长期评审项目：新建输入名字，或从历史里挑一个已有项目继续——
-            钉住后同名的评审会在侧栏/历史页自动聚合，不用每次都在话里念"创建...长期评审项目"。 */}
-        <div className="relative shrink-0">
-          <button
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
-              pinnedProject ? 'bg-warm-orange/15 text-warm-orange' : 'text-text-muted hover:bg-bg-secondary hover:text-text-primary'
-            )}
-            onClick={() => {
-              setProjectPickerOpen((v) => !v)
-              setSkillPickerOpen(false)
-              setTypePickerOpen(false)
-            }}
-            aria-label="选择长期评审项目"
-            title="加入长期评审项目——之后的评审会按项目名聚合成时间线"
-          >
-            <FolderOpen className="h-4 w-4" strokeWidth={2} />
-          </button>
-          {projectPickerOpen && (
-            <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-xl border border-border bg-bg-card p-2 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
-              <p className="px-1 pb-1.5 text-xs text-text-muted">新建项目</p>
-              <div className="flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newProjectName.trim()) {
-                      setPinnedProject(newProjectName.trim())
-                      setNewProjectName('')
-                      setProjectPickerOpen(false)
-                    }
-                  }}
-                  placeholder="给项目起个名字…"
-                  className="w-full rounded-md border border-border bg-bg-secondary px-2 py-1.5 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary/40"
-                />
-                <button
-                  disabled={!newProjectName.trim()}
-                  onClick={() => {
-                    setPinnedProject(newProjectName.trim())
-                    setNewProjectName('')
-                    setProjectPickerOpen(false)
-                  }}
-                  className="shrink-0 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-                >
-                  创建
-                </button>
-              </div>
-              {(() => {
-                const existing = Array.from(new Set((reviewHistory ?? []).map((r) => r.project_key).filter((k): k is string => !!k)))
-                if (existing.length === 0) return null
-                return (
-                  <>
-                    <p className="px-1 pb-1 pt-2.5 text-xs text-text-muted">继续已有项目</p>
-                    <div className="max-h-40 overflow-y-auto">
-                      {existing.map((key) => (
-                        <button
-                          key={key}
-                          className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
-                          onClick={() => {
-                            setPinnedProject(key)
-                            setProjectPickerOpen(false)
-                          }}
-                        >
-                          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warm-orange" strokeWidth={1.5} />
-                          <span className="truncate">{key}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
-          )}
-        </div>
+        {/* 原来这里是"新建/选择长期评审项目"的悬浮弹窗按钮——就是用户反馈
+            "点击这个建立项目的位置不合理"的那个。项目现在是侧栏里的真实实体，
+            创建、改名、拖拽归属都在侧栏做；这里改成上面那条徽章 + 下拉，
+            只负责"把当前对话挪进哪个项目"，不再是项目的创建入口。 */}
         </div>
 
         <div className="h-9 w-px shrink-0 bg-border" aria-hidden="true" />
@@ -1424,7 +1550,28 @@ function groupHistoryByProject(history: ReviewListItem[]): { projects: { key: st
 function HistorySidebar({
   open,
   history,
-  drafts,
+  conversations,
+  projects,
+  expandedProjects,
+  onToggleProject,
+  draggingConvId,
+  onDragStartConv,
+  onDragEndConv,
+  onMoveConversation,
+  newProjectOpen,
+  newProjectDraft,
+  onNewProjectOpenChange,
+  onNewProjectDraftChange,
+  onCreateProject,
+  renamingProjectId,
+  renameDraft,
+  onStartRenameProject,
+  onRenameDraftChange,
+  onCommitRenameProject,
+  confirmingProjectId,
+  onAskDeleteProject,
+  onConfirmDeleteProject,
+  onCancelDeleteProject,
   activeConversationId,
   onOpenConversation,
   error,
@@ -1439,7 +1586,29 @@ function HistorySidebar({
 }: {
   open: boolean
   history: ReviewListItem[] | null
-  drafts: ConversationSummary[]
+  /** 全部对话（不管有没有产出评审），CC Desktop 风格侧栏树的数据源 */
+  conversations: ConversationSummary[]
+  projects: Project[] | null
+  expandedProjects: Set<string>
+  onToggleProject: (id: string) => void
+  draggingConvId: string | null
+  onDragStartConv: (id: string) => void
+  onDragEndConv: () => void
+  onMoveConversation: (conversationId: string, projectId: string | null) => void
+  newProjectOpen: boolean
+  newProjectDraft: string
+  onNewProjectOpenChange: (open: boolean) => void
+  onNewProjectDraftChange: (v: string) => void
+  onCreateProject: () => void
+  renamingProjectId: string | null
+  renameDraft: string
+  onStartRenameProject: (id: string, currentName: string) => void
+  onRenameDraftChange: (v: string) => void
+  onCommitRenameProject: (id: string, name: string) => void
+  confirmingProjectId: string | null
+  onAskDeleteProject: (id: string) => void
+  onConfirmDeleteProject: (id: string) => void
+  onCancelDeleteProject: () => void
   activeConversationId: string | null
   onOpenConversation: (id: string) => void
   error: string | null
@@ -1452,6 +1621,62 @@ function HistorySidebar({
   onConfirmDelete: (e: React.MouseEvent, id: string) => void
   onCancelDelete: () => void
 }) {
+  // 对话按 project_id 分桶：项目内的、未分组的。计算一次给下面两块都用，
+  // 避免"项目卡片显示 N 条"和"实际渲染出来的行数"因为各自筛选口径不同而对不上。
+  const byProject = new Map<string, ConversationSummary[]>()
+  const ungroupedConvs: ConversationSummary[] = []
+  for (const c of conversations) {
+    if (c.project_id) {
+      if (!byProject.has(c.project_id)) byProject.set(c.project_id, [])
+      byProject.get(c.project_id)!.push(c)
+    } else {
+      ungroupedConvs.push(c)
+    }
+  }
+
+  const convRow = (c: ConversationSummary) => (
+    <button
+      key={c.id}
+      draggable
+      onDragStart={(e) => {
+        onDragStartConv(c.id)
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', c.id)
+      }}
+      onDragEnd={onDragEndConv}
+      onClick={() => onOpenConversation(c.id)}
+      className={cn(
+        'flex w-full items-center gap-1.5 truncate rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+        c.id === activeConversationId
+          ? 'bg-brand-primary/10 text-brand-primary'
+          : 'text-text-secondary hover:bg-bg-card',
+        draggingConvId === c.id && 'opacity-40',
+      )}
+      title={c.title || '未命名对话'}
+    >
+      {/* 已经产出评审的对话给个小圆点提示——纯装饰性区分，不影响可点性 */}
+      {c.review_id && (
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary/50" aria-hidden="true" />
+      )}
+      <span className="min-w-0 flex-1 truncate">{c.title || '未命名对话'}</span>
+    </button>
+  )
+
+  /** 项目标题行本身是拖放目标：把对话拖到这上面即挂靠该项目
+   *  （dropTarget=null 时代表"未分组"区，拖上去即解除挂靠）。 */
+  const dropZoneProps = (dropTarget: string | null) => ({
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault() // 不 preventDefault 的话 onDrop 根本不会触发
+      e.dataTransfer.dropEffect = 'move'
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault()
+      const id = e.dataTransfer.getData('text/plain')
+      if (id) onMoveConversation(id, dropTarget)
+      onDragEndConv()
+    },
+  })
+
   return (
     <aside
       className={cn(
@@ -1460,7 +1685,7 @@ function HistorySidebar({
       )}
     >
       <div className="flex h-full w-64 flex-col">
-        <div className="shrink-0 p-3">
+        <div className="shrink-0 space-y-1.5 p-3">
           <button
             onClick={onNewConversation}
             className="flex w-full items-center gap-2 rounded-xl border border-brand-primary/30 bg-brand-primary/10 px-3 py-2.5 text-sm font-semibold text-brand-primary transition-all hover:bg-brand-primary/20 hover:shadow-[0_2px_12px_rgba(0,113,227,0.12)]"
@@ -1468,178 +1693,334 @@ function HistorySidebar({
             <Plus className="h-4 w-4" strokeWidth={2} />
             新建对话
           </button>
+          {/* "新建项目"从输入框工具栏里一个不起眼的悬浮弹窗，改成侧栏里
+              一个常驻、点了就知道在做什么的入口——原来的位置太容易被当成
+              普通图标按钮划过去，弹窗本身也和"新建对话"这种一级操作抢地位。 */}
+          {newProjectOpen ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={newProjectDraft}
+                onChange={(e) => onNewProjectDraftChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onCreateProject()
+                  if (e.key === 'Escape') onNewProjectOpenChange(false)
+                }}
+                placeholder="给项目起个名字…"
+                className="w-full rounded-lg border border-border bg-bg-secondary px-2.5 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary/40"
+              />
+              <button
+                disabled={!newProjectDraft.trim()}
+                onClick={onCreateProject}
+                className="shrink-0 rounded-lg bg-brand-primary px-2.5 py-2 text-xs font-medium text-white disabled:opacity-40"
+              >
+                创建
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onNewProjectOpenChange(true)}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-card hover:text-text-primary"
+            >
+              <FolderOpen className="h-4 w-4" strokeWidth={2} />
+              新建项目
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pb-3">
-          {/* 还没产出评审的对话。它们此前在这里完全不可见——侧栏只读评审列表，
-              于是"聊到一半还没开评审"的内容关掉页面就永久消失。 */}
-          {drafts.length > 0 && (
-            <div className="mb-4">
-              <div className="mb-2 flex items-center gap-1.5 px-1">
-                <div className="h-4 w-[3px] rounded-full bg-text-muted/40" />
-                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">
-                  进行中的对话
-                </p>
-              </div>
-              <div className="space-y-1">
-                {drafts.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => onOpenConversation(c.id)}
-                    className={cn(
-                      'block w-full truncate rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
-                      c.id === activeConversationId
-                        ? 'bg-brand-primary/10 text-brand-primary'
-                        : 'text-text-secondary hover:bg-bg-card',
-                    )}
-                    title={c.title || '未命名对话'}
-                  >
-                    {c.title || '未命名对话'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-2 flex items-center gap-1.5 px-1">
-            <div className="h-4 w-[3px] rounded-full bg-brand-primary/40" />
-            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">评审历史</p>
-          </div>
-
-          {/* 加载失败 / 删除失败都走这里，必须是明确可见的一块，不能只是一行灰字 */}
-          {error && (
-            <div
-              role="alert"
-              className="mb-2 flex items-start gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-2 py-1.5 text-[11px] leading-snug text-severity-critical"
-            >
-              <AlertTriangle className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
-              <span className="min-w-0">{error}</span>
-            </div>
-          )}
-
-          {history === null ? (
-            <div className="flex items-center gap-2 px-1 py-3 text-xs text-text-muted">
+          {/* ---- 项目树：CC Desktop 风格，项目是一级容器，对话嵌在下面 ---- */}
+          {projects === null ? (
+            <div className="flex items-center gap-2 px-1 py-2 text-xs text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-              加载中…
+              加载项目…
             </div>
-          ) : history.length === 0 ? (
-            requiresLogin ? (
-              // 空列表有两种完全不同的含义，必须分开说：
-              // "你还没做过评审" vs "这台实例上历史要登录才看得到"。
-              // 后者如果也显示成"还没有评审记录"，用户会以为自己的评审丢了。
-              <div className="flex flex-col items-center gap-3 px-2 py-8 text-center text-xs text-text-muted rounded-xl bg-bg-card border border-border border-dashed">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/10">
-                  <LogIn className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
-                </div>
-                <span className="leading-relaxed">
-                  登录后可以看到自己的评审历史
-                  <br />
-                  <span className="text-text-muted/70">未登录时的评审不会归到任何账号下</span>
-                </span>
-                <Link
-                  to="/login"
-                  className="rounded-lg border border-brand-primary/40 bg-brand-primary/10 px-3 py-1.5 text-[11px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
-                >
-                  去登录
-                </Link>
+          ) : (
+            projects.length > 0 && (
+              <div className="mb-3 space-y-1">
+                {projects.map((p) => {
+                  const items = byProject.get(p.id) || []
+                  const isExpanded = expandedProjects.has(p.id)
+                  const isRenaming = renamingProjectId === p.id
+                  const isConfirming = confirmingProjectId === p.id
+                  return (
+                    <div key={p.id} className="rounded-lg" {...dropZoneProps(p.id)}>
+                      {isConfirming ? (
+                        <div
+                          role="alertdialog"
+                          aria-label={`确认删除项目「${p.name}」`}
+                          className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
+                        >
+                          <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
+                            删除项目「<span className="text-text-primary">{p.name}</span>」？
+                            <br />
+                            里面 {items.length} 段对话会回到"未分组"，不会被删除。
+                          </p>
+                          <div className="flex gap-1.5">
+                            <button
+                              autoFocus
+                              onClick={() => onConfirmDeleteProject(p.id)}
+                              className="rounded bg-severity-critical/85 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-severity-critical"
+                            >
+                              删除项目
+                            </button>
+                            <button
+                              onClick={onCancelDeleteProject}
+                              className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="group flex items-center gap-1 rounded-lg px-1 py-1 hover:bg-bg-card">
+                          <button
+                            onClick={() => onToggleProject(p.id)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left"
+                          >
+                            <ChevronDown
+                              className={cn('h-3.5 w-3.5 shrink-0 text-text-muted transition-transform', !isExpanded && '-rotate-90')}
+                              strokeWidth={2}
+                            />
+                            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warm-orange" strokeWidth={1.5} />
+                            {isRenaming ? (
+                              <input
+                                autoFocus
+                                value={renameDraft}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => onRenameDraftChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') onCommitRenameProject(p.id, renameDraft)
+                                  if (e.key === 'Escape') onCommitRenameProject(p.id, '')
+                                }}
+                                onBlur={() => onCommitRenameProject(p.id, renameDraft)}
+                                className="min-w-0 flex-1 rounded border border-brand-primary/40 bg-bg-secondary px-1 text-xs text-text-primary outline-none"
+                              />
+                            ) : (
+                              <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">
+                                {p.name}
+                              </span>
+                            )}
+                            <span className="shrink-0 text-[10px] text-text-muted">{items.length}</span>
+                          </button>
+                          {!isRenaming && (
+                            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+                              <button
+                                onClick={() => onStartRenameProject(p.id, p.name)}
+                                className="rounded p-1 text-text-muted/60 hover:bg-bg-card-hover hover:text-text-primary"
+                                aria-label={`重命名「${p.name}」`}
+                                title="重命名"
+                              >
+                                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M12 20h9" />
+                                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onAskDeleteProject(p.id)}
+                                className="rounded p-1 text-text-muted/60 hover:bg-severity-critical/10 hover:text-severity-critical"
+                                aria-label={`删除「${p.name}」`}
+                                title="删除项目（对话会回到未分组）"
+                              >
+                                <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {isExpanded && items.length > 0 && (
+                        <div className="ml-4 space-y-0.5 border-l-2 border-border/60 pl-2 pt-0.5">
+                          {items.map(convRow)}
+                        </div>
+                      )}
+                      {isExpanded && items.length === 0 && (
+                        <p className="ml-4 border-l-2 border-border/60 py-1 pl-4 text-[10px] text-text-muted/60">
+                          把对话拖到这里
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            ) : (
+            )
+          )}
+
+          {/* ---- 未分组：既是列表，也是"拖上来即移出项目"的放置区 ---- */}
+          {(ungroupedConvs.length > 0 || (projects && projects.length > 0)) && (
+            <div className="mb-4" {...dropZoneProps(null)}>
+              <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                <div className="h-4 w-[3px] rounded-full bg-text-muted/40" />
+                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">未分组</p>
+              </div>
+              {ungroupedConvs.length > 0 ? (
+                <div className="space-y-0.5">{ungroupedConvs.map(convRow)}</div>
+              ) : (
+                <p className="px-2 py-1 text-[10px] text-text-muted/60">没有未分组的对话</p>
+              )}
+            </div>
+          )}
+
+          {/* ---- 早期评审记录：没有关联对话的 Review（走旧 Wizard 建的，
+              或对话持久化上线之前产生的）。有真实对话记录的评审已经在
+              上面的项目树/未分组里能打开（且是真实消息记录，不是这里
+              点开走的近似重建），不在这里重复列一遍。 ---- */}
+          {(() => {
+            const convReviewIds = new Set(conversations.map((c) => c.review_id).filter((x): x is string => !!x))
+            const legacyHistory = (history || []).filter((r) => !convReviewIds.has(r.id))
+            if (history !== null && legacyHistory.length === 0 && !error) return null
+            return (
+              <div>
+                <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                  <div className="h-4 w-[3px] rounded-full bg-brand-primary/40" />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">早期评审记录</p>
+                </div>
+
+                {/* 加载失败 / 删除失败都走这里，必须是明确可见的一块，不能只是一行灰字 */}
+                {error && (
+                  <div
+                    role="alert"
+                    className="mb-2 flex items-start gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-2 py-1.5 text-[11px] leading-snug text-severity-critical"
+                  >
+                    <AlertTriangle className="mt-px h-3 w-3 shrink-0" strokeWidth={1.5} />
+                    <span className="min-w-0">{error}</span>
+                  </div>
+                )}
+
+                {history === null ? (
+                  <div className="flex items-center gap-2 px-1 py-3 text-xs text-text-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                    加载中…
+                  </div>
+                ) : legacyHistory.length === 0 ? (
+                  requiresLogin && (
+                    // 空列表有两种完全不同的含义，必须分开说：
+                    // "你还没做过评审" vs "这台实例上历史要登录才看得到"。
+                    // 后者如果也显示成"还没有评审记录"，用户会以为自己的评审丢了。
+                    <div className="flex flex-col items-center gap-3 px-2 py-8 text-center text-xs text-text-muted rounded-xl bg-bg-card border border-border border-dashed">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary/10">
+                        <LogIn className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+                      </div>
+                      <span className="leading-relaxed">
+                        登录后可以看到自己的评审历史
+                        <br />
+                        <span className="text-text-muted/70">未登录时的评审不会归到任何账号下</span>
+                      </span>
+                      <Link
+                        to="/login"
+                        className="rounded-lg border border-brand-primary/40 bg-brand-primary/10 px-3 py-1.5 text-[11px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
+                      >
+                        去登录
+                      </Link>
+                    </div>
+                  )
+                ) : (
+                  (() => {
+                    const { projects: legacyGroups, ungrouped } = groupHistoryByProject(legacyHistory)
+                    const renderItem = (r: ReviewListItem) => {
+                      const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
+                      // 二次确认直接长在这一行里。整行不再可点（避免"想点取消结果打开了评审"）。
+                      if (confirmingId === r.id) {
+                        return (
+                          <div
+                            key={r.id}
+                            role="alertdialog"
+                            aria-label={`确认删除「${label}」`}
+                            className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
+                          >
+                            <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
+                              删除「<span className="text-text-primary">{label}</span>」？
+                              <br />
+                              报告、各角色意见、全部追问记录一起没，无法撤销。
+                            </p>
+                            <div className="flex gap-1.5">
+                              <button
+                                autoFocus
+                                onClick={(e) => onConfirmDelete(e, r.id)}
+                                disabled={deletingId === r.id}
+                                className="flex items-center gap-1 rounded bg-severity-critical/85 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-severity-critical disabled:opacity-60"
+                              >
+                                {deletingId === r.id && (
+                                  <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
+                                )}
+                                删除
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onCancelDelete()
+                                }}
+                                className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => onOpenReview(r)}
+                          className="group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary transition-all hover:bg-bg-card hover:shadow-sm hover:text-text-primary border border-transparent hover:border-border"
+                        >
+                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary/30 group-hover:bg-brand-primary/60 transition-colors" />
+                          <span className="min-w-0 flex-1 truncate">{label}</span>
+                          {/* 删除按钮常驻可见（低对比度，hover/focus 才提亮）。
+                              以前是 opacity-0 + group-hover 才显形：触屏没有 hover，
+                              等于这台设备上根本删不掉；桌面端用户也压根发现不了。
+                              p-1.5 + h-3.5 图标 ≈ 26px 命中区，配合行高够手指点。 */}
+                          <button
+                            onClick={(e) => onAskDelete(e, r.id)}
+                            className="shrink-0 rounded p-1.5 text-text-muted/40 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
+                            aria-label={`删除「${label}」`}
+                            title="删除这条评审（会二次确认）"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          </button>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className="space-y-3">
+                        {legacyGroups.map((group) => (
+                          <div key={group.key}>
+                            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-warm-orange">
+                              <div className="flex h-5 w-5 items-center justify-center rounded bg-warm-orange/10">
+                                <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                              </div>
+                              <span className="min-w-0 flex-1 truncate">{group.key}</span>
+                              <span className="shrink-0 text-text-muted font-normal">{group.items.length}</span>
+                            </div>
+                            <div className="space-y-0.5 border-l-2 border-border/60 pl-2.5">
+                              {group.items.map(renderItem)}
+                            </div>
+                          </div>
+                        ))}
+                        {ungrouped.length > 0 && <div className="space-y-1">{ungrouped.map(renderItem)}</div>}
+                      </div>
+                    )
+                  })()
+                )}
+              </div>
+            )
+          })()}
+
+          {/* 彻底的空态：没有项目、没有对话、也没有早期评审——第一次使用 */}
+          {projects !== null &&
+            projects.length === 0 &&
+            conversations.length === 0 &&
+            history !== null &&
+            history.length === 0 &&
+            !error &&
+            !requiresLogin && (
               <div className="flex flex-col items-center gap-3 px-2 py-8 text-center text-xs text-text-muted rounded-xl bg-bg-card border border-border border-dashed">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-secondary">
                   <Inbox className="h-5 w-5 text-text-muted" strokeWidth={1.5} />
                 </div>
-                <span>还没有评审记录</span>
-                <span className="text-[10px] text-text-muted/70">开始一段新对话，评审结果会出现在这里</span>
+                <span>还没有对话或评审记录</span>
+                <span className="text-[10px] text-text-muted/70">开始一段新对话，它会出现在这里</span>
               </div>
-            )
-          ) : (
-            (() => {
-              const { projects, ungrouped } = groupHistoryByProject(history)
-              const renderItem = (r: ReviewListItem) => {
-                const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
-                // 二次确认直接长在这一行里。整行不再可点（避免"想点取消结果打开了评审"）。
-                if (confirmingId === r.id) {
-                  return (
-                    <div
-                      key={r.id}
-                      role="alertdialog"
-                      aria-label={`确认删除「${label}」`}
-                      className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
-                    >
-                      <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
-                        删除「<span className="text-text-primary">{label}</span>」？
-                        <br />
-                        报告、各角色意见、全部追问记录一起没，无法撤销。
-                      </p>
-                      <div className="flex gap-1.5">
-                        <button
-                          autoFocus
-                          onClick={(e) => onConfirmDelete(e, r.id)}
-                          disabled={deletingId === r.id}
-                          className="flex items-center gap-1 rounded bg-severity-critical/85 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-severity-critical disabled:opacity-60"
-                        >
-                          {deletingId === r.id && (
-                            <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
-                          )}
-                          删除
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onCancelDelete()
-                          }}
-                          className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    </div>
-                  )
-                }
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => onOpenReview(r)}
-                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-text-secondary transition-all hover:bg-bg-card hover:shadow-sm hover:text-text-primary border border-transparent hover:border-border"
-                  >
-                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary/30 group-hover:bg-brand-primary/60 transition-colors" />
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                    {/* 删除按钮常驻可见（低对比度，hover/focus 才提亮）。
-                        以前是 opacity-0 + group-hover 才显形：触屏没有 hover，
-                        等于这台设备上根本删不掉；桌面端用户也压根发现不了。
-                        p-1.5 + h-3.5 图标 ≈ 26px 命中区，配合行高够手指点。 */}
-                    <button
-                      onClick={(e) => onAskDelete(e, r.id)}
-                      className="shrink-0 rounded p-1.5 text-text-muted/40 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
-                      aria-label={`删除「${label}」`}
-                      title="删除这条评审（会二次确认）"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    </button>
-                  </div>
-                )
-              }
-              return (
-                <div className="space-y-3">
-                  {projects.map((group) => (
-                    <div key={group.key}>
-                      <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold text-warm-orange">
-                        <div className="flex h-5 w-5 items-center justify-center rounded bg-warm-orange/10">
-                          <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={1.5} />
-                        </div>
-                        <span className="min-w-0 flex-1 truncate">{group.key}</span>
-                        <span className="shrink-0 text-text-muted font-normal">{group.items.length}</span>
-                      </div>
-                      <div className="space-y-0.5 border-l-2 border-border/60 pl-2.5">
-                        {group.items.map(renderItem)}
-                      </div>
-                    </div>
-                  ))}
-                  {ungrouped.length > 0 && <div className="space-y-1">{ungrouped.map(renderItem)}</div>}
-                </div>
-              )
-            })()
-          )}
+            )}
         </div>
       </div>
     </aside>

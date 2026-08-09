@@ -405,8 +405,23 @@ export interface ConversationSummary {
   title: string | null
   /** 这段对话最终产出的评审（弱引用：删评审不会删掉对话本身） */
   review_id: string | null
+  /** 所属项目，null = 未分组。真外键，删项目会让它回到 null（不删对话）。 */
+  project_id: string | null
   created_at: string | null
   /** 列表按它倒序。按 created_at 排会让老对话里的新消息沉底。 */
+  updated_at: string | null
+}
+
+// ---------------- 项目：对话的分组容器 ----------------
+// 与 Review.project_key（旧的自由文本标签，供独立的评审历史页分组）是两套
+// 并存的系统，不合并——见后端 models.Project 的类文档。
+
+export interface Project {
+  id: string
+  name: string
+  /** 现查的真实计数，不是创建时缓存下来的快照 */
+  conversation_count: number
+  created_at: string | null
   updated_at: string | null
 }
 

@@ -133,6 +133,38 @@ class ReviewChatMessage(Base):
     review = relationship("Review", back_populates="chat_messages")
 
 
+class Project(Base):
+    """对话的分组容器（CC Desktop 风格侧栏里的"项目"）。
+
+    与 Review.project_key 是两套并存的系统，不合并：
+      · project_key —— Review 上的自由文本标签，靠字符串相同聚合，
+        供 /ask 侧栏出现之前就在用的旧 Wizard 建评审流程，及独立的
+        评审历史页（ReviewHistoryPage）分组，两处都已经在生产使用，
+        改成外键会牵连那两处一起重写，超出本次"对话框架"的范围。
+      · Project —— 真实体，只挂在 Conversation 下（见 Conversation.project_id）。
+        对话创建评审时，会把当时所在项目的名字顺手写进 review.project_key，
+        这样旧的评审历史页无需任何改动就能继续按项目分组——桥接是单向的，
+        改项目名不会回填到已经生成的旧评审上（那些评审的 project_key
+        是一份独立的历史快照，不是实时视图）。
+    """
+
+    __tablename__ = "projects"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, index=True, nullable=True, default="anonymous")
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    conversations = relationship("Conversation", back_populates="project")
+
+
 class Conversation(Base):
     """评审**之前**那段对话本身。
 
@@ -148,6 +180,12 @@ class Conversation(Base):
     review_id 可空且是弱引用（不设外键）：一段对话可能最终没有产出评审，
     产出了也只是它的结果之一。设成真外键会让"删评审"连带删掉用户的
     原始描述，那是数据丢失而不是级联。
+
+    project_id 与 review_id 不同，是**真外键**、ON DELETE SET NULL：
+    项目只是对话的分组方式，删掉项目应该让对话回到"未分组"，而不是
+    连对话内容一起删掉——那才是数据丢失。SQLite 默认不校验外键约束，
+    这条 ondelete 子句在 SQLite 下不会自动生效，project_service.delete_project
+    因此在应用层显式把归属对话的 project_id 置空，不依赖数据库帮忙。
     """
 
     __tablename__ = "conversations"
@@ -159,6 +197,9 @@ class Conversation(Base):
     title = Column(String, nullable=True)
     # 弱引用，见类文档。不加 ForeignKey 是刻意的。
     review_id = Column(String, nullable=True, index=True)
+    project_id = Column(
+        String, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     # 列表按它倒序——按 created_at 排会让老对话里的新消息沉底
     updated_at = Column(
@@ -169,6 +210,7 @@ class Conversation(Base):
         index=True,
     )
 
+    project = relationship("Project", back_populates="conversations")
     messages = relationship(
         "ConversationMessage",
         back_populates="conversation",

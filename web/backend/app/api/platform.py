@@ -439,6 +439,12 @@ class ClaimReviewsRequest(BaseModel):
     # 评审并不会顺带把对话带过来。放在同一个端点而不是新开一个：
     # 归属校验与并发条件 UPDATE 那套逻辑一模一样，抄一遍必然会有一份先腐烂。
     conversation_ids: List[str] = Field(default_factory=list)
+    # 项目本身没有内容（只是个名字），但如果不认领它，一个真实的坑会发生：
+    # 用户匿名时新建项目、把对话拖进去，登录后只认领了对话——对话的
+    # project_id 还指向匿名桶里那个项目，get_owned 按新账号一查就是 404，
+    # 侧栏里那段对话会从项目里"消失"（实际是查不到项目、不是对话丢了，
+    # 但用户看到的现象就是"我建的项目不见了"）。
+    project_ids: List[str] = Field(default_factory=list)
 
 
 # 一次最多认领多少条。上限的意义不是"够不够用"，而是别让这个接口变成
@@ -577,14 +583,43 @@ async def claim_reviews(
                 ).update({"user_id": identity.user_id}, synchronize_session=False)
             db.commit()
 
+    # ---- 项目：同一套条件 UPDATE。放在对话认领之后——项目本身的认领
+    # 顺序其实无所谓，但这样读下来是"内容 → 内容的容器"，逻辑顺序更顺。
+    wanted_projects = list(dict.fromkeys(body.project_ids or []))
+    if len(wanted_projects) > CLAIM_MAX_IDS:
+        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 个项目")
+    claimed_projects: List[str] = []
+    if wanted_projects:
+        from app.models import Project
+
+        proj_rows = db.query(Project).filter(Project.id.in_(wanted_projects)).all()
+        for proj in proj_rows:
+            if proj.user_id and proj.user_id != anon:
+                continue  # 已属真实账号，绝不转移
+            updated = (
+                db.query(Project)
+                .filter(
+                    Project.id == proj.id,
+                    or_(Project.user_id.is_(None), Project.user_id == anon),
+                )
+                .update({"user_id": identity.user_id}, synchronize_session=False)
+            )
+            if updated == 1:
+                claimed_projects.append(proj.id)
+        if claimed_projects:
+            db.commit()
+
     claimed_set = set(claimed)
     claimed_conv_set = set(claimed_convs)
+    claimed_project_set = set(claimed_projects)
     return {
         "claimed": claimed,
         "rejected": [rid for rid in wanted if rid not in claimed_set],
         "claimed_count": len(claimed),
         "claimed_conversations": claimed_convs,
         "rejected_conversations": [c for c in wanted_convs if c not in claimed_conv_set],
+        "claimed_projects": claimed_projects,
+        "rejected_projects": [p for p in wanted_projects if p not in claimed_project_set],
     }
 
 
@@ -1441,6 +1476,89 @@ def _serialize_chat_message(m, gate_assistant: bool = False) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 项目：对话的分组容器（CC Desktop 风格侧栏）
+#
+# 与下面"对话持续化"是同一批端点的姊妹组，但先声明——项目端点在
+# patch_conversation 里被引用（挂靠项目时要校验项目归属）。
+# ---------------------------------------------------------------------------
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class ProjectPatchRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+@router.get("/v2/projects")
+async def list_projects(
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import project_service
+
+    rows = project_service.list_projects(db, identity.user_id)
+    counts = project_service.conversation_counts(db, [p.id for p in rows])
+    return {"projects": [project_service.to_dict(p, counts.get(p.id, 0)) for p in rows]}
+
+
+@router.post(
+    "/v2/projects",
+    dependencies=[Depends(rate_limit("project_create", 60, 3600))],
+)
+async def create_project(
+    body: ProjectCreateRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import project_service
+
+    try:
+        project = project_service.create_project(db, identity.user_id, body.name)
+    except ValueError as exc:
+        raise BadRequest(str(exc))
+    return project_service.to_dict(project, 0)
+
+
+@router.patch("/v2/projects/{project_id}")
+async def patch_project(
+    project_id: str,
+    body: ProjectPatchRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    from app.services import project_service
+
+    project = project_service.get_owned(db, project_id, identity.user_id)
+    if project is None:
+        raise NotFound("项目不存在")
+    try:
+        project_service.rename_project(db, project, body.name)
+    except ValueError as exc:
+        raise BadRequest(str(exc))
+    counts = project_service.conversation_counts(db, [project.id])
+    return project_service.to_dict(project, counts.get(project.id, 0))
+
+
+@router.delete("/v2/projects/{project_id}")
+async def delete_project(
+    project_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """删除项目。归属的对话不会被删除，只是解除挂靠、回到"未分组"——
+    见 project_service.delete_project 的文档。"""
+    from app.services import project_service
+
+    project = project_service.get_owned(db, project_id, identity.user_id)
+    if project is None:
+        raise NotFound("项目不存在")
+    unlinked = project_service.delete_project(db, project)
+    return {"ok": True, "conversations_unlinked": unlinked}
+
+
+# ---------------------------------------------------------------------------
 # 对话持续化
 #
 # 与上面 /v2/reviews/{id}/chat 的分工不要搞混：
@@ -1470,6 +1588,11 @@ class ConversationMessageRequest(BaseModel):
 class ConversationPatchRequest(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
     review_id: Optional[str] = None
+    # project_id 用 model_fields_set 而不是"是否为 None"来判断有没有传：
+    # 这个字段的语义天生需要区分三种情况——不传（不动项目归属）、
+    # 显式传 null（移回未分组）、传具体 id（挂到某个项目）。若只看值是否
+    # 为 None，后两种会被合并成同一种，"移出项目"这个操作就做不出来。
+    project_id: Optional[str] = None
 
 
 @router.get("/v2/conversations")
@@ -1535,6 +1658,19 @@ async def patch_conversation(
         if not review or (review.user_id or "anonymous") != identity.user_id:
             raise NotFound("评审不存在")
         conv.review_id = body.review_id
+    if "project_id" in body.model_fields_set:
+        if body.project_id is None:
+            conv.project_id = None  # 显式移回未分组
+        else:
+            from app.services import project_service
+
+            project = project_service.get_owned(db, body.project_id, identity.user_id)
+            if project is None:
+                # 同样的道理：把任意项目 id 绑到自己的对话上，就能顺着这条关联
+                # 探测别人有没有某个项目 id（虽然项目本身不含敏感内容，但归属
+                # 校验的口径必须处处一致，不能因为"反正项目没什么好偷"就放水）。
+                raise NotFound("项目不存在")
+            conv.project_id = project.id
     db.add(conv)
     db.commit()
     db.refresh(conv)
