@@ -17,6 +17,7 @@ import {
   type ChatMessage,
   type CreateReviewResponse,
   type HealthConfig,
+  type UploadConfig,
   type HitRate,
   type Identity,
   type IntentResult,
@@ -320,6 +321,8 @@ export const api = {
   // ---------------- 健康 / 身份 ----------------
 
   health: () => request<{ status: string; config: HealthConfig }>('/api/health'),
+
+  uploadConfig: () => request<UploadConfig>('/api/upload-config'),
 
   me: () => request<Identity>('/api/auth/me'),
 

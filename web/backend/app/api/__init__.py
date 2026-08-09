@@ -38,6 +38,7 @@ from app.schemas import (
     RubricResponse,
     SkillTypeResponse,
     TaskTypeResponse,
+    UploadConfigResponse,
 )
 from app.db import get_db
 from app.config import settings
@@ -576,6 +577,22 @@ def get_preset(task_type: str):
         task_type=task_type,
         default_personas=preset.get("default_personas", []),
         optional_personas=preset.get("optional_personas", []),
+    )
+
+
+@router.get("/upload-config", response_model=UploadConfigResponse)
+def get_upload_config():
+    """教程页"适合上传的文件类型"要展示真实允许的扩展名，不能是编的例子。
+
+    故意不用 settings.upload_allowed_ext——那是对话附件（platform.py）的白名单，
+    与教程页讲的"上传文件，AI 自动提取"是两个不同的上传入口，各自的允许列表不一样：
+    这里读的 ALLOWED_EXTENSIONS/MAX_UPLOAD_SIZE 才是 /extract-materials 的真实事实源。
+    """
+    return UploadConfigResponse(
+        allowed_ext=sorted(ALLOWED_EXTENSIONS),
+        allowed_image_ext=sorted(settings.upload_allowed_image_ext),
+        max_bytes=MAX_UPLOAD_SIZE,
+        max_image_bytes=settings.upload_max_image_bytes,
     )
 
 

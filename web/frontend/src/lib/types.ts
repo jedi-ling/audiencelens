@@ -79,6 +79,13 @@ export interface HealthConfig {
   review_concurrency: number
 }
 
+export interface UploadConfig {
+  allowed_ext: string[]
+  allowed_image_ext: string[]
+  max_bytes: number
+  max_image_bytes: number
+}
+
 export interface Identity {
   user_id: string
   email: string | null

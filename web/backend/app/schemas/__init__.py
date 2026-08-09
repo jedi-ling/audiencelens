@@ -143,6 +143,13 @@ class ExampleResponse(BaseModel):
     artifact_bundle: Dict[str, Any]
 
 
+class UploadConfigResponse(BaseModel):
+    allowed_ext: List[str]
+    allowed_image_ext: List[str]
+    max_bytes: int
+    max_image_bytes: int
+
+
 class ExtractedMaterialsResponse(BaseModel):
     title: str
     materials: Dict[str, str]

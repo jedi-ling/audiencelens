@@ -2,6 +2,8 @@
 import { Link } from 'react-router'
 import { TASK_MATERIALS, TASK_TYPES } from '@/lib/mock-data'
 import { fetchExamples } from '@/lib/api'
+import { api } from '@/lib/apiClient'
+import type { UploadConfig } from '@/lib/types'
 import {
   ListChecks,
   FileText,
@@ -93,6 +95,9 @@ export default function TutorialPage() {
   // null 表示"数量未知"（加载中或接口失败），此时文案不出现数字。
   // 教程页不因为一个可选的计数而报错或阻塞，失败就静默降级。
   const [exampleCount, setExampleCount] = useState<number | null>(null)
+  // 同样是"接口失败就不显示，不能编"：允许的扩展名必须来自
+  // app/config.py 的真实白名单，写死一份示例扩展名的话后端一改配置这页就撒谎。
+  const [uploadConfig, setUploadConfig] = useState<UploadConfig | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -102,6 +107,14 @@ export default function TutorialPage() {
       })
       .catch(() => {
         if (alive) setExampleCount(null)
+      })
+    api
+      .uploadConfig()
+      .then((config) => {
+        if (alive) setUploadConfig(config)
+      })
+      .catch(() => {
+        if (alive) setUploadConfig(null)
       })
     return () => {
       alive = false
@@ -224,6 +237,15 @@ export default function TutorialPage() {
               </div>
             ))}
           </div>
+          {uploadConfig && (
+            <p className="mt-4 text-xs text-text-secondary">
+              系统实际接受的文件格式：文本类 {uploadConfig.allowed_ext.join(' / ')}
+              （单个文件不超过 {Math.round(uploadConfig.max_bytes / 1024 / 1024)}MB），
+              图片类 {uploadConfig.allowed_image_ext.join(' / ')}
+              （单张不超过 {Math.round(uploadConfig.max_image_bytes / 1024 / 1024)}MB）。
+              其他格式的文档请先转换为以上格式再上传。
+            </p>
+          )}
         </section>
 
         <section className="rounded-xl border border-border bg-bg-card p-6">
