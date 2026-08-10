@@ -67,6 +67,22 @@ html, body {
   color: var(--color-text-primary);
 }
 
+/* 全页背景图：position:fixed 铺满视口，滚动时纹丝不动。
+   z-index 用 -1 让它落在所有内容之下——但 Layout 父容器有 isolation:relative
+   会创建新的 stacking context，把 fixed 子元素的视口定位限制在自己范围内。
+   解决：给父容器自身加 isolation:static 让定位逃逸出去（fixed 仍然是相对 viewport）。
+   透明度从 .45 提到 .55，背景明显但不抢内容。 */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  opacity: 0.55;
+}
+
 ::selection {
   background: rgba(0, 113, 227, 0.18);
 }
@@ -443,6 +459,33 @@ html, body {
   100% { opacity: 0;    transform: translate(0, 0) scale(0.7); }
 }
 
+/* ---------- Logo 扫光 ----------
+ * 一道倾斜的高光从图标左上扫到右下，循环。
+ * 用 mix-blend-mode:screen 让亮处更亮、暗处不变——只在已有像素上加亮，
+ * 不至于把整张 logo 拍成白片。
+ * reduced-motion 时直接停掉扫光，保留静态 logo。 */
+.logo-shine-sweep {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.0) 42%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.0) 58%,
+    transparent 62%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  transform: translateX(-120%);
+  animation: logoShineSweep 3.6s cubic-bezier(0.45, 0, 0.55, 1) 0.6s infinite;
+}
+
+@keyframes logoShineSweep {
+  0%   { transform: translateX(-120%); }
+  60%  { transform: translateX(120%);  }
+  100% { transform: translateX(120%);  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shimmer-bar::after,
   .animate-breathe,
@@ -453,7 +496,8 @@ html, body {
   .animate-grid-pulse,
   .animate-hero-text,
   .animate-scanline,
-  .mote {
+  .mote,
+  .logo-shine-sweep {
     animation: none;
   }
   /* ⚠️ .animate-hero-text 自带 opacity:0（靠 forwards 动画补到 1）。

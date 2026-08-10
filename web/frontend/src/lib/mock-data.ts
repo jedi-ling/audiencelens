@@ -641,6 +641,10 @@ export interface Review {
   project_key?: string
   evaluation_scorecard?: EvaluationScorecard
   ethics_reports?: EthicsReport[]
+  /** 只读分享状态。null/缺省 = 未分享。只会回给作者本人（后端所有吐
+   *  ReviewResponse 的端点都先过 _check_review_owner）。 */
+  share_token?: string | null
+  shared_at?: string | null
 }
 
 /** GET /api/reviews 的列表项——后端返回的是瘦身字段（见后端

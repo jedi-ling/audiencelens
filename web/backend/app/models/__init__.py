@@ -77,6 +77,16 @@ class Review(Base):
     report_json = Column(JSON, nullable=True)
     report_markdown = Column(Text, nullable=True)
     calibration = Column(JSON, nullable=True)
+    # 只读分享链接。NULL = 未分享（默认）；非 NULL 即"任何人凭这个 token 可读"。
+    #
+    # 为什么是 token 而不是 is_public 布尔：报告里是用户尚未发布的产品材料、
+    # 定价策略、BP——这类东西一旦可枚举就是事故。token 是 32 字节随机串，
+    # 不可猜；撤销 = 置回 NULL，旧链接立刻全废，不需要额外的黑名单表。
+    #
+    # 公开出去的字段是白名单（见 share_service.to_public_dict），不是"这张表
+    # 减几列"——默认全不给、要给的一条条列出来，加新列时不会因为忘了改而漏。
+    share_token = Column(String, unique=True, index=True, nullable=True)
+    shared_at = Column(DateTime, nullable=True)
 
     persona_outputs = relationship("PersonaOutput", back_populates="review", cascade="all, delete-orphan")
     chat_messages = relationship("ReviewChatMessage", back_populates="review", cascade="all, delete-orphan")

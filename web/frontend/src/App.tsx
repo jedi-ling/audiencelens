@@ -20,6 +20,7 @@ const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
 const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
 const ReviewHistoryPage = lazy(() => import('@/pages/ReviewHistoryPage'))
+const SharedReportPage = lazy(() => import('@/pages/SharedReportPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 
@@ -67,6 +68,10 @@ export default function App() {
             <Route path="/review/new" element={<CreateReviewPage />} />
             <Route path="/review/:id" element={<ReviewProgressPage />} />
             <Route path="/review/:id/report" element={<ReportPage />} />
+            {/* 公开只读报告。全站唯一不需要身份的内容页——作者显式生成链接
+                才存在，撤销后这里就是"链接已失效"。路径刻意短（/s/），
+                因为它是要被复制粘贴到聊天窗口里的。 */}
+            <Route path="/s/:token" element={<SharedReportPage />} />
             <Route path="/personas" element={<PersonasPage />} />
             <Route path="/task-types" element={<TaskTypesPage />} />
             <Route path="/tutorial" element={<TutorialPage />} />

@@ -72,6 +72,12 @@ class ReviewResponse(BaseModel):
     report_markdown: Optional[str] = None
     calibration: Optional[Dict[str, Any]] = None
     persona_outputs: List[PersonaOutputResponse] = []
+    # 只读分享状态。None = 未分享。报告页据此决定分享按钮显示「生成链接」
+    # 还是「已公开 + 撤销」。
+    # 出现在这里是安全的：所有吐 ReviewResponse 的端点都先过 _check_review_owner，
+    # 也就是说这个 token 只会回给它自己的作者。
+    share_token: Optional[str] = None
+    shared_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

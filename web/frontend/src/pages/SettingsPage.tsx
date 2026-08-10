@@ -30,6 +30,33 @@ import {
 
 type Provider = 'anthropic' | 'openai_compatible'
 type TestStatus = 'idle' | 'testing' | 'success' | 'error'
+type SectionKey = 'account' | 'model' | 'usage' | 'data'
+
+// 参考 MiniMax 控制台那种「左侧分组导航 + 右侧单类目内容」的信息架构——
+// 之前是三个大 section 从上到下堆一整屏，用户想改密码得先划过整块 BYOK
+// 表单。分组按"这是关于什么"分：账户身份 / 怎么接模型 / 花了多少钱 / 数据主权，
+// 而不是按"这段代码是什么时候加的"从上到下堆。
+const NAV_GROUPS: Array<{
+  label: string
+  items: Array<{ key: SectionKey; label: string; icon: React.ElementType }>
+}> = [
+  {
+    label: '账户',
+    items: [{ key: 'account', label: '个人信息', icon: User }],
+  },
+  {
+    label: '模型配置',
+    items: [{ key: 'model', label: 'API Key（BYOK）', icon: KeyRound }],
+  },
+  {
+    label: '用量与兑换',
+    items: [{ key: 'usage', label: '兑换码 · 用量统计', icon: BarChart3 }],
+  },
+  {
+    label: '数据与隐私',
+    items: [{ key: 'data', label: '导出与删除', icon: ShieldCheck }],
+  },
+]
 
 const PROVIDER_CONFIG: Record<Provider, {
   label: string
@@ -71,6 +98,7 @@ const PRESET_ICONS: Record<string, React.ElementType> = {
 }
 
 export default function SettingsPage() {
+  const [activeSection, setActiveSection] = useState<SectionKey>('model')
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
 
@@ -314,19 +342,196 @@ export default function SettingsPage() {
     }
   }
 
+  const SECTION_HEADERS: Record<SectionKey, { title: string; desc: string }> = {
+    account: {
+      title: '个人信息',
+      desc: identity?.is_anonymous
+        ? '当前是游客身份，登录后可以改昵称、改密码、管理长期账号。'
+        : '管理你的账号信息与安全设置。',
+    },
+    model: {
+      title: 'API Key（BYOK）',
+      desc: '选择评审使用的大模型。支持 Anthropic 官方 API，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 等任意 OpenAI 兼容服务。点「测试」可验证连接是否可用。',
+    },
+    usage: {
+      title: '兑换码 · 用量统计',
+      desc: '用 CDK 兑换码换取评审次数，查看近 24 小时用量与累计 token 消耗。',
+    },
+    data: {
+      title: '数据与隐私',
+      desc: '你上传的材料、评审报告、对话记录随时可以导出或永久删除。',
+    },
+  }
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">
         <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-green mb-2">
-          模型设置
+          设置
         </h1>
         <p className="text-text-secondary">
-          选择评审使用的大模型。支持 Anthropic 官方 API，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 等任意 OpenAI 兼容服务。点「测试」可验证连接是否可用。
+          账户、模型接入、用量与数据，都在这里管理。
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-8 items-start">
+        {/* 左侧分组导航——按"这是关于什么"分组（账户身份 / 怎么接模型 /
+            花了多少钱 / 数据主权），不是按代码加入的先后顺序堆叠。 */}
+        <aside className="w-full md:w-56 shrink-0 md:sticky md:top-24">
+          <nav className="space-y-5">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  {group.label}
+                </div>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = activeSection === item.key
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => setActiveSection(item.key)}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left transition-colors',
+                          isActive
+                            ? 'bg-brand-primary/10 text-brand-primary font-medium'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-bg-card-hover'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        {/* 右侧内容：一次只显示当前选中的一个类目，而不是把三大块全部
+            堆在一条竖向滚动里——之前改密码得先滚过整块 BYOK 表单。 */}
+        <div className="flex-1 min-w-0 w-full">
+      <div className="mb-6">
+        <h2 className="font-display text-xl font-semibold text-text-primary mb-1">
+          {SECTION_HEADERS[activeSection].title}
+        </h2>
+        <p className="text-sm text-text-secondary">
+          {SECTION_HEADERS[activeSection].desc}
         </p>
       </div>
 
       <div className="space-y-6">
-        {/* API Key 区块 */}
+        {/* ---------------- 账户：个人信息 ---------------- */}
+        {activeSection === 'account' && (
+          identity?.is_anonymous ? (
+            <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+                  <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-semibold text-text-primary">
+                    当前是游客身份
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    没有邮箱和密码可以改——登录或注册一个账号后，这里会显示昵称、密码修改入口。
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/login"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
+              >
+                去登录 / 注册
+              </Link>
+            </section>
+          ) : (
+            <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
+                  <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-semibold text-text-primary">
+                    账户信息
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    当前登录：{identity?.email}
+                  </p>
+                </div>
+              </div>
+              {/* 昵称 */}
+              <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
+                <label className="block text-xs font-medium text-text-secondary">昵称</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => { setNameDraft(e.target.value); setNameMsg(null); setNameError(null) }}
+                    maxLength={50}
+                    className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                    placeholder="怎么称呼你"
+                  />
+                  <button
+                    onClick={() => void handleSaveName()}
+                    disabled={nameBusy || !nameDraft.trim() || nameDraft.trim() === (identity?.display_name ?? '')}
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+                  >
+                    {nameBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
+                    保存
+                  </button>
+                </div>
+                {nameMsg && <p className="mt-2 text-xs text-brand-primary">{nameMsg}</p>}
+                {nameError && <p className="mt-2 text-xs text-severity-critical">{nameError}</p>}
+                <p className="mt-2 text-xs text-text-muted">
+                  邮箱暂不支持自助修改。如需更换，请联系我们。
+                </p>
+              </div>
+
+              {/* 密码 */}
+              <div className="mt-3 rounded-lg border border-border bg-bg-card p-4">
+                <label className="block text-xs font-medium text-text-secondary">修改密码</label>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  <input
+                    type="password" value={pwCurrent} autoComplete="current-password"
+                    onChange={(e) => { setPwCurrent(e.target.value); setPwMsg(null); setPwError(null) }}
+                    placeholder="当前密码"
+                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                  />
+                  <input
+                    type="password" value={pwNext} autoComplete="new-password"
+                    onChange={(e) => { setPwNext(e.target.value); setPwMsg(null); setPwError(null) }}
+                    placeholder="新密码（至少 8 位）"
+                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                  />
+                  <input
+                    type="password" value={pwConfirm} autoComplete="new-password"
+                    onChange={(e) => { setPwConfirm(e.target.value); setPwMsg(null); setPwError(null) }}
+                    placeholder="再输一次新密码"
+                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                  />
+                </div>
+                <button
+                  onClick={() => void handleChangePassword()}
+                  disabled={pwBusy || !pwCurrent || !pwNext || !pwConfirm}
+                  className="mt-3 flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+                >
+                  {pwBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <KeyRound className="h-4 w-4" strokeWidth={1.5} />}
+                  修改密码
+                </button>
+                {pwMsg && <p className="mt-2 text-xs text-brand-primary">{pwMsg}</p>}
+                {pwError && <p className="mt-2 text-xs text-severity-critical">{pwError}</p>}
+                <p className="mt-2 text-xs text-text-muted">
+                  修改后其他设备会自动退出登录，本设备保持登录。如忘记当前密码，请退出后通过「忘记密码」重置。
+                </p>
+              </div>
+            </section>
+          )
+        )}
+
+        {/* ---------------- 模型配置：API Key（BYOK） ---------------- */}
+        {activeSection === 'model' && (
         <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
@@ -585,9 +790,14 @@ export default function SettingsPage() {
               多模态支持：评审时可上传截图、设计稿、BP 页面。支持视觉的模型（Claude、GPT-4o、Qwen-VL、GLM-4V 等）会直接看图；不支持视觉的模型仅按文字评审，流程不会中断。
             </span>
           </div>
+        </section>
+        )}
 
+        {/* ---------------- 用量与兑换 ---------------- */}
+        {activeSection === 'usage' && (
+        <div className="space-y-6">
           {/* CDK 兑换码：无需登录，兑换后自动获得游客身份 */}
-          <div className="mt-6 rounded-xl border border-border bg-bg-secondary/60 p-5">
+          <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-warm-orange/10 border border-warm-orange/20">
                 <Ticket className="w-3.5 h-3.5 text-warm-orange" strokeWidth={1.5} />
@@ -749,96 +959,13 @@ export default function SettingsPage() {
               )}
             </div>
           )}
-        </section>
-
-        {/* ---------------- 账户 ----------------
-         * 改昵称 / 改密码。以前这两件事在界面上没有任何入口，
-         * 密码只能走"退出 → 忘记密码 → 收邮件"，邮件没配通就等于改不了。 */}
-        {!identity?.is_anonymous && (
-        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
-              <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-display font-semibold text-text-primary">
-                账户
-              </h2>
-              <p className="text-xs text-text-muted">
-                当前登录：{identity?.email}
-              </p>
-            </div>
-          </div>
-          {/* 昵称 */}
-          <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
-            <label className="block text-xs font-medium text-text-secondary">昵称</label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                value={nameDraft}
-                onChange={(e) => { setNameDraft(e.target.value); setNameMsg(null); setNameError(null) }}
-                maxLength={50}
-                className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
-                placeholder="怎么称呼你"
-              />
-              <button
-                onClick={() => void handleSaveName()}
-                disabled={nameBusy || !nameDraft.trim() || nameDraft.trim() === (identity?.display_name ?? '')}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
-              >
-                {nameBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
-                保存
-              </button>
-            </div>
-            {nameMsg && <p className="mt-2 text-xs text-brand-primary">{nameMsg}</p>}
-            {nameError && <p className="mt-2 text-xs text-severity-critical">{nameError}</p>}
-            <p className="mt-2 text-xs text-text-muted">
-              邮箱暂不支持自助修改。如需更换，请联系我们。
-            </p>
-          </div>
-
-          {/* 密码 */}
-          <div className="mt-3 rounded-lg border border-border bg-bg-card p-4">
-            <label className="block text-xs font-medium text-text-secondary">修改密码</label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              <input
-                type="password" value={pwCurrent} autoComplete="current-password"
-                onChange={(e) => { setPwCurrent(e.target.value); setPwMsg(null); setPwError(null) }}
-                placeholder="当前密码"
-                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
-              />
-              <input
-                type="password" value={pwNext} autoComplete="new-password"
-                onChange={(e) => { setPwNext(e.target.value); setPwMsg(null); setPwError(null) }}
-                placeholder="新密码（至少 8 位）"
-                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
-              />
-              <input
-                type="password" value={pwConfirm} autoComplete="new-password"
-                onChange={(e) => { setPwConfirm(e.target.value); setPwMsg(null); setPwError(null) }}
-                placeholder="再输一次新密码"
-                className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
-              />
-            </div>
-            <button
-              onClick={() => void handleChangePassword()}
-              disabled={pwBusy || !pwCurrent || !pwNext || !pwConfirm}
-              className="mt-3 flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
-            >
-              {pwBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <KeyRound className="h-4 w-4" strokeWidth={1.5} />}
-              修改密码
-            </button>
-            {pwMsg && <p className="mt-2 text-xs text-brand-primary">{pwMsg}</p>}
-            {pwError && <p className="mt-2 text-xs text-severity-critical">{pwError}</p>}
-            <p className="mt-2 text-xs text-text-muted">
-              修改后其他设备会自动退出登录，本设备保持登录。如忘记当前密码，请退出后通过「忘记密码」重置。
-            </p>
-          </div>
-        </section>
+        </div>
         )}
 
         {/* ---------------- 数据自主权 ----------------
          * "你的东西归你"不能只写在隐私政策里——给两个用户能亲手按的按钮，
          * 承诺才变成可验证的事实。 */}
+        {activeSection === 'data' && (
         <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
@@ -947,6 +1074,9 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+        )}
+      </div>
+        </div>
       </div>
 
       <div className="mt-8 pt-6 border-t border-border text-center">

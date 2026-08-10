@@ -200,6 +200,17 @@ def _legacy_migrations() -> None:
         patches.append("ALTER TABLE reviews ADD COLUMN input_tokens INTEGER DEFAULT 0 NOT NULL")
     if "output_tokens" not in columns:
         patches.append("ALTER TABLE reviews ADD COLUMN output_tokens INTEGER DEFAULT 0 NOT NULL")
+    if "share_token" not in columns:
+        # 不带 UNIQUE：SQLite 的 ALTER TABLE ADD COLUMN 不支持加唯一约束，
+        # 写了整条迁移会失败。唯一性在新库由 create_all 保证；老库这里补一个
+        # 普通索引保证按 token 查是走索引的，防重复则靠 token 本身的熵
+        # （32 字节随机，碰撞概率远低于硬盘位翻转）。
+        patches.append("ALTER TABLE reviews ADD COLUMN share_token VARCHAR")
+        patches.append("CREATE INDEX IF NOT EXISTS ix_reviews_share_token ON reviews (share_token)")
+    if "shared_at" not in columns:
+        # TIMESTAMP 而不是 DATETIME：PostgreSQL 不认 DATETIME，
+        # 而 SQLite 对类型名是宽容的（亲和性规则），两边都能过的写法只有 TIMESTAMP。
+        patches.append("ALTER TABLE reviews ADD COLUMN shared_at TIMESTAMP")
 
     if "persona_outputs" in inspector.get_table_names():
         po_columns = {c["name"] for c in inspector.get_columns("persona_outputs")}

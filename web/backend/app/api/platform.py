@@ -44,6 +44,7 @@ from app.services import (
     quota_service,
     report_gating,
     review_service,
+    share_service,
     validation_service,
 )
 
@@ -1439,7 +1440,89 @@ async def get_review_v2(
         "output_tokens": review.output_tokens,
         "report": report,
         "calibration": review.calibration,
+        # 分享状态跟着报告一起回：报告页要据此决定"分享"按钮显示的是
+        # 「生成链接」还是「已公开 + 撤销」。token 本身只给作者。
+        "share_token": review.share_token,
+        "shared_at": review.shared_at.isoformat() if review.shared_at else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# 报告只读分享
+#
+# 目的是"把报告发给合伙人/团队看"，不是做公开广场——所以是一份一份显式开启、
+# 随时可撤销的不可猜链接，没有任何聚合列表接口。
+# 设计约束与字段白名单见 services/share_service.py 的模块注释。
+# ---------------------------------------------------------------------------
+
+
+def _owned_review_or_404(db: Session, review_id: str, identity: Identity) -> Review:
+    """取自己的评审。查不到和不属于自己都回 404（不是 403）——403 等于确认
+    "这个 id 存在，只是不归你"，可以拿来枚举。与项目/对话端点同一口径。"""
+    review = db.get(Review, review_id)
+    if not review or (review.user_id or "anonymous") != identity.user_id:
+        raise NotFound("评审不存在")
+    return review
+
+
+@router.post(
+    "/v2/reviews/{review_id}/share",
+    dependencies=[Depends(rate_limit("share", 30, 3600))],
+)
+async def create_review_share(
+    review_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """开启只读分享，返回 token（幂等：已开启则原样返回旧 token）。
+
+    require_isolated_identity 这行不能省，它堵的是一条具体的绕过路径：
+    匿名用户看自己的报告是被 report_gating 裁剪过的，如果匿名也能建分享链接，
+    那么"跑评审 → 给自己建个链接 → 打开" 就能看到完整报告，登录墙当场作废。
+    """
+    require_isolated_identity(identity)
+    review = _owned_review_or_404(db, review_id, identity)
+    if review.status != "completed":
+        # 未完成的评审分享出去，对方看到的是空壳；而 error_message 可能带着
+        # 用户材料的片段。两个理由都指向"没跑完就不给分享"。
+        raise BadRequest("只有已完成的评审可以分享")
+    token = share_service.enable_share(db, review)
+    return {
+        "share_token": token,
+        "shared_at": review.shared_at.isoformat() if review.shared_at else None,
+    }
+
+
+@router.delete("/v2/reviews/{review_id}/share")
+async def revoke_review_share(
+    review_id: str,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """撤销分享。已发出去的旧链接立刻全部失效。"""
+    require_isolated_identity(identity)
+    review = _owned_review_or_404(db, review_id, identity)
+    share_service.disable_share(db, review)
+    return {"share_token": None, "shared_at": None}
+
+
+@router.get(
+    "/v2/shared/{token}",
+    # 唯一一个不需要任何身份的读接口。限流不是为了防爆破（43 个 base64url
+    # 字符爆不动），是防批量抓取——万一某个 token 从聊天记录里泄漏出去，
+    # 至少不该让人拿它当稳定的抓取入口。
+    dependencies=[Depends(rate_limit("shared_view", 120, 3600))],
+)
+async def get_shared_review(token: str, db: Session = Depends(get_db)):
+    """公开只读地取一份被分享的报告。**不做任何身份校验，这就是本意。**
+
+    撤销后（share_token 置回 NULL）这里查不到，直接 404——和"这个 token 从来
+    没存在过"是同一个响应，不泄漏"曾经有过但被撤了"。
+    """
+    review = share_service.get_by_token(db, token)
+    if not review:
+        raise NotFound("分享链接不存在或已被作者撤销")
+    return share_service.to_public_dict(review)
 
 
 class ChatMessageRequest(BaseModel):

@@ -79,6 +79,25 @@ export interface HealthConfig {
   review_concurrency: number
 }
 
+/** GET /api/v2/shared/{token} 的响应——公开只读视图。
+ *
+ *  这个类型就是后端 share_service.to_public_dict 白名单的镜像：**它没有
+ *  user_id、没有邮箱、没有费用与 token 数、没有 artifact_bundle**。
+ *  往这里加字段之前先确认后端真的会给，且那个字段确实可以给陌生人看。 */
+export interface SharedReport {
+  task_type: string
+  mode: string
+  target_title: string | null
+  persona_pack: string | null
+  selected_personas: string[] | null
+  skill_type: string | null
+  created_at: string | null
+  completed_at: string | null
+  shared_at: string | null
+  report: unknown
+  calibration: unknown
+}
+
 export interface UploadConfig {
   allowed_ext: string[]
   allowed_image_ext: string[]

@@ -40,26 +40,28 @@ export default function LandingPage() {
     if (!root) return
     const cleanups: Array<() => void> = []
 
-    // 导航滚动态
-    const navEl = root.querySelector<HTMLElement>('#nav')
-    const onScroll = () => navEl?.classList.toggle('scrolled', window.scrollY > 24)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    cleanups.push(() => window.removeEventListener('scroll', onScroll))
-
-    // 移动端菜单
-    const toggle = root.querySelector<HTMLElement>('#navToggle')
-    const links = root.querySelector<HTMLElement>('#navLinks')
-    const onToggle = () => links?.classList.toggle('open')
-    const onLinksClick = (e: Event) => {
-      if ((e.target as HTMLElement).tagName === 'A') links?.classList.remove('open')
+    // Hero 视频背景：autoplay 属性会被部分环境拦截，这里强制补一次 play()。
+    // muted + playsinline 已满足浏览器自动播放策略，重复 play() 无副作用。
+    //
+    // P1-11：prefers-reduced-motion 或窄屏（≤640px，与 HeroScene 3D 场景
+    // ≤920px 不挂载的先例一致，这里更保守一档因为视频还有网络流量成本）
+    // 时直接不播放。不用 CSS display:none——那样浏览器仍会继续下载/解码，
+    // 起不到省流量的作用；这里连 <source> 一并摘掉、调 load() 释放资源，
+    // 摘掉 source 后 poster 帧会一直顶在原地。
+    const heroVideo = root.querySelector<HTMLVideoElement>('video.hero-bg-video')
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const isNarrowViewport = window.innerWidth <= 640
+    if (heroVideo && (prefersReducedMotion || isNarrowViewport)) {
+      heroVideo.pause()
+      heroVideo.removeAttribute('autoplay')
+      heroVideo.querySelectorAll('source').forEach((s) => s.remove())
+      heroVideo.load()
+    } else {
+      const onVideoCanPlay = () => { heroVideo?.play().catch(() => {}) }
+      heroVideo?.addEventListener('canplay', onVideoCanPlay)
+      heroVideo?.play().catch(() => {})
+      cleanups.push(() => heroVideo?.removeEventListener('canplay', onVideoCanPlay))
     }
-    toggle?.addEventListener('click', onToggle)
-    links?.addEventListener('click', onLinksClick)
-    cleanups.push(() => {
-      toggle?.removeEventListener('click', onToggle)
-      links?.removeEventListener('click', onLinksClick)
-    })
 
     // 统一链接拦截：# 锚点页内平滑滚动；/ 开头内部路由走 SPA；http/_blank 外链放行
     const onRootClick = (e: MouseEvent) => {
@@ -182,6 +184,10 @@ export default function LandingPage() {
     }
 
     // 数字计数（HTML 默认已是真数字，动画作增强）
+    // P1-12：其余动效（reveal、debate-stagger、three 粒子）都已经查
+    // prefers-reduced-motion，这个计数动画之前漏了——直接赋最终值，不跑
+    // requestAnimationFrame 循环。
+    const prefersReducedMotionForCount = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const counted = new WeakSet<Element>()
     const co = new IntersectionObserver(
       (entries) => {
@@ -190,6 +196,10 @@ export default function LandingPage() {
           counted.add(en.target)
           const el = en.target as HTMLElement
           const target = parseInt(el.dataset.target || '0', 10)
+          if (prefersReducedMotionForCount) {
+            el.textContent = String(target)
+            return
+          }
           const dur = 1400
           let t0: number | null = null
           const step = (ts: number) => {

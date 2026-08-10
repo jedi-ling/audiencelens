@@ -18,6 +18,23 @@ const navItems = [
   { path: '/settings', label: '设置' },
 ]
 
+/** 全页背景图映射。landing 走自己的视频背景，不在这里管。
+ * 这里用的是精确匹配——子路由（/review/new）需要单独挂一份 */
+const ROUTE_BG: Record<string, string> = {
+  '/ask': '/images/bg-ask.png',
+  '/history': '/images/bg-history.png',
+  '/ledger': '/images/bg-ledger.png',
+  '/settings': '/images/bg-settings.png',
+  '/tutorial': '/images/bg-tutorial.png',
+  '/skills': '/images/bg-skills.png',
+  '/task-types': '/images/bg-task-types.png',
+  '/personas': '/images/bg-personas.png',
+  '/plans': '/images/bg-plans.png',
+  '/login': '/images/bg-login.png',
+  '/register': '/images/bg-register.png',
+  '/review/new': '/images/bg-review-new.png',
+}
+
 // 这里曾有一条 { path: '/evaluations', label: '评估报告' } 的次级导航。
 // 路由表里只有 /evaluations/:id，没有 /evaluations——点它会被 <Route path="*">
 // 兜底静默 Navigate 回首页，用户以为自己点错了。
@@ -87,6 +104,15 @@ export default function Layout() {
   }, [location.pathname])
 
   const loggedIn = !!identity && !identity.is_anonymous
+  // 评审历史/判断复利这两项要看"过往数据"。原来只在首页对未登录用户隐藏，
+  // 结果首页和其它页面导航项不一致——用户从首页点进别的页面，导航突然多出
+  // 两项，同样是一种困惑。改成全站统一：未登录状态下（不管在哪个页面）都
+  // 不显示这两项，登录后（含匿名认领后转正）才出现，导航在任意路由间跳转
+  // 都保持一致。/history 本身仍然可以用匿名 guest 身份直接访问（任务82的
+  // 认领机制不受影响），只是不再出现在未登录时的导航条里。
+  const visibleNavItems = loggedIn
+    ? navItems
+    : navItems.filter((item) => item.path !== '/history' && item.path !== '/ledger')
 
   const handleLogout = () => {
     setAccountOpen(false)
@@ -111,20 +137,29 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip">
+    <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip" style={{ isolation: 'auto' }}>
+      {/* 全页背景图：按路由切换，position:fixed 铺满视口，滚动时纹丝不动。
+         只对非 landing 页生效——landing 有自己的视频+粒子背景，不要叠加。
+         z-index 0 让所有内容自然压在上面。 */}
+      {location.pathname !== '/' && ROUTE_BG[location.pathname] && (
+        <img
+          src={ROUTE_BG[location.pathname]}
+          alt=""
+          aria-hidden="true"
+          className="page-bg pointer-events-none"
+        />
+      )}
       <header className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-xl backdrop-saturate-180 border-b border-black/[0.06] shrink-0">
-        <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
-            <svg
-              viewBox="0 0 24 24"
-              className="w-5 h-5 shrink-0"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 2l1.9 6.2L20 10l-6.1 1.8L12 18l-1.9-6.2L4 10l6.1-1.8L12 2z"
-                fill="#0071e3"
+        <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-3 group shrink-0">
+            <span className="logo-shine relative inline-flex h-16 w-[64px] shrink-0 items-center justify-center overflow-hidden">
+              <img
+                src="/images/logo-icon.png"
+                className="h-16 w-auto shrink-0 object-contain"
+                alt=""
               />
-            </svg>
+              <span className="logo-shine-sweep pointer-events-none absolute inset-0" aria-hidden="true" />
+            </span>
             <span className="font-display font-semibold text-[17px] tracking-tight whitespace-nowrap">
               <span className="text-text-primary">Audience</span>
               <span className="text-brand-primary">Lens</span>
@@ -133,7 +168,7 @@ export default function Layout() {
 
           <div className="hidden md:flex items-center gap-2 min-w-0">
             <nav className="flex items-center gap-0.5 shrink-0">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = item.path === '/'
                   ? location.pathname === '/'
                   : location.pathname.startsWith(item.path)
@@ -207,12 +242,24 @@ export default function Layout() {
                 )}
               </div>
             ) : (
-              <Link
-                to="/login"
-                className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
-              >
-                <span>登录</span>
-              </Link>
+              <>
+                {/* 未登录也有游客身份（CDK 兑换/匿名对话都在用），/settings 本身
+                    已经处理了匿名态（配额、CDK 兑换、认领入口），给未登录用户
+                    一个显式入口，不是只有一个孤零零的"登录"链接 */}
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
+                >
+                  <User className="w-4 h-4" strokeWidth={1.5} />
+                  <span>游客</span>
+                </Link>
+                <Link
+                  to="/login"
+                  className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
+                >
+                  <span>登录</span>
+                </Link>
+              </>
             )}
           </div>
 
@@ -246,7 +293,7 @@ export default function Layout() {
             aria-label="导航菜单"
             className="absolute left-0 top-0 bottom-0 w-64 bg-bg-card border-r border-black/[0.06] shadow-2xl animate-fade-in flex flex-col pt-20 px-4"
           >
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = item.path === '/'
                 ? location.pathname === '/'
                 : location.pathname.startsWith(item.path)
@@ -359,10 +406,17 @@ export default function Layout() {
       <footer className="relative border-t border-black/[0.06] py-10 shrink-0">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
-            <span className="font-display font-semibold text-sm tracking-tight">
-              <span className="text-text-primary">Audience</span>
-              <span className="text-brand-primary">Lens</span>
-            </span>
+            <div className="flex items-center gap-2">
+              <img
+                src="/images/logo-icon.png"
+                className="h-8 w-auto shrink-0 object-contain"
+                alt=""
+              />
+              <span className="font-display font-semibold text-sm tracking-tight">
+                <span className="text-text-primary">Audience</span>
+                <span className="text-brand-primary">Lens</span>
+              </span>
+            </div>
             <span className="text-xs text-text-muted">
               多代理合成用户评审系统
             </span>

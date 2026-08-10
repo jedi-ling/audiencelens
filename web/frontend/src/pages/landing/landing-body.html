@@ -1,7 +1,15 @@
+<!-- 全页固定视频背景：position:fixed 铺满视口，滚动时纹丝不动。
+     放在 .al-landing 最前面（第一个子节点），所有 section 内容叠在它上面。
+     P1-11：poster 避免视频没加载完之前先黑屏一下；prefers-reduced-motion 与
+     ≤640px 窄屏（移动端流量/性能）两种情况下由 LandingPage.tsx 里的 JS
+     直接暂停播放并让海报帧顶替（见下方 .hero-bg-video.is-paused 规则），
+     不靠 CSS display:none——那样音轨仍会解码，起不到省流量的作用。 -->
+<video class="hero-bg-video" autoplay muted loop playsinline poster="/videos/hero-bg-poster.jpg" aria-hidden="true">
+  <source src="/videos/hero-bg.mp4" type="video/mp4">
+</video>
+
 <!-- HERO -->
 <section class="hero" id="top">
-  <!-- 底层背景图：宏大银河场景，在粒子系统之下 -->
-  <div class="hero-bg-img" aria-hidden="true"></div>
   <!-- 全幅 3D 背景挂载点。必须是 hero 的靠前子节点：文案与卡片压在它上面。
        挂载由 LandingPage.tsx 命令式完成。 -->
   <div id="heroStageMount"></div>
@@ -10,22 +18,28 @@
       <div class="hero-copy">
         <h1>让 72 个 AI 评审员，<br>在你上线前<span class="h1-accent nobr">找到风险</span></h1>
         <p class="hero-sub">在找真人测试之前，先让 72 个 AI 评审员分组独立审阅，再把分歧最大的争议点拉出来对质一轮。</p>
+        <!-- P0-1：免注册是首屏最大的降摩擦信息，原来压到 final CTA 才出现，
+             首屏用户会默认"要注册才能用"。挪一句到输入框正下方，视觉权重低于
+             input 本身（.hero-hint），只做确认作用不抢注意力。 -->
+        <p class="hero-hint">无需注册，几分钟拿到风险清单</p>
 
         <form class="hero-ask" id="heroAsk">
           <input type="text" id="heroAskInput" placeholder="说说你想评审什么，比如「帮我看看这个定价页」…" autocomplete="off">
           <button type="submit">开始 <span class="arw">→</span></button>
         </form>
 
-        <!-- P1-3：输入框下方示例 chips，复用 .chip 样式，被 LandingPage.tsx 中的统一 chips 拦截逻辑自动捕获 -->
-        <div class="chips chips-examples">
-          <button class="chip" type="button">评审我的 Steam 商店页</button>
-          <button class="chip" type="button">看看我的定价页</button>
-          <button class="chip" type="button">测试新手引导</button>
-          <button class="chip" type="button">挑刺我的创业 BP</button>
-        </div>
+        <!-- P0-2：原来这里还有一组独立的 chips-examples，和输入框上方的
+             placeholder 表达的是同一件事（"举个例子"），首屏视觉块已经很挤
+             （badge/h1/sub/hint/输入框/CTA/debate-card 共7个），这组重复的
+             示例入口直接砍掉，不再单独占一屏空间。 -->
 
+        <!-- P0-4：hero-cta 原来只有一个 GitHub 按钮，视觉上和"立即体验"平级，
+             会让首次访客误以为这是个开源项目介绍页而不是产品入口。现在补一个
+             与 final CTA 一致的主转化按钮，GitHub 降级成纯文字链接、字号更小，
+             只做"顺便看看代码"的次要动作，不再抢主 CTA 的视觉权重。 -->
         <div class="hero-cta">
-          <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">GitHub 源码</a>
+          <a class="btn btn-primary" href="/ask">立即体验对话评审 <span class="arw">→</span></a>
+          <a class="hero-cta-secondary" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">查看 GitHub 源码 →</a>
         </div>
 
       </div>
@@ -68,9 +82,13 @@
         <!-- 原来是两条带灰色填充轨道的进度条。技能把"带背景轨道的评分条"列为
              落地页上的 dashboard 杂讯：轨道不承载信息，只占面积。改成数字本身。
              数值仍只用引擎真实产出的字段（见本卡顶部注释的两条铁律）。 -->
+        <!-- critique P2："推断"这个词在 SOLUTION 区块（"证据三级标注"）才第一次
+             被定义，hero 里先看到这张卡的访客拿不到判断 34% 是好是坏的基准。
+             不想再往本就密的 hero 里加一整句解释，用原生 title 悬浮提示补一个
+             口径，不增加常态视觉重量。 -->
         <div class="debate-meter">
           <div class="meter-cell"><b>92%</b><span>必答项覆盖率</span></div>
-          <div class="meter-cell"><b>34%</b><span>结论靠推断得出</span></div>
+          <div class="meter-cell"><b>34%</b><span class="term-gloss" title="推断占比超过 40% 会被标记为「推断过度」——这条判断有三分之一依赖合理推断，而非从材料里直接观察到">结论靠推断得出</span></div>
         </div>
         <div class="debate-foot">Top-3 争议点 · 证据三级标注 · 一轮交叉质询</div>
       </div>
@@ -101,9 +119,18 @@
                  收集数被当成了全仓总数。测试数会随开发漂移，本页只允许 STATS 区写一处并带统计
                  日期（见 test_public_claims.py::test_test_counts_are_stated_once_and_dated），
                  所以 hero 改成同样可自动核对的 Pack 数。 -->
-            <span><b>72 个人格</b> · <b>14 种场景</b> · <b>11 个人格 Pack</b></span>
+            <!-- critique P2：人格数是 H1 反复出现的核心数字，原来和场景数/Pack数
+                 三个数字挤在同一个 <b> 权重里没有主次。人格数单独放大加粗，
+                 场景数/Pack数降级成次要说明，视觉上先看到最重要的那个数。 -->
+            <span class="proof-lead"><b>72</b> 个人格</span>
+            <span class="proof-sub">14 种场景 · 11 个人格 Pack</span>
+            <!-- critique P1：hero 里唯一有分量的"证据"是争议点示意卡，但那张卡明确
+                 标注是样例数据；真正可核对的证据（自动化测试数）在 STATS 区，隔了
+                 6 屏。不重复写一遍测试数（会撞 test_test_counts_are_stated_once_and_dated），
+                 而是在这里提前放一个锚点，把怀疑型访客早点引导到真证据那里。 -->
+            <a class="proof-jump" href="#numbers">这些数字都能在仓库里核对 ↓</a>
           </div>
-  
+
           <div class="hero-models">
             <span class="lbl">兼容模型</span>
             <span class="m">Anthropic</span>
@@ -142,6 +169,32 @@
         <p>市面上的合成用户工具大多闭源黑箱，按人口统计标签编人设。你无法验证判断依据，也无法事后和真实结果对上账。</p>
         <div class="cost">闭源 · 无法核对</div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- P1-8：USE CASES 原来夹在 SOLUTION（信任基石）和 CAPABILITIES/COMPARE（证明可靠）
+     两个"证明我靠谱"的模块中间，打断了信任建立的连贯性。挪到 PAIN 之后，
+     让读者先确认"这是给我用的"，再看方法论怎么做——认领感先于说服细节。 -->
+<!-- USE CASES -->
+<section class="sec" id="usecases">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">应用场景</div>
+      <h2 class="sec-title">为每一次"上线前"而生</h2>
+      <p class="sec-desc">一套评审团，14 种任务类型，覆盖你最怕出错的那几次上线。</p>
+    </div>
+    <div class="use-grid">
+      <!-- P1-5：use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
+      <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
+           （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
+           真实存在的是面板里几个专职唱反调的人格，照此写。 -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy"><h3>对抗性视角</h3><p>面板里自带几个专职挑刺的人格：魔鬼代言人、单位经济学质疑者、怀疑型评测者。</p></div>
     </div>
   </div>
 </section>
@@ -243,32 +296,22 @@
     <div class="flow">
       <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么，页面、文案、概念、创业 BP 都行。</p></div>
       <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面都可以。图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
-      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 分歧聚类 → Top-3 争议点双方各反驳一轮 → 改票由代码判定，全程可追溯。</p></div>
+      <!-- P1-5：机制细节（分组独立评审/Top-3争议点/改票判定）在 SOLUTION 区块
+           已经逐条展开过一次，这里是第4次重复几乎同一句话，读者会疲劳。
+           改成一句话概括，细节交给 SOLUTION 独占。 -->
+      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 交叉质询 → 结构化输出，全程可追溯（机制细节见上方"判断如何被生成、约束、验证"）。</p></div>
       <div class="flow-step reveal"><div class="fn">04</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
     </div>
   </div>
 </section>
 
-<!-- USE CASES -->
-<section class="sec" id="usecases">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <div class="eyebrow">应用场景</div>
-      <h2 class="sec-title">为每一次"上线前"而生</h2>
-      <p class="sec-desc">一套评审团，14 种任务类型，覆盖你最怕出错的那几次上线。</p>
-    </div>
-    <div class="use-grid">
-      <!-- P1-5：use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
-      <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
-           （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
-           真实存在的是面板里几个专职唱反调的人格，照此写。 -->
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="对抗性视角" loading="lazy"><h3>对抗性视角</h3><p>面板里自带几个专职挑刺的人格：魔鬼代言人、单位经济学质疑者、怀疑型评测者。</p></div>
-    </div>
+<!-- P1-6：中间路径 pain→usecases→gap→solution→flow→capabilities→compare→stats
+     太长，之前从 solution 到 capabilities 之间没有任何行动点，只能滚到底才能
+     操作。这里插一个轻量次要 CTA，复用 hero 输入框的视觉语言但更克制。 -->
+<section class="sec-midcta">
+  <div class="wrap reveal">
+    <p class="midcta-text">已经想好要评审什么了？</p>
+    <a class="midcta-btn" href="/ask">直接开始 <span class="arw">→</span></a>
   </div>
 </section>
 
@@ -288,13 +331,19 @@
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-model.png" alt="模型中立" loading="lazy"></div>
         <h3>自带 Key，模型任选</h3>
-        <p>支持 Anthropic 原生，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型等任意 OpenAI 兼容服务。Key 加密存在服务端，按你的模型账户计费。未配置 Key 时接口直接返回提示，不会返回模拟数据。</p>
+        <!-- P2-a：原来这句还塞进了"未配置 Key 时接口直接返回提示，不会返回模拟数据"
+             这个边界情况说明，三件事挤在一句里信息超载。首页读者不需要这个错误处理
+             细节，砍掉只留价值主张：可选模型 + 计费方式。 -->
+        <p>支持 Anthropic 原生，以及 DeepSeek、Kimi、通义千问、智谱 GLM、Ollama 本地模型等任意 OpenAI 兼容服务。Key 加密存在服务端，按你的模型账户计费。</p>
         <div class="meta">Anthropic、DeepSeek、Kimi、通义千问、智谱 GLM、Ollama</div>
       </div>
       <div class="cap-card reveal">
         <div class="ico"><img src="/landing/icon-saas.png" alt="开箱即用 SaaS" loading="lazy"></div>
         <h3>开箱即用</h3>
-        <p>无需注册即可体验：CDK 兑换码免登录换取评审次数，自动创建游客身份。渐进式认证、配额套餐、多租户管理后台全部就绪。</p>
+        <!-- P0-3：原来写"渐进式认证、配额套餐、多租户管理后台全部就绪"——"全部就绪"是
+             无核实依据的绝对化措辞，没有测试兜底。换成具体机制点，每一句都能在
+             app/services/{quota,cdk,project}_service.py 与 admin.py 里找到对应代码。 -->
+        <p>无需注册即可体验：CDK 兑换码免登录换取评审次数，自动创建游客身份，登录后一键认领此前的评审记录。按账号隔离配额与数据，套餐与用量可在管理后台单独配置。</p>
         <div class="meta">兑换码、访客试用、多租户隔离</div>
       </div>
     </div>
@@ -323,12 +372,19 @@
           <tr><td class="dim-key">方法论</td><td class="us">多人格评审团</td><td>访谈式</td><td>真人访谈</td><td>对话式</td></tr>
           <tr><td class="dim-key">分歧处理</td><td class="us"><span class="ck">✓</span> 分歧聚类 + Top-3 争议点各反驳一轮，改票由代码判定</td><td><span class="cx">✕</span> 单轮</td><td><span class="cx">✕</span> 依赖主持人</td><td><span class="cx">✕</span> 单轮</td></tr>
           <tr><td class="dim-key">证据可核验</td><td class="us"><span class="ck">✓</span> 三级标注 + 推断占比 ≤40% 硬上限</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
-          <tr><td class="dim-key">多模态材料</td><td class="us"><span class="ck">✓</span> 截图 / BP 进视觉模型（限视觉模型）</td><td><span class="cx">✕</span> 仅文字</td><td>真人录屏</td><td><span class="cx">✕</span> 仅文字</td></tr>
+          <!-- P2-b：Outset 这格原来是纯文字"真人录屏"，跟其它格的 ✓/✕ 体系不统一，
+               容易被读成"这一格是对手赢了"。用 .note 标出这是"方法论不同"而非
+               "对手更强"，避免读者误读成 AudienceLens 输给了真人录屏。 -->
+          <tr><td class="dim-key">多模态材料</td><td class="us"><span class="ck">✓</span> 截图 / BP 进视觉模型（限视觉模型）</td><td><span class="cx">✕</span> 仅文字</td><td><span class="note">真人录屏（方法论不同，非文字材料）</span></td><td><span class="cx">✕</span> 仅文字</td></tr>
           <tr><td class="dim-key">模型选择</td><td class="us"><span class="ck">✓</span> Anthropic + 国产任选</td><td><span class="cx">✕</span> 绑定自家云</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
           <tr><td class="dim-key">开源</td><td class="us"><span class="cg">✓</span> MIT 开源</td><td><span class="cx">✕</span> 闭源</td><td><span class="cx">✕</span> 闭源</td><td><span class="cx">✕</span> 闭源</td></tr>
           <tr><td class="dim-key">价格</td><td class="us"><span class="cg">自带 Key · 按量</span></td><td>$60 / 次</td><td>按项目报价</td><td>$800 / 月</td></tr>
         </tbody>
       </table>
+      <!-- P1-9：竞品的价格/特性描述之前没有来源和核对日期，读起来像断言而非
+           可复核的事实。所有己方数字都接了自动化测试兜底，竞品这几格没有，
+           这里补一句免责声明，读者知道这些数字有时效性、以官网为准。 -->
+      <p class="tbl-note">竞品信息基于其官网公开资料人工核对，如有变动请以对方官网当前信息为准。AudienceLens 一列的每一格均对应仓库内可运行的代码与测试。</p>
     </div>
   </div>
 </section>

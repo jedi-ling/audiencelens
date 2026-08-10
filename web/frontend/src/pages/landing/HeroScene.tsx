@@ -66,7 +66,7 @@ void main() {
   // 再加一个上限：没有它，近处粒子被透视放大成大光斑，少数几颗就堆满一片区域，
   // 逼着你砍总量——"海量"和"不糊"就变成了二选一。封住上限后两者可以同时成立。
   float ps = aSize * uPixelRatio * (210.0 / max(-mv.z, 0.001));
-  gl_PointSize = min(ps, 4.2 * uPixelRatio);
+  gl_PointSize = min(ps, 3.2 * uPixelRatio);
 }
 `
 
@@ -279,9 +279,10 @@ export default function HeroScene() {
       // 天花板，整块糊成白斑（实测 uOpacity=0.5 时右半屏均值 0.92、过曝像素 91.6%，
       // 而且此时砍一半粒子只把 0.94 挪到 0.92——在天花板上砍量是没用的）。
       // 低 alpha 让"要叠很多层才亮"重新成立，这才是黑底稀疏亮点的成因。
-      const main = makePoints(pos, col, siz, spn, sed, 0.6)
+      // 2026-08-09 视频背景上线后整体调低：粒子从主角退为点缀，视频画面必须透出来。
+      const main = makePoints(pos, col, siz, spn, sed, 0.20)
       rig.add(main.points)
-      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.62)
+      const dustP = makePoints(dPos, dCol, dSiz, dSpn, dSed, 0.22)
       scene.add(dustP.points) // 挂 scene：星尘不随主体转
 
       const totalParticles = pos.length / 3 + dPos.length / 3

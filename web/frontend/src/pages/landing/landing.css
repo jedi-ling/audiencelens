@@ -4,7 +4,10 @@
 .al-landing *, .al-landing *::before, .al-landing *::after{margin:0;padding:0;box-sizing:border-box}
 .al-landing{
   --bg:#000000;--bg-alt:#1c1c1e;--bg-card:#1c1c1e;--bg-elev:#2c2c2e;
-  --text:#ffffff;--text-dim:#8e8e93;--text-mute:#636366;
+  /* P1-10：#636366 在纯黑背景上约 4.4:1，小字号（.debate-foot/.meter-cell span 等
+     .68-.7rem 的 mono 文案）不够 WCAG AA 小字号要求的 4.5:1，边缘不达标。
+     提亮到 #6e6e74，约 4.9:1，全站沿用这一个变量的地方一次性达标。 */
+  --text:#ffffff;--text-dim:#8e8e93;--text-mute:#6e6e74;
   --gold:#0a84ff;--gold-bright:#2997ff;--gold-soft:rgba(10,132,255,.08);
   --mint:#32ade6;
   --line:rgba(255,255,255,.08);--line-strong:rgba(255,255,255,.14);
@@ -41,26 +44,11 @@
   .al-landing .debate-msg.agree{transition:none}
   .al-landing .debate-stagger{opacity:1;transform:none}
 }
-.al-landing nav{position:fixed;top:0;left:0;right:0;z-index:100;transition:background .35s,border-color .35s,backdrop-filter .35s;
-  border-bottom:1px solid transparent}
-.al-landing nav.scrolled{background:rgba(28,28,30,.72);backdrop-filter:blur(18px) saturate(180%);
-  /* // P0-4：滚动后强化导航与正文的层级分隔 */
-  -webkit-backdrop-filter:blur(18px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 8px 32px rgba(0,0,0,.3)}
-.al-landing .nav-inner{max-width:var(--maxw);margin:0 auto;padding:0 28px;height:68px;
-  display:flex;align-items:center;justify-content:space-between}
-.al-landing .brand{font-weight:700;font-size:1.05rem;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
-.al-landing .brand .mark{width:20px;height:20px;flex:none}
-.al-landing .brand b{font-weight:700;color:var(--text)}
-.al-landing .brand i{font-style:normal;color:var(--gold)}
-.al-landing .nav-links{display:flex;gap:34px;list-style:none;align-items:center}
-.al-landing .nav-links a{font-size:.88rem;color:var(--text-dim);font-weight:500}
-.al-landing .nav-links a:hover{color:var(--text)}
-.al-landing .nav-cta{display:inline-flex;align-items:center;gap:7px;font-size:.85rem;font-weight:600;
-  color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));
-  padding:9px 20px;border-radius:999px;box-shadow:0 4px 18px rgba(0,113,227,.22)}
-.al-landing .nav-cta:hover{transform:translateY(-1px);box-shadow:0 6px 26px rgba(0,113,227,.34)}
-.al-landing .nav-toggle{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:8px}
-.al-landing .nav-toggle span{width:22px;height:1.5px;background:var(--text);transition:.3s}
+/* 评审报告 critique 的 P0：这里原来还有一套完整的独立导航系统
+   （nav/.nav-inner/.brand/.nav-links/.nav-cta/.nav-toggle 及其滚动态、
+   移动端展开态），但 landing-body.html 里从来没有对应的 <nav> 标签——
+   /` 路由挂在共享的 Layout.tsx 里，页头导航由 Layout 提供，这套是从
+   落地页尚未接入共享 Layout 时期遗留的死代码，删掉，不留着骗自己。 */
 .al-landing .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.95rem;
   padding:15px 30px;border-radius:999px;cursor:pointer;border:1px solid transparent;transition:all .28s;line-height:1}
 .al-landing .btn-primary{color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));
@@ -72,26 +60,23 @@
 .al-landing .btn:hover .arw{transform:translateX(3px)}
 .al-landing section{position:relative}
 .al-landing .sec{padding:140px 0}
-.al-landing .sec-alt{background:var(--bg-alt)}
+/* 全页固定视频背景上线后，sec-alt 改为半透明深色：既保留区块分隔感，又让
+   底层视频透出来——否则不透明背景会把固定背景整个盖住，滚动时看不到画面。 */
+.al-landing .sec-alt{background:rgba(20,22,28,.55)}
 .al-landing .sec-head{max-width:720px;margin-bottom:64px}
 .al-landing .sec-title{font-size:clamp(2rem,4.2vw,3.2rem);font-weight:800;letter-spacing:-.03em;line-height:1.08}
 .al-landing .sec-desc{color:var(--text-dim);font-size:1.06rem;margin-top:18px;max-width:600px}
 .al-landing .hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;
   padding:112px 0 72px;text-align:center}
-/* 背景层0：宏大银河场景图——最底层，粒子与光晕叠在上面 */
-.al-landing .hero-bg-img{position:absolute;inset:0;z-index:-1;pointer-events:none;
-  background:url('/images/hero-bg.jpg') center/cover no-repeat;
-  opacity:.55}
-/* 背景层1：极淡的噪点纹理，替代网格线——有质感但不抢戏 */
-.al-landing .hero::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-  background-size:256px 256px;opacity:.35}
-/* 背景层2：主光晕+辅助光晕——组合多层径向渐变创造空间深度 */
-.al-landing .hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:
-    radial-gradient(circle at 50% 30%,rgba(41,151,255,.16) 0%,rgba(0,113,227,.05) 32%,transparent 58%),
-    radial-gradient(circle at 78% 18%,rgba(74,169,255,.08) 0%,transparent 45%),
-    radial-gradient(circle at 22% 65%,rgba(50,173,230,.05) 0%,transparent 40%)}
+/* 背景层0：全页固定视频背景。
+   position:fixed 铺满视口，滚动时纹丝不动——所有 section 内容压在它上面。
+   注意 z-index 不能是 -1：.al-landing 有 isolation:isolate 创建隔离层叠上下文，
+   负 z-index 的子元素会被该上下文的黑色背景盖住（实测全黑，画面上完全消失）。
+   提到 0，让粒子层(1)和文案(2)自然压在上面。 */
+.al-landing .hero-bg-video{position:fixed;inset:0;z-index:0;pointer-events:none;
+  width:100%;height:100%;object-fit:cover;opacity:.65}
+/* 2026-08-09：全页固定视频背景上线后，hero 的噪点纹理和光晕渐变已多余——
+   它们叠加在视频上会让画面发灰、发脏。只保留粒子层的左侧暗遮罩保护文案可读性。 */
 .al-landing .hero-inner{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;
   /* 左文右卡双栏：文案列固定 720px，保证主标题「让 72 个 AI 评审员，」一行放下 */
   display:grid;grid-template-columns:minmax(0,720px) minmax(0,1fr);gap:56px;align-items:center;text-align:left}
@@ -113,33 +98,44 @@
 .al-landing .hero-sub b{color:var(--text);font-weight:600}
 /* 防碎行：强调短语内部禁止折行（"找到风险"永远同行） */
 .al-landing .nobr{white-space:nowrap}
-.al-landing .chips{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 34px}
-/* P1-3：输入框下方示例 chips —— 与上方主 chips 视觉一致，仅减小顶距与字号作层级区分 */
-.al-landing .chips-examples{margin:-12px 0 26px;gap:7px}
-.al-landing .chips-examples .chip{font-size:.72rem;padding:5px 12px;color:var(--text-mute)}
-.al-landing .chip{font-size:.78rem;color:var(--text-dim);border:1px solid var(--line);border-radius:999px;
-  padding:6px 14px;background:rgba(255,255,255,.05);cursor:pointer;transition:all .25s}
-.al-landing .chip:hover{border-color:rgba(0,113,227,.45);color:var(--gold);background:var(--gold-soft)}
-.al-landing .hero-cta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:40px}
-.al-landing .hero-ask{display:flex;align-items:center;gap:8px;max-width:480px;margin:0 0 22px;
-  background:var(--bg-card);border:1px solid var(--line-strong);border-radius:12px;padding:5px 6px 5px 16px;
+/* P0-1：免注册提示，视觉权重刻意低于 h1/hero-sub——只做确认作用，不抢注意力 */
+.al-landing .hero-hint{font-size:.82rem;color:var(--text-mute);margin:-20px 0 20px;letter-spacing:.01em}
+.al-landing .hero-cta{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:40px}
+/* P0-4：GitHub 降级为纯文字链接，字号与视觉权重明显低于 .btn-primary 主 CTA */
+.al-landing .hero-cta-secondary{font-size:.85rem;color:var(--text-mute);transition:color .25s}
+.al-landing .hero-cta-secondary:hover{color:var(--gold)}
+.al-landing .hero-ask{display:flex;align-items:center;gap:10px;max-width:540px;margin:0 0 22px;
+  background:var(--bg-card);border:1px solid var(--line-strong);border-radius:14px;padding:7px 8px 7px 20px;
   box-shadow:0 4px 24px rgba(0,0,0,.06);transition:border-color .2s}
 .al-landing .hero-ask:focus-within{border-color:rgba(0,113,227,.5)}
-.al-landing .hero-ask input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:.88rem;
+.al-landing .hero-ask input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:.95rem;
   font-family:inherit;min-width:0}
 .al-landing .hero-ask input::placeholder{color:var(--text-mute)}
-.al-landing .hero-ask button{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:.82rem;font-weight:600;
-  color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));border:none;border-radius:999px;padding:9px 18px;cursor:pointer;
+.al-landing .hero-ask button{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:.9rem;font-weight:600;
+  color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));border:none;border-radius:999px;padding:11px 22px;cursor:pointer;
   transition:all .25s;box-shadow:0 4px 16px rgba(0,113,227,.35)}
 .al-landing .hero-ask button:hover{background:linear-gradient(105deg,var(--gold-bright),#5bbdff);box-shadow:0 6px 22px rgba(0,113,227,.5);transform:translateY(-1px)}
 @media(max-width:920px){.al-landing .hero-ask{margin-left:auto;margin-right:auto}}
 .al-landing .proof{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--text-mute);font-size:.86rem}
 .al-landing .avatars{display:flex}
+/* critique P3：白字压在这几个渐变浅端（如 #7fcdf0、#adadb6）上实测只有
+   1.8-2.2:1，加一层深色 text-shadow 兜底提对比度，不用逐个改内联渐变色值 */
 .al-landing .avatars span{width:30px;height:30px;border-radius:50%;border:2px solid var(--bg);margin-left:-9px;
-  display:grid;place-items:center;font-size:.7rem;font-weight:600;color:#ffffff}
+  display:grid;place-items:center;font-size:.7rem;font-weight:600;color:#ffffff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
 .al-landing .avatars span:first-child{margin-left:0}
 .al-landing .proof .sep{width:1px;height:14px;background:var(--line-strong)}
 .al-landing .proof b{color:var(--text-dim);font-weight:600}
+/* critique P2：人格数（H1 反复出现的核心数字）拿视觉优先权，场景数/Pack数降级 */
+.al-landing .proof-lead{font-size:1rem;color:var(--text)}
+.al-landing .proof-lead b{color:var(--gold);font-size:1.15em;font-weight:800}
+.al-landing .proof-sub{color:var(--text-mute);font-size:.82rem}
+/* critique P1：把怀疑访客早点引导到 STATS 区的真实证据（自动化测试数），
+   不复述数字本身（复述会撞 test_test_counts_are_stated_once_and_dated）。 */
+/* flex-basis:100% 强制它在 .proof 的 flex 行里另起一行，不管视口多宽都不会
+   和头像/数字挤在同一行 */
+.al-landing .proof-jump{flex-basis:100%;margin-top:10px;font-size:.78rem;color:var(--text-mute);
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-strong);transition:color .25s}
+.al-landing .proof-jump:hover{color:var(--gold)}
 /* 辩论卡与左侧文案列同档宽度，justify-self:end 靠右对齐，形成稳定的右栏 */
 .al-landing .debate-card{background:var(--bg-card);border:1px solid var(--line);border-radius:20px;
   padding:26px 24px;box-shadow:0 12px 40px rgba(0,0,0,.35);position:relative;width:100%;max-width:none;transform:translateY(8px)}
@@ -154,16 +150,22 @@
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .al-landing .debate-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .al-landing .debate-tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;color:var(--gold)}
-.al-landing .debate-round{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;color:var(--text-mute);
-  border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+/* P0-2：这张卡是示意图不是真实评审记录，标签原来只是灰色描边小字（.text-mute），
+   容易被当成真数据扫过去。改成实心警示色底，权重提到能被一眼看到。 */
+.al-landing .debate-round{font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.08em;
+  color:#ffb020;border:1px solid rgba(255,176,32,.4);background:rgba(255,176,32,.14);
+  border-radius:999px;padding:4px 11px}
 .al-landing .debate-msg{display:flex;gap:12px;margin-bottom:14px}
 .al-landing .debate-msg .pav{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;
-  font-size:.68rem;font-weight:700;color:#ffffff}
+  font-size:.68rem;font-weight:700;color:#ffffff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
 .al-landing .debate-msg .bubble{background:var(--bg-elev);border:1px solid var(--line);border-radius:12px;
   padding:11px 14px;font-size:.85rem;color:var(--text-dim);line-height:1.55}
 .al-landing .debate-msg .who{font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;color:var(--text-mute);margin-bottom:4px}
 .al-landing .debate-msg.oppose .who em{color:#e1543f;font-style:normal}
-.al-landing .debate-msg.agree .who em{color:var(--mint);font-style:normal}
+/* P2-e：这里原来用 --mint，和 .gold 强调色同属蓝青色系，小字号下几乎分不清语义。
+   mint 只留给真正的状态类信号（.ck 复选、hero-badge 在线点），人物身份色改用白色，
+   和反方的红色形成清楚的二元对比，不再引入第三种容易混淆的蓝色。 */
+.al-landing .debate-msg.agree .who em{color:#fff;font-style:normal}
 .al-landing .debate-flip{display:flex;align-items:center;gap:8px;justify-content:center;font-family:var(--mono);
   font-size:.72rem;color:var(--mint);margin:2px 0 14px;padding:8px 0;
   border-top:1px dashed var(--line);border-bottom:1px dashed var(--line)}
@@ -179,7 +181,7 @@
 @media(max-width:920px){.al-landing .hero-inner{grid-template-columns:1fr;text-align:center;gap:44px}
 .al-landing .hero-copy{max-width:640px;margin:0 auto}
 .al-landing .hero-sub{margin:0 auto 32px}
-.al-landing .chips, .al-landing .hero-cta, .al-landing .proof{justify-content:center}
+.al-landing .hero-cta, .al-landing .proof{justify-content:center}
 .al-landing .debate-card{max-width:460px;margin:0 auto}}
 .al-landing .pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
 .al-landing .pain-card{background:var(--bg-card);border:1px solid var(--line);border-radius:18px;padding:36px 32px;
@@ -189,8 +191,10 @@
   display:flex;flex-direction:column;
   /* 顶部 accent 条：增加视觉锚点和品牌色呼应 */
   position:relative;overflow:hidden}
+/* P2-d：常态 opacity 原来是 .6，这条装饰线不承载信息，常态存在感太强容易被
+   读成"进度条"。降到 .28，强调完全留给 hover。 */
 .al-landing .pain-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--gold),var(--gold-bright));opacity:.6;transition:opacity .35s}
+  background:linear-gradient(90deg,var(--gold),var(--gold-bright));opacity:.28;transition:opacity .35s}
 .al-landing .pain-card:hover{transform:translateY(-6px);border-color:rgba(10,132,255,.2);box-shadow:0 12px 40px rgba(10,132,255,.12),0 4px 16px rgba(0,0,0,.25)}
 .al-landing .pain-card:hover::before{opacity:1}
 .al-landing .pain-card .n{font-family:var(--mono);font-size:.78rem;letter-spacing:.18em;color:var(--gold);margin-bottom:18px;opacity:.85}
@@ -199,7 +203,9 @@
 .al-landing .pain-card .cost{margin-top:auto;font-family:var(--mono);font-size:.8rem;color:var(--gold);
   /* P1-4: margin-top:auto 把 cost 推到卡底，让三张卡等高；用 padding-top:18px 替代原先的 margin-top:18px，避免 flex 布局下与 auto 冲突 */
   padding-top:18px}
-.al-landing .gap{padding:160px 0;text-align:center;position:relative;overflow:hidden}
+/* P2-c：常规 section 是 140px、.gap 原来只比它多 20px，视觉上感知不到
+   "呼吸点"。.gap 承载全篇最重的一句论点，加大到 190px 和常规区块拉开明显断层。 */
+.al-landing .gap{padding:190px 0;text-align:center;position:relative;overflow:hidden}
 .al-landing .gap::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:700px;height:700px;pointer-events:none;background:radial-gradient(circle,rgba(0,113,227,.06) 0%,transparent 60%)}
 .al-landing .gap p{font-size:clamp(1.6rem,3.6vw,2.6rem);font-weight:800;letter-spacing:-.03em;line-height:1.28;
@@ -229,7 +235,10 @@
 .al-landing .flow-step h4{font-size:1.08rem;font-weight:700;margin-bottom:8px}
 .al-landing .flow-step p{color:var(--text-dim);font-size:.9rem}
 .al-landing .use-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.al-landing .use-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:30px 28px;
+/* P1-7：pain-card(36/32)、use-card(30/28)、cap-card(34/30) 三组内边距互相
+   只差 2-6px，没有实际功能区分。统一成两档：pain-card 是"强调型"(36/32，
+   信息量大、承接痛点)，use-card/cap-card 是"常规型"(28/26)。 */
+.al-landing .use-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:28px 26px;
   box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s;position:relative;overflow:hidden}
 .al-landing .use-card:hover{transform:translateY(-5px);border-color:rgba(10,132,255,.3);box-shadow:0 12px 36px rgba(10,132,255,.15)}
@@ -250,7 +259,7 @@
 .al-landing .use-card h3{font-size:1.1rem;font-weight:700;margin-bottom:9px}
 .al-landing .use-card p{color:var(--text-dim);font-size:.92rem}
 .al-landing .cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.al-landing .cap-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:34px 30px;
+.al-landing .cap-card{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:28px 26px;
   box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s}
 .al-landing .cap-card:hover{transform:translateY(-5px);border-color:var(--line-strong);box-shadow:0 12px 36px rgba(0,0,0,.35)}
@@ -275,12 +284,15 @@
 .al-landing .cx{color:var(--text-mute)}
 .al-landing .cg{color:var(--gold);font-weight:600}
 .al-landing .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-.al-landing .stat{padding:38px 24px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;text-align:center;
+/* P1-7：pain/use/cap 四种卡片视觉权重原来几乎相同，翻到 STATS 区时数字应该是
+   全篇视觉高潮，却和上面说明性卡片同一个音量。这里加强边框色 + 放大数字，
+   拉开与前面卡片的层级差。 */
+.al-landing .stat{padding:38px 24px;background:var(--bg-card);border:1px solid rgba(10,132,255,.25);border-radius:16px;text-align:center;
   box-shadow:0 4px 24px rgba(0,0,0,.25);
   transition:transform .35s,border-color .35s,box-shadow .35s}
-.al-landing .stat:hover{transform:translateY(-4px);border-color:rgba(10,132,255,.3);box-shadow:0 12px 36px rgba(0,0,0,.35)}
+.al-landing .stat:hover{transform:translateY(-4px);border-color:rgba(10,132,255,.45);box-shadow:0 12px 36px rgba(0,0,0,.35)}
 /* // P1-1：统一数据数字与全局金色文字渐变方向 */
-.al-landing .stat .num{font-size:2.8rem;font-weight:800;letter-spacing:-.03em;line-height:1;
+.al-landing .stat .num{font-size:3.3rem;font-weight:800;letter-spacing:-.03em;line-height:1;
   color:var(--gold);font-weight:900}
 .al-landing .stat .lbl{margin-top:12px;font-size:.84rem;color:var(--text-dim)}
 .al-landing .final{text-align:center;padding:160px 0;position:relative;overflow:hidden}
@@ -304,20 +316,50 @@
 .al-landing .foot-bottom{max-width:var(--maxw);margin:44px auto 0;padding:24px 28px 0;border-top:1px solid var(--line);
   display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--text-mute);font-size:.82rem}
 .al-landing .foot-bottom .license{color:var(--mint)}
+
+/* P1-6：中间路径次要 CTA，视觉语言参考 hero-ask 但更克制——不抢主转化按钮的
+   注意力，只在用户已经被说服到一半时给一个顺手的出口。 */
+.al-landing .sec-midcta{padding:64px 0;text-align:center}
+.al-landing .midcta-text{font-size:1.1rem;color:var(--text-dim);margin-bottom:18px}
+.al-landing .midcta-btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:.92rem;
+  color:var(--text);background:transparent;border:1px solid var(--line-strong);border-radius:999px;
+  padding:12px 26px;transition:all .25s}
+.al-landing .midcta-btn:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-2px)}
+.al-landing .midcta-btn .arw{transition:transform .28s}
+.al-landing .midcta-btn:hover .arw{transform:translateX(3px)}
+
+/* P1-9：COMPARE 表下方的来源/核对日期免责声明 */
+.al-landing .tbl-note{margin-top:14px;font-size:.78rem;color:var(--text-mute);line-height:1.6}
+/* P2-b：Outset"多模态材料"格用这个类，和 .ck/.cx 的符号体系区分开——
+   它既不是"有"也不是"没有"，是方法论不同，视觉上也不该用同一套符号语言 */
+.al-landing .note{color:var(--text-mute);font-style:italic}
+
+/* P2-f：卡片组入场动效原来只有 hero 的 debate-stagger 有节奏差异，其余
+   .reveal 全部同时触发，和 hero 精心设计的节奏感形成割裂。给卡片组加
+   :nth-child stagger，呼应 hero 的入场节奏。只在用户不要求减少动效时生效。 */
+@media(prefers-reduced-motion:no-preference){
+  .al-landing .pain-grid .pain-card:nth-child(1),
+  .al-landing .use-grid .use-card:nth-child(1),
+  .al-landing .cap-grid .cap-card:nth-child(1){transition-delay:0ms}
+  .al-landing .pain-grid .pain-card:nth-child(2),
+  .al-landing .use-grid .use-card:nth-child(2),
+  .al-landing .cap-grid .cap-card:nth-child(2){transition-delay:80ms}
+  .al-landing .pain-grid .pain-card:nth-child(3),
+  .al-landing .use-grid .use-card:nth-child(3),
+  .al-landing .cap-grid .cap-card:nth-child(3){transition-delay:160ms}
+  .al-landing .use-grid .use-card:nth-child(4){transition-delay:240ms}
+  .al-landing .use-grid .use-card:nth-child(5){transition-delay:320ms}
+  .al-landing .use-grid .use-card:nth-child(6){transition-delay:400ms}
+}
+
 @media(max-width:920px){.al-landing .pain-grid, .al-landing .use-grid, .al-landing .cap-grid{grid-template-columns:1fr 1fr}
 .al-landing .flow{grid-template-columns:1fr 1fr}
 .al-landing .stats{grid-template-columns:1fr 1fr}
 .al-landing .stage-row{grid-template-columns:1fr;gap:20px}
-.al-landing .stage-key{position:static}}
+.al-landing .stage-key{position:static}
+/* P2-h：单列降级后 .kw 仍是桌面端 1.7rem 配 200px 原宽度的排版习惯，窄屏下偏大突兀 */
+.al-landing .stage-key .kw{font-size:1.4rem}}
 @media(max-width:640px){.al-landing .sec{padding:88px 0}
-.al-landing .nav-links{position:fixed;top:68px;left:0;right:0;flex-direction:column;gap:0;
-    background:rgba(28,28,30,.97);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);
-    padding:8px 28px 20px;display:none}
-.al-landing .nav-links.open{display:flex}
-.al-landing .nav-links li{width:100%;border-bottom:1px solid var(--line)}
-.al-landing .nav-links li:last-child{border:none;margin-top:12px}
-.al-landing .nav-links a{display:block;padding:14px 0}
-.al-landing .nav-toggle{display:flex}
 .al-landing .pain-grid, .al-landing .use-grid, .al-landing .cap-grid, .al-landing .flow, .al-landing .stats{grid-template-columns:1fr}
 .al-landing .foot-inner{flex-direction:column;gap:36px}}
 
@@ -393,46 +435,28 @@
    这类产品站的常见结构，对比本身也是层级）。
    ============================================================ */
 
-.al-landing .hero{
-  /* 与 HeroScene 里的 Fog 颜色 0x0a1024 对齐，边缘才不露缝 */
-  background:
-    radial-gradient(ellipse 90% 70% at 72% 42%,#0a1628 0%,transparent 60%),
-    linear-gradient(180deg,#000000 0%,#05080f 62%,#0a1020 100%);
-  color:#e9eefb}
-
-/* 网格改成暗底上的浅线，并整体压淡——它是空间基底，不是内容 */
-.al-landing .hero::before{
-  background-image:linear-gradient(rgba(140,180,255,.07) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(140,180,255,.07) 1px,transparent 1px);
-  opacity:.4}
-/* 中心光晕加强：深底上它才真正成为"光源" */
-.al-landing .hero::after{
-  background:radial-gradient(circle,rgba(41,151,255,.16) 0%,transparent 62%)}
+/* 2026-08-09：全页固定视频背景上线后，hero 的背景渐变、网格线和中心光晕全部删除——
+   它们叠加在视频上只会让画面发灰发脏。视频本身就是最好的"光源"。 */
 
 /* 3D 层压在网格之上、内容之下 */
 .al-landing .hero-bg3d{z-index:1}
 .al-landing .hero-inner{z-index:2}
 
-/* 左侧遮罩改用深色，且更克制——深底上文字本就清楚，不必压太狠，
-   压狠了 3D 会被吃掉一半，那就又回到"效果太弱" */
+/* 左侧遮罩：视频背景上线后不能压死——纯黑会把视频画面完全吃掉。
+   改成半透明黑（55%→0%），视频从左侧也能透出约四成，文字用 text-shadow 保可读性。 */
 .al-landing .hero-bg3d::after{
   background:linear-gradient(100deg,
-    #000000 0%,
-    color-mix(in srgb,#000000 82%,transparent) 24%,
-    color-mix(in srgb,#000000 34%,transparent) 42%,
-    transparent 58%)}
+    rgba(0,0,0,.78) 0%,
+    rgba(0,0,0,.45) 32%,
+    rgba(0,0,0,.18) 50%,
+    transparent 62%)}
 
 /* ---- hero 内的文字与控件翻成浅色 ---- */
 .al-landing .hero h1{color:#fff;text-shadow:0 2px 30px rgba(4,10,26,.5)}
 .al-landing .h1-accent{color:#4aa9ff;font-weight:900}
 .al-landing .hero-sub{color:#c8d6ed}
 .al-landing .hero-sub b{color:#fff}
-
-.al-landing .hero .chip{color:#c8d6ed;border-color:rgba(150,185,255,.28);
-  background:rgba(255,255,255,.06);backdrop-filter:blur(6px)}
-.al-landing .hero .chip:hover{color:#fff;border-color:rgba(150,185,255,.55);
-  background:rgba(255,255,255,.12);box-shadow:0 4px 16px rgba(74,169,255,.12)}
-.al-landing .hero .chips-examples .chip{color:#9fb3d4}
+.al-landing .hero .hero-hint{color:#9fb3d4;text-shadow:0 1px 12px rgba(4,10,26,.4)}
 
 .al-landing .hero-ask{background:rgba(255,255,255,.06);border-color:rgba(150,185,255,.26);
   backdrop-filter:blur(10px);box-shadow:0 8px 32px -12px rgba(0,0,0,.6)}
@@ -441,10 +465,8 @@
 .al-landing .hero-ask input{color:#fff}
 .al-landing .hero-ask input::placeholder{color:#8092b5}
 
-.al-landing .hero .btn-ghost{color:#d7e2f7;border-color:rgba(150,185,255,.3);
-  background:rgba(255,255,255,.04)}
-.al-landing .hero .btn-ghost:hover{color:#fff;border-color:rgba(150,185,255,.55);
-  background:rgba(255,255,255,.09)}
+.al-landing .hero .hero-cta-secondary{color:#9fb3d4}
+.al-landing .hero .hero-cta-secondary:hover{color:#fff}
 
 .al-landing .sec-trust .proof{color:var(--text-mute)}
 .al-landing .sec-trust .proof b{color:var(--text)}
@@ -453,22 +475,26 @@
 
 
 /* 产出卡片：半透明毛玻璃，融入深色舞台，不再像"从另一页贴过来的"。
-   backdrop-filter 需要浏览器支持，降级 gracefully 到半透明背景。 */
+   backdrop-filter 需要浏览器支持，降级 gracefully 到半透明背景。
+   2026-08 视频背景换得更亮后，原 .07 透明度被视频光晕吃掉、文字几乎看不清，
+   提高到 .16 + saturate 拉到 160% + blur 28px，让视频能透出但文字不被吞。 */
 .al-landing .hero .debate-card{
-  background:rgba(255,255,255,.07);
-  border-color:rgba(150,185,255,.18);
-  backdrop-filter:blur(20px) saturate(140%);
-  -webkit-backdrop-filter:blur(20px) saturate(140%);
-  box-shadow:0 24px 70px -20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
+  background:rgba(10,16,32,.82);
+  border-color:rgba(150,185,255,.28);
+  backdrop-filter:blur(28px) saturate(160%);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  box-shadow:0 24px 70px -20px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.10)}
 
 /* debate-card 内部元素适配深色背景——简化设计，减少视觉噪音 */
-.al-landing .hero .debate-card .debate-round{color:rgba(180,200,230,.55);border-color:rgba(150,185,255,.14);background:rgba(255,255,255,.04)}
-.al-landing .hero .debate-card .debate-msg .bubble{background:rgba(255,255,255,.06);border:none;color:#c8d6ed;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-.al-landing .hero .debate-card .debate-msg .who{color:rgba(180,200,230,.6);font-size:.66rem}
-.al-landing .hero .debate-card .debate-flip{color:#5ecfff;border-color:rgba(150,185,255,.12);font-size:.7rem}
+/* P0-2：这条选择器比基础 .debate-round 规则更具体，hero 视频背景下如果不
+   覆盖，警示色底会被这里重新盖成灰色描边小字——原样保留基础规则的实心警示色。 */
+.al-landing .hero .debate-card .debate-round{color:#ffb020;border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.14)}
+.al-landing .hero .debate-card .debate-msg .bubble{background:rgba(255,255,255,.08);border:none;color:#e4ecfa;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.al-landing .hero .debate-card .debate-msg .who{color:rgba(200,220,245,.78);font-size:.66rem}
+.al-landing .hero .debate-card .debate-flip{color:#7ed4ff;border-color:rgba(150,185,255,.22);font-size:.7rem}
 .al-landing .hero .debate-card .meter-cell b{color:#fff;font-size:1.1rem}
-.al-landing .hero .debate-card .meter-cell span{color:rgba(180,200,230,.55);font-size:.68rem}
-.al-landing .hero .debate-card .debate-foot{color:rgba(180,200,230,.45);border-color:rgba(150,185,255,.08);font-size:.65rem}
+.al-landing .hero .debate-card .meter-cell span{color:rgba(200,220,245,.7);font-size:.68rem}
+.al-landing .hero .debate-card .debate-foot{color:rgba(200,220,245,.6);border-color:rgba(150,185,255,.18);font-size:.65rem}
 
 /* 焦点环在深底上要用亮蓝，沿用浅色主色会看不见 */
 .al-landing .hero :focus-visible{outline-color:#4aa9ff}
@@ -490,7 +516,7 @@
 
 /* 信任条：从 hero 内部移出来的独立区块（hero 文本元素原本有 8 个，上限 4）。
    放在首屏正下方，滚动一点就能看到，但不再和主张挤在同一列。 */
-.al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0a1020 0%,var(--bg) 100%)}
+.al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line);background:rgba(10,16,32,.45)}
 .al-landing .sec-trust .wrap{display:flex;align-items:center;justify-content:space-between;
   gap:20px 34px;flex-wrap:wrap}
 .al-landing .sec-trust .proof,.al-landing .sec-trust .hero-models{margin-top:0}
@@ -501,6 +527,8 @@
 .al-landing .meter-cell b{font-size:1.16rem;font-weight:650;color:var(--text);
   font-variant-numeric:tabular-nums;line-height:1.15}
 .al-landing .meter-cell span{font-size:.7rem;color:var(--text-mute)}
+/* critique P2：dotted underline 提示"这里有 title 悬浮说明"，不加常态视觉重量 */
+.al-landing .term-gloss{text-decoration:underline dotted;text-underline-offset:2px;cursor:help}
 
 @media (max-width:720px){
   .al-landing .sec-trust .wrap{flex-direction:column;align-items:flex-start}

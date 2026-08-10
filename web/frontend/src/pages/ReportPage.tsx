@@ -51,7 +51,7 @@ import {
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -135,7 +135,7 @@ interface RealSharedConcern {
   title_variants?: string[]
 }
 
-interface RealReport {
+export interface RealReport {
   /** 评审失败时 report_json 就是 {"error": ...}（v1 对外契约，见后端
    *  api/__init__.py::_report_json_for 与 services/report_gating.py：这个键被
    *  明确列为"不许裁掉的诚实声明"）。前端此前根本没读它——{"error":...} 是真值，
@@ -247,7 +247,7 @@ function noteStance(note: RealPersonaNote): string {
  * 位置固定在页面最顶部（标题之上），用高对比警示色而非灰色小字：伦理指南里
  * "弱化"和"删除"是同一档问题，摆在需要滚动才看得到的地方就是弱化。
  */
-function SyntheticBanner() {
+export function SyntheticBanner() {
   return (
     <div className="mb-4 rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-4">
       <div className="flex items-start gap-3">
@@ -582,7 +582,7 @@ const LIMITATIONS: string[] = [
 ]
 
 /** ETHICS.md 强制项之二：Limitations & Caveats 章节（下载的 .md 一直有，网页端此前没有）。 */
-function LimitationsSection({ caveats }: { caveats?: string[] }) {
+export function LimitationsSection({ caveats }: { caveats?: string[] }) {
   const extra = (caveats ?? []).filter((c) => typeof c === 'string' && c.trim())
   return (
     <section className="mb-6 rounded-xl border border-warm-orange/40 bg-bg-card p-4 md:p-5">
@@ -1049,7 +1049,63 @@ export default function ReportPage() {
   const [hoursSaved, setHoursSaved] = useState(0)
   const [willingnessToPay, setWillingnessToPay] = useState(0)
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  // ---- 只读分享链接 ----
+  // 初值来自 review.share_token（后端只回给作者本人），之后由本页的
+  // 开启/撤销动作维护，不再回头依赖 review——否则撤销后按钮还显示"已公开"。
+  const [shareToken, setShareToken] = useState<string | null>(null)
+  const [sharePanelOpen, setSharePanelOpen] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    setShareToken(review?.share_token ?? null)
+  }, [review?.share_token])
+
+  const shareUrl = shareToken ? `${window.location.origin}/s/${shareToken}` : null
+
+  const handleShare = async () => {
+    if (!id || shareBusy) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      const r = await api.shareReview(id)
+      setShareToken(r.share_token)
+    } catch (e) {
+      setShareError(e instanceof Error ? e.message : '生成分享链接失败')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const handleUnshare = async () => {
+    if (!id || shareBusy) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      await api.unshareReview(id)
+      setShareToken(null)
+      setShareCopied(false)
+    } catch (e) {
+      setShareError(e instanceof Error ? e.message : '撤销失败')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const handleCopyShareUrl = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      // 剪贴板 API 在非 HTTPS/无权限时会拒绝。不弹"复制成功"的假消息——
+      // 链接本身就在输入框里显示着，用户可以自己选中复制。
+      setShareError('浏览器拒绝了剪贴板访问，请手动选中上面的链接复制')
+    }
+  }
 
   const toggleIssue = (index: number) => {
     setExpandedIssues((prev) => {
@@ -1287,6 +1343,18 @@ export default function ReportPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={() => setSharePanelOpen((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all',
+              shareToken
+                ? 'bg-brand-primary/10 border-brand-primary/30 text-brand-primary'
+                : 'bg-bg-card border-border text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary'
+            )}
+          >
+            <Share2 className="w-3.5 h-3.5" strokeWidth={1.25} />
+            <span className="hidden sm:inline">{shareToken ? '已公开' : '分享'}</span>
+          </button>
+          <button
             onClick={() => handleExport('json')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
           >
@@ -1316,6 +1384,97 @@ export default function ReportPage() {
           </button>
         </div>
       </div>
+
+      {/* 分享面板。
+          这里的"对方能看到 / 看不到"两栏不是装饰，是知情同意的正文：报告里
+          可能有还没发布的产品材料和定价策略，用户按下"生成链接"之前必须
+          知道自己在公开什么。两栏内容与后端白名单（share_service.to_public_dict）
+          一一对应，改后端就要改这里，否则这段说明会变成一句谎话。 */}
+      {sharePanelOpen && (
+        <div className="mb-6 rounded-xl border border-border bg-bg-card p-5">
+          <div className="flex items-start gap-2.5">
+            <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold text-text-primary">只读分享链接</h3>
+              <p className="mt-1 text-xs text-text-secondary">
+                生成一条链接发给合伙人或团队，<strong className="text-text-primary">对方无需注册即可打开</strong>。
+                任何拿到链接的人都能看，所以别发到公开场合。
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-bg-secondary/50 p-3">
+                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">对方能看到</div>
+                  <ul className="space-y-1 text-[11px] text-text-muted">
+                    <li>· 报告全文（摘要、优先修复、各角色视角、共识与分歧）</li>
+                    <li>· 这次评审的标题与任务类型</li>
+                    <li>· 评审时间与校准指标</li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-border bg-bg-secondary/50 p-3">
+                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">对方看不到</div>
+                  <ul className="space-y-1 text-[11px] text-text-muted">
+                    <li>· 你的账号与邮箱</li>
+                    <li>· 这次评审的花费与 token 消耗</li>
+                    <li>· 你上传的原始材料</li>
+                  </ul>
+                </div>
+              </div>
+
+              {shareError && (
+                <p className="mt-3 flex items-start gap-1.5 text-xs text-severity-critical">
+                  <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                  <span className="break-all">{shareError}</span>
+                </p>
+              )}
+
+              {shareToken && shareUrl ? (
+                <div className="mt-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      readOnly
+                      value={shareUrl}
+                      onFocus={(e) => e.currentTarget.select()}
+                      aria-label="分享链接"
+                      className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 font-mono text-xs text-text-primary outline-none"
+                    />
+                    <button
+                      onClick={() => void handleCopyShareUrl()}
+                      className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-xs text-text-primary transition-colors hover:border-brand-primary/40"
+                    >
+                      {shareCopied ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-brand-primary" strokeWidth={1.5} />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      )}
+                      {shareCopied ? '已复制' : '复制'}
+                    </button>
+                    <button
+                      onClick={() => void handleUnshare()}
+                      disabled={shareBusy}
+                      className="flex items-center gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/5 px-3 py-2 text-xs text-severity-critical transition-colors hover:bg-severity-critical/10 disabled:opacity-50"
+                    >
+                      {shareBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Lock className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                      撤销
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] text-text-muted">
+                    撤销后这条链接立刻失效，已经打开过的人也无法再次访问。再次分享会生成一条新链接。
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => void handleShare()}
+                  disabled={shareBusy}
+                  className="mt-4 flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
+                >
+                  {shareBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                  生成分享链接
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HTML 版本缺席要说原因。禁用按钮的 title 只有把鼠标停上去才看得到，
           而这件事（"这份报告没有 HTML 版"还是"渲染坏了"）用户有权直接读到。 */}

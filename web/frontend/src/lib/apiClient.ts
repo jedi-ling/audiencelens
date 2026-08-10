@@ -17,6 +17,7 @@ import {
   type ChatMessage,
   type CreateReviewResponse,
   type HealthConfig,
+  type SharedReport,
   type UploadConfig,
   type HitRate,
   type Identity,
@@ -576,6 +577,26 @@ export const api = {
 
   deleteConversation: (id: string) =>
     request<{ ok: boolean }>(`/api/v2/conversations/${id}`, { method: 'DELETE' }),
+
+  // ---------------- 报告只读分享 ----------------
+
+  /** 开启分享，拿到 token（幂等：已开启则返回原 token，不会让旧链接失效） */
+  shareReview: (id: string) =>
+    request<{ share_token: string; shared_at: string | null }>(
+      `/api/v2/reviews/${id}/share`,
+      { method: 'POST' },
+    ),
+
+  /** 撤销分享——已发出去的旧链接立刻全部失效 */
+  unshareReview: (id: string) =>
+    request<{ share_token: null; shared_at: null }>(`/api/v2/reviews/${id}/share`, {
+      method: 'DELETE',
+    }),
+
+  /** 公开只读地取一份被分享的报告。全站唯一不需要身份的读接口——
+   *  收到 404 的正常含义是"作者撤销了"，不是出错了。 */
+  getSharedReport: (token: string) =>
+    request<SharedReport>(`/api/v2/shared/${encodeURIComponent(token)}`),
 
   // ---------------- 项目：对话的分组容器 ----------------
 
