@@ -292,6 +292,27 @@ function DegradationNotice({ degradation }: { degradation?: RealDegradation | nu
   )
 }
 
+/**
+ * 高级技能/红队被静默降级的提醒。
+ *
+ * 功能完整性审查 P1：review.skill_degraded 这个字段一直存在（免费次数用完时
+ * 后端会把红队/高级技能降级，AskPage 创建评审那一刻会弹一次提示），但报告页
+ * 从没读过它——用户如果不是当场看到那句提示、而是过后从历史记录点进报告，
+ * 就永远不知道这次评审其实没跑红队/高级技能，会把"没跑出争议点"误读成
+ * "评审出来就是没什么好争的"。这里补上报告页的持久化展示。
+ */
+function SkillDegradedNotice({ notice }: { notice?: string | null }) {
+  if (!notice) return null
+  return (
+    <div className="mb-4 rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
+        <p className="text-sm font-bold text-warm-orange md:text-base">{notice}</p>
+      </div>
+    </div>
+  )
+}
+
 /** 校验门控：这些人格跑出来了，但输出没过 schema / 角色一致性 / 证据核对，
  *  所以**不计入**下面任何结论。引擎只回传英文的失败类型枚举
  *  （src/runner/cli.py 的 RETRY_SCHEMA / RETRY_ROLE_DRIFT / RETRY_HALLUCINATION），
@@ -451,9 +472,14 @@ function failureDetail(raw: unknown): string | null {
  * 历史病灶：空态判断只有 `if (!review || !report)`，而 {"error": ...} 是真值，
  * 于是失败评审直接落进完整报告分支——summary 为 undefined，风险等级被兜底成
  * "中风险"，共识/存疑点显示 0/0，看起来像"跑完了、没发现问题"。
+ *
+ * 功能完整性审查 P1：原来只读 report.error，漏了 review.error_message 这条
+ * 后端专门开的兜底路径——引擎写了半份报告又失败时 report_json 非空、
+ * report.error 读不到东西，这时唯一能看到失败原因的地方就是 error_message。
+ * 两个都读不到才真的说明后端没回传原因，不能提前放弃。
  */
 function reviewFailure(review: Review | null, report: RealReport | null): { reason: string | null } | null {
-  const reason = failureDetail(report?.error)
+  const reason = failureDetail(report?.error) ?? failureDetail(review?.error_message)
   if (reason) return { reason }
   if (review?.status === 'failed') return { reason: null }
   return null
@@ -1321,6 +1347,7 @@ export default function ReportPage() {
         </div>
       )}
       <DegradationNotice degradation={report.degradation} />
+      <SkillDegradedNotice notice={review?.skill_degraded} />
       <ValidationGateNotice validation={report.validation} />
       <BudgetNotice budget={report.budget} />
       <PanelSelectionNotice panelSelection={report.panel_selection} />
@@ -2324,6 +2351,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
         </div>
       )}
       <DegradationNotice degradation={gated.degradation} />
+      <SkillDegradedNotice notice={review?.skill_degraded} />
 
       <div className="flex items-center gap-3 mb-6">
         <Link to={review ? `/review/${review.id}` : '/'} className="p-2 rounded-lg hover:bg-bg-card transition-colors">

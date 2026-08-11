@@ -185,11 +185,13 @@
       <p class="sec-desc">一套评审团，14 种任务类型，覆盖你最怕出错的那几次上线。</p>
     </div>
     <div class="use-grid">
-      <!-- P1-5：use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰🚀💡📊⚔） -->
+      <!-- 内容密度精简：原本 6 张卡砍到 4 张，挑跨度最大的四个（游戏/SaaS/
+           创业BP 三个差异明显的领域 + 对抗性视角这个独特机制），不逐一穷举
+           14 种任务类型——那是 /task-types 页面的职责，首页只需要证明
+           "覆盖面够广"，不需要证明"覆盖面够全"。
+           P1-5：use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，emoji :before 由 CSS 兜底（顺序：🎮💰📊⚔） -->
       <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="游戏评审" loading="lazy"><h3>游戏 Steam / Demo 评审</h3><p>商店页文案、截图、Demo 首因体验——找出玩家 20 秒内离开的理由。</p></div>
       <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="定价页评审" loading="lazy"><h3>SaaS 定价页</h3><p>套餐结构、锚定、CTA 说服力——在真实流量进来前压测转化风险。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-onboarding.png" alt="新手引导评审" loading="lazy"><h3>新手引导流程</h3><p>Onboarding 每一步的困惑与流失点，站在第一次使用者视角走一遍。</p></div>
-      <div class="use-card reveal"><img class="ico" src="/landing/icon-crowdfund.png" alt="众筹页评审" loading="lazy"><h3>众筹 / Kickstarter 页</h3><p>信任信号、回报梯度、故事说服力——上线前先被"挑剔支持者"审一轮。</p></div>
       <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="创业 BP 评审" loading="lazy"><h3>创业 BP 路演</h3><p>投资人 / 孵化器导师 / 技术合伙人视角，提前接住路演现场最扎心的追问。</p></div>
       <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
            （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
@@ -220,6 +222,9 @@
           <div class="lbl">// 01 生成</div>
           <div class="kw">判断如何被<br><span class="gold">生成</span></div>
         </div>
+        <!-- 内容密度精简：3 阶段原本 4+3+3=10 条，砍到 3+2+2=7 条。
+             每阶段留下最有差异化的两三条，弱一点的（"按影响面排优先级"这种
+             听起来像是常规工程实践、不算独特卖点的）删掉或并进相邻条目。 -->
         <div class="stage-list">
           <div class="stage-item">
             <div class="ico">◇</div>
@@ -232,10 +237,6 @@
           <div class="stage-item">
             <div class="ico">⚖</div>
             <div><h4>改票由代码判定</h4><p>反驳之后谁改了口，由代码比较反驳前后的立场与置信度变化来判定，阈值写在开源配置里。</p></div>
-          </div>
-          <div class="stage-item">
-            <div class="ico">✎</div>
-            <div><h4>按影响面排修复优先级</h4><p>按"受影响人格数 × 严重度"排序，让"5 个人都卡在新手引导"这种问题不会被一句 low 吞掉。</p></div>
           </div>
         </div>
       </div>
@@ -254,10 +255,6 @@
             <div class="ico">⊘</div>
             <div><h4>伦理护栏</h4><p>身份与行为解耦：人格基于行为特征定义，性别/年龄/地域字段在注入提示词前会被剥离；另有身份-行为因果推理检测自动标记倾向。</p></div>
           </div>
-          <div class="stage-item">
-            <div class="ico">▤</div>
-            <div><h4>8 维质量评估（可选）</h4><p>评审跑完后可从 8 个维度打分：可执行性、输入依据、人格区分度、刻板印象、结构完整、校准诚实、风险检出、分歧充分。阈值全部开源可查。</p></div>
-          </div>
         </div>
       </div>
 
@@ -267,13 +264,11 @@
           <div class="kw">判断如何被<br><span class="gold">验证</span></div>
         </div>
         <div class="stage-list">
+          <!-- 原来"预测盖时间戳留档"和"真人结果回填"是两张卡，其实是同一条
+               时间线的前后两步，合并成一条不损失信息、少一次视觉跳转 -->
           <div class="stage-item">
             <div class="ico">⏱</div>
-            <div><h4>预测盖时间戳留档</h4><p>评审完成时把每条预测盖上时间戳落库，形成一份可审计记录。</p></div>
-          </div>
-          <div class="stage-item">
-            <div class="ico">↺</div>
-            <div><h4>真人结果回填</h4><p>真人测试跑完后回填真实结果，系统自动比对预测与现实。</p></div>
+            <div><h4>预测留档 · 真人结果回填</h4><p>评审完成时把每条预测盖上时间戳落库；真人测试跑完后回填真实结果，系统自动比对预测与现实。</p></div>
           </div>
           <div class="stage-item">
             <div class="ico">▲</div>
@@ -293,14 +288,14 @@
     <div class="sec-head reveal">
       <h2 class="sec-title">从一句话到结构化报告</h2>
       <p class="sec-desc">全流程自动化，实时推送进度，几分钟拿到发布风险清单。</p>    </div>
+    <!-- 内容密度精简：原 03「评审团分组评审」这一步和 SOLUTION 区块讲的是
+         同一件事，上次只敢先把文案压成一句话，这次直接删掉——机制细节
+         SOLUTION 已经独占展开过，这里不需要再提一遍，哪怕只是一句话。
+         3 步走完"说什么→传什么→拿什么"，中间"怎么评"交给上一个区块。 -->
     <div class="flow">
       <div class="flow-step reveal"><div class="fn">01</div><h4>说人话描述</h4><p>对话式入口，直接说你想评审什么，页面、文案、概念、创业 BP 都行。</p></div>
       <div class="flow-step reveal"><div class="fn">02</div><h4>上传素材</h4><p>文本、截图、demo 图、BP 页面都可以。图片会进视觉模型上下文（需选一个支持视觉的模型）。</p></div>
-      <!-- P1-5：机制细节（分组独立评审/Top-3争议点/改票判定）在 SOLUTION 区块
-           已经逐条展开过一次，这里是第4次重复几乎同一句话，读者会疲劳。
-           改成一句话概括，细节交给 SOLUTION 独占。 -->
-      <div class="flow-step reveal"><div class="fn">03</div><h4>评审团分组评审</h4><p>人格分组独立评审 → 交叉质询 → 结构化输出，全程可追溯（机制细节见上方"判断如何被生成、约束、验证"）。</p></div>
-      <div class="flow-step reveal"><div class="fn">04</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
+      <div class="flow-step reveal"><div class="fn">03</div><h4>拿结构化报告</h4><p>HTML 评价书 + JSON 数据 + Markdown 摘要，实时进度推送。</p></div>
     </div>
   </div>
 </section>

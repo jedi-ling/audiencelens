@@ -228,13 +228,15 @@
 .al-landing .moat{margin-top:20px;padding:16px 20px;border:1px solid rgba(0,113,227,.22);border-radius:12px;background:var(--gold-soft);
   border-radius:0 10px 10px 0;font-size:.9rem;color:var(--text-dim)}
 .al-landing .moat b{color:var(--gold)}
-.al-landing .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+/* 4 步砍到 3 步后改 3 列，避免桌面端留出一列空白 */
+.al-landing .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
 .al-landing .flow-step{position:relative}
 .al-landing .flow-step .fn{font-family:var(--mono);font-size:2.4rem;font-weight:800;
   color:transparent;-webkit-text-stroke:1px rgba(0,113,227,.4);letter-spacing:-.02em;line-height:1;margin-bottom:20px}
 .al-landing .flow-step h4{font-size:1.08rem;font-weight:700;margin-bottom:8px}
 .al-landing .flow-step p{color:var(--text-dim);font-size:.9rem}
-.al-landing .use-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+/* 4 张卡改用 4 列——3 列会在桌面端剩出一张孤儿卡单独占一行 */
+.al-landing .use-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
 /* P1-7：pain-card(36/32)、use-card(30/28)、cap-card(34/30) 三组内边距互相
    只差 2-6px，没有实际功能区分。统一成两档：pain-card 是"强调型"(36/32，
    信息量大、承接痛点)，use-card/cap-card 是"常规型"(28/26)。 */
@@ -252,10 +254,8 @@
 .al-landing .use-card:has(img.ico[style*="display: none"]) img.ico{display:none}
 .al-landing .use-grid > .use-card:nth-of-type(1):has(img.ico[style*="display: none"])::before{content:"🎮"}
 .al-landing .use-grid > .use-card:nth-of-type(2):has(img.ico[style*="display: none"])::before{content:"💰"}
-.al-landing .use-grid > .use-card:nth-of-type(3):has(img.ico[style*="display: none"])::before{content:"🚀"}
-.al-landing .use-grid > .use-card:nth-of-type(4):has(img.ico[style*="display: none"])::before{content:"💡"}
-.al-landing .use-grid > .use-card:nth-of-type(5):has(img.ico[style*="display: none"])::before{content:"📊"}
-.al-landing .use-grid > .use-card:nth-of-type(6):has(img.ico[style*="display: none"])::before{content:"⚔️"}
+.al-landing .use-grid > .use-card:nth-of-type(3):has(img.ico[style*="display: none"])::before{content:"📊"}
+.al-landing .use-grid > .use-card:nth-of-type(4):has(img.ico[style*="display: none"])::before{content:"⚔️"}
 .al-landing .use-card h3{font-size:1.1rem;font-weight:700;margin-bottom:9px}
 .al-landing .use-card p{color:var(--text-dim);font-size:.92rem}
 .al-landing .cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
@@ -348,8 +348,6 @@
   .al-landing .use-grid .use-card:nth-child(3),
   .al-landing .cap-grid .cap-card:nth-child(3){transition-delay:160ms}
   .al-landing .use-grid .use-card:nth-child(4){transition-delay:240ms}
-  .al-landing .use-grid .use-card:nth-child(5){transition-delay:320ms}
-  .al-landing .use-grid .use-card:nth-child(6){transition-delay:400ms}
 }
 
 @media(max-width:920px){.al-landing .pain-grid, .al-landing .use-grid, .al-landing .cap-grid{grid-template-columns:1fr 1fr}

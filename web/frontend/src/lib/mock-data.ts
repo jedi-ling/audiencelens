@@ -645,6 +645,16 @@ export interface Review {
    *  ReviewResponse 的端点都先过 _check_review_owner）。 */
   share_token?: string | null
   shared_at?: string | null
+  /** 功能完整性审查 P1：后端 ReviewResponse 一直有这两个字段，前端类型
+   *  之前没声明，走 v1 客户端（api.ts::fetchReview）的调用方读不到——具体
+   *  后果见 schemas/__init__.py 里 error_message 字段上的注释："引擎写了
+   *  半份报告又失败时 report_json 非空，旧兜底分支不触发，此时唯一能看到
+   *  失败原因的地方就是这个字段"，以及 skill_degraded 上的注释："走 v1
+   *  的用户会以为红队/高级技能正常跑了，静默降级是本仓库要根除的形状"。 */
+  error_message?: string | null
+  skill_degraded?: string | null
+  input_tokens?: number
+  output_tokens?: number
 }
 
 /** GET /api/reviews 的列表项——后端返回的是瘦身字段（见后端

@@ -137,7 +137,7 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col overflow-x-clip" style={{ isolation: 'auto' }}>
+    <div className="min-h-screen bg-black flex flex-col overflow-x-clip" style={{ isolation: 'auto' }}>
       {/* 全页背景图：按路由切换，position:fixed 铺满视口，滚动时纹丝不动。
          只对非 landing 页生效——landing 有自己的视频+粒子背景，不要叠加。
          z-index 0 让所有内容自然压在上面。 */}
@@ -149,7 +149,7 @@ export default function Layout() {
           className="page-bg pointer-events-none"
         />
       )}
-      <header className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-xl backdrop-saturate-180 border-b border-black/[0.06] shrink-0">
+      <header className="sticky top-0 z-50 bg-black/90 backdrop-blur-xl backdrop-saturate-180 border-b border-white/[0.06] shrink-0">
         <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 group shrink-0">
             <span className="logo-shine relative inline-flex h-16 w-[64px] shrink-0 items-center justify-center overflow-hidden">
@@ -403,7 +403,7 @@ export default function Layout() {
       </main>
 
       {!isAskPage && (
-      <footer className="relative border-t border-black/[0.06] py-10 shrink-0">
+      <footer className="relative border-t border-white/[0.06] py-10 shrink-0 bg-black/60 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
             <div className="flex items-center gap-2">
