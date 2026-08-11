@@ -468,6 +468,81 @@ def ablation(task_type, artifact, personas, limit, model, conditions, output_pat
         _print(f"\n结果已保存: {output_path}")
 
 
+@main.command("cross-exam-ablation")
+@click.argument("task_type")
+@click.argument("artifact", type=click.Path(exists=True))
+@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML 路径（默认 game-core）")
+@click.option("--panel", default=None, help="逗号分隔的人格 id，固定面板；不传则按 task_type 自动选人")
+@click.option("--conditions", default="none,moderated,multi_agent", help="逗号分隔的实验条件（必须含 none 基线）")
+@click.option("--output", "output_path", type=click.Path(), default=None, help="结果 JSON 输出路径")
+def cross_exam_ablation(task_type, artifact, personas, panel, conditions, output_path):
+    """交叉质询消融：关掉反驳，报告会变吗？（需 ANTHROPIC_API_KEY）
+
+    人格评审只跑一次、三个条件共用，因此反驳是唯一变量。
+    注意：本实验能证伪（没变=纯成本），不能证实（变了≠变好了）。
+    """
+    import os
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        _print("[red]错误: 交叉质询消融需要 ANTHROPIC_API_KEY，模拟模式下一次反驳都不发[/red]")
+        sys.exit(1)
+
+    from harness.cross_exam_ablation import run_cross_exam_ablation
+
+    artifact_bundle = runner_cli.load_artifact_bundle(artifact)
+    condition_list = [c.strip() for c in conditions.split(",") if c.strip()]
+    panel_ids = [p.strip() for p in panel.split(",") if p.strip()] if panel else None
+
+    _print("\n=== 交叉质询消融实验 ===")
+    _print(f"条件: {condition_list}")
+    _print("[dim]人格评审只跑一次，三个条件共用同一批输出[/dim]\n")
+
+    result = run_cross_exam_ablation(
+        task_type=task_type,
+        artifact_bundle=artifact_bundle,
+        personas_path=personas,
+        selected_personas=panel_ids,
+        conditions=condition_list,
+        progress=lambda cond, info: _print(f"  [{cond}] {info}"),
+    )
+
+    _print(f"\n面板: {result['panel']}")
+    _print(f"争议点: {result['controversy_points_found']} | 相似度方法: {result['similarity_method']}")
+
+    rows = []
+    for cond, m in result["conditions"].items():
+        f = m["priority_fixes"]
+        rows.append((
+            cond, m["cross_exam_mode"], str(f["net_new"]), str(f["dropped"]),
+            f"{f['rank_churn']:.3f}", f"{f['delta_ratio']:.3f}",
+            f"{m['vote_changes']}/{m['suppressed_changes']}",
+            f"{m['cost']['cost_usd']:.4f}",
+        ))
+
+    headers = ["条件", "反驳模式", "新增", "删除", "排序位移", "改动率", "改票/被抑制", "成本$"]
+    if HAS_RICH and console:
+        table = Table(title="相对 none 基线的报告差异")
+        for h, style in zip(headers, ["cyan"] + [None] * 7):
+            table.add_column(h, style=style, justify="left" if style else "right")
+        for r in rows:
+            table.add_row(*r)
+        console.print(table)
+    else:
+        print("\n" + "  ".join(f"{h:>10}" for h in headers))
+        print("-" * 90)
+        for r in rows:
+            print("  ".join(f"{c:>10}" for c in r))
+
+    v = result["verdict"]
+    _print(f"\n[bold]结论[/bold]: {v['headline']}")
+    _print(f"[yellow]{v['caveat']}[/yellow]")
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        _print(f"\n结果已保存: {output_path}")
+
+
 @main.command()
 def version():
     """显示版本信息"""

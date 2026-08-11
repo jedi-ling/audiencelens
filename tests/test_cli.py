@@ -394,6 +394,65 @@ class TestRunPanel:
         assert result["calibration"] is not None
         assert result["cost_summary"]["persona_count"] > 3
 
+    def _panel_run(self, **overrides):
+        kwargs = dict(
+            task_type="concept_review",
+            artifact_bundle=self._rich_bundle(),
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+        )
+        kwargs.update(overrides)
+        return run_panel(**kwargs)
+
+    def test_enable_cross_exam_false_skips_debate_without_touching_panel_size(self):
+        """交叉质询消融的基线依赖这一条：关掉反驳**不能**顺带改人数。
+
+        mode="quick" 同时意味着 3 人 + 不反驳，拿它当基线会让人数和反驳
+        混在一起，实验结论作废。enable_cross_exam=False 必须只动反驳这一项。
+        """
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        baseline = self._panel_run(enable_cross_exam=False)
+        legacy = self._panel_run()
+
+        assert baseline["report"].get("cross_examination") in (None, {}, [])
+        # 人数与不传该参数时一致，且未被截到 quick 档的 3 人
+        assert baseline["cost_summary"]["persona_count"] == legacy["cost_summary"]["persona_count"]
+        assert baseline["cost_summary"]["persona_count"] > 3
+        assert baseline["cost_summary"]["cross_exam"]["calls"] == 0
+
+    def test_enable_cross_exam_overrides_mode(self):
+        """显式开关优先于档位：full 档也能单独把反驳关掉。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = self._panel_run(mode="full", enable_cross_exam=False)
+        assert result["cost_summary"]["cross_exam"]["calls"] == 0
+
+    def test_enable_cross_exam_none_preserves_legacy_behavior(self):
+        """None（默认）必须与完全不传该参数等价，否则是行为回归。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        explicit = self._panel_run(enable_cross_exam=None)
+        implicit = self._panel_run()
+        assert (
+            explicit["report"].get("cross_examination")
+            == implicit["report"].get("cross_examination")
+        )
+
+    def test_run_panel_exposes_persona_outputs_for_reuse(self):
+        """消融实验要在同一批人格输出上分叉反驳条件，需要原件而非 persona_notes。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = self._panel_run()
+        outputs = result["persona_outputs"]
+        assert len(outputs) == result["cost_summary"]["persona_count"]
+        # persona_notes 是渲染子集，缺 severity；原件必须带得动二次分析
+        assert all("key_issues" in o for o in outputs)
+        assert len(result["panel_personas"]) >= len(outputs)
+
     def test_selected_personas_with_no_match_falls_back_to_auto_select(self, sample_artifact_bundle):
         """id 全部拼错/串包时不能跑出一个空面板——静默回落到自动选人。"""
         os.environ.pop("ANTHROPIC_API_KEY", None)

@@ -18,21 +18,40 @@ const navItems = [
   { path: '/settings', label: '设置' },
 ]
 
-/** 全页背景图映射。landing 走自己的视频背景，不在这里管。
- * 这里用的是精确匹配——子路由（/review/new）需要单独挂一份 */
-const ROUTE_BG: Record<string, string> = {
-  '/ask': '/images/bg-ask.png',
-  '/history': '/images/bg-history.png',
-  '/ledger': '/images/bg-ledger.png',
-  '/settings': '/images/bg-settings.png',
-  '/tutorial': '/images/bg-tutorial.png',
-  '/skills': '/images/bg-skills.png',
-  '/task-types': '/images/bg-task-types.png',
-  '/personas': '/images/bg-personas.png',
-  '/plans': '/images/bg-plans.png',
-  '/login': '/images/bg-login.png',
-  '/register': '/images/bg-register.png',
-  '/review/new': '/images/bg-review-new.png',
+/** 全页背景图映射：13 个路由循环复用 4 张高质量素材图。
+ * 顺序按路由的"视觉重要度"排列——重要的页面（/ask、/review/new）放差异化图片，
+ * 辅助页面循环复用。landing 走自己的视频背景，这里不管。
+ * 数组里的索引决定哪张图被分配给哪个路由——按调用顺序循环取。 */
+const BG_POOL = [
+  '/images/bg-1.png',
+  '/images/bg-2.png',
+  '/images/bg-3.png',
+  '/images/bg-4.png',
+]
+
+/** 哪些路由需要显示背景图——按路由顺序定义，自然循环复用 4 张图 */
+const ROUTES_WITH_BG: readonly string[] = [
+  '/ask',
+  '/history',
+  '/ledger',
+  '/settings',
+  '/tutorial',
+  '/skills',
+  '/task-types',
+  '/personas',
+  '/plans',
+  '/login',
+  '/register',
+  '/review/new',
+]
+
+/** 根据路径返回对应的背景图 URL。
+ * 路径不在白名单里就返回 undefined（不显示背景）。
+ * 同样路径返回同一张图，避免切换路由时图突变。 */
+function getBgForRoute(path: string): string | undefined {
+  const idx = ROUTES_WITH_BG.indexOf(path)
+  if (idx === -1) return undefined
+  return BG_POOL[idx % BG_POOL.length]
 }
 
 // 这里曾有一条 { path: '/evaluations', label: '评估报告' } 的次级导航。
@@ -137,13 +156,13 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen bg-black flex flex-col overflow-x-clip" style={{ isolation: 'auto' }}>
+    <div className="min-h-screen flex flex-col overflow-x-clip relative" style={{ isolation: 'auto' }}>
       {/* 全页背景图：按路由切换，position:fixed 铺满视口，滚动时纹丝不动。
          只对非 landing 页生效——landing 有自己的视频+粒子背景，不要叠加。
-         z-index 0 让所有内容自然压在上面。 */}
-      {location.pathname !== '/' && ROUTE_BG[location.pathname] && (
+         z-index -1 让它落在所有内容之下。 */}
+      {location.pathname !== '/' && getBgForRoute(location.pathname) && (
         <img
-          src={ROUTE_BG[location.pathname]}
+          src={getBgForRoute(location.pathname)}
           alt=""
           aria-hidden="true"
           className="page-bg pointer-events-none"
@@ -398,7 +417,7 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="flex-1">
+      <main className="flex-1 relative z-[1]">
         <Outlet />
       </main>
 

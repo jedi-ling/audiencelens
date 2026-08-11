@@ -739,6 +739,7 @@ def run_panel(
     api_base: Optional[str] = None,
     selected_personas: Optional[List[str]] = None,
     mode: Optional[str] = None,
+    enable_cross_exam: Optional[bool] = None,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -765,7 +766,15 @@ def run_panel(
     调用）。**mode=None 在这一项上不等价于 full**：它走 DEFAULT_CROSS_EXAM_MODE，
     即较省的仲裁式一档，与 v1 后端默认一致——不能让没做选择的 CLI/MCP 用户默认
     掉进最贵的路径。想要多智能体反驳必须显式传 mode="full"。
-    没有 api_key 的模拟模式下一次反驳调用都不发，如实标成派生摘要。"""
+    没有 api_key 的模拟模式下一次反驳调用都不发，如实标成派生摘要。
+
+    enable_cross_exam：显式覆盖"跑不跑交叉质询"，优先级高于 mode。None（默认）
+    完全保持既有行为——由 mode 决定，不传 mode 就跑。传 False 时无论哪一档都不发
+    反驳调用，且**不影响人数**：mode 的 max_personas 截断与这一项无关。
+    加它是因为这两件事在 REVIEW_MODE_CONFIG 里被绑成了一档（quick 同时意味着
+    3 人 + 不反驳），想单独关掉反驳而保持人数不变，此前没有任何入口。
+    交叉质询消融实验（src/harness/cross_exam_ablation.py）依赖这一点取得基线：
+    人数一起变的话，三档之间的差异里人数和反驳无法分离。"""
     if task_type not in VALID_TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
 
@@ -1007,7 +1016,11 @@ def run_panel(
         )
         logging.getLogger("audiencelens").warning(budget_notice)
 
-    cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
+    # 显式开关优先于档位：enable_cross_exam=None 时才回退到 mode 的决定（既有行为）
+    if enable_cross_exam is not None:
+        cross_exam_enabled = bool(enable_cross_exam)
+    else:
+        cross_exam_enabled = mode_config["cross_examination"] if mode_config else True
     cross_exam_data = None
     # 交叉质询的用量单独记一份：它是人格评审之外新增的付费调用，必须并进 cost_summary
     cross_exam_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
@@ -1210,6 +1223,13 @@ def run_panel(
         "html": html,
         "calibration": calibration,
         "simulated": simulated,
+        # 通过校验的人格原始输出。report.persona_notes 是渲染用的子集，字段不全，
+        # 拿它做二次分析会少掉 key_issues 的 severity 等字段。
+        # 交叉质询消融要在同一批人格输出上分叉出多种反驳条件（人格评审只跑一次），
+        # 需要的就是这份原件。
+        "persona_outputs": persona_outputs,
+        # 同一批输出对应的人格 YAML 定义，反驳轮渲染身份卡要用
+        "panel_personas": valid_personas,
         # 降级标记也放顶层：调用方在落库前就能判断要不要提示用户 / 要不要按满额计费
         "degraded": degraded,
         "failed_personas": failed_personas,

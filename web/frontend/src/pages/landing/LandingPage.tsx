@@ -58,9 +58,19 @@ export default function LandingPage() {
       heroVideo.load()
     } else {
       const onVideoCanPlay = () => { heroVideo?.play().catch(() => {}) }
+      // 部分浏览器（尤其 Chrome）在 <video loop> 走到末尾时偶尔会停顿
+      // 一帧再循环，肉眼像"卡了一下"。这里用 ended 兜底重置 currentTime，
+      // 强制从头开始，避免黑帧出现。
+      const onVideoEnded = () => {
+        if (!heroVideo) return
+        heroVideo.currentTime = 0
+        heroVideo.play().catch(() => {})
+      }
       heroVideo?.addEventListener('canplay', onVideoCanPlay)
+      heroVideo?.addEventListener('ended', onVideoEnded)
       heroVideo?.play().catch(() => {})
       cleanups.push(() => heroVideo?.removeEventListener('canplay', onVideoCanPlay))
+      cleanups.push(() => heroVideo?.removeEventListener('ended', onVideoEnded))
     }
 
     // 统一链接拦截：# 锚点页内平滑滚动；/ 开头内部路由走 SPA；http/_blank 外链放行

@@ -19,7 +19,17 @@ from app.config import settings
 from app.core.errors import BadRequest, NotFound
 from app.db import get_db
 from app.deps import rate_limit, require_admin
-from app.models import Job, Judgment, Review, UsageRecord, User
+from app.models import (
+    CdkCode,
+    CdkRedemption,
+    CreditLedger,
+    Job,
+    Judgment,
+    Review,
+    UsageRecord,
+    User,
+    UserApiKey,
+)
 from app.services import (
     admin_settings_service,
     audit_log_service,
@@ -150,6 +160,202 @@ async def timeseries(days: int = 14, db: Session = Depends(get_db)):
             }
         )
     return {"days": days, "series": series}
+
+
+# ---------------- 运营健康（成功率 / 耗时 / 卡死）----------------
+#
+# timeseries 回答"跑了多少、花了多少钱"，这一段回答"跑得好不好"。
+# 两者刻意分开：前者是业务量，后者是系统健康度，看板上也该是两张图。
+
+# 一个任务在 queued/running 待多久算"卡死"。默认 30 分钟——
+# 一次评审要调数十次 LLM，正常也可能跑几分钟，阈值太小会天天误报。
+STUCK_MINUTES_DEFAULT = 30
+
+
+def _as_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """库里存的是 naive UTC（见 models 的 default=datetime.now(timezone.utc)，
+    SQLite 落盘时丢时区）。跟 aware 的 now() 相减前必须补回 tzinfo，否则 TypeError。"""
+    if dt is None:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _percentile(sorted_values: list, pct: float) -> Optional[float]:
+    """最近秩法。刻意不引入 numpy/statistics.quantiles——
+    这里只喂看板，样本量小的时候插值法反而让人以为精度比实际高。"""
+    if not sorted_values:
+        return None
+    k = max(0, min(len(sorted_values) - 1, int(round(pct / 100.0 * len(sorted_values) + 0.5)) - 1))
+    return round(float(sorted_values[k]), 2)
+
+
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+_NUM_RE = re.compile(r"\d+")
+
+
+def _error_signature(msg: Optional[str]) -> str:
+    """把错误消息归一成"同一类错误"的签名，好让 Top 榜真的能聚起来。
+
+    不归一的话，每条消息里的 review_id / 行号 / 耗时都不一样，
+    N 次同类故障会散成 N 个只出现 1 次的条目，榜单等于没有。
+    """
+    if not msg:
+        return "(无错误消息)"
+    s = _UUID_RE.sub("<id>", msg.strip())
+    s = _NUM_RE.sub("<n>", s)
+    return s[:160]
+
+
+@router.get("/stats/health")
+async def stats_health(
+    days: int = 14,
+    stuck_minutes: int = STUCK_MINUTES_DEFAULT,
+    db: Session = Depends(get_db),
+):
+    """系统健康度：按天成功率 + 评审耗时分位数 + 当前卡死的任务。
+
+    卡死的定义是"状态还停在 queued/running，但创建时间已超过阈值"。
+    进程内队列（InProcessBackend）在进程重启后不会自动把这些行推进到终态——
+    启动时的孤儿清理只覆盖启动那一刻，之后再卡住就没人管了，只能靠这里看见。
+    """
+    days = max(1, min(days, 90))
+    stuck_minutes = max(1, min(stuck_minutes, 60 * 24))
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+
+    by_day: dict = {}
+    durations: list = []
+    for created_at, completed_at, status in db.query(
+        Review.created_at, Review.completed_at, Review.status
+    ).filter(Review.created_at >= since).all():
+        c = _as_utc(created_at)
+        if c is None:
+            continue
+        bucket = by_day.setdefault(c.date().isoformat(), {"completed": 0, "failed": 0, "other": 0})
+        if status == "completed":
+            bucket["completed"] += 1
+            done = _as_utc(completed_at)
+            if done is not None:
+                secs = (done - c).total_seconds()
+                # 负数只可能来自时钟回拨或脏数据；混进分位数会把 P50 拉歪
+                if secs >= 0:
+                    durations.append(secs)
+        elif status == "failed":
+            bucket["failed"] += 1
+        else:
+            bucket["other"] += 1
+
+    series = []
+    for i in range(days + 1):
+        day = (since + timedelta(days=i)).date().isoformat()
+        b = by_day.get(day, {"completed": 0, "failed": 0, "other": 0})
+        settled = b["completed"] + b["failed"]
+        series.append(
+            {
+                "date": day,
+                "completed": b["completed"],
+                "failed": b["failed"],
+                "running": b["other"],
+                # 没有已结束的评审时是 None 而不是 100——
+                # 那天没跑过任何东西，不该在图上画成一条漂亮的满分线
+                "success_rate": round(b["completed"] / settled, 4) if settled else None,
+            }
+        )
+
+    durations.sort()
+    stuck_before = now - timedelta(minutes=stuck_minutes)
+    stuck_rows = (
+        db.query(Job)
+        .filter(Job.status.in_(["queued", "running"]), Job.created_at <= stuck_before)
+        .order_by(Job.created_at.asc())
+        .limit(50)
+        .all()
+    )
+
+    settled_total = sum(s["completed"] + s["failed"] for s in series)
+    failed_total = sum(s["failed"] for s in series)
+    return {
+        "days": days,
+        "series": series,
+        "totals": {
+            "completed": sum(s["completed"] for s in series),
+            "failed": failed_total,
+            "success_rate": round((settled_total - failed_total) / settled_total, 4)
+            if settled_total
+            else None,
+        },
+        "duration_seconds": {
+            "sample_size": len(durations),
+            "p50": _percentile(durations, 50),
+            "p95": _percentile(durations, 95),
+            "avg": round(sum(durations) / len(durations), 2) if durations else None,
+            "max": round(durations[-1], 2) if durations else None,
+        },
+        "stuck": {
+            "threshold_minutes": stuck_minutes,
+            "count": len(stuck_rows),
+            "jobs": [
+                {
+                    **_job_row(j),
+                    "stuck_minutes": int((now - _as_utc(j.created_at)).total_seconds() // 60),
+                }
+                for j in stuck_rows
+            ],
+        },
+    }
+
+
+@router.get("/stats/jobs")
+async def stats_jobs(days: int = 14, db: Session = Depends(get_db)):
+    """任务队列的聚合视图：状态分布 + 失败原因 Top 榜 + 执行耗时。
+
+    /jobs 是逐条日志流，出事时你得自己往下翻。这条是"翻之前先看哪儿"。
+    """
+    days = max(1, min(days, 90))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    by_status = dict(
+        db.query(Job.status, func.count(Job.id))
+        .filter(Job.created_at >= since)
+        .group_by(Job.status)
+        .all()
+    )
+    by_kind = dict(
+        db.query(Job.kind, func.count(Job.id))
+        .filter(Job.created_at >= since)
+        .group_by(Job.kind)
+        .all()
+    )
+
+    reasons: dict = {}
+    for (msg,) in db.query(Job.error_message).filter(
+        Job.created_at >= since, Job.status == "failed"
+    ).all():
+        sig = _error_signature(msg)
+        slot = reasons.setdefault(sig, {"signature": sig, "count": 0, "sample": msg})
+        slot["count"] += 1
+
+    runtimes = []
+    for started_at, finished_at in db.query(Job.started_at, Job.finished_at).filter(
+        Job.created_at >= since, Job.started_at.isnot(None), Job.finished_at.isnot(None)
+    ).all():
+        s, f = _as_utc(started_at), _as_utc(finished_at)
+        if s and f and (f - s).total_seconds() >= 0:
+            runtimes.append((f - s).total_seconds())
+    runtimes.sort()
+
+    return {
+        "days": days,
+        "by_status": {k: int(v) for k, v in by_status.items()},
+        "by_kind": {k: int(v) for k, v in by_kind.items()},
+        "failure_reasons": sorted(reasons.values(), key=lambda r: -r["count"])[:10],
+        "runtime_seconds": {
+            "sample_size": len(runtimes),
+            "p50": _percentile(runtimes, 50),
+            "p95": _percentile(runtimes, 95),
+            "max": round(runtimes[-1], 2) if runtimes else None,
+        },
+    }
 
 
 # ============================== 判断复利（跨用户聚合） ==============================
@@ -406,6 +612,75 @@ async def list_cdk(
     return cdk_service.list_codes(db, status=status, limit=min(limit, 200), offset=offset)
 
 
+@router.get("/cdk/redemptions")
+async def list_cdk_redemptions(
+    code: Optional[str] = None,
+    user_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """谁在什么时候兑了哪个码、拿到多少次数。
+
+    在此之前 CdkRedemption 表只被 cdk_service（去重）和 user_data_service
+    （用户自己导出数据）读过，后台一条都看不到——运营只能看见 used_count 这个
+    数字，"我兑了码但没到账"这类客诉完全没法查。
+
+    带上 credit_ledger 里对应的入账行：兑换记录存在、但流水没进账，
+    正是"码用掉了次数没到"的形态，两边并排放才看得出来。
+    """
+    q = (
+        db.query(CdkRedemption, CdkCode.code, CdkCode.note, User.email)
+        .join(CdkCode, CdkCode.id == CdkRedemption.code_id)
+        # outer join：匿名兑换（guest token）的 user_id 不在 users 表里，
+        # 用 inner join 会把这批记录整个吞掉——而它们恰恰是最容易出问题的一批
+        .outerjoin(User, User.id == CdkRedemption.user_id)
+    )
+    if code:
+        q = q.filter(CdkCode.code == code.strip().upper())
+    if user_id:
+        q = q.filter(CdkRedemption.user_id == user_id.strip())
+
+    total = q.count()
+    rows = (
+        q.order_by(CdkRedemption.created_at.desc())
+        .offset(max(offset, 0))
+        .limit(min(limit, 200))
+        .all()
+    )
+
+    ledger_by_user_code: dict = {}
+    if rows:
+        pairs = {(r.user_id, r.code_id) for r, _, _, _ in rows}
+        for uid, ref, delta in db.query(
+            CreditLedger.user_id, CreditLedger.ref_id, func.coalesce(func.sum(CreditLedger.delta), 0)
+        ).filter(
+            CreditLedger.reason == "cdk_redeem",
+            CreditLedger.user_id.in_({u for u, _ in pairs}),
+        ).group_by(CreditLedger.user_id, CreditLedger.ref_id).all():
+            ledger_by_user_code[(uid, ref)] = int(delta or 0)
+
+    return {
+        "total": total,
+        "offset": offset,
+        "redemptions": [
+            {
+                "id": r.id,
+                "code": code_str,
+                "code_id": r.code_id,
+                "note": note,
+                "user_id": r.user_id,
+                "user_email": email,  # None = 匿名/访客兑换，或用户已注销
+                "credits": r.credits,
+                # 对不上就是有问题：这一列存在的全部意义就是让"没到账"能被一眼看见
+                "credited_in_ledger": ledger_by_user_code.get((r.user_id, r.code_id)),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r, code_str, note, email in rows
+        ],
+    }
+
+
 @router.put("/cdk/{code_id}/disable")
 async def disable_cdk(code_id: str, db: Session = Depends(get_db)):
     if not cdk_service.disable_code(db, code_id):
@@ -463,6 +738,8 @@ class UserUpdate(BaseModel):
 @router.get("/users")
 async def list_users(
     q: Optional[str] = None,
+    sort: str = "created_at",
+    order: str = "desc",
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -472,7 +749,22 @@ async def list_users(
     if q:
         query = query.filter(User.email.contains(q.strip().lower()))
     total = query.count()
-    rows = query.order_by(User.created_at.desc()).offset(max(offset, 0)).limit(min(limit, 200)).all()
+
+    # 排序只允许 User 表自己的列。reviews_total / cost_usd_total 是在 Python 里
+    # 聚合出来的，只覆盖当前这一页——按它们排序会得到"页内有序、跨页乱序"的结果，
+    # 比不能排序更容易误导人。要按用量排全局，得先把聚合下推到 SQL。
+    sortable = {
+        "created_at": User.created_at,
+        "email": User.email,
+        "plan": User.plan,
+        "is_active": User.is_active,
+    }
+    col = sortable.get((sort or "created_at").strip())
+    if col is None:
+        raise BadRequest(f"不支持按 {sort} 排序，可选：{', '.join(sortable)}")
+    query = query.order_by(col.asc() if order == "asc" else col.desc())
+
+    rows = query.offset(max(offset, 0)).limit(min(limit, 200)).all()
 
     user_ids = [u.id for u in rows]
     review_counts: dict = {}
@@ -523,6 +815,101 @@ async def list_users(
             }
             for u in rows
         ],
+    }
+
+
+@router.get("/users/{user_id}")
+async def user_detail(user_id: str, db: Session = Depends(get_db)):
+    """单个用户的全景：评审、用量按 key 来源拆分、BYOK 密钥、次数余额、兑换记录。
+
+    列表页只能回答"这个人跑了多少、花了多少"。出问题时要问的是更细的：
+    他用的是自己的 key 还是平台的？余额对不对得上兑换记录？最近几次是不是都失败了？
+    这些以前只能连数据库查。
+
+    **不返回任何密钥内容**——只返回 key_masked（本来就是给前端回显的字段）
+    和 provider/last_used_at。密文永远不出这台机器。
+    """
+    u = db.get(User, user_id)
+    if not u:
+        raise NotFound("用户不存在")
+
+    review_status = dict(
+        db.query(Review.status, func.count(Review.id))
+        .filter(Review.user_id == user_id)
+        .group_by(Review.status)
+        .all()
+    )
+    recent_reviews = (
+        db.query(Review)
+        .filter(Review.user_id == user_id)
+        .order_by(Review.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    usage_by_source = [
+        {
+            "key_source": src or "(未记录)",
+            "count": int(cnt or 0),
+            "cost_usd": round(float(cost or 0.0), 4),
+            "input_tokens": int(in_tok or 0),
+            "output_tokens": int(out_tok or 0),
+        }
+        for src, cnt, cost, in_tok, out_tok in db.query(
+            UsageRecord.key_source,
+            func.count(UsageRecord.id),
+            func.coalesce(func.sum(UsageRecord.cost_usd), 0.0),
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.output_tokens), 0),
+        )
+        .filter(UsageRecord.user_id == user_id)
+        .group_by(UsageRecord.key_source)
+        .all()
+    ]
+
+    keys = [
+        {
+            "provider": k.provider,
+            "model": k.model,
+            "api_base": k.api_base,
+            "key_masked": k.key_masked,
+            "is_active": k.is_active,
+            "created_at": k.created_at.isoformat() if k.created_at else None,
+            "last_used_at": k.last_used_at.isoformat() if k.last_used_at else None,
+        }
+        for k in db.query(UserApiKey).filter(UserApiKey.user_id == user_id).all()
+    ]
+
+    redemptions = [
+        {
+            "code": code_str,
+            "credits": r.credits,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r, code_str in db.query(CdkRedemption, CdkCode.code)
+        .join(CdkCode, CdkCode.id == CdkRedemption.code_id)
+        .filter(CdkRedemption.user_id == user_id)
+        .order_by(CdkRedemption.created_at.desc())
+        .all()
+    ]
+
+    return {
+        "id": u.id,
+        "email": u.email,
+        "display_name": u.display_name,
+        "plan": u.plan,
+        "is_active": u.is_active,
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+        "token_quota_total": u.token_quota_total,
+        "reviews": {
+            "by_status": {k: int(v) for k, v in review_status.items()},
+            "total": sum(int(v) for v in review_status.values()),
+            "recent": [_review_row(r) for r in recent_reviews],
+        },
+        "usage_by_key_source": usage_by_source,
+        "api_keys": keys,
+        "credit_balance": cdk_service.credit_balance(db, user_id),
+        "cdk_redemptions": redemptions,
     }
 
 
@@ -709,6 +1096,90 @@ async def job_detail(job_id: str, db: Session = Depends(get_db)):
         "payload": j.payload,
         "started_at": j.started_at.isoformat() if j.started_at else None,
     }
+
+
+# ---------------- 任务的两个运维操作 ----------------
+#
+# 刻意**没有**「重试」：enqueue_review 只把 {"key_source": ...} 写进 payload，
+# API key 是显式传参、绝不落库的（review_service.py 里那段注释解释了原因——
+# 多 worker 并发时用环境变量注入会在用户之间串 key）。后台手上没有密钥，
+# 重试必然当场失败，加一个注定失败的按钮比没有按钮更糟。
+# 用户要重跑，走产品前端重新发起一次（那条路上有他自己的 key）。
+
+TERMINAL_JOB_STATUSES = ("done", "failed", "cancelled")
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str, db: Session = Depends(get_db)):
+    """取消尚未开始的任务。
+
+    只对 queued 生效：InProcessBackend 用线程池，已经在跑的线程杀不掉
+    （Python 没有安全的线程中断）。对 running 返回 400 并指向 force-fail，
+    而不是假装取消成功——那会让 UI 显示"已取消"而任务还在烧钱。
+    """
+    from app.services import job_service
+
+    j = db.get(Job, job_id)
+    if not j:
+        raise NotFound("任务不存在")
+    if j.status in TERMINAL_JOB_STATUSES:
+        raise BadRequest(f"任务已是终态（{j.status}），无需取消")
+    if j.status == "running":
+        raise BadRequest(
+            "任务已在执行中，进程内队列无法中断正在运行的线程。"
+            "若确认它已卡死，请用「标记为失败」。"
+        )
+
+    backend_cancelled = job_service.get_backend().cancel(job_id)
+    db.refresh(j)
+    # backend.cancel 只有在 future 还没被线程池取走时才返回 True。
+    # 返回 False 也要把库里的状态推到终态：不然这一行会永远停在 queued，
+    # 既污染统计，也让"卡死任务"面板长期挂着一条永远不会动的记录。
+    if j.status not in TERMINAL_JOB_STATUSES:
+        j.status = "cancelled"
+        j.finished_at = datetime.now(timezone.utc)
+        db.commit()
+
+    audit_log_service.record(
+        db, "job.cancel", job_id, {"backend_cancelled": backend_cancelled, "kind": j.kind}
+    )
+    return {**_job_row(j), "backend_cancelled": backend_cancelled}
+
+
+@router.post("/jobs/{job_id}/force-fail")
+async def force_fail_job(job_id: str, db: Session = Depends(get_db)):
+    """把卡死的任务强制推到 failed。
+
+    这不会真的停下后台线程（停不了）——它做的是把库里那行推到终态，
+    于是：统计不再被一条永远 running 的记录污染，关联评审也不再卡在
+    "进行中"让用户干等。若线程其实还活着并最终跑完，_finish_job 会把
+    状态改回 done，这是可接受的：终态被更正总好过永远没有终态。
+    """
+    j = db.get(Job, job_id)
+    if not j:
+        raise NotFound("任务不存在")
+    if j.status in TERMINAL_JOB_STATUSES:
+        raise BadRequest(f"任务已是终态（{j.status}）")
+
+    prev = j.status
+    j.status = "failed"
+    j.finished_at = datetime.now(timezone.utc)
+    j.error_message = "管理员标记为失败（任务卡死，无终态回写）"
+
+    # 关联评审一并推到终态——否则用户前端会一直转圈等一个永远不来的结果
+    review_updated = None
+    if j.kind == "review" and j.ref_id:
+        r = db.get(Review, j.ref_id)
+        if r is not None and r.status not in ("completed", "failed"):
+            r.status = "failed"
+            r.error_message = "任务卡死，已由管理员终止"
+            review_updated = r.id
+    db.commit()
+
+    audit_log_service.record(
+        db, "job.force_fail", job_id, {"from": prev, "review_updated": review_updated}
+    )
+    return {**_job_row(j), "review_updated": review_updated}
 
 
 def _review_row(r: Review) -> dict:

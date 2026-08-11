@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, Users } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
-import type { AdminUser } from '@/lib/types'
+import type { AdminUser, AdminUserSortField } from '@/lib/types'
 import { Pager } from './Pager'
+import { UserDetailDrawer } from './UserDetailDrawer'
 
 const PAGE_SIZE = 20
 /* 兜底列表：套餐真实清单以 /api/admin/plans 为准（挂载后拉取覆盖），
@@ -18,6 +19,9 @@ export function UsersPanel() {
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [planOptions, setPlanOptions] = useState<string[]>(PLAN_OPTIONS_FALLBACK)
+  const [sort, setSort] = useState<AdminUserSortField>('created_at')
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc')
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   // 套餐清单从 /api/admin/plans 拉，和 PlansPanel 同一事实源；失败就保持兜底列表
   useEffect(() => {
@@ -33,17 +37,31 @@ export function UsersPanel() {
 
   const load = useCallback(async () => {
     try {
-      const result = await adminApi.listUsers({ q: q || undefined, limit: PAGE_SIZE, offset })
+      const result = await adminApi.listUsers({
+        q: q || undefined,
+        limit: PAGE_SIZE,
+        offset,
+        sort,
+        order,
+      })
       setUsers(result.users)
       setTotal(result.total)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
-  }, [q, offset])
+  }, [q, offset, sort, order])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  function applySort(field: AdminUserSortField) {
+    // 换列时回到 desc；同列再点翻转。切列必须回第一页——
+    // 排序变了 offset 还停在第 3 页，看到的会是一段毫无意义的中间切片。
+    setOrder(sort === field && order === 'desc' ? 'asc' : 'desc')
+    setSort(field)
+    setOffset(0)
+  }
 
   const update = async (
     id: string,
@@ -83,14 +101,21 @@ export function UsersPanel() {
         <table className="w-full text-left font-mono text-xs">
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-text-muted">
-              <th className="py-2 pr-3 font-normal">邮箱</th>
-              <th className="py-2 pr-3 font-normal">套餐</th>
+              <SortableTh field="email" sort={sort} order={order} onSort={applySort}>邮箱</SortableTh>
+              <SortableTh field="plan" sort={sort} order={order} onSort={applySort}>套餐</SortableTh>
+              {/* 评审数 / 成本 / Token 刻意不可排序：它们是在 Python 里按当前页聚合出来的，
+                  按它们排序只会得到"页内有序、跨页乱序"，比不能排更容易误导人。
+                  要按用量排全局，得先把聚合下推到 SQL。后端对这些列直接返 400。 */}
               <th className="py-2 pr-3 font-normal">评审数</th>
               <th className="py-2 pr-3 font-normal">累计成本</th>
               <th className="py-2 pr-3 font-normal">累计 Token</th>
               <th className="py-2 pr-3 font-normal" title="留空=跟随全局 AL_QUOTA_TOKENS_TOTAL">体验额度</th>
-              <th className="py-2 pr-3 font-normal">注册时间</th>
-              <th className="py-2 font-normal">状态</th>
+              <SortableTh field="created_at" sort={sort} order={order} onSort={applySort}>
+                注册时间
+              </SortableTh>
+              <SortableTh field="is_active" sort={sort} order={order} onSort={applySort} last>
+                状态
+              </SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -101,8 +126,14 @@ export function UsersPanel() {
             )}
             {users.map((u) => (
               <tr key={u.id} className={u.is_active ? '' : 'opacity-50'}>
-                <td className="max-w-[200px] truncate py-2 pr-3 text-text-primary" title={u.email}>
-                  {u.email}
+                <td className="max-w-[200px] py-2 pr-3">
+                  <button
+                    onClick={() => setDetailId(u.id)}
+                    title={`${u.email} · 点击查看详情`}
+                    className="block w-full truncate text-left text-text-primary underline decoration-border underline-offset-2 transition-colors hover:text-brand-primary hover:decoration-brand-primary"
+                  >
+                    {u.email}
+                  </button>
                 </td>
                 <td className="py-2 pr-3">
                   <select
@@ -173,6 +204,45 @@ export function UsersPanel() {
       </div>
 
       <Pager total={total} offset={offset} pageSize={PAGE_SIZE} onChange={setOffset} />
+
+      {detailId && <UserDetailDrawer userId={detailId} onClose={() => setDetailId(null)} />}
     </section>
+  )
+}
+
+/** 可排序表头。同一列再点一次翻转方向；换列时回到 desc（新手最常想看"最新/最多"）。 */
+function SortableTh({
+  field,
+  sort,
+  order,
+  onSort,
+  last,
+  children,
+}: {
+  field: AdminUserSortField
+  sort: AdminUserSortField
+  order: 'asc' | 'desc'
+  onSort: (f: AdminUserSortField) => void
+  last?: boolean
+  children: React.ReactNode
+}) {
+  const active = sort === field
+  return (
+    <th className={`py-2 font-normal ${last ? '' : 'pr-3'}`}>
+      <button
+        onClick={() => onSort(field)}
+        className={`flex items-center gap-1 transition-colors hover:text-brand-primary ${
+          active ? 'text-brand-primary' : ''
+        }`}
+      >
+        {children}
+        {active &&
+          (order === 'asc' ? (
+            <ArrowUp className="h-3 w-3" strokeWidth={2} />
+          ) : (
+            <ArrowDown className="h-3 w-3" strokeWidth={2} />
+          ))}
+      </button>
+    </th>
   )
 }

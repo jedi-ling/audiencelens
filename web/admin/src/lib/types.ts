@@ -295,3 +295,116 @@ export interface AdminCostStats {
     records: number
   }>
 }
+
+// ---------- 运营健康 / 任务聚合 / 兑换记录 / 用户详情 ----------
+//
+// 与上面「统计分析」那批的区别：那批回答"跑了多少"，这批回答"跑得好不好、
+// 出事时去哪儿看"。字段名与 app/api/admin.py 里对应端点的返回一一对应，
+// 改名要两边一起改。
+
+/** 分位数在样本为空时是 null，不是 0——0 会被图表画成一根真实存在的柱子。 */
+export interface AdminPercentiles {
+  sample_size: number
+  p50: number | null
+  p95: number | null
+  avg?: number | null
+  max: number | null
+}
+
+export interface AdminHealthPoint {
+  date: string
+  completed: number
+  failed: number
+  running: number
+  /** null = 当天没有已结束的评审。不要在前端 ?? 0 —— 那会把空白天画成 0% 崩溃日 */
+  success_rate: number | null
+}
+
+export interface AdminStuckJob extends AdminJob {
+  stuck_minutes: number
+}
+
+export interface AdminHealth {
+  days: number
+  series: AdminHealthPoint[]
+  totals: { completed: number; failed: number; success_rate: number | null }
+  duration_seconds: AdminPercentiles
+  stuck: { threshold_minutes: number; count: number; jobs: AdminStuckJob[] }
+}
+
+export interface AdminJobFailureReason {
+  /** 归一化后的错误签名（UUID/数字已替换），用于把同类故障聚成一条 */
+  signature: string
+  count: number
+  sample: string | null
+}
+
+export interface AdminJobStats {
+  days: number
+  by_status: Record<string, number>
+  by_kind: Record<string, number>
+  failure_reasons: AdminJobFailureReason[]
+  runtime_seconds: AdminPercentiles
+}
+
+export interface AdminCdkRedemption {
+  id: string
+  code: string
+  code_id: string
+  note: string | null
+  user_id: string
+  /** null = 访客兑换（user_id 不在 users 表里）或用户已注销 */
+  user_email: string | null
+  credits: number
+  /** credit_ledger 里对应的入账量。与 credits 对不上就是"兑了没到账" */
+  credited_in_ledger: number | null
+  created_at: string | null
+}
+
+export interface AdminCdkRedemptionList {
+  total: number
+  offset: number
+  redemptions: AdminCdkRedemption[]
+}
+
+export interface AdminUsageBySource {
+  key_source: string
+  count: number
+  cost_usd: number
+  input_tokens: number
+  output_tokens: number
+}
+
+/** 只有脱敏回显，永远没有密文——后端刻意不返回 key_ciphertext */
+export interface AdminUserKeyRow {
+  provider: string
+  model: string | null
+  api_base: string | null
+  key_masked: string
+  is_active: boolean
+  created_at: string | null
+  last_used_at: string | null
+}
+
+export interface AdminUserDetail {
+  id: string
+  email: string
+  display_name: string | null
+  plan: string
+  is_active: boolean
+  created_at: string | null
+  token_quota_total: number | null
+  reviews: {
+    by_status: Record<string, number>
+    total: number
+    recent: AdminReviewRow[]
+  }
+  usage_by_key_source: AdminUsageBySource[]
+  api_keys: AdminUserKeyRow[]
+  credit_balance: number
+  cdk_redemptions: Array<{ code: string; credits: number; created_at: string | null }>
+}
+
+/** /users 支持的排序列。聚合列（评审数/成本）刻意不在内——它们只在当前页内聚合，
+ *  按它们排会得到"页内有序、跨页乱序"，比不能排更误导人。后端会 400。 */
+export type AdminUserSortField = 'created_at' | 'email' | 'plan' | 'is_active'

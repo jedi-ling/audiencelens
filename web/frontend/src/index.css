@@ -68,19 +68,18 @@ html, body {
 }
 
 /* 全页背景图：position:fixed 铺满视口，滚动时纹丝不动。
-   z-index 用 -1 让它落在所有内容之下——但 Layout 父容器有 isolation:relative
-   会创建新的 stacking context，把 fixed 子元素的视口定位限制在自己范围内。
-   解决：给父容器自身加 isolation:static 让定位逃逸出去（fixed 仍然是相对 viewport）。
-   透明度从 .45 提到 .55，背景明显但不抢内容。 */
+   z-index 0 + 父 div 不设 isolation——图片自然落在内容之下但不会被父 div 的
+   bg-black 盖住。父 div 的 bg-black 才是真正的底色（防止图片加载失败时露白）。
+   opacity 0.85 让弧光更明显但不抢内容风头。 */
 .page-bg {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  opacity: 0.55;
+  opacity: 0.85;
 }
 
 ::selection {

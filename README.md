@@ -111,6 +111,8 @@ Traditional "let the most disagreeing personas argue" often produces unproductiv
 
 > **Still designed but not implemented — do not cite these as capabilities:** the second and third debate rounds, early termination on convergence, panel-wide persuasion scoring (only the two most-opposed personas per point participate, and no 1–5 persuasiveness score is computed anywhere), consensus-evolution tracking, and tipping-point detection. `consensus_strength`, `converging`, `oscillating`, `tipping_point`, and `cascade_point` appear in zero source files. **And the implemented round has not been evaluated:** we have no measurement showing it makes a review better, and θ=0.15 is an engineering guess that is now consequential rather than validated.
 >
+> **What now exists is the instrument, not the answer.** `audiencelens cross-exam-ablation` (`src/harness/cross_exam_ablation.py`) runs the panel **once** and forks that single set of persona outputs into `none` / `moderated` / `multi_agent`, so cross-examination is the only variable — deliberately *not* `run_panel(mode=...)`, which would also change panel size (3/6/8) and confound the result. It reports what the rebuttal added, dropped, and reordered in the final report, plus the `vote_changes` / `suppressed_changes` ratio that θ would have to be calibrated against. Read its verdict precisely: **it can falsify** (if nothing changes, the round is pure cost — a conclusion that needs no external ground truth) but **it cannot confirm** (change ≠ improvement; that requires adoption rates or human-cohort references, see [product-validation](docs/product-validation.md)). No result is published here yet.
+>
 > **One precise exception, so this stays honest in the other direction.** The above describes the **Python engine** — the path behind the CLI, the Python package, the MCP server, and the hosted Web app, i.e. everything most users touch. The **skill packs** (`.claude/skills/`, `.trae/skills/`) are a different path: there, an LLM coding agent reads `SKILL.md` and performs Phase 5 itself, including the persuasion scoring and the θ=0.15 stance update. So the skill path may do more than the engine does — but it is an agent following Markdown instructions, with **no code enforcing it, no schema validating it, and no test covering it**. It is not deterministic and it is not a guarantee. Do not cite the skill path as evidence for the engine, or vice versa.
 
 ### 4. Task Types — 14 Review Scenarios
@@ -218,6 +220,12 @@ audiencelens stereotype-eval --llm
 
 # Persona-differentiation ablation: full vs no_behavior vs bare (requires API key)
 audiencelens ablation concept_review examples/steam-page-sample/artifact.json --limit 4 --output ablation.json
+
+# Cross-examination ablation: does turning the rebuttal off change the report?
+# Panel runs once and is shared across all three conditions, so cross-exam is the
+# only variable. Falsifies ("nothing changed → pure cost"); does not confirm
+# ("changed" is not "improved"). Requires API key.
+audiencelens cross-exam-ablation concept_review examples/steam-page-sample/artifact.json --output cross-exam-ablation.json
 
 # Compare one case against the same post-hoc human-research reference
 audiencelens benchmark-compare --reference reference.json \
@@ -495,6 +503,8 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 **反驳调用失败时**不会被吞：`mode` 回落 `derived_summary`，原因写进 `failures[]` 与报告的 `limitation`，评审其余部分照常产出。反驳的 token 与成本会计入评审总账，并在 `cost_summary["cross_exam"]` 里单列。
 
 > **仍然只有设计、没有实现——请勿当作能力引用：** 第二、三轮辩论，收敛后提前终止，全员说服力评分（每个点只有最对立的两位人格参与，任何地方都不计算 1–5 的说服力分），共识演化追踪，临界点检测。`consensus_strength`、`converging`、`oscillating`、`tipping_point`、`cascade_point` 在源码里 0 处命中。**而且已实现的这一轮没有被评估过：** 我们没有任何测量能表明它让评审变好了；θ=0.15 是一个工程判断值，它现在有后果，但仍未经验证。
+>
+> **现在有的是量具，不是答案。** `audiencelens cross-exam-ablation`（`src/harness/cross_exam_ablation.py`）把人格评审**只跑一次**，再从这一批人格输出上分叉出 `none` / `moderated` / `multi_agent` 三个条件，因此交叉质询是唯一变量——**刻意不走** `run_panel(mode=...)`，因为那条路径会连人数一起改（3/6/8），两个变量混在一起结论就作废。它报告反驳在最终报告里**新增了什么、删掉了什么、只是重排了什么**，以及校准 θ 唯一能依据的 `vote_changes` / `suppressed_changes` 比值。它的结论要按字面读：**能证伪**（若什么都没变，这一轮就是纯成本——这个结论不需要外部真值即可成立），**但不能证实**（变了 ≠ 变好了，后者需要建议采纳率或真人对照，见 [产品验证](docs/product-validation.md)）。此处尚未发布任何实验结果。
 >
 > **一个必须说清的例外，免得反过来也失真。** 上面说的是 **Python 引擎**——也就是 CLI、Python 包、MCP Server、托管 Web 应用背后的那条链路，绝大多数用户碰到的就是它。**技能包**（`.claude/skills/`、`.trae/skills/`）是另一条链路：在那里由 LLM 编码代理读取 `SKILL.md` 并**自己执行** Phase 5，包括说服力评分和 θ=0.15 的立场更新。所以技能链路可能比引擎做得更多——但那是一个代理在遵循 Markdown 指令，**没有任何代码强制它、没有 schema 校验它、也没有测试覆盖它**，不确定、不可保证。请勿拿技能链路给引擎背书，反之亦然。
 

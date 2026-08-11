@@ -17,6 +17,9 @@ import { UsersPanel } from '@/components/UsersPanel'
 import { TaskTypeStatsPanel } from '@/components/TaskTypeStatsPanel'
 import { CostInsightsPanel } from '@/components/CostInsightsPanel'
 import { CdkPanel } from '@/components/CdkPanel'
+import { CdkRedemptionsPanel } from '@/components/CdkRedemptionsPanel'
+import { HealthPanel } from '@/components/HealthPanel'
+import { JobStatsPanel } from '@/components/JobStatsPanel'
 
 type GateState = 'checking' | 'disabled' | 'locked' | 'unlocked'
 
@@ -238,8 +241,11 @@ function Dashboard() {
           {section === 'overview' && (
             <>
               {overview && <OverviewCards data={overview} />}
-              <div className="mt-6">
+              {/* 业务量在上、健康度在下：先看"跑了多少"，再看"跑得好不好"。
+                  合成一张六线图谁都读不出来，所以刻意分开两块。 */}
+              <div className="mt-6 grid gap-6 xl:grid-cols-2">
                 <TimeseriesChart />
+                <HealthPanel />
               </div>
               <div className="mt-6 grid gap-6 xl:grid-cols-2">
                 <TaskTypeStatsPanel />
@@ -263,6 +269,9 @@ function Dashboard() {
               <div className="mt-6">
                 <CdkPanel />
               </div>
+              <div className="mt-6">
+                <CdkRedemptionsPanel />
+              </div>
             </>
           )}
 
@@ -275,10 +284,18 @@ function Dashboard() {
           )}
 
           {section === 'ops' && (
-            <div className="grid gap-6 xl:grid-cols-2">
-              <JobsPanel />
-              <ReviewsPanel />
-            </div>
+            <>
+              {/* 聚合在上、日志流在下。出事时先看"哪种状态堆着、失败栽在什么上"，
+                  确定方向之后再下去翻具体的行——反过来就是拿着放大镜找森林。 */}
+              <div className="grid gap-6 xl:grid-cols-2">
+                <HealthPanel />
+                <JobStatsPanel />
+              </div>
+              <div className="mt-6 grid gap-6 xl:grid-cols-2">
+                <JobsPanel />
+                <ReviewsPanel />
+              </div>
+            </>
           )}
 
           {section === 'audit' && <AuditLogPanel />}

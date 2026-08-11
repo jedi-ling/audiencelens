@@ -8,6 +8,9 @@ import { Pager } from './Pager'
 
 const PAGE_SIZE = 20
 
+/** 终态：这些行没有可执行的运维操作，后端对它们一律 400。 */
+const TERMINAL = ['done', 'failed', 'cancelled']
+
 export function JobsPanel() {
   const [jobs, setJobs] = useState<AdminJob[]>([])
   const [total, setTotal] = useState(0)
@@ -16,6 +19,7 @@ export function JobsPanel() {
   const [userId, setUserId] = useState('')
   const [selected, setSelected] = useState<AdminJobDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -35,6 +39,21 @@ export function JobsPanel() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const act = async (id: string, op: 'cancel' | 'force-fail') => {
+    setBusyId(id)
+    setError(null)
+    try {
+      if (op === 'cancel') await adminApi.cancelJob(id)
+      else await adminApi.forceFailJob(id)
+      await load()
+    } catch (e) {
+      // 后端对 running 的取消返回 400 并说明理由，那条消息本身就是给运营看的，直接透出
+      setError(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const openDetail = async (id: string) => {
     try {
@@ -97,6 +116,30 @@ export function JobsPanel() {
             </div>
             <div className="mt-1 truncate text-text-muted">{j.ref_id ?? '—'}</div>
             {j.error_message && <div className="mt-1 truncate text-severity-critical">{j.error_message}</div>}
+
+            {/* 运维操作只在非终态的行上出现。stopPropagation 是必需的——
+                外层 li 整块是"打开详情"的点击区，不拦住的话点按钮会同时弹出抽屉。 */}
+            {!TERMINAL.includes(j.status) && (
+              <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                {j.status === 'queued' && (
+                  <button
+                    onClick={() => void act(j.id, 'cancel')}
+                    disabled={busyId === j.id}
+                    className="rounded border border-border px-2 py-0.5 text-[10px] text-text-muted transition-colors hover:border-brand-primary/40 hover:text-brand-primary disabled:opacity-40"
+                  >
+                    取消
+                  </button>
+                )}
+                <button
+                  onClick={() => void act(j.id, 'force-fail')}
+                  disabled={busyId === j.id}
+                  title="不会真的停下后台线程，但会把这行推到终态，让统计和用户前端解锁"
+                  className="rounded border border-severity-critical/40 px-2 py-0.5 text-[10px] text-severity-critical transition-colors hover:bg-severity-critical/10 disabled:opacity-40"
+                >
+                  {busyId === j.id ? '处理中…' : '标记为失败'}
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
