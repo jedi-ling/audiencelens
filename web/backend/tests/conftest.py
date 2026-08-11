@@ -92,3 +92,41 @@ def _reset_limiter():
 
     get_limiter().reset()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_anonymous_key():
+    """每条测试跑完都清掉 "anonymous" 身份下的 BYOK key。
+
+    为什么必须是全局 autouse，而不是让每个文件自己记得清：
+    整个测试会话共用一个 sqlite 文件、不按测试回滚（见上面 _init_db 的说明），
+    而 "anonymous" 是**所有测试共享的同一个身份桶**——任何一条测试给它存了
+    key 而没清，后面所有断言"匿名且没配 key 时应该 428/不该有 key"的测试
+    都会跟着红，且红在一个跟它自己毫无关系的文件里。
+
+    这个坑已经被踩过两次，两次的处理都是"在出事的那个文件里补一个
+    autouse fixture"（test_review_chat.py、test_token_counting.py 里都有
+    同款局部 fixture，注释还写明了病因）——但那是打补丁不是堵源头：
+    test_chat_features.py 有 9 处 save_user_key、一处清理都没有，它现在不炸
+    纯粹是因为字母序在它后面的 test_multi_provider_keys.py 有一句
+    `db.query(UserApiKey).delete()` 顺手替它擦了屁股。靠文件名字母序维持的
+    正确性，下一个新增测试文件就可能打破。
+
+    实测复现（本次修复前）：
+        pytest tests/test_chat_features.py \\
+               tests/test_auth_and_gating.py::...::test_anonymous_review_creation_not_blocked_by_auth
+        → 1 failed（后者拿到了前者漏下的 key，428 变成了别的）
+
+    放在这里之后，新写测试的人不需要知道这件事，也不会再踩。
+    只清 "anonymous"：真实用户 id 在各测试里是唯一的（随机邮箱），
+    不构成跨测试污染，没必要连它们一起删。
+    """
+    yield
+    from app.db import session_scope
+    from app.services import key_service
+
+    s = session_scope()
+    try:
+        key_service.delete_user_key(s, "anonymous")
+    finally:
+        s.close()
