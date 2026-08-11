@@ -24,6 +24,35 @@ web/admin/dist/
 
 # 本地 AI 工具产物（Qoder 分析报告等，机器专属）
 .qoder/
+.impeccable/
+.trae/
+
+# 一次性生成的评审/审计报告。它们是某次跑出来的快照，不是仓库的一部分——
+# 留在工作区可以，进 git 只会让每个人的仓库里堆着别人某天跑的结果。
+audiencelens-audience-panel-report.*
+security_best_practices_report.md
+
+# 调试用截图与截图脚本。做落地页时一轮能产出十几张，全是过程产物。
+web/frontend/screenshots/
+web/frontend/*.png
+web/frontend/_shots.py
+
+# 注意：web/frontend/public/ 下的图片**不要**加通配忽略。
+# 那个目录里全是站点真正在用的资源（logo-icon.png 见 Layout.tsx，
+# bg-1~4.png 见 Layout.tsx 的背景轮换），一条 public/**/*.png 就能让
+# fresh clone 出来的站点满屏坏图，而本地因为文件还在，谁都看不出来。
+
+# Hero 背景视频：44.9 MB，不进 git。
+#
+# 为什么单独例外：git 里的大文件删不干净（历史里永久占着），而这个文件
+# 每换一次素材就多压 45MB 进去。同目录的 hero-bg-poster.jpg（163 KB）**已提交**，
+# landing-body.html 的 <video> 标签带着 poster 属性——缺了 mp4 时首屏显示的是
+# 那张静帧，页面不会破，只是没有动效。
+#
+# 也就是说 fresh clone 能正常跑，只是 hero 是静态的。要恢复动效，把视频文件
+# 放回 web/frontend/public/videos/hero-bg.mp4 即可（文件名是 landing-body.html
+# 里写死的）。
+web/frontend/public/videos/hero-bg.mp4
 
 # Utility scripts
 copy-files.ps1
