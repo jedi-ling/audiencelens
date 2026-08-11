@@ -1426,6 +1426,10 @@ async def get_review_v2(
     return {
         "id": review.id,
         "task_type": review.task_type,
+        # v1 详情一直回它、v2 一直漏着——被 test_review_serialization_parity
+        # 抓出来的第一条真实漂移。评审标题是最基本的展示字段，
+        # 走 v2 读评审的调用方没有理由拿不到。
+        "target_title": review.target_title,
         "mode": review.mode,
         "persona_pack": review.persona_pack,
         "selected_personas": review.selected_personas,

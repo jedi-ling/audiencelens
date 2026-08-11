@@ -195,30 +195,6 @@ export async function fetchExamples(): Promise<Example[]> {
   return res.json()
 }
 
-export async function fetchPresets(): Promise<Preset[]> {
-  const res = await authedFetch('/api/presets')
-  if (!res.ok) throw await toApiError(res, '加载预设失败')
-  return res.json()
-}
-
-export async function createReview(data: {
-  task_type: string
-  artifact_bundle: Record<string, unknown>
-  persona_pack?: string
-  selected_personas?: string[]
-  mode?: string
-  skill_type?: SkillType
-  enable_evaluation?: boolean
-  enable_red_team?: boolean
-}): Promise<Review> {
-  const res = await authedFetch('/api/reviews', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw await toApiError(res, '发起评审失败')
-  return res.json()
-}
 
 export async function extractMaterials(taskType: string, file: File): Promise<{ title: string; materials: Record<string, string> }> {
   const formData = new FormData()
@@ -239,23 +215,6 @@ export async function deleteReview(id: string): Promise<void> {
   if (!res.ok) throw await toApiError(res, '删除评审失败')
 }
 
-export function connectReviewWS(
-  reviewId: string,
-  onMessage: (msg: WSMessage) => void
-): () => void {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${protocol}//${window.location.host}/ws/review/${reviewId}`
-  const ws = new WebSocket(wsUrl)
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data)
-      onMessage(msg)
-    } catch {}
-  }
-  return () => {
-    ws.close()
-  }
-}
 
 export async function fetchTaskTypes(): Promise<TaskTypeDetail[]> {
   const res = await authedFetch('/api/task-types')
@@ -275,11 +234,6 @@ export async function fetchReviewModes(): Promise<ReviewModeConfig[]> {
   return res.json()
 }
 
-export async function fetchPersonasByPack(pack: string): Promise<Persona[]> {
-  const res = await authedFetch(`/api/personas/packs/${pack}`)
-  if (!res.ok) throw await toApiError(res, '加载人格包成员失败')
-  return res.json()
-}
 
 export async function fetchReviewResult(reviewId: string): Promise<ReviewResultData> {
   const res = await authedFetch(`/api/reviews/${reviewId}/result`)
@@ -295,11 +249,6 @@ export async function fetchSkills(): Promise<{ skill_type: string; name: string;
   return res.json()
 }
 
-export async function fetchSkill(skillType: SkillType): Promise<SkillDetail> {
-  const res = await authedFetch(`/api/skills/${skillType}`)
-  if (!res.ok) throw await toApiError(res, '加载技能详情失败')
-  return res.json()
-}
 
 export async function runEvaluation(reviewId: string): Promise<EvaluationScorecard> {
   const res = await authedFetch(`/api/evaluations/${reviewId}`, { method: 'POST' })
@@ -319,41 +268,3 @@ export async function fetchEthicsReport(reviewId: string): Promise<EthicsReport[
   return res.json()
 }
 
-export async function fetchRubric(): Promise<{ dimensions: { id: string; name: string; description: string }[] }> {
-  const res = await authedFetch('/api/rubric')
-  if (!res.ok) throw await toApiError(res, '加载评分量表失败')
-  return res.json()
-}
-
-/** POST /api/generate-personas 生成出来的人格。
- *  形状照抄后端 PersonaService.generate_personas 的产出（服务层 docstring 与
- *  fallback 实现均为这七个字段），不是评审用的 Persona——那个类型多出 pack 等
- *  库内人格才有的字段，生成结果并不落库。 */
-export interface GeneratedPersona {
-  id: string
-  name: string
-  archetype: string
-  identity_summary: string
-  behavior_profile: Record<string, string>
-  motivations: string[]
-  decision_rules: string[]
-}
-
-/** 请求体逐字对齐后端 PersonaGenerateRequest（schemas/__init__.py）。
- *  以前这里发的是 skill_type/task_type/constraints——后端一个都不认识，
- *  domain 是必填缺失，接上就是 422；返回值也不是数组而是 {personas, count}。
- *  当时因为零调用点没炸过，修正是为了让第一个接它的人不掉进坑里。 */
-export async function generatePersonas(data: {
-  domain: string
-  audience?: string
-  goals?: string
-  count?: number
-}): Promise<{ personas: GeneratedPersona[]; count: number }> {
-  const res = await authedFetch('/api/generate-personas', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw await toApiError(res, '生成人格失败')
-  return res.json()
-}

@@ -38,10 +38,13 @@ def _ts_interface_body(source: str, interface_name: str) -> str:
     """取一个 TS interface 的花括号内文本。用括号计数而不是非贪婪正则截到
     第一个 `}`——这些 interface 内部嵌套了别的花括号（对象类型字段、
     行内 union），非贪婪匹配会在第一层嵌套就截断，看起来像字段缺失。"""
-    marker = f"interface {interface_name}"
-    start = source.find(marker)
-    assert start != -1, f"ReportPage.tsx 里找不到 interface {interface_name}"
-    brace_start = source.index("{", start)
+    # 必须带词边界：朴素的 find("interface " + name) 会被前缀相同的接口抢答
+    # （实测在 test_review_serialization_parity 里踩过——找 Review 命中了
+    # 更早出现的 ReviewModeConfig）。这里当前没有 RealReportXxx 之类的邻居，
+    # 但那是运气不是保证，加一道边界比日后 debug 一条"莫名其妙全绿"便宜。
+    m = re.search(r"interface %s\s*(?:<[^>]*>)?\s*(?:extends [^{]+)?\{" % re.escape(interface_name), source)
+    assert m, f"ReportPage.tsx 里找不到 interface {interface_name}"
+    brace_start = source.index("{", m.start())
     depth = 0
     for i in range(brace_start, len(source)):
         if source[i] == "{":

@@ -38,10 +38,13 @@ def _ts_interface_top_level_keys(source: str, interface_name: str) -> set:
     """取一个 TS interface 顶层的字段名集合。用括号计数取花括号内文本，
     再只匹配缩进一层的 `key:`/`key?:` 行——避免把嵌套类型内部的字段名
     误当成顶层字段（这个接口目前没有嵌套对象字段，但写成通用的更安全）。"""
-    marker = f"interface {interface_name}"
-    start = source.find(marker)
-    assert start != -1, f"types.ts 里找不到 interface {interface_name}"
-    brace_start = source.index("{", start)
+    # 必须带词边界：朴素的 find("interface " + name) 会被前缀相同的接口抢答
+    # （实测在 test_review_serialization_parity 里踩过——找 Review 命中了
+    # 更早出现的 ReviewModeConfig，解析出一组完全无关的字段）。
+    # 当前 types.ts 里没有 SharedReportXxx，但那是运气不是保证。
+    m = re.search(r"interface %s\s*(?:<[^>]*>)?\s*(?:extends [^{]+)?\{" % re.escape(interface_name), source)
+    assert m, f"types.ts 里找不到 interface {interface_name}"
+    brace_start = source.index("{", m.start())
     depth = 0
     body = None
     for i in range(brace_start, len(source)):

@@ -226,11 +226,17 @@ export interface ReviewDetail {
   error_message: string | null
   created_at: string | null
   completed_at: string | null
+  target_title: string | null
   total_cost_usd: number
   input_tokens?: number
   output_tokens?: number
   report: ReviewReport | null
   calibration: unknown
+  /** 只读分享状态。null = 未分享；只回给作者本人。
+   *  这两个字段是加分享功能时在 v2 端点加了返回、却忘了在这里声明的——
+   *  被 test_review_serialization_parity 抓出来，正是那条测试存在的理由。 */
+  share_token: string | null
+  shared_at: string | null
 }
 
 /** 见 src/runner/aggregator.py aggregate_report()——不是一句话摘要，
