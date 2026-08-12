@@ -19,6 +19,9 @@
   --color-cyan: #00d4ff;
   --color-cyan-dim: #00a8cc;
   --color-warm-orange: #ff6b35;
+  /* OverviewCards 的 token 占比条在用一个叫 gold-cream 的颜色（此前未定义、等于透明）。
+     在这里补上，token 输入段的语义色，与输出段的品牌绿成对。 */
+  --color-gold-cream: #ffd166;
   --color-text-primary: #e8e8f0;
   --color-text-secondary: #8888a0;
   --color-text-muted: #55556a;
@@ -38,3 +41,11 @@ html, body {
 ::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-border-hover); }
+
+/* 窄屏横向页签条等"功能性横滚"区域用：隐藏滚动条但不禁用滚动。 */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

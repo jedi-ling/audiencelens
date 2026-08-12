@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Ticket, Loader2, Copy, Check, Ban } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { CdkCode, CdkGenerateResult, CdkStatus } from '@/lib/types'
+import { PanelShell, PanelDesc, PanelError, PanelEmpty } from './panel'
 
 const STATUS_LABEL: Record<CdkStatus, string> = {
   active: '可用',
@@ -94,22 +95,15 @@ export function CdkPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Ticket className="h-4 w-4 text-warm-orange" strokeWidth={1.5} />
-        CDK 兑换码
-        <span className="font-mono text-[10px] font-normal text-text-muted">
-          免登录兑换评审次数（走平台垫付 Key 时生效）
-        </span>
-      </h2>
-      <p className="mt-1 text-xs text-text-muted">
+    <PanelShell icon={Ticket} iconTone="text-warm-orange" title="CDK 兑换码" hint="免登录兑换评审次数（走平台垫付 Key 时生效）">
+      <PanelDesc>
         批量生成兑换码，用户在设置页兑换后获得评审次数。兑换接口有 10 次/分钟的防枚举限流。
-      </p>
+      </PanelDesc>
 
-      {error && <p className="mt-3 font-mono text-xs text-severity-critical">{error}</p>}
+      <PanelError>{error}</PanelError>
 
       {/* 生成表单 */}
-      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-5">
         <label className="text-xs text-text-muted">
           生成数量
           <input
@@ -258,8 +252,8 @@ export function CdkPanel() {
           ))}
         </ul>
       ) : (
-        !loading && <p className="mt-2 font-mono text-xs text-text-muted">暂无兑换码。</p>
+        !loading && <PanelEmpty />
       )}
-    </section>
+    </PanelShell>
   )
 }

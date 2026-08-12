@@ -177,6 +177,7 @@ function Dashboard() {
     <div className="mx-auto flex max-w-[88rem] gap-6 px-6 py-6">
       {/* 分区导航：桌面侧栏 */}
       <aside className="hidden w-52 shrink-0 lg:block">
+        {/* top-20 = header h-14（3.5rem）+ 1.5rem 间距：侧栏吸顶时与 header 下沿保持固定距离 */}
         <nav className="sticky top-20 space-y-1">
           {SECTIONS.map((s) => {
             const Icon = s.icon

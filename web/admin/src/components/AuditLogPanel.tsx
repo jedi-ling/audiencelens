@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { FileClock } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminAuditLogEntry } from '@/lib/types'
+import { PanelShell, PanelError, PanelLoading, EmptyRow } from './panel'
 
 const ACTION_LABELS: Record<string, string> = {
   'setting.update': '修改配置',
@@ -21,11 +22,13 @@ const ACTION_LABELS: Record<string, string> = {
 /** 谁在何时改了哪个配置/套餐/平台 Key——目前只有单一共享令牌，不区分具体管理员身份。 */
 export function AuditLogPanel() {
   const [entries, setEntries] = useState<AdminAuditLogEntry[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       setEntries((await adminApi.auditLog(50)).entries)
+      setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -36,14 +39,11 @@ export function AuditLogPanel() {
   }, [load])
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <FileClock className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-        操作审计
-      </h2>
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+    <PanelShell icon={FileClock} iconTone="text-cyan" title="操作审计">
+      <PanelError>{error}</PanelError>
+      {!loaded && !error && <PanelLoading />}
       <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
-        {entries.length === 0 && <li className="py-4 text-center text-xs text-text-muted">暂无记录</li>}
+        {loaded && entries.length === 0 && <EmptyRow />}
         {entries.map((e) => (
           <li key={e.id} className="rounded-md border border-border bg-bg-primary/60 px-3 py-2 font-mono text-xs">
             <div className="flex items-center gap-2">
@@ -59,6 +59,6 @@ export function AuditLogPanel() {
           </li>
         ))}
       </ul>
-    </section>
+    </PanelShell>
   )
 }

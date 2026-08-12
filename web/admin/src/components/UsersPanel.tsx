@@ -4,6 +4,7 @@ import { adminApi } from '@/lib/adminClient'
 import type { AdminUser, AdminUserSortField } from '@/lib/types'
 import { Pager } from './Pager'
 import { UserDetailDrawer } from './UserDetailDrawer'
+import { PanelShell, PanelError, PanelLoading } from './panel'
 
 const PAGE_SIZE = 20
 /* 兜底列表：套餐真实清单以 /api/admin/plans 为准（挂载后拉取覆盖），
@@ -22,6 +23,7 @@ export function UsersPanel() {
   const [sort, setSort] = useState<AdminUserSortField>('created_at')
   const [order, setOrder] = useState<'asc' | 'desc'>('desc')
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   // 套餐清单从 /api/admin/plans 拉，和 PlansPanel 同一事实源；失败就保持兜底列表
   useEffect(() => {
@@ -46,6 +48,8 @@ export function UsersPanel() {
       })
       setUsers(result.users)
       setTotal(result.total)
+      setLoaded(true)
+      setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -80,25 +84,26 @@ export function UsersPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <Users className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-          用户管理
-          <span className="font-mono text-[10px] font-normal text-text-muted">改套餐/停用立即生效</span>
-        </h2>
+    <PanelShell
+      icon={Users}
+      title="用户管理"
+      hint="改套餐/停用立即生效"
+      actions={
         <input
           value={q}
           onChange={(e) => { setOffset(0); setQ(e.target.value) }}
           placeholder="按邮箱搜索"
-          className="ml-auto w-44 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
+          className="w-44 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
         />
-      </div>
+      }
+    >
+      <PanelError>{error}</PanelError>
 
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      {!loaded && !error && <PanelLoading />}
 
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-left font-mono text-xs">
+        {/* 8 列 + 行内编辑控件，窄屏必须横向滚动而不是把列挤变形 */}
+        <table className="w-full min-w-[720px] text-left font-mono text-xs">
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-text-muted">
               <SortableTh field="email" sort={sort} order={order} onSort={applySort}>邮箱</SortableTh>
@@ -119,9 +124,9 @@ export function UsersPanel() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {users.length === 0 && (
+            {loaded && users.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-text-muted">暂无注册用户</td>
+                <td colSpan={8} className="py-6 text-center text-xs text-text-muted">暂无数据</td>
               </tr>
             )}
             {users.map((u) => (
@@ -206,7 +211,7 @@ export function UsersPanel() {
       <Pager total={total} offset={offset} pageSize={PAGE_SIZE} onChange={setOffset} />
 
       {detailId && <UserDetailDrawer userId={detailId} onClose={() => setDetailId(null)} />}
-    </section>
+    </PanelShell>
   )
 }
 

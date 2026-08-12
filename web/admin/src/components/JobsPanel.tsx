@@ -5,6 +5,7 @@ import type { AdminJob, AdminJobDetail } from '@/lib/types'
 import { StatusDot } from './StatusDot'
 import { DetailDrawer, DetailField, DetailJson } from './DetailDrawer'
 import { Pager } from './Pager'
+import { PanelShell, PanelError, PanelLoading, EmptyRow } from './panel'
 
 const PAGE_SIZE = 20
 
@@ -20,6 +21,7 @@ export function JobsPanel() {
   const [selected, setSelected] = useState<AdminJobDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -31,6 +33,7 @@ export function JobsPanel() {
       })
       setJobs(result.jobs)
       setTotal(result.total)
+      setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -64,37 +67,40 @@ export function JobsPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <ListChecks className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-          任务
-        </h2>
-        <input
-          value={userId}
-          onChange={(e) => { setOffset(0); setUserId(e.target.value) }}
-          placeholder="按 user_id 过滤"
-          className="ml-auto w-32 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
-        />
-        <select
-          value={status}
-          onChange={(e) => { setOffset(0); setStatus(e.target.value) }}
-          className="rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none"
-        >
-          <option value="">全部状态</option>
-          <option value="queued">queued</option>
-          <option value="running">running</option>
-          <option value="done">done</option>
-          <option value="failed">failed</option>
-          {/* 后端 Job.status 注释明确有 cancelled（job_service 取消链路会写入），筛选项要跟全 */}
-          <option value="cancelled">cancelled</option>
-        </select>
-      </div>
+    <PanelShell
+      icon={ListChecks}
+      iconTone="text-cyan"
+      title="任务"
+      actions={
+        <>
+          <input
+            value={userId}
+            onChange={(e) => { setOffset(0); setUserId(e.target.value) }}
+            placeholder="按 user_id 过滤"
+            className="w-32 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary placeholder-text-muted outline-none focus:border-brand-primary"
+          />
+          <select
+            value={status}
+            onChange={(e) => { setOffset(0); setStatus(e.target.value) }}
+            className="rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none"
+          >
+            <option value="">全部状态</option>
+            <option value="queued">queued</option>
+            <option value="running">running</option>
+            <option value="done">done</option>
+            <option value="failed">failed</option>
+            {/* 后端 Job.status 注释明确有 cancelled（job_service 取消链路会写入），筛选项要跟全 */}
+            <option value="cancelled">cancelled</option>
+          </select>
+        </>
+      }
+    >
+      <PanelError>{error}</PanelError>
 
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      {!loaded && !error && <PanelLoading />}
 
       <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
-        {jobs.length === 0 && <li className="py-4 text-center text-xs text-text-muted">无记录</li>}
+        {loaded && jobs.length === 0 && <EmptyRow />}
         {jobs.map((j) => (
           <li
             key={j.id}
@@ -159,6 +165,6 @@ export function JobsPanel() {
           <DetailJson label="Payload" value={selected.payload} />
         </DetailDrawer>
       )}
-    </section>
+    </PanelShell>
   )
 }

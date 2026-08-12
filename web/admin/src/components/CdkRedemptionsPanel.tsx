@@ -3,6 +3,7 @@ import { AlertTriangle, Receipt } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminCdkRedemptionList } from '@/lib/types'
 import { Pager } from './Pager'
+import { PanelShell, PanelError, PanelEmpty, PanelLoading } from './panel'
 
 const PAGE = 20
 
@@ -48,14 +49,13 @@ export function CdkRedemptionsPanel() {
   const mismatched = rows.filter((r) => r.credited_in_ledger !== r.credits)
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <Receipt className="h-4 w-4 text-warm-orange" strokeWidth={1.5} />
-          兑换记录
-          {data && <span className="font-mono text-xs font-normal text-text-muted">{data.total}</span>}
-        </h2>
-        <div className="flex gap-2">
+    <PanelShell
+      icon={Receipt}
+      iconTone="text-warm-orange"
+      title="兑换记录"
+      hint={data ? `共 ${data.total} 条` : undefined}
+      actions={
+        <>
           <input
             value={code}
             onChange={(e) => {
@@ -74,10 +74,10 @@ export function CdkRedemptionsPanel() {
             placeholder="按 user_id 筛选"
             className="w-40 rounded-md border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
-        </div>
-      </div>
-
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+        </>
+      }
+    >
+      <PanelError>{error}</PanelError>
 
       {mismatched.length > 0 && (
         <p className="mt-3 flex items-center gap-2 rounded-lg border border-severity-critical/40 bg-severity-critical/5 px-3 py-2 font-mono text-[11px] text-severity-critical">
@@ -129,13 +129,11 @@ export function CdkRedemptionsPanel() {
         </table>
       </div>
 
-      {rows.length === 0 && !error && (
-        <p className="py-8 text-center text-xs text-text-muted">
-          {code || userId ? '没有匹配的兑换记录' : '还没有任何兑换记录'}
-        </p>
-      )}
+      {!data && !error && <PanelLoading />}
+
+      {rows.length === 0 && data && <PanelEmpty />}
 
       {data && <Pager offset={offset} pageSize={PAGE} total={data.total} onChange={setOffset} />}
-    </section>
+    </PanelShell>
   )
 }

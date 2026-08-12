@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ListChecks } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminJobStats } from '@/lib/types'
+import { PanelShell, PanelError, PanelLoading, MiniStat, EmptyPill } from './panel'
 
 const STATUS_COLOR: Record<string, string> = {
   done: 'var(--color-brand-primary)',
@@ -50,12 +51,11 @@ export function JobStatsPanel({ refreshKey }: { refreshKey?: number }) {
   const rt = data?.runtime_seconds
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <ListChecks className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-          任务队列聚合
-        </h2>
+    <PanelShell
+      icon={ListChecks}
+      iconTone="text-cyan"
+      title="任务队列聚合"
+      actions={
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -66,9 +66,11 @@ export function JobStatsPanel({ refreshKey }: { refreshKey?: number }) {
           <option value={30}>近 30 天</option>
           <option value={90}>近 90 天</option>
         </select>
-      </div>
+      }
+    >
+      <PanelError>{error}</PanelError>
 
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      {!data && !error && <PanelLoading />}
 
       {statusTotal > 0 && (
         <>
@@ -99,20 +101,20 @@ export function JobStatsPanel({ refreshKey }: { refreshKey?: number }) {
         </>
       )}
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <Mini label="执行耗时 P50" value={fmtSeconds(rt?.p50 ?? null)} />
-        <Mini label="执行耗时 P95" value={fmtSeconds(rt?.p95 ?? null)} />
-        <Mini label="最长一次" value={fmtSeconds(rt?.max ?? null)} hint={rt ? `样本 ${rt.sample_size}` : ''} />
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MiniStat label="执行耗时 P50" value={fmtSeconds(rt?.p50 ?? null)} />
+        <MiniStat label="执行耗时 P95" value={fmtSeconds(rt?.p95 ?? null)} />
+        <MiniStat label="最长一次" value={fmtSeconds(rt?.max ?? null)} hint={rt ? `样本 ${rt.sample_size}` : undefined} />
       </div>
 
       <div className="mt-5">
         <p className="font-mono text-[10px] uppercase tracking-wide text-text-muted">
           失败原因 Top {reasons.length}
         </p>
-        {reasons.length === 0 && (
-          <p className="mt-2 rounded-lg border border-border bg-bg-secondary px-3 py-4 text-center text-xs text-text-muted">
-            这段时间没有失败的任务
-          </p>
+        {data && reasons.length === 0 && (
+          <div className="mt-2">
+            <EmptyPill>这段时间没有失败的任务</EmptyPill>
+          </div>
         )}
         <ul className="mt-2 space-y-1.5">
           {reasons.map((r) => (
@@ -150,16 +152,6 @@ export function JobStatsPanel({ refreshKey }: { refreshKey?: number }) {
           </p>
         )}
       </div>
-    </section>
-  )
-}
-
-function Mini({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-3">
-      <p className="font-mono text-[10px] uppercase tracking-wide text-text-muted">{label}</p>
-      <p className="mt-1 font-mono text-lg text-text-primary">{value}</p>
-      {hint && <p className="mt-0.5 font-mono text-[10px] text-text-muted">{hint}</p>}
-    </div>
+    </PanelShell>
   )
 }

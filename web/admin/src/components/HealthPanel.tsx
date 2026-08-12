@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Activity, AlertTriangle } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import { ApiError, type AdminHealth } from '@/lib/types'
+import { PanelShell, PanelError, PanelLoading, MiniStat } from './panel'
 
 const WIDTH = 640
 const HEIGHT = 150
@@ -73,12 +74,10 @@ export function HealthPanel({ onJobsChanged }: { onJobsChanged?: () => void }) {
   const stuck = data?.stuck
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <Activity className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-          系统健康度
-        </h2>
+    <PanelShell
+      icon={Activity}
+      title="系统健康度"
+      actions={
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -89,9 +88,9 @@ export function HealthPanel({ onJobsChanged }: { onJobsChanged?: () => void }) {
           <option value={30}>近 30 天</option>
           <option value={90}>近 90 天</option>
         </select>
-      </div>
-
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      }
+    >
+      <PanelError>{error}</PanelError>
 
       {/* 卡死告警：有就顶在最上面。这是整个面板里唯一需要立刻动手的东西。 */}
       {stuck && stuck.count > 0 && (
@@ -128,11 +127,11 @@ export function HealthPanel({ onJobsChanged }: { onJobsChanged?: () => void }) {
       )}
 
       {/* 三个健康数字。分位数为 null 时显示 —— 而不是 0：样本为空和"跑得飞快"是两回事。 */}
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MiniStat
           label="整体成功率"
           value={fmtRate(data?.totals.success_rate ?? null)}
-          hint={data ? `完成 ${data.totals.completed} · 失败 ${data.totals.failed}` : ''}
+          hint={data ? `完成 ${data.totals.completed} · 失败 ${data.totals.failed}` : undefined}
           tone={
             data?.totals.success_rate == null
               ? 'muted'
@@ -143,17 +142,15 @@ export function HealthPanel({ onJobsChanged }: { onJobsChanged?: () => void }) {
                   : 'bad'
           }
         />
-        <Stat
+        <MiniStat
           label="评审耗时 P50"
           value={fmtDuration(dur?.p50 ?? null)}
-          hint={dur ? `样本 ${dur.sample_size}` : ''}
-          tone="muted"
+          hint={dur ? `样本 ${dur.sample_size}` : undefined}
         />
-        <Stat
+        <MiniStat
           label="评审耗时 P95"
           value={fmtDuration(dur?.p95 ?? null)}
-          hint={dur?.max != null ? `最长 ${fmtDuration(dur.max)}` : ''}
-          tone="muted"
+          hint={dur?.max != null ? `最长 ${fmtDuration(dur.max)}` : undefined}
         />
       </div>
 
@@ -240,37 +237,7 @@ export function HealthPanel({ onJobsChanged }: { onJobsChanged?: () => void }) {
           </div>
         </>
       )}
-      {series.length === 0 && !error && (
-        <p className="mt-4 py-6 text-center text-xs text-text-muted">加载中…</p>
-      )}
-    </section>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string
-  value: string
-  hint: string
-  tone: 'good' | 'warn' | 'bad' | 'muted'
-}) {
-  const color =
-    tone === 'good'
-      ? 'text-brand-primary'
-      : tone === 'warn'
-        ? 'text-warm-orange'
-        : tone === 'bad'
-          ? 'text-severity-critical'
-          : 'text-text-primary'
-  return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-3">
-      <p className="font-mono text-[10px] uppercase tracking-wide text-text-muted">{label}</p>
-      <p className={`mt-1 font-mono text-xl ${color}`}>{value}</p>
-      {hint && <p className="mt-0.5 font-mono text-[10px] text-text-muted">{hint}</p>}
-    </div>
+      {series.length === 0 && !error && <PanelLoading />}
+    </PanelShell>
   )
 }

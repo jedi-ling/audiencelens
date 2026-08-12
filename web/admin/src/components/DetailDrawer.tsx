@@ -17,12 +17,18 @@ export function DetailDrawer({ title, onClose, children }: { title: string; onCl
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="h-full w-full max-w-lg overflow-y-auto border-l border-border bg-bg-secondary p-5"
+        /* 窄屏近乎全宽（留 1rem 露出遮罩提示可点外面关闭），sm 起限到 max-w-lg */
+        className="h-full w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-l border-border bg-bg-secondary p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-mono text-sm font-semibold text-text-primary">{title}</h3>
-          <button onClick={onClose} className="rounded-md p-1 text-text-muted hover:text-text-primary transition-colors">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="truncate font-mono text-sm font-semibold text-text-primary">{title}</h3>
+          {/* aria-label：图标按钮没有文字，读屏与测试选择器都靠它 */}
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="shrink-0 rounded-md border border-border p-1.5 text-text-muted hover:border-border-hover hover:text-text-primary transition-colors"
+          >
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
         </div>

@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Mail, Loader2, CheckCircle2, XCircle, AlertTriangle, Send } from 'lucide-react'
 import { getAdminToken } from '@/lib/adminClient'
+import { PanelShell, PanelDesc, PanelError, PanelLoading } from './panel'
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
 
@@ -120,19 +121,14 @@ export function MailPanel() {
   const blindSpot = config && !config.really_sends
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Mail className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-        邮件发送
-        <span className="font-mono text-[10px] font-normal text-text-muted">
-          邮箱验证 / 密码重置走这条链路
-        </span>
-      </h2>
-      <p className="mt-1 text-xs text-text-muted">
+    <PanelShell icon={Mail} title="邮件发送" hint="邮箱验证 / 密码重置走这条链路">
+      <PanelDesc>
         邮件配错时注册接口仍返回成功，但用户收不到激活信。配置后请发一封测试邮件验证。
-      </p>
+      </PanelDesc>
 
-      {loadError && <p className="mt-3 font-mono text-xs text-severity-critical">{loadError}</p>}
+      <PanelError>{loadError}</PanelError>
+
+      {!config && !loadError && <PanelLoading />}
 
       {config && (
         <>
@@ -239,6 +235,6 @@ export function MailPanel() {
           <span className="break-all">{result.warning}</span>
         </div>
       )}
-    </section>
+    </PanelShell>
   )
 }

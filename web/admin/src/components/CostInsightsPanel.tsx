@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Wallet } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminCostStats } from '@/lib/types'
+import { PanelShell, PanelError, PanelEmpty, PanelLoading, SubHeading } from './panel'
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   byok: { label: 'BYOK（用户自付）', color: 'bg-cyan/70' },
@@ -32,12 +33,11 @@ export function CostInsightsPanel() {
   const maxUserCost = Math.max(0.0001, ...topUsers.map((u) => u.cost_usd))
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <Wallet className="h-4 w-4 text-warm-orange" strokeWidth={1.5} />
-          成本构成
-        </h2>
+    <PanelShell
+      icon={Wallet}
+      iconTone="text-warm-orange"
+      title="成本构成"
+      actions={
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -47,9 +47,11 @@ export function CostInsightsPanel() {
           <option value={30}>近 30 天</option>
           <option value={90}>近 90 天</option>
         </select>
-      </div>
+      }
+    >
+      <PanelError>{error}</PanelError>
 
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      {!data && !error && <PanelLoading />}
 
       {data && (
         <>
@@ -100,6 +102,6 @@ export function CostInsightsPanel() {
           </div>
         </>
       )}
-    </section>
+    </PanelShell>
   )
 }
