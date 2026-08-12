@@ -453,6 +453,39 @@ class TestRunPanel:
         assert all("key_issues" in o for o in outputs)
         assert len(result["panel_personas"]) >= len(outputs)
 
+    def test_adaptive_panel_can_stop_after_initial_batch(self):
+        """阈值高于所有候选的代理分时，扩面必须停止并省掉后续调用。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = self._panel_run(
+            adaptive_panel=True,
+            adaptive_initial_size=2,
+            adaptive_min_score=1.0,
+            enable_cross_exam=False,
+        )
+        adaptive = result["report"]["adaptive_panel"]
+        assert adaptive["enabled"] is True
+        assert adaptive["executed_personas"] == 2
+        assert adaptive["saved_persona_calls"] == adaptive["eligible_personas"] - 2
+        assert adaptive["decisions"][-1]["stop_reason"] == "marginal_value_below_threshold"
+        assert result["cost_summary"]["attempted_count"] == 2
+        assert len(result["panel_personas"]) == 2
+
+    def test_adaptive_panel_never_drops_explicitly_requested_personas(self):
+        """用户点名优先于成本优化；自适应不得静默裁掉点名角色。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        requested = ["P01-indie-core-operator", "P02-systems-theorycrafter"]
+        result = self._panel_run(
+            selected_personas=requested,
+            adaptive_panel=True,
+            adaptive_initial_size=1,
+            adaptive_min_score=1.0,
+            enable_cross_exam=False,
+        )
+        adaptive = result["report"]["adaptive_panel"]
+        assert adaptive["enabled"] is False
+        assert adaptive["disabled_reason"] == "explicit_persona_selection"
+        assert {p["id"] for p in result["panel_personas"]} == set(requested)
+
     def test_selected_personas_with_no_match_falls_back_to_auto_select(self, sample_artifact_bundle):
         """id 全部拼错/串包时不能跑出一个空面板——静默回落到自动选人。"""
         os.environ.pop("ANTHROPIC_API_KEY", None)

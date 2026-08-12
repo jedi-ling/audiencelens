@@ -105,7 +105,8 @@ def main():
 @click.option("--mode", type=click.Choice(["quick", "standard", "full"]), default="standard", help="评审模式")
 @click.option("--output-dir", type=click.Path(), default="./output", help="输出目录")
 @click.option("--personas", type=click.Path(exists=True), help="自定义人物目录")
-def run(skill, task_type, artifact, mode, output_dir, personas):
+@click.option("--adaptive-panel/--fixed-panel", default=False, help="按边际价值逐步扩展人格面板")
+def run(skill, task_type, artifact, mode, output_dir, personas, adaptive_panel):
     """运行合成评审"""
     _print(f"\n=== AudienceLens v{VERSION} ===")
     _print(f"技能: {skill} | 任务: {task_type} | 模式: {mode}\n")
@@ -124,6 +125,7 @@ def run(skill, task_type, artifact, mode, output_dir, personas):
             artifact_bundle=artifact_bundle,
             personas_path=personas,
             mode=mode,
+            adaptive_panel=adaptive_panel,
         )
 
         output_path = Path(output_dir)
@@ -541,6 +543,56 @@ def cross_exam_ablation(task_type, artifact, personas, panel, conditions, output
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         _print(f"\n结果已保存: {output_path}")
+
+
+@main.command("identity-invariance")
+@click.argument("task_type")
+@click.argument("artifact", type=click.Path(exists=True))
+@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML path (default: game-core)")
+@click.option("--limit", type=int, default=None, help="Maximum personas to audit; default is all")
+@click.option("--output", "output_path", type=click.Path(), default=None, help="JSON output path")
+def identity_invariance(task_type, artifact, personas, limit, output_path):
+    """Verify that protected identity fields cannot alter the model payload."""
+    from harness.counterfactual_identity import audit_panel_non_interference
+    from runner.panel_selector import load_personas
+    from runner.persona_agent import render_prompt
+
+    artifact_bundle = runner_cli.load_artifact_bundle(artifact)
+    personas_path = personas or str(PROJECT_ROOT / "personas" / "game-core.yaml")
+    persona_prompt_path = str(PROJECT_ROOT / "templates" / "persona-prompt.md")
+    panel = load_personas(personas_path)
+    if limit is not None:
+        if limit < 1:
+            raise click.BadParameter("must be greater than zero", param_hint="--limit")
+        panel = panel[:limit]
+
+    artifact_summary = artifact_bundle.get("title", "")
+
+    def render(persona):
+        return render_prompt(
+            persona,
+            task_type,
+            artifact_summary,
+            persona_prompt_path,
+            artifact_bundle,
+        )
+
+    result = audit_panel_non_interference(panel, render)
+    _print("\n=== Counterfactual identity invariance audit ===")
+    _print(f"Personas: {result['persona_count']} | interventions: {result['intervention_count']}")
+    _print(f"Score: {result['score']:.4f} | {'PASS' if result['passed'] else 'FAIL'}")
+    if result["failures"]:
+        for failure in result["failures"]:
+            _print(f"  [red]{failure['persona_id']} / {failure['field']} changed the model payload[/red]")
+    _print(f"[yellow]Scope: {result['limitation']}[/yellow]")
+
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        _print(f"Result saved: {output_path}")
+
+    if not result["passed"]:
+        raise click.ClickException("a protected identity field reached the model payload")
 
 
 @main.command()

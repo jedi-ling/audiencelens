@@ -86,6 +86,9 @@ POST /api/v2/reviews
   │     ← 每个人格完成即回调 → WS: review.persona_completed {persona_id, done, total}
   │                              WS: review.progress {progress: 5→80}
   │                              job.progress 同步更新
+  │     ← adaptive_panel=true 时先跑小面板，再按任务亲和度 / 行为新颖度 /
+  │       证据缺口覆盖率逐个扩面；低于阈值或达到成本上限即停止。
+  │       报告中的 method 明示为 marginal_value_proxy_v1（启发式，不冒充信息增益）
   ├─ 安全网：若 result.simulated == true → 直接丢弃并报错（不让假数据入库）
   ├─ 落库 report + persona_outputs
   ├─ ledger.record_judgments()             ← 预测盖时间戳留档（护城河）
@@ -133,7 +136,7 @@ WS 连不上时自动回落轮询 `GET /api/v2/reviews/{id}`。
 | **意图解析** | 启用 | LLM 档 + 启发式降级档（无 key 也能用） | 默认即用 |
 | **LLM 服务商** | 启用 | 双路径出口 `runner/llm_client.py`：Anthropic 原生 SDK + 任意 OpenAI 兼容 HTTP（DeepSeek/Kimi/通义千问/智谱GLM/Ollama），不依赖 litellm | BYOK/平台 key 各自存 `provider/model/api_base`；`/api/keys/test`、`/api/admin/server-key/test` 走同一条真实链路，不是摆设 |
 | **多模态** | 启用 | 图片走独立上传白名单转 `data:` URI；内部统一用 OpenAI Vision 内容块，按 provider 转换（Anthropic）或原样透传；非视觉模型静默降级为纯文字，不中断评审 | `/api/uploads` 图片扩展名默认 `.png,.jpg,.jpeg,.webp,.gif`；`VISION_CAPABLE_PREFIXES` 控制哪些模型真正"看" |
-| **判断复利** | 启用 | 预测留档、回填验证、命中率、人格排行 | 默认即用 |
+| **判断复利** | 启用 | 可证伪干预假设留档、回填验证、命中率、Brier/ECE 校准、人格排行 | 默认即用 |
 | **CDK 兑换码** | 启用 | 后台批量生成、免登录兑换（匿名自动签发游客身份）、防枚举限流；两种配额模式：`plan`（日限用完后垫）/ `credits`（纯次数制，每次评审 -1，用完即止） | CDK 发码运营：`AL_AUTH_ENABLED=true` + `AL_QUOTA_ENABLED=true` + `AL_QUOTA_MODE=credits`（次数只对服务端垫付 key 生效） |
 | **结构化错误** | 启用 | 9 种错误码、统一 `{error:{code,message}}` | 新错误继承 `AppError` |
 | **可观测性** | 启用 | 请求 ID、耗时日志、`X-Request-Id` 回传 | 接 Sentry：改 `core/logging.py` |
@@ -162,16 +165,19 @@ CLI 里保留模拟模式（带醒目警告）仅供开发者验证流水线。
 
 ### 4.3 判断复利闭环是护城河，不是附加功能
 
-一次性评审工具跑完就断了，经验不沉淀。这一层把每条**可证伪的预测**盖时间戳留档，
-真人测试回来回填 Outcome。于是系统能回答"P14 的判断历史上准不准"。
+一次性评审工具跑完就断了，经验不沉淀。这一层把优先修复项转换成带
+`target_metric / comparison / success_criterion / verification_window` 的
+**可证伪干预假设**并盖时间戳留档。它不虚构效果量，置信度明确标为尚未实证校准的
+合成面板启发式。真人测试回来回填 Outcome。于是系统能回答"P14 的判断历史上准不准"。
 
 我们的验证来源是**真实用户测试**——干净的 ground truth，不像股价那样掺运气噪音。
 
 **诚实原则写进代码**：样本 < 10 时 `low_confidence=true` 且 `note` 明说"不具统计意义"，
 UI 必须显示。绝不用 3 个样本吹准确率。
 
-**闭环目前只闭了一半（别对外说成"越用越准"）**：留档、回填、命中率、`low_confidence`
-标注、leaderboard 都已实现，但 `hit_rate` **没有**接回 `panel_selector` 或聚合权重——
+**闭环目前仍未自动反哺推理（别对外说成"越用越准"）**：留档、回填、命中率、
+Brier Score、ECE、可靠性分箱、`low_confidence` 标注、leaderboard 都已实现，
+但历史结果**没有**接回 `panel_selector` 或聚合权重——
 系统不会因为历史命中率而自动改选人或调权，要不要更信某个人格由用户自己判断。
 "自动反馈回路"是路线图，不是现状；把最后这根线接上之前，"护城河"是设计意图而非既成事实。
 另注：v1 链路目前不记 judgment，两条链路的口径尚未统一。
@@ -198,6 +204,7 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 | GET | `/api/ledger/judgments` | 历史预测（`only_unverified=true` 即待回填工作台） |
 | POST | `/api/ledger/judgments/{id}/verify` | 回填真实结果 |
 | GET | `/api/ledger/hit-rate` | 命中率（带 `low_confidence` 诚实标注） |
+| GET | `/api/ledger/calibration` | 置信度可靠性（Brier Score、ECE、五档分箱；小样本警告） |
 | GET | `/api/ledger/leaderboard` | 人格命中率排行 |
 | WS | `/ws/review/{id}` | 进度推送 |
 | GET | `/api/admin/overview` | 跨用户系统概览（需 `X-Admin-Token`，见 §8） |
