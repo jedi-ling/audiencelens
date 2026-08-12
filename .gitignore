@@ -27,6 +27,11 @@ web/admin/dist/
 .impeccable/
 .trae/
 
+# HyperFrames 宣传片工程的预览缩略图。文件名里带内容哈希与时间戳，
+# 每次预览都会生成一批新的——进了 git 就是每改一次动画多堆几十个 jpg，
+# 而它们从源文件（index.html）随时可以重新生成。
+audiencelens-*/.thumbnails/
+
 # 一次性生成的评审/审计报告。它们是某次跑出来的快照，不是仓库的一部分——
 # 留在工作区可以，进 git 只会让每个人的仓库里堆着别人某天跑的结果。
 audiencelens-audience-panel-report.*

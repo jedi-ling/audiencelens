@@ -12,7 +12,9 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -55,8 +57,44 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    """探活 + 当前生效的链路开关（绝不泄露密钥）。"""
+    """探活 + 当前生效的链路开关（绝不泄露密钥）。
+
+    注意这条**不碰数据库**，是纯进程存活探测，用于容器 healthcheck 之类
+    "进程还在不在"的场景。要判断"服务是不是真的能用"，用 /health/ready。
+    """
     return {"status": "ok", "config": settings.sanitized()}
+
+
+@router.get("/health/ready")
+async def health_ready(db: Session = Depends(get_db)):
+    """就绪探测：真的打一次数据库，不可用时返回 503。
+
+    为什么需要单独一条：上面的 /health 返回的 "ok" 是写死的字符串，
+    数据库挂掉、磁盘满、连接池耗尽时它**照样 200**。拿它接 UptimeRobot
+    这类外部监控，监控到的只是"uvicorn 进程还活着"——而用户看到的是
+    每个页面都在报错。这正是"监控一片绿、服务全挂"的经典形态。
+
+    刻意只查数据库，不查上游模型服务商：
+      · 上游是按调用计费的，健康检查每分钟打一次会产生真实账单
+      · 上游抖动不该让本服务被判定为宕机（评审会失败，但站点是能用的）
+    上游的可用性通过后台「系统健康度」的失败率趋势事后观察，不做实时探测。
+
+    不需要鉴权：外部监控探针没有令牌，加了鉴权就没法用了。
+    响应里也刻意不含任何业务数据，只有 ok/error 两种形态。
+    """
+    try:
+        # SELECT 1 是最轻的连通性探测：不读表、不加锁、不受数据量影响。
+        # 用 text() 显式包一层——SQLAlchemy 2.x 不再接受裸字符串 SQL。
+        db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001  连通性探测要抓所有异常
+        # 把异常类型带出去（不带消息——消息里可能有连接串/主机名）。
+        # 监控告警里能看到 OperationalError 还是 TimeoutError，排查方向完全不同。
+        logger.error("readiness probe failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "checks": {"database": type(exc).__name__}},
+        )
+    return {"status": "ok", "checks": {"database": "ok"}}
 
 
 # ============================== 认证（埋线）==============================

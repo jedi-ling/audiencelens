@@ -44,7 +44,19 @@ _probe_db_url() {
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BACKEND_DIR="$REPO_ROOT/web/backend"
-VENV_PY="${VENV_PY:-$REPO_ROOT/.venv/bin/python}"
+
+# venv 的 python 在 Linux 下是 bin/python，Windows（Git Bash）下是
+# Scripts/python.exe。两种都探，否则开发机上没法先试跑一遍再挂到服务器。
+_default_venv_py() {
+    if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+        echo "$REPO_ROOT/.venv/bin/python"
+    elif [ -x "$REPO_ROOT/.venv/Scripts/python.exe" ]; then
+        echo "$REPO_ROOT/.venv/Scripts/python.exe"
+    else
+        echo "$REPO_ROOT/.venv/bin/python"
+    fi
+}
+VENV_PY="${VENV_PY:-$(_default_venv_py)}"
 
 DB_URL=""
 if [ -x "$VENV_PY" ] && [ -d "$BACKEND_DIR" ]; then
@@ -82,33 +94,62 @@ case "$DB_URL" in
     # sqlite:///relative/path 与 sqlite:////abs/path 都由这一句还原
     DB_FILE="${DB_URL#sqlite:///}"
     OUT="$BACKUP_DIR/reviews-${STAMP}.db"
-    TMP_IN_CONTAINER="${DB_FILE}.backup-tmp"
 
-    # 用 sqlite3 的 backup API（运行中也能安全备份，不是裸 cp）。
-    # 库文件不存在就直接失败——不能让 connect() 现造一个空库当备份。
-    docker compose exec -T backend python - "$DB_FILE" "$TMP_IN_CONTAINER" <<'PY'
+    # 备份逻辑（sqlite3 的 backup API，运行中也能安全备份，不是裸 cp）。
+    #
+    # SRC_ARG 约定：给 "-" 就让 Python 自己去读 settings.database_url，
+    # 否则用传进来的路径。这一层间接是为了本机分支——库路径含非 ASCII
+    # 字符时（比如中文目录名），Python→bash→Python 的往返会被 shell 的编码
+    # 环境改写，得到一个"库文件不存在"的假故障。让 Python 自己算就没有这一趟。
+    _SQLITE_BACKUP_PY='
 import os
 import sqlite3
 import sys
 
-src_path, tmp_path = sys.argv[1], sys.argv[2]
+src_arg, tmp_path = sys.argv[1], sys.argv[2]
+if src_arg == "-":
+    sys.path.insert(0, os.getcwd())
+    from app.config import settings
+    src_path = settings.database_url[len("sqlite:///"):]
+else:
+    src_path = src_arg
+
 if not os.path.isfile(src_path):
     sys.exit(f"ERROR: SQLite 库文件不存在：{src_path}（AL_DATABASE_URL 指错了？）")
 src = sqlite3.connect(src_path)
 dst = sqlite3.connect(tmp_path)
 src.backup(dst)
 tables = dst.execute(
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
+    "SELECT COUNT(*) FROM sqlite_master WHERE type=\"table\""
 ).fetchone()[0]
 dst.close()
 src.close()
 if tables == 0:
     sys.exit(f"ERROR: 备份出来的库一张表都没有：{src_path} 是空库")
 print(f"backup ok: {src_path} ({tables} tables)")
-PY
+'
 
-    docker compose cp "backend:$TMP_IN_CONTAINER" "$OUT"
-    docker compose exec -T backend rm -f "$TMP_IN_CONTAINER"
+    # 与 PostgreSQL 分支同一口径：先试本机，再回落容器。
+    #
+    # 这里以前只有 docker 那条路，而 DEPLOY-BAREMETAL.md 恰恰让人把本脚本挂进
+    # crontab —— 裸机 + SQLite 的部署，备份每天定时失败一次（docker: command
+    # not found），且没人会去看那个日志。等于"以为自己有每日备份"，实际一份都没有。
+    if [ -x "$VENV_PY" ]; then
+        # 输出路径要先转绝对：下面 cd 进了 backend 目录，相对路径会落错地方
+        OUT_ABS="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
+        (cd "$BACKEND_DIR" && "$VENV_PY" -c "$_SQLITE_BACKUP_PY" "-" "$OUT_ABS")
+    elif command -v docker >/dev/null 2>&1; then
+        TMP_IN_CONTAINER="${DB_FILE}.backup-tmp"
+        docker compose exec -T backend python -c "$_SQLITE_BACKUP_PY" \
+            "$DB_FILE" "$TMP_IN_CONTAINER"
+        docker compose cp "backend:$TMP_IN_CONTAINER" "$OUT"
+        docker compose exec -T backend rm -f "$TMP_IN_CONTAINER"
+    else
+        echo "ERROR: 库是 SQLite，但本机既没有可用的 venv python 也没有 docker。" >&2
+        echo "       未做任何备份（绝不假装成功）。" >&2
+        echo "       裸机请确认 VENV_PY，容器部署请确认 docker compose 可用。" >&2
+        exit 1
+    fi
     # 先验未压缩的大小再压：一个只有表结构的 SQLite 也有 8KB 以上，
     # 压完却可能不到 1KB——拿压缩后的字节数当阈值会把新装实例误判成空库。
     _verify_size "$OUT"
