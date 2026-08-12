@@ -1,8 +1,24 @@
 # 生产叠加层：Caddy 终结 TLS（自动申请/续期 Let's Encrypt 证书）。
 # 用法：
-#   1. cp .env.production.example .env 并填写（含 FRONTEND_BIND=127.0.0.1:8080 和 SITE_DOMAIN）
+#   1. cp .env.production.example .env 并填写 SITE_DOMAIN
 #   2. docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 services:
+  # 用这一层把前端从公网 80 上挪走，而不是依赖运维在 .env 里记得设
+  # FRONTEND_BIND。
+  #
+  # 原来的分工是：基础层写 "${FRONTEND_BIND:-80}:80"，模板里给一行
+  # FRONTEND_BIND=127.0.0.1:8080，叠加层不管。漏填的后果不是报个错就完事：
+  # frontend 先起来占住宿主 :80（caddy depends_on frontend），caddy 再想绑 :80
+  # 就失败退出——站点仍然"能打开"，只是**全程明文 HTTP、没有任何 TLS**，
+  # 而 docker compose up 的输出里只有一行不起眼的容器启动失败。
+  # 这是典型的"看起来部署成功了"。
+  #
+  # 叠加层自己钉死绑定，运维少填一项也不会掉进这个坑。仍留 PROD_FRONTEND_BIND
+  # 可覆盖：有人把 Caddy 换成外部 nginx/云负载均衡时需要改这个端口。
+  frontend:
+    ports:
+      - "${PROD_FRONTEND_BIND:-127.0.0.1:8080}:80"
+
   caddy:
     image: caddy:2-alpine
     ports:

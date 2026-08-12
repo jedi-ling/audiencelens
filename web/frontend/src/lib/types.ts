@@ -67,16 +67,20 @@ export class ApiError extends Error {
   }
 }
 
+/** GET /api/health 的 config。
+ *
+ * 这个端点不鉴权，所以后端只回**前端真的要用的**四项，而不是所有非密钥配置。
+ * 曾经还回过 env / ratelimit_enabled / queue_backend / ledger_enabled /
+ * review_concurrency，前端一个都没消费——但它们组合起来是一张给攻击者的
+ * 侦察表（限流关没关、配额关没关、有没有平台密钥）。详见 config.sanitized()。
+ *
+ * 想加字段前先问：前端真的会读它吗？读不到的字段不该出现在公开响应里。
+ * 后端有 test_health_config_parity 守着这两边一致。 */
 export interface HealthConfig {
-  env: string
   auth_enabled: boolean
   key_mode: 'byok' | 'managed' | 'hybrid'
   server_key_present: boolean
   quota_enabled: boolean
-  ratelimit_enabled: boolean
-  queue_backend: string
-  ledger_enabled: boolean
-  review_concurrency: number
 }
 
 /** GET /api/v2/shared/{token} 的响应——公开只读视图。

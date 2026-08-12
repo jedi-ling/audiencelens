@@ -9,18 +9,22 @@ import pytest
 
 class TestHealth:
     def test_health_exposes_switches(self, client):
+        """只暴露前端真的要用的四个开关。
+
+        这条原来还断言 ratelimit_enabled / queue_backend / ledger_enabled
+        必须存在。它们后来被移出公开响应了——/api/health 不鉴权，而前端
+        （唯一消费点 session-store.ts）从没读过这三个；
+        ratelimit_enabled=false + quota_enabled=false + server_key_present=true
+        组合起来正是"这里可以免费无限调模型"的侦察信息。
+
+        字段集的完整约束（不许多给 / 不许少给 / 白名单里的必须真有人读）
+        在 test_health_config_parity.py 里，这里只保底钉住四个必需项。
+        """
         r = client.get("/api/health")
         assert r.status_code == 200
         cfg = r.json()["config"]
-        for k in (
-            "auth_enabled",
-            "key_mode",
-            "quota_enabled",
-            "ratelimit_enabled",
-            "queue_backend",
-            "ledger_enabled",
-        ):
-            assert k in cfg
+        for k in ("auth_enabled", "key_mode", "quota_enabled", "server_key_present"):
+            assert k in cfg, f"前端依赖 {k}，它必须留在 /api/health 里"
 
     def test_health_never_leaks_secret(self, client):
         body = client.get("/api/health").text
