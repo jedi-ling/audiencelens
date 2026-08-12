@@ -1257,6 +1257,8 @@ class CreateReviewRequest(BaseModel):
     enable_evaluation: bool = False
     # 追加红队对抗视角提示（与 skill_type 独立——选了别的技能也能叠加红队）
     enable_red_team: bool = False
+    # 自动面板才可用；显式 selected_personas 时引擎保留全员并在报告中解释禁用原因。
+    adaptive_panel: bool = False
 
 
 # 路径不能用 /skills/quota —— api/__init__.py 已经有 /api/skills/{skill_type}，
@@ -1346,6 +1348,7 @@ async def create_review_v2(
         project_key=body.project_key,
         enable_evaluation=body.enable_evaluation,
         enable_red_team=enable_red_team,
+        adaptive_panel=body.adaptive_panel,
         key_source=resolved.source,
         mode=body.mode,
         status="pending",
@@ -1433,6 +1436,7 @@ async def get_review_v2(
         "mode": review.mode,
         "persona_pack": review.persona_pack,
         "selected_personas": review.selected_personas,
+        "adaptive_panel": review.adaptive_panel,
         "skill_type": review.skill_type,
         "project_key": review.project_key,
         "status": review.status,
@@ -1954,6 +1958,17 @@ async def hit_rate(
     """历史命中率。样本不足时会如实标注 low_confidence。"""
     require_isolated_identity(identity)
     return ledger_service.hit_rate(db, identity.user_id, persona_id)
+
+
+@router.get("/ledger/calibration")
+async def confidence_calibration(
+    persona_id: Optional[str] = None,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """置信度与真实回填结果的可靠性：Brier 分数、ECE 与分箱明细。"""
+    require_isolated_identity(identity)
+    return ledger_service.confidence_calibration(db, identity.user_id, persona_id)
 
 
 @router.get("/ledger/leaderboard")

@@ -767,6 +767,7 @@ class ReviewService:
         project_key: Optional[str] = None,
         enable_red_team: bool = False,
         enable_evaluation: bool = False,
+        adaptive_panel: bool = False,
         key_source: Optional[str] = None,
     ) -> Review:
         review = Review(
@@ -784,6 +785,7 @@ class ReviewService:
             # 永远是 False——用户在 v1 打开的"启用评估"开关不会有任何效果，
             # 而报告页会显示"暂无评估结果"，看起来像是评估跑失败了。
             enable_evaluation=enable_evaluation,
+            adaptive_panel=adaptive_panel,
             key_source=key_source,
             mode=mode,
             status="pending",

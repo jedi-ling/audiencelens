@@ -25,6 +25,7 @@ class ReviewCreate(BaseModel):
     # 也没有任何回执说明。这是"以为开了其实没开"，比直接 422 更坏。
     enable_red_team: bool = False
     enable_evaluation: bool = False
+    adaptive_panel: bool = False
 
 
 class PersonaOutputResponse(BaseModel):
@@ -51,6 +52,7 @@ class ReviewResponse(BaseModel):
     selected_personas: Optional[List[str]] = None
     skill_type: Optional[str] = None
     project_key: Optional[str] = None
+    adaptive_panel: bool = False
     mode: str = "standard"
     status: str
     created_at: datetime

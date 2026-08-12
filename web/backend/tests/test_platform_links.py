@@ -136,6 +136,16 @@ class TestKeyResolution:
 # ============================== 评审入口：无 key 必须拒绝 ==============================
 
 class TestReviewGuards:
+    def test_v2_request_accepts_adaptive_panel_switch(self):
+        from app.api.platform import CreateReviewRequest
+
+        body = CreateReviewRequest(
+            task_type="concept_review",
+            artifact={"title": "x", "materials": []},
+            adaptive_panel=True,
+        )
+        assert body.adaptive_panel is True
+
     def test_create_review_without_key_returns_428(self, client, monkeypatch):
         from app.config import settings
 
@@ -352,6 +362,52 @@ class TestLedger:
         assert "价格超出心理预期" in claims
         assert any(r["persona_id"] == "P14" for r in rows)
 
+    def test_explicit_predictions_take_priority_and_keep_verification_contract(self, db):
+        from app.models import Judgment, Review
+        from app.services import ledger_service
+
+        report = {
+            "predictions": [
+                {
+                    "prediction_id": "PRED-001",
+                    "type": "intervention_hypothesis",
+                    "claim": "修复首屏价格信息后，paid_conversion_rate 相较当前版本将提高",
+                    "issue": "首屏没有价格",
+                    "intervention": "首屏展示价格",
+                    "target_metric": "paid_conversion_rate",
+                    "direction": "increase",
+                    "comparison": "treatment_vs_current_control",
+                    "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+                    "verification_window": "14d",
+                    "verification_method": "controlled_comparison",
+                    "severity": "high",
+                    "confidence": 0.7,
+                    "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+                    "affected_personas": ["P01", "P02"],
+                    "evidence": "两位合成人格均无法判断价值",
+                    "is_synthetic": True,
+                }
+            ],
+            # predictions 存在时不能再把旧 priority_fix 重复落一次。
+            "priority_fixes": [{"title": "首屏没有价格", "severity": "high"}],
+        }
+        rows = ledger_service.extract_judgments_from_report(report)
+        assert len(rows) == 1
+        assert rows[0]["evidence"]["target_metric"] == "paid_conversion_rate"
+
+        review = Review(
+            user_id="u-prediction-contract",
+            task_type="pricing_page_review",
+            artifact_bundle={},
+            status="completed",
+        )
+        db.add(review)
+        db.commit()
+        assert ledger_service.record_judgments(db, review, report) == 1
+        stored = db.query(Judgment).filter(Judgment.review_id == review.id).one()
+        assert stored.evidence["verification_method"] == "controlled_comparison"
+        assert stored.evidence["confidence_basis"].endswith("not_empirically_calibrated")
+
     def test_record_and_verify_and_hit_rate(self, db):
         from app.models import Review
         from app.services import ledger_service
@@ -415,7 +471,44 @@ class TestLedger:
     def test_ledger_endpoints(self, client):
         assert client.get("/api/ledger/judgments").status_code == 200
         assert client.get("/api/ledger/hit-rate").status_code == 200
+        assert client.get("/api/ledger/calibration").status_code == 200
         assert client.get("/api/ledger/leaderboard").status_code == 200
+
+    def test_confidence_calibration_uses_verified_outcomes(self, db):
+        from app.models import Judgment, Outcome, Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-calibration",
+            task_type="concept_review",
+            artifact_bundle={},
+            status="completed",
+        )
+        db.add(review)
+        db.flush()
+        samples = [(0.9, "hit"), (0.8, "miss"), (0.5, "partial"), (None, "hit")]
+        for confidence, verdict in samples:
+            judgment = Judgment(
+                review_id=review.id,
+                user_id="u-calibration",
+                claim=f"claim-{confidence}-{verdict}",
+                confidence=confidence,
+            )
+            db.add(judgment)
+            db.flush()
+            db.add(Outcome(judgment_id=judgment.id, verdict=verdict))
+        db.commit()
+
+        result = ledger_service.confidence_calibration(db, "u-calibration")
+        assert result["verified_rows"] == 4
+        assert result["sample_size"] == 3
+        assert result["excluded_rows"] == 1
+        assert result["mean_predicted_confidence"] == pytest.approx(0.733, abs=0.001)
+        assert result["observed_hit_score"] == 0.5
+        assert result["brier_score"] == pytest.approx(0.2167, abs=0.0001)
+        assert result["expected_calibration_error"] is not None
+        assert result["low_confidence"] is True
+        assert "不具统计意义" in result["note"]
 
 
 # ============================== 错误契约 ==============================

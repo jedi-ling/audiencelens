@@ -157,6 +157,7 @@ def create_review(
         skill_type=skill_type,   # 降级后的值
         enable_red_team=enable_red_team,  # 同上，必须是降级后的值
         enable_evaluation=data.enable_evaluation,
+        adaptive_panel=data.adaptive_panel,
         project_key=data.project_key,
         # v1 也要落这两个字段。只改 v2 的话，从 v1 入口发起的评审在技能计次里
         # 完全看不见——用户走那条路就能无限用高级技能。这个仓库反复出现的

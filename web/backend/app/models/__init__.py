@@ -65,6 +65,9 @@ class Review(Base):
     # 评审完成后自动运行质量评估（8 维评分）——Wizard"启用评估"开关的落点。
     # 此前该开关从 UI 传到后端被 schema 静默丢弃，从来没有生效过。
     enable_evaluation = Column(Boolean, default=False, nullable=False)
+    # 自动选人时先跑小面板，再按可解释的边际价值代理逐个扩面。
+    # 显式点名人格时 runner 会自动禁用，保证用户指定的角色一个不少。
+    adaptive_panel = Column(Boolean, default=False, nullable=False)
     mode = Column(String, default="standard", nullable=False)
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)

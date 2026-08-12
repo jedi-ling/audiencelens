@@ -191,6 +191,10 @@ def _legacy_migrations() -> None:
         patches.append(
             "ALTER TABLE reviews ADD COLUMN enable_red_team BOOLEAN DEFAULT false NOT NULL"
         )
+    if "adaptive_panel" not in columns:
+        patches.append(
+            "ALTER TABLE reviews ADD COLUMN adaptive_panel BOOLEAN DEFAULT false NOT NULL"
+        )
     if "key_source" not in columns:
         # 可空、无默认：老数据确实不知道当时花的是谁的钱，写成 'byok' 会是编造，
         # 写成 'server' 会凭空给老用户扣掉免费次数。NULL 如实表达"不知道"，
