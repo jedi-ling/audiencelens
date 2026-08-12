@@ -87,7 +87,21 @@ const sections = [
         details: [
           '不用你的内容训练任何模型——我们不训练模型，也不向任何人出售或共享你的数据',
           '不拿你的项目内容做案例展示、宣传素材或公开样本',
-          '不在你未要求时读取你的内容；运维排障也不会把你的材料复制到别处',
+          '运维排障不会把你的材料复制到别处，也不会转手给任何第三方',
+        ],
+      },
+      {
+        type: 'use',
+        label: '管理端可见范围（我们如实说明）',
+        details: [
+          // 早期版本这里写的是"不在你未要求时读取你的内容"——管理后台上线评审
+          // 巡检功能后，这条承诺已经不成立了：处理客诉、排查滥用、核对计费
+          // 争议时，运营方（目前是本站唯一的开发者）可以在未经你主动求助的
+          // 情况下打开评审内容。与其让承诺继续挂着不实的文案，不如把真实
+          // 边界写清楚。
+          '为处理客诉、排查滥用、核对计费争议，运营方可以查看评审内容，不需要你先主动求助',
+          '这类访问会记入后台审计日志（时间、被查看的评审），但目前不会主动通知你',
+          '这不改变上面那条：内容不会被用来训练模型、做案例展示，或转手给任何第三方',
         ],
       },
     ],
@@ -211,7 +225,9 @@ import { cn } from '@/lib/utils'
 
 export default function PrivacyPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
+    // 长文排版：max-w-3xl 收阅读宽度；正文 leading-7；段前距大于段后距（space-y-8 / mb-4）；
+    // 邮箱等长串加 break-all 防移动端横向溢出。
+    <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-10">
         <Link
           to="/"
@@ -244,7 +260,7 @@ export default function PrivacyPage() {
                 section.bgColor
               )}
             >
-              <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-3 mb-4">
                 <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', section.iconBg)}>
                   <SectionIcon className={cn('w-5 h-5', section.color)} strokeWidth={1.25} />
                 </div>
@@ -307,7 +323,7 @@ export default function PrivacyPage() {
           </p>
           <a
             href="mailto:audience-lens@example.com"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium"
+            className="inline-flex max-w-full items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium break-all"
           >
             <Mail className="w-4 h-4" strokeWidth={1.25} />
             audience-lens@example.com

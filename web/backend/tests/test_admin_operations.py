@@ -493,6 +493,26 @@ class TestUserDetail:
         _enable_admin(monkeypatch)
         assert client.get("/api/admin/users/nope", headers=_headers()).status_code == 404
 
+    def test_viewing_detail_is_audited(self, client, monkeypatch):
+        """隐私政策原话："这类访问会记入后台审计日志"——这条测试守着这句话不是空话。
+
+        列表页 (/users) 不含评审内容，不必记；这个端点会带出 recent 评审标题，
+        属于政策里说的"查看内容"，必须留痕。
+        """
+        _enable_admin(monkeypatch)
+        uid, _ = self._signup(client, "ops-audit-view@example.com")
+        client.get(f"/api/admin/users/{uid}", headers=_headers())
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        hit = [e for e in entries if e["action"] == "user.view_detail" and e["target"] == "ops-audit-view@example.com"]
+        assert hit, "查看了用户详情，但审计日志里没有留痕"
+
+    def test_404_does_not_get_audited(self, client, monkeypatch):
+        """查不存在的用户不算"看到了内容"，不该污染审计日志。"""
+        _enable_admin(monkeypatch)
+        client.get("/api/admin/users/no-such-user", headers=_headers())
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        assert not [e for e in entries if e["action"] == "user.view_detail"]
+
     def test_never_returns_key_ciphertext(self, client, monkeypatch, db):
         """后台要能看到"这人配没配 BYOK"，但绝不能看到密钥本身。
 
