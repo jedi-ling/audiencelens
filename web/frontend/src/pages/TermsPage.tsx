@@ -309,6 +309,20 @@ export default function TermsPage() {
           </Link>
           ，了解我们如何处理你的数据。
         </p>
+
+        {/* 备案主体信息。条款是一份协议，用户有权知道对方是谁——
+            只在页脚放一个备案号，等于告诉用户"有备案"但不告诉他跟谁签的约。 */}
+        <p className="mt-4 text-xs text-text-muted">
+          本服务备案主体：
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mx-1 hover:text-text-secondary transition-colors"
+          >
+            苏ICP备2025198057号
+          </a>
+        </p>
       </section>
     </div>
   )

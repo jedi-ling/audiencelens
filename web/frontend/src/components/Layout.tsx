@@ -490,6 +490,18 @@ export default function Layout() {
             <span className="text-[10px] text-text-muted">
               © 2026 AudienceLens
             </span>
+            {/* ICP 备案号。工信部要求：在网站首页**底部**公示，且必须超链接到
+                beian.miit.gov.cn（《互联网信息服务管理办法》）。
+                target/rel 是安全惯例——noopener 防止新标签页通过 window.opener
+                回改本页。 */}
+            <a
+              href="https://beian.miit.gov.cn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+            >
+              苏ICP备2025198057号
+            </a>
           </div>
         </div>
       </footer>
