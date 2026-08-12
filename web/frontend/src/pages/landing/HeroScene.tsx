@@ -402,6 +402,14 @@ export default function HeroScene() {
       raf = requestAnimationFrame(tick)
       cleanups.push(() => cancelAnimationFrame(raf))
 
+      // 切回 tab 时恢复渲染：tick 遇 document.hidden 只停不启，不挂这个监听
+      // 页面最小化过就永久黑屏（start() 无人调用）。unload 兜底停掉 rAF 链。
+      const onVisChange = () => {
+        if (document.hidden) stop()
+        else start()
+      }
+      window.addEventListener('visibilitychange', onVisChange)
+
       const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting }, {
         threshold: 0.01,
       })
@@ -409,6 +417,10 @@ export default function HeroScene() {
       cleanups.push(() => io.disconnect())
 
       cleanups.push(() => {
+        window.removeEventListener('visibilitychange', onVisChange)
+        // 探针挂着会让 renderer 上的一切（几何/材质/缓冲）整树被闭包引用住，
+        // 卸载后无法被 GC。删全局引用与 dispose 缺一不可。
+        delete (window as unknown as Record<string, unknown>).__heroLum
         renderer.dispose()
         main.geo.dispose()
         main.mat.dispose()

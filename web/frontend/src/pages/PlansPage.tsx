@@ -135,30 +135,28 @@ export default function PlansPage() {
       </header>
 
       {/* ---------- 当前状态：这个部署到底按什么规则算额度 ---------- */}
-      <section className="mb-8 space-y-3">
-        {!quotaEnabled && (
-          <Banner tone="info">
-            当前部署<strong className="font-semibold">未开启配额限制</strong>，评审暂不受次数约束。
-          </Banner>
-        )}
-        {quotaEnabled && creditsMode && (
-          <Banner tone="info">
-            当前部署按 <strong className="font-semibold">CDK 次数制</strong>计费：每次评审消耗 1 次，用完可再兑。
-          </Banner>
-        )}
-        {byokOnly && (
+      <section className="mb-8 space-y-2">
+        {byokOnly ? (
           <Banner tone="info">
             当前部署为 <strong className="font-semibold">BYOK 模式</strong>：评审使用你自己填的 Key，套餐额度不生效。
           </Banner>
-        )}
+        ) : !quotaEnabled ? (
+          <Banner tone="info">
+            当前部署<strong className="font-semibold">未开启配额限制</strong>，评审暂不受次数约束。
+          </Banner>
+        ) : creditsMode ? (
+          <Banner tone="info">
+            当前部署按 <strong className="font-semibold">CDK 次数制</strong>计费：每次评审消耗 1 次，用完可再兑。
+          </Banner>
+        ) : null}
         {authEnabled && isAnonymous && (
-          <Banner tone="warn">
+          <p className="text-xs text-text-muted">
             未登录时用量保存在浏览器本地（共享匿名身份）。
-            <Link to="/register" className="ml-1 underline underline-offset-2 hover:text-text-primary">
+            <Link to="/register" className="underline underline-offset-2 hover:text-text-primary">
               注册账号
             </Link>
             后，额度与账号绑定。
-          </Banner>
+          </p>
         )}
       </section>
 
@@ -258,7 +256,7 @@ export default function PlansPage() {
         ) : loading ? (
           <div className="rounded-xl border border-border bg-bg-card p-6 text-sm text-text-muted">正在读取套餐…</div>
         ) : (
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3 md:items-stretch">
             {(plans ?? []).map((plan) => {
               const isCurrent = plan.id === currentPlanId
               const isFree = plan.price_usd_month <= 0
@@ -277,18 +275,21 @@ export default function PlansPage() {
                 <div
                   key={plan.id}
                   className={cn(
-                    'group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300',
+                    // h-full 撑满 grid 行：三张卡同高，底部操作区靠 mt-auto 对齐到同一基线
+                    'group relative flex h-full flex-col overflow-hidden rounded-2xl border transition-all duration-300',
                     isCurrent
-                      ? 'border-brand-primary/40 bg-brand-primary/[0.04] shadow-[0_8px_32px_rgba(0,113,227,0.1)]'
+                      // 当前档的视觉权重来自描边 + 底色，不靠错位浮动 badge 破坏整行基线
+                      ? 'border-brand-primary/50 bg-brand-primary/[0.06] shadow-[0_8px_32px_rgba(0,113,227,0.12)]'
                       : 'border-border bg-bg-card shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-1',
                   )}
                 >
                   {/* 顶部渐变 accent 条 */}
                   <div className={cn('h-1.5 w-full bg-gradient-to-r', tierColor)} />
 
-                  {/* 当前档位角标 */}
+                  {/* 当前档位标记：放在卡内文档流里（右上角），不用 absolute 浮出卡片，
+                      三张卡的内容起点保持同一基线 */}
                   {isCurrent && (
-                    <div className="absolute right-3 top-3">
+                    <div className="flex justify-end px-6 pt-4">
                       <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
                         <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
                         当前使用
@@ -296,7 +297,7 @@ export default function PlansPage() {
                     </div>
                   )}
 
-                  <div className="p-6">
+                  <div className={cn('flex flex-1 flex-col p-6', isCurrent && 'pt-3')}>
                     {/* 档位名 + 图标 */}
                     <div className="mb-4 flex items-center gap-2.5">
                       <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm', tierAccent)}>
@@ -310,9 +311,9 @@ export default function PlansPage() {
                       </div>
                     </div>
 
-                    {/* 价格：大字号 + 强对比 */}
+                    {/* 价格：大字号 + 强对比；tabular-nums 让三档数字纵向对齐 */}
                     <div className="mb-5 flex items-baseline gap-1">
-                      <span className="font-display text-4xl font-extrabold tracking-tight text-text-primary">
+                      <span className="font-display text-4xl font-extrabold tracking-tight text-text-primary tabular-nums">
                         {money(plan.price_usd_month)}
                       </span>
                       <span className="text-sm text-text-muted">/ 月</span>
@@ -325,7 +326,7 @@ export default function PlansPage() {
                           <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
                         </div>
                         <span>
-                          每天 <strong className="text-text-primary">{plan.reviews_per_day}</strong> 次评审
+                          每天 <strong className="text-text-primary tabular-nums">{plan.reviews_per_day}</strong> 次评审
                         </span>
                       </li>
                       <li className="flex items-start gap-2.5">

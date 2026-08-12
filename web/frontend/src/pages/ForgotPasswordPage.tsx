@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 忘记密码：申请重置链接。
  *
  * 无论邮箱是否注册过，界面都显示同样的成功文案——后端本来就不区分
@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
       {/* 必须是真的 <form>：此前是「input + onKeyDown + 按钮 onClick」的拼装式提交，
           代价是浏览器/密码管理器认不出这是账号相关表单（不自动填邮箱），
           读屏软件也拿不到表单语义。这一页只有一个字段，更没有理由不用 form。 */}
-      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-6">
+      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-8">
         {sent ? (
           <div className="text-center">
             <p className="text-sm text-text-primary">如果该邮箱已注册，重置链接已经发出。</p>

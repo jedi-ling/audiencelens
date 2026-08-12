@@ -22,10 +22,13 @@ interface CalibrationGaugeProps {
   passLineNote?: string
 }
 
-const COLOR_PASS = '#34c759'
+// 深色主题：合格线颜色沿用深色语义 token（status-completed / severity-high / severity-critical），
+// 弧线底色和缺省色沿用 border / text-muted——原来的 #e5e5ea 弧线在 #1c1c1e 卡片上亮得刺眼。
+const COLOR_PASS = '#32d74b'
 const COLOR_NEAR = '#ff9f0a'
-const COLOR_FAIL = '#ff3b30'
-const COLOR_NEUTRAL = '#86868b'
+const COLOR_FAIL = '#ff453a'
+const COLOR_NEUTRAL = '#636366'
+const COLOR_TRACK = '#38383a'
 
 export default function CalibrationGauge({ label, value, max = 1, passLine, passLineNote }: CalibrationGaugeProps) {
   const missing = value === null || value === undefined || Number.isNaN(value)
@@ -71,7 +74,7 @@ export default function CalibrationGauge({ label, value, max = 1, passLine, pass
             y1={75 + 52 * Math.sin(passRad)}
             x2={70 + 68 * Math.cos(passRad)}
             y2={75 + 68 * Math.sin(passRad)}
-            stroke="#86868b"
+            stroke="#8e8e93"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -89,7 +92,7 @@ export default function CalibrationGauge({ label, value, max = 1, passLine, pass
         <circle cx="70" cy="75" r="4" fill={color} />
       </svg>
       <div className="text-center">
-        <span className="font-display text-lg font-bold" style={{ color }}>
+        <span className="font-display text-lg font-bold tabular-nums" style={{ color }}>
           {missing ? '—' : `${percentage.toFixed(0)}%`}
         </span>
         <p className="text-xs text-text-secondary mt-0.5">{label}</p>

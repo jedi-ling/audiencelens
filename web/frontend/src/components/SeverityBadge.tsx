@@ -15,8 +15,11 @@ const severityConfig: Record<Severity, { label: string; className: string }> = {
 export default function SeverityBadge({ severity }: SeverityBadgeProps) {
   const config = severityConfig[severity]
   return (
+    // rounded-md：与全站徽章圆角统一（原 rounded=0.25rem 偏小）。
+    // 语义 token 类名必须是完整字面量，Tailwind 才扫得到——severityConfig 里的
+    // 拼接已经满足这一点，别改成模板字符串组装。
     <span className={cn(
-      'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border',
+      'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium',
       config.className
     )}>
       {config.label}

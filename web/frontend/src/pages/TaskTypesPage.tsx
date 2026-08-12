@@ -4,6 +4,7 @@ import { TASK_TYPES, TASK_TYPE_CATEGORIES } from '@/lib/mock-data'
 import type { TaskTypeDetail } from '@/lib/mock-data'
 import { fetchTaskTypes, fetchTaskType } from '@/lib/api'
 import { X, Loader2, AlertTriangle, Shapes } from 'lucide-react'
+import { PageShell, PageHeader, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
 // category 是纯前端概念：后端 TaskTypeResponse 里没有这个字段，只有 task_type/name_zh/
 // description/stance_enum/score_dimensions/base_dimensions。所以分组只能靠本地的
@@ -115,38 +116,31 @@ export default function TaskTypesPage() {
     )
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-text-primary font-display mb-2">任务类型</h1>
-        <p className="text-text-secondary text-sm">
-          {/* 数字只在真拿到后端列表时才出现，加载中/失败时不显示任何可被证伪的计数 */}
-          {taskTypes
+    <PageShell size="grid">
+      <PageHeader
+        title="任务类型"
+        // 数字只在真拿到后端列表时才出现，加载中/失败时不显示任何可被证伪的计数
+        subtitle={
+          taskTypes
             ? `共 ${taskTypes.length} 种评审任务类型`
             : listError
               ? '任务类型清单加载失败'
-              : '正在加载任务类型清单'}
-        </p>
-      </div>
+              : '正在加载任务类型清单'
+        }
+      />
 
       {listError && (
-        <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/5 p-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" strokeWidth={1.25} />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-text-primary">无法加载任务类型</p>
-              <p className="text-xs text-text-secondary mt-1">{listError}</p>
-              <p className="text-xs text-text-muted mt-1">
-                这里显示的不是"没有任务类型"，而是没能取到清单，请重试。
-              </p>
-              <button
-                onClick={loadList}
-                className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-bg-card hover:border-brand-primary/40 text-text-primary transition-colors"
-              >
-                重新加载
-              </button>
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          icon={AlertTriangle}
+          tone="error"
+          title="无法加载任务类型"
+          description={`${listError}——这里显示的不是"没有任务类型"，而是没能取到清单，请重试。`}
+          action={
+            <button onClick={loadList} className={SECONDARY_BUTTON_CLASS}>
+              重新加载
+            </button>
+          }
+        />
       )}
 
       {!taskTypes && !listError && (
@@ -157,9 +151,7 @@ export default function TaskTypesPage() {
       )}
 
       {taskTypes && taskTypes.length === 0 && (
-        <div className="py-16 text-center">
-          <p className="text-sm text-text-secondary">后端当前没有开放任何评审任务类型。</p>
-        </div>
+        <EmptyState icon={Shapes} title="后端当前没有开放任何评审任务类型" />
       )}
 
       {taskTypes && taskTypes.length > 0 && (
@@ -183,7 +175,9 @@ export default function TaskTypesPage() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {/* 网格断点与角色库/技能中心统一一档（sm 2 列 / lg 3 列），
+              卡片内容差异大，靠 line-clamp + mt-auto 拉齐标题/描述/底部基线 */}
+          <div className={CARD_GRID_CLASS}>
             {visibleTypes.map((tt) => {
               const local = localById.get(tt.task_type)
               const categoryId = categoryOf(tt.task_type)
@@ -195,7 +189,7 @@ export default function TaskTypesPage() {
                 <button
                   key={tt.task_type}
                   onClick={() => handleCardClick(tt.task_type)}
-                  className="flex flex-col gap-3 p-5 rounded-xl border border-border bg-bg-card hover:bg-bg-card-hover hover:border-brand-primary/30 transition-all text-left group"
+                  className="flex h-full flex-col gap-3 p-5 rounded-xl border border-border bg-bg-card hover:bg-bg-card-hover hover:border-brand-primary/30 transition-all text-left group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-primary/10 shrink-0">
@@ -212,7 +206,8 @@ export default function TaskTypesPage() {
                     </div>
                   </div>
 
-                  <p className="text-xs text-text-secondary leading-relaxed">{tt.description}</p>
+                  {/* 描述行数差很多：clamp 到 3 行才能让同一行网格的卡片底边对齐 */}
+                  <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">{tt.description}</p>
 
                   {tt.stance_enum.length > 0 && (
                     <div>
@@ -316,7 +311,7 @@ export default function TaskTypesPage() {
                 </div>
               ) : (
                 <div className="py-6 text-center">
-                  <AlertTriangle className="w-6 h-6 text-red-500 mx-auto mb-3" strokeWidth={1.25} />
+                  <AlertTriangle className="w-6 h-6 text-severity-critical mx-auto mb-3" strokeWidth={1.25} />
                   <p className="text-sm text-text-primary">无法加载详情</p>
                   <p className="text-xs text-text-secondary mt-1">{detailError ?? '请稍后重试'}</p>
                 </div>
@@ -325,6 +320,6 @@ export default function TaskTypesPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

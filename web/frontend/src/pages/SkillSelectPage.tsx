@@ -5,6 +5,7 @@ import { TASK_TYPES } from '@/lib/mock-data'
 import { NON_REVIEW_SKILL_TYPES, loadSkillTruth } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import { AlertTriangle, ArrowRight, Layers, RefreshCw } from 'lucide-react'
+import { PageShell, PageHeader, EmptyState, CARD_GRID_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui'
 
 export default function SkillSelectPage() {
   const navigate = useNavigate()
@@ -58,53 +59,49 @@ export default function SkillSelectPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="text-center mb-10">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-green mb-3">
-          技能中心
-        </h1>
-        <p className="text-text-secondary max-w-2xl mx-auto">
-          {/* 原文是「不同技能提供差异化的评审策略和角色配置」，对 4 个技能一视同仁。
-              实际只有红队对抗与受众面板会往提示词里加视角说明，合成试玩是默认流程、
-              人格生成压根没接进评审。改成只承诺「换一种视角」这件确实发生的事。 */}
-          选择评审技能：技能决定评审员以哪种视角来看你的材料，具体人数和角色仍由你在创建评审时选择
-        </p>
-      </div>
+    <PageShell size="grid">
+      <PageHeader
+        center
+        title="技能中心"
+        subtitle={
+          <>
+            {/* 原文是「不同技能提供差异化的评审策略和角色配置」，对 4 个技能一视同仁。
+                实际只有红队对抗与受众面板会往提示词里加视角说明，合成试玩是默认流程、
+                人格生成压根没接进评审。改成只承诺「换一种视角」这件确实发生的事。 */}
+            选择评审技能：技能决定评审员以哪种视角来看你的材料，具体人数和角色仍由你在创建评审时选择
+          </>
+        }
+      />
 
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" aria-busy="true">
+        <div className={CARD_GRID_CLASS} aria-busy="true">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-64 rounded-2xl border-2 border-border bg-bg-card animate-pulse" />
+            <div key={i} className="h-64 rounded-xl border border-border bg-bg-card animate-pulse" />
           ))}
         </div>
       )}
 
       {!loading && error && (
-        <div className="rounded-2xl border-2 border-red-500/30 bg-red-500/5 p-8 text-center">
-          <AlertTriangle className="w-8 h-8 mx-auto mb-3 text-red-500" strokeWidth={1.25} />
-          <h2 className="font-display text-lg font-bold mb-1">技能列表没能加载出来</h2>
-          <p className="text-sm text-text-secondary mb-4">{error}</p>
-          <p className="text-xs text-text-muted mb-5">
-            这不代表你的技能被停用了，只是这次没取到列表，请重试。
-          </p>
-          <button
-            onClick={load}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
-            重新加载
-          </button>
-        </div>
+        <EmptyState
+          icon={AlertTriangle}
+          tone="error"
+          title="技能列表没能加载出来"
+          description={`${error}——这不代表你的技能被停用了，只是这次没取到列表，请重试。`}
+          action={
+            <button onClick={load} className={PRIMARY_BUTTON_CLASS}>
+              <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
+              重新加载
+            </button>
+          }
+        />
       )}
 
       {!loading && !error && skills?.length === 0 && (
-        <div className="rounded-2xl border-2 border-border bg-bg-card p-8 text-center text-sm text-text-secondary">
-          当前账号下没有可用的评审技能。
-        </div>
+        <EmptyState icon={Layers} title="当前账号下没有可用的评审技能" />
       )}
 
       {!loading && !error && skills && skills.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={CARD_GRID_CLASS}>
           {skills.map((skill) => {
             const deco = skill.deco
             // 任务类型只认后端详情里的 task_types。这里以前用的是本地 SKILLS[].task_types，
@@ -130,17 +127,18 @@ export default function SkillSelectPage() {
                 disabled={!startsReview}
                 aria-disabled={!startsReview}
                 className={cn(
-                  'group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 text-left',
+                  // h-full + flex-col 让卡片在网格行内等高；底部 CTA 用 mt-auto 对齐基线
+                  'group relative flex flex-col h-full p-6 rounded-xl border-2 transition-all duration-300 text-left',
                   'bg-bg-card',
                   border,
                   startsReview
-                    ? 'hover:bg-bg-card-hover hover:scale-[1.02] hover:shadow-lg'
+                    ? 'hover:bg-bg-card-hover hover:shadow-lg'
                     : 'opacity-70 cursor-not-allowed'
                 )}
               >
-                <div className={cn('absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none', bg)} />
+                <div className={cn('absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none', bg)} />
 
-                <div className="relative z-10">
+                <div className="relative z-10 flex flex-col flex-1">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
                       {deco ? (
@@ -200,12 +198,12 @@ export default function SkillSelectPage() {
                   )}
 
                   {startsReview ? (
-                    <div className={cn('flex items-center gap-2 text-sm font-medium transition-colors', color)}>
+                    <div className={cn('mt-auto flex items-center gap-2 text-sm font-medium transition-colors', color)}>
                       <span>使用此技能创建评审</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={1.25} />
                     </div>
                   ) : (
-                    <div className="flex items-start gap-2 text-xs text-text-muted leading-relaxed">
+                    <div className="mt-auto flex items-start gap-2 text-xs text-text-muted leading-relaxed">
                       <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
                       <span>
                         该技能还没有接入评审流程：从这里创建评审不会改变评审的跑法，
@@ -219,6 +217,6 @@ export default function SkillSelectPage() {
           })}
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

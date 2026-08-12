@@ -19,6 +19,7 @@ import {
   type HealthConfig,
   type SharedReport,
   type UploadConfig,
+  type ConfidenceCalibration,
   type HitRate,
   type Identity,
   type IntentResult,
@@ -486,6 +487,7 @@ export const api = {
     mode?: ReviewMode
     persona_pack?: PersonaPack
     selected_personas?: string[]
+    adaptive_panel?: boolean
     skill_type?: string | null
     project_key?: string | null
     /** 评审完成后自动运行 8 维质量评估 */
@@ -671,6 +673,12 @@ export const api = {
 
   hitRate: (personaId?: string) =>
     request<HitRate>(`/api/ledger/hit-rate${personaId ? `?persona_id=${personaId}` : ''}`),
+
+  /** 置信度校准。hitRate 回答"说中了几次"，这个回答"说自己有把握时准不准"。 */
+  calibration: (personaId?: string) =>
+    request<ConfidenceCalibration>(
+      `/api/ledger/calibration${personaId ? `?persona_id=${personaId}` : ''}`,
+    ),
 
   leaderboard: () => request<{ personas: LeaderboardEntry[] }>('/api/ledger/leaderboard'),
 

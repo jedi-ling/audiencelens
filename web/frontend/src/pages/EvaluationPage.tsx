@@ -15,6 +15,7 @@ import {
 } from '@/lib/mock-data'
 import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, AlertCircle, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
 import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { PageShell, PageHeader, EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
 /** 「还没生成」和「加载失败」必须分开：前者是正常状态，后者是故障。
  *  后端 GET /api/evaluations/{id} 在没有记分卡时返回 404，其余状态码都是真故障。 */
@@ -116,10 +117,10 @@ export default function EvaluationPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <PageShell size="reading" animate={false} className="py-16 text-center">
         <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-4" strokeWidth={1.25} />
         <p className="text-text-secondary">加载评估报告...</p>
-      </div>
+      </PageShell>
     )
   }
 
@@ -129,36 +130,36 @@ export default function EvaluationPage() {
     const blocking = !scorecard ? scorecardError : reviewError
     const notGenerated = !scorecard && isNotGenerated(scorecardError)
     return (
-      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
-        {notGenerated ? (
-          <>
-            <FlaskConical className="w-10 h-10 text-text-muted mx-auto mb-4" strokeWidth={1.25} />
-            <p className="text-text-secondary mb-2">评估报告尚未生成</p>
-            <p className="text-text-muted text-sm mb-6">请先在评审报告页运行评估</p>
-          </>
-        ) : (
-          <>
-            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-4" strokeWidth={1.25} />
-            <p className="text-text-secondary mb-2">没能加载评估报告</p>
-            <p className="text-text-muted text-sm mb-1 break-all">{errMessage(blocking)}</p>
-            <p className="text-text-muted text-sm mb-6">这不代表评估没跑过——接口可能临时抖动，点下面重试</p>
-            <button
-              onClick={handleRetry}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-all mb-6"
-            >
-              <Loader2 className="w-4 h-4" strokeWidth={1.25} />
-              重试
-            </button>
-          </>
-        )}
-        <Link
-          to={`/review/${id}/report`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-all text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
-          返回评审报告
-        </Link>
-      </div>
+      <PageShell size="reading" animate={false} className="py-16">
+        <div className="mx-auto max-w-2xl">
+          {notGenerated ? (
+            <EmptyState
+              icon={FlaskConical}
+              title="评估报告尚未生成"
+              description="请先在评审报告页运行评估"
+            />
+          ) : (
+            <EmptyState
+              icon={AlertCircle}
+              tone="error"
+              title="没能加载评估报告"
+              description={`${errMessage(blocking)}——这不代表评估没跑过，接口可能只是临时抖动`}
+              action={
+                <button onClick={handleRetry} className={PRIMARY_BUTTON_CLASS}>
+                  <Loader2 className="w-4 h-4" strokeWidth={1.25} />
+                  重试
+                </button>
+              }
+            />
+          )}
+          <div className="mt-4 text-center">
+            <Link to={`/review/${id}/report`} className={SECONDARY_BUTTON_CLASS}>
+              <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
+              返回评审报告
+            </Link>
+          </div>
+        </div>
+      </PageShell>
     )
   }
 
@@ -174,16 +175,17 @@ export default function EvaluationPage() {
   })
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={`/review/${id}/report`} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
-          <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-semibold text-text-primary truncate">评估报告</h1>
-          <p className="text-sm text-text-secondary">{review.target_title}</p>
-        </div>
-      </div>
+    // 阅读型页面：正文列收窄居中（recharts 自带响应式容器，图表不需要横向滚动兜底）
+    <PageShell size="reading">
+      <PageHeader
+        leading={
+          <Link to={`/review/${id}/report`} aria-label="返回评审报告" className="p-2 rounded-lg hover:bg-bg-card transition-colors">
+            <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
+          </Link>
+        }
+        title="评估报告"
+        subtitle={review.target_title}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-1 rounded-xl border border-border bg-bg-card p-6 flex flex-col items-center justify-center">
@@ -197,7 +199,7 @@ export default function EvaluationPage() {
                 : 'border-severity-critical bg-severity-critical/10'
           )}>
             <span className={cn(
-              'text-3xl font-bold font-mono',
+              'text-3xl font-bold font-mono tabular-nums',
               scorecard.overall_score > 70
                 ? 'text-brand-primary'
                 : scorecard.overall_score >= 50
@@ -227,16 +229,17 @@ export default function EvaluationPage() {
           <h3 className="text-sm font-medium text-text-muted mb-4">维度雷达图</h3>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="#e5e5ea" />
-              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#86868b' }} />
+              {/* 深色底上 #e5e5ea 网格会亮得刺眼；刻度/网格/雷达线统一用深色适配色 */}
+              <PolarGrid stroke="#38383a" />
+              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#8e8e93' }} />
               {/* 轴上限 = 单维度满分 3，不是 0–100：按 100 画会把满分压成一个贴着
                   圆心的点，整张雷达图恒定塌陷成一团 */}
-              <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#86868b' }} />
+              <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#636366' }} />
               <Radar
                 name="评分"
                 dataKey="score"
-                stroke="#32ade6"
-                fill="#32ade6"
+                stroke="#0a84ff"
+                fill="#0a84ff"
                 fillOpacity={0.2}
                 strokeWidth={2}
               />
@@ -351,7 +354,8 @@ export default function EvaluationPage() {
       {ethicsData.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
+          {/* lucide 调色板里没有 purple 语义 token；用品牌蓝保持一致，伦理摘要本就是辅助区 */}
+          <Shield className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">伦理摘要</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -457,6 +461,6 @@ export default function EvaluationPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

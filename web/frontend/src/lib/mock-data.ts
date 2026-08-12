@@ -627,6 +627,7 @@ export interface Review {
   artifact_bundle: Record<string, unknown>
   persona_pack?: string
   selected_personas?: string[]
+  adaptive_panel: boolean
   mode: ReviewMode
   status: 'pending' | 'running' | 'completed' | 'failed'
   created_at: string

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 评审进度页 —— 同时接住 v1 / v2 两条链路。
  *
  * v1（旧）：/api/reviews/{id} 返回含 persona_outputs 的全量 Review，
@@ -578,14 +578,16 @@ export default function ReviewProgressPage() {
         )}
       </div>
 
-      {/* 总进度条：与对话评审页同一套金色视觉语言 */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className="text-text-muted">总进度</span>
-          <span className="font-medium text-text-secondary">{overallProgress}%</span>
+      {/* 总进度条：与对话评审页同一套金色视觉语言。
+          页面是等待型——用户会盯着它 30-120 秒，所以百分比数字放大、
+          进度条加粗，总览成为全页视觉权重最高的一块 */}
+      <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="flex items-baseline justify-between mb-2">
+          <span className="text-sm text-text-muted">总进度</span>
+          <span className="font-display text-2xl md:text-3xl font-bold text-text-primary">{overallProgress}%</span>
         </div>
         {/* 跑批时百分比会在某个人格思考时卡住十几秒，静止的条会被读成「卡死」→ 非终态挂流光 */}
-        <div className={cn('h-2 overflow-hidden rounded-full bg-bg-card', !terminal && 'shimmer-bar')}>
+        <div className={cn('h-3 overflow-hidden rounded-full bg-bg-secondary', !terminal && 'shimmer-bar')}>
           <div
             className="h-full rounded-full bg-brand-primary transition-all duration-700"
             style={{ width: `${overallProgress}%` }}
@@ -614,15 +616,30 @@ export default function ReviewProgressPage() {
         </div>
       )}
 
-      {/* 失败：如实展示 error_message */}
+      {/* 失败：如实展示 error_message，并给出明确的下一步动作——
+          只有一个红色说明框会把人晾在这里 */}
       {status === 'failed' && (
         <div className="mb-6 rounded-xl border-2 border-severity-critical/30 bg-bg-card p-4 flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-severity-critical shrink-0 mt-0.5" strokeWidth={1.25} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-severity-critical">评审失败</p>
             <p className="text-xs text-text-secondary mt-1 break-all">
               {errorMessage ?? '执行失败，请稍后重试'}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Link
+                to="/create"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-primary-dim"
+              >
+                重新发起评审
+              </Link>
+              <Link
+                to="/history"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
+              >
+                返回评审历史
+              </Link>
+            </div>
           </div>
         </div>
       )}
@@ -644,7 +661,7 @@ export default function ReviewProgressPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <div className="rounded-xl border border-border bg-bg-card p-3 md:p-4">
           <div className="flex items-center gap-2 text-text-muted mb-1">
             <Clock className="w-3.5 h-3.5" strokeWidth={1.25} />
@@ -805,7 +822,7 @@ export default function ReviewProgressPage() {
             })}
           </div>
         ) : v2CompletedIds.length > 0 || v2Total > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch gap-3">
             {/* v2：逐人格打勾（事件只告诉我们谁完成了） */}
             {v2CompletedIds.map((pid) => {
               const persona = personas.find((p) => p.id === pid)
@@ -846,7 +863,7 @@ export default function ReviewProgressPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <div className="flex items-center gap-2 mb-3">
             {/* 排队中也给点生命感；running 已有流光，别两个动效打架 */}

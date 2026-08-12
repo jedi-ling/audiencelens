@@ -145,6 +145,17 @@ export default function Layout() {
     setAccountOpen(false)
   }, [location.pathname])
 
+  // 抽屉打开时锁定 body 滚动，否则矮屏手机上手滑滚动的是被遮罩盖住的背景页面，
+  // 抽屉本身内容又滚不动。Layout 几乎不会卸载，cleanup 以关闭抽屉为主要触发点。
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen])
+
   // Esc 键关闭移动端菜单
   useEffect(() => {
     if (!menuOpen) return
@@ -156,7 +167,7 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-clip relative" style={{ isolation: 'auto' }}>
+    <div className="min-h-screen flex flex-col overflow-x-clip relative bg-black" style={{ isolation: 'auto' }}>
       {/* 全页背景图：按路由切换，position:fixed 铺满视口，滚动时纹丝不动。
          只对非 landing 页生效——landing 有自己的视频+粒子背景，不要叠加。
          z-index -1 让它落在所有内容之下。 */}
@@ -287,7 +298,7 @@ export default function Layout() {
             aria-label="菜单"
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
-            className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-card transition-colors"
+            className="lg:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-card transition-colors"
           >
             {menuOpen ? (
               <X className="w-5 h-5" strokeWidth={1.25} />
@@ -370,7 +381,7 @@ export default function Layout() {
             <Link
               to="/privacy"
               onClick={() => setMenuOpen(false)}
-              className="mt-4 flex items-center gap-3 border-t border-black/5 px-4 py-3 pt-5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
+              className="mt-4 flex shrink-0 items-center gap-3 border-t border-black/5 px-4 py-3 pt-5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
             >
               <span>隐私政策</span>
             </Link>
@@ -422,7 +433,7 @@ export default function Layout() {
       </main>
 
       {!isAskPage && (
-      <footer className="relative border-t border-white/[0.06] py-10 shrink-0 bg-black/60 backdrop-blur-md">
+      <footer className="relative z-[2] bg-black border-t border-white/[0.06] py-10 shrink-0">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
             <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 评审历史列表——之前产品里完全没有这个页面，用户发起评审后除了当次的进度页
  * 链接，没有任何地方能回看"我都评审过什么"。数据走 fetchReviewsPage()
  * （/api/reviews），后端已按登录身份过滤（见 app/api/__init__.py 的
@@ -18,7 +18,6 @@ import { fetchReviewsPage, deleteReview, REVIEWS_PAGE_SIZE } from '@/lib/api'
 import { TASK_TYPES } from '@/lib/mock-data'
 import type { ReviewListItem, ReviewMode } from '@/lib/mock-data'
 import {
-  History,
   Loader2,
   FileText,
   Trash2,
@@ -33,6 +32,7 @@ import {
   ChevronDown,
   CheckCircle2,
 } from 'lucide-react'
+import { PageShell, PageHeader, EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
   pending: { label: '等待中', color: 'text-text-muted', bg: 'bg-bg-secondary' },
@@ -184,17 +184,16 @@ export default function ReviewHistoryPage() {
         : `共 ${total} 条`
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <History className="w-6 h-6 text-brand-primary" strokeWidth={1.25} />
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">评审历史</h1>
-          <p className="text-sm text-text-secondary mt-0.5">你发起过的所有评审，点进去看报告或继续跟进</p>
-        </div>
-        {countLabel && (
-          <span className="ml-auto shrink-0 text-xs text-text-muted tabular-nums">{countLabel}</span>
-        )}
-      </div>
+    <PageShell size="reading">
+      <PageHeader
+        title="评审历史"
+        subtitle="你发起过的所有评审，点进去看报告或继续跟进"
+        actions={
+          countLabel
+            ? <span className="text-xs text-text-muted tabular-nums">{countLabel}</span>
+            : undefined
+        }
+      />
 
       {error && (
         <div className="mb-4 flex items-center gap-2 text-sm text-severity-critical">
@@ -212,28 +211,27 @@ export default function ReviewHistoryPage() {
         /* 空列表要分清两种情况：真的没有记录，和"没加载出来"。
            以前加载失败时这里会照样显示"还没有评审记录"——用户会以为数据没了。 */
         error ? (
-          <div className="py-16 text-center rounded-xl border border-border bg-bg-card">
-            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-3" strokeWidth={1.25} />
-            <p className="text-text-secondary text-sm mb-1">没能加载评审历史</p>
-            <p className="text-text-muted text-xs mb-4">这不代表记录被删除了，请重试或稍后再来</p>
-            <button
-              onClick={() => void loadFirstPage()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-text-primary transition-colors"
-            >
-              重试
-            </button>
-          </div>
+          <EmptyState
+            icon={AlertCircle}
+            tone="error"
+            title="没能加载评审历史"
+            description="这不代表记录被删除了，请重试或稍后再来"
+            action={
+              <button onClick={() => void loadFirstPage()} className={SECONDARY_BUTTON_CLASS}>
+                重试
+              </button>
+            }
+          />
         ) : (
-          <div className="py-16 text-center rounded-xl border border-border bg-bg-card">
-            <Inbox className="w-10 h-10 text-text-muted mx-auto mb-3" strokeWidth={1.25} />
-            <p className="text-text-secondary text-sm mb-4">还没有评审记录</p>
-            <Link
-              to="/ask"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-colors"
-            >
-              发起第一次评审 →
-            </Link>
-          </div>
+          <EmptyState
+            icon={Inbox}
+            title="还没有评审记录"
+            action={
+              <Link to="/ask" className={PRIMARY_BUTTON_CLASS}>
+                发起第一次评审 →
+              </Link>
+            }
+          />
         )
       ) : (
         (() => {
@@ -392,6 +390,6 @@ export default function ReviewHistoryPage() {
           )
         })()
       )}
-    </div>
+    </PageShell>
   )
 }

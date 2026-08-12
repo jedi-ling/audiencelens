@@ -51,7 +51,7 @@ import {
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy, Target, Layers } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -179,8 +179,57 @@ export interface RealReport {
   budget?: RealBudget | null
   validation?: RealValidation | null
   panel_selection?: RealPanelSelection | null
+  /** 可证伪预测：把"建议"升格成带目标指标/对照方式/验证窗口的假设。
+   *  引擎刻意不编效果量（confidence_basis 恒为合成面板启发式），
+   *  展示时必须把这个口径一起写出来，否则用户会把它当成实测结论。 */
+  predictions?: RealPrediction[]
+  /** 自适应面板的执行轨迹。requested/enabled 分开是有意的：
+   *  用户点名了角色时会被禁用，那种情况要说明"为什么没自适应"而不是装作没请求过。 */
+  adaptive_panel?: RealAdaptivePanel | null
   is_gated?: boolean
   gated_counts?: { priority_fixes_hidden?: number; persona_notes_hidden?: number }
+}
+
+export interface RealPrediction {
+  prediction_id?: string
+  claim?: string
+  issue?: string
+  intervention?: string
+  target_metric?: string
+  direction?: 'increase' | 'decrease'
+  success_criterion?: string
+  verification_window?: string
+  verification_method?: string
+  severity?: string | null
+  /** 0–1。它是启发式，不是实测命中率——渲染时永远和 confidence_basis 一起出现 */
+  confidence?: number
+  confidence_basis?: string
+  status?: string
+  is_synthetic?: boolean
+  affected_personas?: string[]
+}
+
+export interface RealAdaptivePanel {
+  requested?: boolean
+  enabled?: boolean
+  /** 请求了但被禁用时的原因，如 explicit_persona_selection */
+  disabled_reason?: string | null
+  method?: string
+  initial_size?: number | null
+  eligible_personas?: number
+  executed_personas?: number
+  /** 省下的人格调用次数。这是自适应面板唯一能自证价值的数字 */
+  saved_persona_calls?: number
+  min_score?: number | null
+  decisions?: Array<{
+    panel_size_before?: number
+    recommended_persona_id?: string | null
+    should_continue?: boolean
+    stop_reason?: string | null
+    score?: number
+    unresolved_evidence?: string[]
+  }>
+  limitation?: string | null
 }
 
 interface RealCalibration {
@@ -347,6 +396,178 @@ function ValidationGateNotice({ validation }: { validation?: RealValidation | nu
           </ul>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** 可证伪预测清单。
+ *
+ * 这是报告里唯一"能被真实世界证伪"的部分：每条都有目标指标、变更方向、
+ * 判定标准和验证窗口。它存在的意义是让用户能回填真实结果（判断留档闭环），
+ * 而不是又一份"建议清单"。
+ *
+ * 展示纪律：confidence 必须和 confidence_basis 同框出现。那个数字是合成面板的
+ * 启发式权重，不是历史命中率——单独把 "0.72" 摆出来，用户会当成实测置信度，
+ * 而这正是本仓库反复防的那类过度声称。
+ */
+function PredictionsSection({ predictions }: { predictions?: RealPrediction[] }) {
+  const rows = (predictions ?? []).filter((p) => p && (p.claim || p.intervention))
+  if (rows.length === 0) return null
+
+  const DIRECTION_LABEL: Record<string, string> = { increase: '提升', decrease: '降低' }
+
+  return (
+    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Target className="w-4 h-4 text-cyan" strokeWidth={1.25} />
+        <h3 className="text-sm font-semibold text-text-primary">可证伪预测</h3>
+        <span className="ml-auto text-xs text-text-muted">{rows.length} 条</span>
+      </div>
+      <p className="mb-4 text-xs leading-relaxed text-text-muted">
+        每条都写明了目标指标与判定标准，可以拿去做真实验证。
+        跑完真人测试后回填结果，就能反过来校准这套面板的准确率。
+      </p>
+
+      <ul className="space-y-3">
+        {rows.map((p, i) => (
+          <li key={p.prediction_id ?? i} className="rounded-lg border border-border bg-bg-secondary p-3">
+            <p className="text-sm text-text-primary">{p.claim || p.intervention}</p>
+
+            <dl className="mt-2 grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-2">
+              {p.target_metric && (
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 text-text-muted">目标指标</dt>
+                  <dd className="text-text-secondary">
+                    {p.target_metric}
+                    {p.direction && (
+                      <span className="ml-1 text-cyan">
+                        （{DIRECTION_LABEL[p.direction] ?? p.direction}）
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
+              {p.verification_window && (
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 text-text-muted">验证窗口</dt>
+                  <dd className="text-text-secondary">{p.verification_window}</dd>
+                </div>
+              )}
+              {p.success_criterion && (
+                <div className="flex gap-1.5 sm:col-span-2">
+                  <dt className="shrink-0 text-text-muted">判定标准</dt>
+                  <dd className="text-text-secondary">{p.success_criterion}</dd>
+                </div>
+              )}
+              {p.verification_method && (
+                <div className="flex gap-1.5 sm:col-span-2">
+                  <dt className="shrink-0 text-text-muted">验证方式</dt>
+                  <dd className="text-text-secondary">{p.verification_method}</dd>
+                </div>
+              )}
+            </dl>
+
+            {typeof p.confidence === 'number' && (
+              // 数字与口径同框：单独摆 0.72 会被读成实测置信度
+              <p className="mt-2 border-t border-border pt-2 text-[11px] text-text-muted">
+                启发式置信度 {(p.confidence * 100).toFixed(0)}%
+                <span className="ml-1">
+                  —— 由合成面板规则算出，<b className="font-medium">尚未经真实结果校准</b>，
+                  不代表历史命中率
+                </span>
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** 自适应面板的执行轨迹。
+ *
+ * 这个区块回答一个用户会直接问的问题："你说帮我省了成本，省在哪？"
+ * saved_persona_calls 是它唯一能自证价值的数字，所以放在最显眼的位置。
+ *
+ * requested 与 enabled 分开展示是有意的：用户点名了角色时会被自动禁用，
+ * 那种情况必须说明"为什么没自适应"，而不是装作用户没请求过。
+ */
+function AdaptivePanelSection({ adaptive }: { adaptive?: RealAdaptivePanel | null }) {
+  // 没请求过就整块不显示——固定面板是默认行为，没必要天天告诉用户"你没开这个功能"
+  if (!adaptive?.requested) return null
+
+  const DISABLED_REASON_LABEL: Record<string, string> = {
+    explicit_persona_selection: '你显式点名了角色，少跑其中任何一个都会违背你的意图，因此本次保持固定面板',
+  }
+  const STOP_REASON_LABEL: Record<string, string> = {
+    cost_budget_reached: '触发成本上限，停止扩面',
+    marginal_value_below_threshold: '继续扩面的边际价值低于阈值，停止',
+  }
+
+  const saved = adaptive.saved_persona_calls ?? 0
+
+  return (
+    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Layers className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
+        <h3 className="text-sm font-semibold text-text-primary">自适应面板</h3>
+      </div>
+
+      {!adaptive.enabled ? (
+        <p className="text-sm text-text-secondary">
+          本次未启用。
+          {adaptive.disabled_reason && (
+            <span className="text-text-muted">
+              {' '}
+              {DISABLED_REASON_LABEL[adaptive.disabled_reason] ?? adaptive.disabled_reason}
+            </span>
+          )}
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg border border-border bg-bg-secondary p-3">
+              <p className="text-xs text-text-muted">实际评审人格</p>
+              <p className="mt-1 font-display text-xl text-text-primary">
+                {adaptive.executed_personas ?? '—'}
+                <span className="text-sm text-text-muted"> / {adaptive.eligible_personas ?? '—'}</span>
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-bg-secondary p-3">
+              <p className="text-xs text-text-muted">省下的调用</p>
+              <p className={cn('mt-1 font-display text-xl', saved > 0 ? 'text-brand-primary' : 'text-text-primary')}>
+                {saved}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-bg-secondary p-3">
+              <p className="text-xs text-text-muted">起始面板</p>
+              <p className="mt-1 font-display text-xl text-text-primary">{adaptive.initial_size ?? '—'}</p>
+            </div>
+          </div>
+
+          {(adaptive.decisions ?? []).length > 0 && (
+            <ol className="mt-4 space-y-1.5">
+              {(adaptive.decisions ?? []).map((d, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-text-secondary">
+                  <span className="shrink-0 text-text-muted">{(d.panel_size_before ?? 0)} 人后</span>
+                  <span>
+                    {d.should_continue
+                      ? `扩入 ${d.recommended_persona_id ?? '下一位人格'}`
+                      : STOP_REASON_LABEL[d.stop_reason ?? ''] ?? '停止扩面'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {adaptive.limitation && (
+            // 引擎自带的局限声明，原样透出——这是"扩面分数是启发式而非实测信息增益"的自陈
+            <p className="mt-3 border-t border-border pt-3 text-[11px] leading-relaxed text-text-muted">
+              扩面分数是可解释的启发式，不是实测信息增益，其权重仍需用真实验证结果校准。
+            </p>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -1337,9 +1558,11 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto px-4 py-6 animate-fade-in">
       {/* 三条诚实信号一律置顶，不滚动就能看到：合成声明（ETHICS.md 强制）、
-          模拟占位输出、人格降级。它们比报告结论本身更需要被先看到。 */}
+          模拟占位输出、人格降级。它们比报告结论本身更需要被先看到。
+          max-w-3xl 与正文同宽——正文阅读列收窄后，全宽横幅会显得比正文"更重要" */}
+      <div className="max-w-3xl mx-auto">
       <SyntheticBanner />
       {report.simulation_notice && (
         <div className="mb-4 rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-4 text-sm font-bold text-severity-critical md:text-base">
@@ -1351,12 +1574,15 @@ export default function ReportPage() {
       <ValidationGateNotice validation={report.validation} />
       <BudgetNotice budget={report.budget} />
       <PanelSelectionNotice panelSelection={report.panel_selection} />
+      </div>
 
-      <div className="flex items-center gap-3 mb-6">
+      {/* 页面头部独立成全宽一行：标题 + 操作组，和下面收窄的正文阅读列分层。
+          分享/导出按钮原本跟在标题行尾部，现在收拢成一个胶囊分组，不再东一个西一个 */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-border pb-4">
         <Link to={`/review/${id}`} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
         </Link>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[12rem]">
           <h1 className="text-xl font-semibold text-text-primary truncate">
             {review.target_title || report.meta?.target || '评审报告'}
           </h1>
@@ -1368,14 +1594,14 @@ export default function ReportPage() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 rounded-xl border border-border bg-bg-card p-1">
           <button
             onClick={() => setSharePanelOpen((v) => !v)}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all',
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all',
               shareToken
-                ? 'bg-brand-primary/10 border-brand-primary/30 text-brand-primary'
-                : 'bg-bg-card border-border text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary'
+                ? 'bg-brand-primary/10 text-brand-primary'
+                : 'text-text-secondary hover:bg-bg-card-hover hover:text-brand-primary'
             )}
           >
             <Share2 className="w-3.5 h-3.5" strokeWidth={1.25} />
@@ -1383,14 +1609,14 @@ export default function ReportPage() {
           </button>
           <button
             onClick={() => handleExport('json')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-bg-card-hover hover:text-brand-primary transition-all"
           >
             <File className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">JSON</span>
           </button>
           <button
             onClick={() => handleExport('markdown')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-card border border-border text-sm text-text-secondary hover:border-cyan/30 hover:text-cyan transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-bg-card-hover hover:text-cyan transition-all"
           >
             <FileText className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">MD</span>
@@ -1400,10 +1626,10 @@ export default function ReportPage() {
             disabled={!reportHtml}
             title={reportHtml ? undefined : htmlUnavailable ?? 'HTML 版本还在生成中'}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all',
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all',
               reportHtml
-                ? 'bg-bg-card border-border text-text-secondary hover:border-warm-orange/30 hover:text-warm-orange'
-                : 'bg-bg-secondary border-border text-text-muted cursor-not-allowed'
+                ? 'text-text-secondary hover:bg-bg-card-hover hover:text-warm-orange'
+                : 'text-text-muted cursor-not-allowed'
             )}
           >
             <Globe className="w-3.5 h-3.5" strokeWidth={1.25} />
@@ -1411,6 +1637,10 @@ export default function ReportPage() {
           </button>
         </div>
       </div>
+
+      {/* 正文阅读列收窄到 3xl 居中：报告是长阅读场景，4xl 容器里单行字数过长；
+          图表/表格类容器统一加 overflow-x-auto 兜底，超宽内容在列内滚动而不是撑破 */}
+      <div className="max-w-3xl mx-auto">
 
       {/* 分享面板。
           这里的"对方能看到 / 看不到"两栏不是装饰，是知情同意的正文：报告里
@@ -1536,7 +1766,7 @@ export default function ReportPage() {
             }
           </button>
           {showHtmlReport && (
-            <div className="mt-3 rounded-xl border border-border overflow-hidden bg-bg-card">
+            <div className="mt-3 rounded-xl border border-border overflow-x-auto bg-bg-card">
               <iframe
                 ref={iframeRef}
                 title="HTML Report"
@@ -1646,8 +1876,8 @@ export default function ReportPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-4">校准指标</h3>
+        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 overflow-x-auto">
+          <h3 className="mb-4 text-base font-semibold text-text-primary">校准指标</h3>
           {calibration ? (
             <>
               {/* 合格线全部来自 src/runner/calibration.py::run_calibration_check：
@@ -1753,7 +1983,7 @@ export default function ReportPage() {
       {/* ---------- 人格视角 ---------- */}
       {personaNotes.length > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-cyan" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">人格视角</h3>
           </div>
@@ -1824,7 +2054,7 @@ export default function ReportPage() {
           而不是只看执行摘要里一个光秃秃的计数 */}
       {(report.consensus?.shared_concerns?.length ?? 0) > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">议题共识明细</h3>
             {typeof report.consensus?.min_personas_for_agreement === 'number' &&
@@ -1874,13 +2104,13 @@ export default function ReportPage() {
       {/* ---------- 主要分歧 ---------- */}
       {disagreements.length > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Scale className="w-5 h-5 text-warm-orange" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">主要分歧</h3>
           </div>
           <div className="flex flex-col gap-3">
             {disagreements.map((d, i) => (
-              <div key={i} className="rounded-xl border border-warm-orange/20 bg-bg-card p-4 md:p-5">
+              <div key={i} className="overflow-x-auto rounded-xl border border-warm-orange/20 bg-bg-card p-4 md:p-5">
                 <p className="text-sm font-medium text-text-primary mb-2">{d.topic}</p>
                 {(d.persona_stances?.length ?? 0) > 0 && (
                   <ul className="space-y-1.5 mb-2">
@@ -1908,8 +2138,8 @@ export default function ReportPage() {
       {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {informationGaps.length > 0 && (
-          <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="mb-4 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
               <h3 className="text-sm font-semibold text-text-primary">信息缺口</h3>
             </div>
@@ -1959,10 +2189,18 @@ export default function ReportPage() {
         )}
       </div>
 
+      {/* ---------- 可证伪预测 ----------
+           紧跟"下一步真人验证"：那一块说的是去做什么测试，
+           这一块说的是测出什么结果算这次评审说对了。 */}
+      <PredictionsSection predictions={report.predictions} />
+
+      {/* ---------- 自适应面板轨迹 ---------- */}
+      <AdaptivePanelSection adaptive={report.adaptive_panel} />
+
       {/* ---------- 伦理合规 ---------- */}
       {report.compliance && (
-        <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="mb-6 overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <div className="mb-4 flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" strokeWidth={1.25} />
             <h3 className="text-sm font-semibold text-text-primary">人格伦理合规</h3>
             <span className={cn(
@@ -1992,7 +2230,7 @@ export default function ReportPage() {
       {/* ---------- 评估评分卡（独立端点，与 report_json 无关） ---------- */}
       {evaluationScorecard && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-cyan" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">评估评分卡</h3>
           </div>
@@ -2015,7 +2253,7 @@ export default function ReportPage() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
-            <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
               {/* 标出满分：右边那块维度分是 0–3，不写清楚两个数看起来是同一把尺子 */}
               <h4 className="text-sm font-medium text-text-muted mb-4">总体评分（满分 100）</h4>
               <div className="flex items-center gap-4">
@@ -2056,7 +2294,7 @@ export default function ReportPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
               <h4 className="text-sm font-medium text-text-muted mb-4">维度评分（每项满分 3，合格线 2）</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={evaluationScorecard.results.map((r) => {
@@ -2134,13 +2372,13 @@ export default function ReportPage() {
       {/* ---------- 伦理报告（独立端点） ---------- */}
       {ethicsReports.length > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">伦理报告</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {ethicsReports.map((er) => (
-              <div key={er.persona_id} className="rounded-xl border border-border bg-bg-card p-4">
+              <div key={er.persona_id} className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-text-primary">{er.persona_id}</span>
                   <span className={cn(
@@ -2221,8 +2459,11 @@ export default function ReportPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <button
+      {/* ---------- 评估操作区：运行评估 / 查看完整评估 / 失败说明收成一组，
+          错误说明换行独占一行，不再和按钮挤在同一行里换行错位 ---------- */}
+      <div className="mb-6 rounded-xl border border-border bg-bg-card p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
           onClick={async () => {
             if (!id) return
             setEvaluating(true)
@@ -2258,8 +2499,9 @@ export default function ReportPage() {
             查看完整评估
           </Link>
         )}
+        </div>
         {evaluationError && (
-          <p className="flex items-start gap-1.5 text-sm text-severity-critical">
+          <p className="mt-3 flex items-start gap-1.5 text-sm text-severity-critical">
             <XCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
             <span className="whitespace-pre-wrap break-words">运行评估失败：{evaluationError}</span>
           </p>
@@ -2329,6 +2571,7 @@ export default function ReportPage() {
         </section>
       )}
       {feedbackSent && <p className="mb-6 text-sm text-brand-primary">已记录。后续可在"判断复利"查看价值指标。</p>}
+      </div>
     </div>
   )
 }

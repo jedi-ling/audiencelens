@@ -1037,7 +1037,11 @@ export default function AskPage() {
   const isEmptyChat = messages.length === 1 && !messages.some((m) => m.role === 'user')
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div
+      // dvh 兜底：100vh 在移动端包含浏览器工具栏，软键盘弹起时会被顶出视口；
+      // dvh 跟随可视高度收缩，输入区始终贴着键盘上沿
+      className="flex h-[calc(100vh-4rem)] h-[calc(100dvh-4rem)]"
+    >
       <HistorySidebar
         open={sidebarOpen}
         history={reviewHistory}
@@ -1096,7 +1100,10 @@ export default function AskPage() {
         onCancelDelete={() => setConfirmingId(null)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col px-6 py-6">
+      {/* 内层 mx-auto max-w-3xl 是聊天列的阅读宽度：header/消息流/输入区共用同一
+          条中线与宽度，超宽屏上气泡和输入框不会跟着拉伸到 1600px */}
+      <div className="flex min-w-0 flex-1 flex-col px-4 sm:px-6 py-6">
+      <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col">
       <header className="mb-4 flex items-center gap-2">
         <button
           onClick={() => setSidebarOpen((v) => !v)}
@@ -1135,7 +1142,9 @@ export default function AskPage() {
         ref={listRef}
         className={cn(
           // isolate：让浮尘层的负 z-index 被限制在这个容器内，只沉到自身背景之上、气泡之下
+          // 空会话时改成 flex 容器把引导内容垂直居中
           'chat-backdrop relative isolate flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
+          isEmptyChat && 'flex flex-col justify-center',
           dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border bg-bg-card/60'
         )}
         onDragOver={handleDragOver}
@@ -1146,6 +1155,24 @@ export default function AskPage() {
             此时对话区基本是空的，需要一点氛围；一旦有真实对话就摘掉——
             正文文字底下飘东西会持续偷注意力。DOM 放在气泡前，天然在内容层下面 */}
         {isEmptyChat && <AmbientMotes className="-z-10" />}
+        {isEmptyChat && (
+          // 空会话引导：空滚动区不能只有一行开场白悬在顶上——给出明确的下一步动作
+          <div className="mx-auto max-w-sm space-y-4 text-center">
+            <p className="text-base font-medium text-text-primary font-display">从一句话开始</p>
+            <div className="flex flex-col gap-2">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  className="rounded-lg border border-border bg-bg-card px-4 py-2.5 text-sm text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary"
+                  onClick={() => void send(ex)}
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted">也可以直接在下方输入框描述你要评审的内容</p>
+          </div>
+        )}
         {messages.map((m) => (
           <ChatBubble
             key={m.id}
@@ -1174,7 +1201,9 @@ export default function AskPage() {
         支持拖拽文件到对话区，或 Ctrl+V 粘贴截图
       </p>
 
-      {/* 示例入口常驻：首轮后自动收起，随时可再展开 */}
+      {/* 示例入口常驻：首轮后自动收起，随时可再展开。
+          空会话时中央引导已经展示了示例，这里收起避免同一屏出现两份 */}
+      {!isEmptyChat && (
       <div className="mt-3 shrink-0">
         <button
           className="flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary transition-colors"
@@ -1202,6 +1231,7 @@ export default function AskPage() {
           </div>
         )}
       </div>
+      )}
 
       {attachments.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2 shrink-0">
@@ -1310,7 +1340,11 @@ export default function AskPage() {
         </div>
       )}
 
-      <div className="mt-3 flex items-end gap-2 rounded-xl border border-border bg-bg-card p-2 shrink-0 transition-opacity">
+      <div
+        // 输入区与消息列的边界：mt-2 让出上方渐变的过渡空间，
+        // 阴影让输入框浮在消息流之上，滚动到最底也不觉得两者粘在一起
+        className="mt-2 flex items-end gap-2 rounded-xl border border-border bg-bg-card p-2 shrink-0 shadow-[0_-16px_28px_-12px_rgba(0,0,0,0.55)] transition-opacity"
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -1522,6 +1556,7 @@ export default function AskPage() {
           </div>
         </div>
       )}
+      </div>
       </div>
     </div>
   )
@@ -2616,7 +2651,7 @@ function ChatBubble({
             </div>
           )}
           {message.text && (
-            <div className="rounded-xl rounded-br-sm bg-brand-primary px-4 py-2.5 text-sm leading-relaxed text-white whitespace-pre-wrap shadow-[0_2px_10px_rgba(0,113,227,0.22)]">
+            <div className="rounded-xl rounded-br-sm bg-brand-primary px-4 py-2.5 text-sm leading-relaxed text-white whitespace-pre-wrap break-words shadow-[0_2px_10px_rgba(0,113,227,0.22)]">
               {message.text}
             </div>
           )}
@@ -2630,10 +2665,10 @@ function ChatBubble({
     return (
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
-        <div className="flex max-w-[75%] flex-col">
+        <div className="flex max-w-[75%] min-w-0 flex-col">
           <div
             className={cn(
-              'rounded-xl rounded-tl-sm border border-l-[3px] px-4 py-2.5 text-sm leading-relaxed text-text-primary',
+              'rounded-xl rounded-tl-sm border border-l-[3px] px-4 py-2.5 text-sm leading-relaxed text-text-primary break-words',
               message.isGated
                 ? 'border-warm-orange/30 border-l-warm-orange/50 bg-warm-orange/5'
                 : 'border-border border-l-brand-primary/40 bg-bg-secondary',
@@ -2664,8 +2699,8 @@ function ChatBubble({
     return (
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
-        <div className="flex max-w-[75%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-severity-critical/40 border-l-[3px] border-l-severity-critical bg-severity-critical/10 px-4 py-2.5 text-sm leading-relaxed text-text-primary">
+        <div className="flex max-w-[75%] min-w-0 flex-col">
+          <div className="rounded-xl rounded-tl-sm border border-severity-critical/40 border-l-[3px] border-l-severity-critical bg-severity-critical/10 px-4 py-2.5 text-sm leading-relaxed text-text-primary break-words">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
               <div>
@@ -2691,8 +2726,8 @@ function ChatBubble({
     return (
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
-        <div className="flex w-full max-w-[85%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+        <div className="flex w-full max-w-[85%] min-w-0 flex-col">
+          <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)] break-words">
             <ReviewStatusBody reviewState={reviewState} onStartFollowUp={onStartFollowUp} />
           </div>
           <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>
@@ -2705,8 +2740,8 @@ function ChatBubble({
     return (
       <div className="flex items-start gap-2.5 animate-message-in">
         <AssistantAvatar />
-        <div className="flex max-w-[80%] flex-col">
-          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-brand-primary/40 bg-bg-secondary px-4 py-3 text-sm">
+        <div className="flex max-w-[80%] min-w-0 flex-col">
+          <div className="rounded-xl rounded-tl-sm border border-border border-l-[3px] border-l-brand-primary/40 bg-bg-secondary px-4 py-3 text-sm break-words">
             <p className="leading-relaxed text-text-primary">{message.question}</p>
             {message.candidates.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -2735,8 +2770,8 @@ function ChatBubble({
   return (
     <div className="flex items-start gap-2.5 animate-message-in">
       <AssistantAvatar />
-      <div className="flex w-full max-w-[85%] flex-col">
-        <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      <div className="flex w-full max-w-[85%] min-w-0 flex-col">
+        <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)] break-words">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
           <h3 className="mt-1.5 text-base font-semibold text-text-primary font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}

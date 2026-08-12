@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { UserPlus } from 'lucide-react'
 import { ApiError } from '@/lib/apiClient'
@@ -50,7 +50,7 @@ export default function RegisterPage() {
       {/* 同 LoginPage：必须是真的 <form>。这一页此前更明显——只有密码框挂了
           onKeyDown，在邮箱框按回车什么都不会发生，正是"靠每个框自己挂、漏一个就不灵"。
           autoComplete 用 new-password 而不是 current-password，浏览器才会提示生成强密码。 */}
-      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-6">
+      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-8">
         <label htmlFor="register-name" className="block text-xs text-text-muted">
           昵称（可选）
         </label>
@@ -109,7 +109,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={busy || !email.trim() || password.length < 8}
-          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
+          className="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           {busy ? '注册中…' : '注册'}
         </button>

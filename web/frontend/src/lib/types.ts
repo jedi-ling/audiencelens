@@ -220,6 +220,7 @@ export interface ReviewDetail {
   mode: ReviewMode
   persona_pack: string | null
   selected_personas: string[] | null
+  adaptive_panel: boolean
   skill_type: string | null
   project_key: string | null
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -365,6 +366,43 @@ export interface HitRate {
   hit_rate: number | null
   sample_size: number
   /** 样本不足时为 true —— UI 必须如实展示，不能拿 3 个样本吹准确率 */
+  low_confidence: boolean
+  note: string | null
+}
+
+/** 置信度校准：预测时说的把握 vs 回填后的真实结果。
+ *
+ * 与 HitRate 的分工：HitRate 回答"说中了几次"，这个回答"说自己有多大把握时
+ * 准不准"——一个恒说 90% 却只对一半的面板，hit_rate 看不出问题，校准能。
+ *
+ * 所有指标在样本为空时是 null 而不是 0：0 分是"预测完美"的意思（Brier 越低越好），
+ * 拿它表示"没数据"会把空账本显示成满分。
+ */
+export interface ConfidenceCalibration {
+  persona_id: string | null
+  sample_size: number
+  /** 已回填真实结果的判断条数（含被排除的） */
+  verified_rows: number
+  /** 因为没有 confidence 或 verdict 无法映射而被排除的条数 */
+  excluded_rows: number
+  mean_predicted_confidence: number | null
+  /** 真实命中得分均值。hit=1 / partial=0.5 / miss=0 */
+  observed_hit_score: number | null
+  /** Brier 分数，越低越好（0 = 完美）。null = 无样本 */
+  brier_score: number | null
+  /** 期望校准误差：各置信度区间内「说的把握」与「真实结果」的加权平均差 */
+  expected_calibration_error: number | null
+  bins: Array<{
+    lower: number
+    upper: number
+    sample_size: number
+    mean_confidence: number | null
+    observed_hit_score: number | null
+    gap: number | null
+  }>
+  outcome_mapping: Record<string, number>
+  confidence_source: string
+  /** 样本不足时为 true —— 同 HitRate，UI 必须如实展示，不能拿几个样本谈校准 */
   low_confidence: boolean
   note: string | null
 }

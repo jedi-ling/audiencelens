@@ -1,9 +1,10 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { usePersonaStore } from '@/store/persona-store'
 import { cn } from '@/lib/utils'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
-import { Search, X, GitCompare, ChevronDown, ChevronUp, Loader2, SlidersHorizontal } from 'lucide-react'
+import { Search, X, GitCompare, ChevronDown, ChevronUp, Loader2, SlidersHorizontal, Bot } from 'lucide-react'
 import { PACK_CATEGORIES } from '@/lib/mock-data'
+import { PageShell, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
 export default function PersonasPage() {
   const {
@@ -89,7 +90,7 @@ export default function PersonasPage() {
           className={cn(
             'text-left px-3 py-2 rounded-lg text-sm transition-all',
             !selectedPack
-              ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
+              ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary font-medium'
               : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
           )}
         >
@@ -131,7 +132,7 @@ export default function PersonasPage() {
                       className={cn(
                         'text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2',
                         selectedPack === pack.panel_id
-                          ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary'
+                          ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary font-medium'
                           : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
                       )}
                     >
@@ -150,18 +151,19 @@ export default function PersonasPage() {
 
   if (!initialized) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+      <PageShell size="grid" animate={false} className="py-16 text-center">
         <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-4" strokeWidth={1.25} />
         <p className="text-text-secondary">加载角色数据...</p>
-      </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
+    <PageShell size="grid">
+      {/* 页头：标题规格与全站统一（text-2xl bold）；右侧操作在小屏折行 */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-text-primary font-display">角色浏览</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary">角色库</h1>
           <button
             onClick={() => setDrawerOpen(true)}
             className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm bg-bg-card border border-border text-text-secondary hover:border-cyan/30 hover:text-cyan transition-all"
@@ -258,7 +260,8 @@ export default function PersonasPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+          {/* 网格断点与技能中心/任务类型统一一档；items-stretch 让卡片默认等高 */}
+          <div className={CARD_GRID_CLASS}>
             {filteredPersonas.map((persona) => {
               const isExpanded = expandedId === persona.id
               const isCompareSelected = compareIds?.includes(persona.id)
@@ -356,12 +359,22 @@ export default function PersonasPage() {
           </div>
 
           {filteredPersonas.length === 0 && (
-            <div className="text-center py-12 text-text-muted">
-              <p>没有匹配的角色</p>
-            </div>
+            <EmptyState
+              icon={Bot}
+              title="没有匹配的角色"
+              description="试试清除搜索词或选择「全部」"
+              className="bg-transparent"
+              action={
+                searchQuery ? (
+                  <button onClick={() => setSearchQuery('')} className={SECONDARY_BUTTON_CLASS}>
+                    清除搜索
+                  </button>
+                ) : undefined
+              }
+            />
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

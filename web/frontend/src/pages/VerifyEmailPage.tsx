@@ -1,4 +1,4 @@
-﻿/** 邮箱验证落地页：从邮件链接进来，自动消费令牌。 */
+/** 邮箱验证落地页：从邮件链接进来，自动消费令牌。 */
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -36,7 +36,7 @@ export default function VerifyEmailPage() {
   }, [token])
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-6 py-16">
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[400px] flex-col justify-center px-4 py-12">
       <div className="rounded-xl border border-border bg-bg-card p-8 text-center">
         {state === 'pending' && (
           <>

@@ -21,14 +21,17 @@
 .al-landing ::selection{background:rgba(10,132,255,.25);color:var(--text)}
 .al-landing a{color:inherit;text-decoration:none;transition:color .25s,opacity .25s}
 .al-landing img{max-width:100%;display:block}
-.al-landing .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
-.al-landing .tag{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--gold);opacity:.85}
+/* 排版基线（2026-08-12 布局统一）：
+   - 区块垂直节奏：普通 .sec 固定 96px 上下，移动端降 72px（见文件底部媒体查询）；
+     .sec-trust（信任条）/.sec-midcta（中段轻 CTA）/.final（收口大 CTA）/.gap（论点呼吸点）
+     四种刻意跳出普通档的特例，值见各自规则上的注释。
+   - 内容栅格：所有 section 只有一个容器 .wrap = max-width 1180px + 两侧 24px 内边距
+     （移动端 16px），不要再发明 max-w-6xl/7xl 或第二种容器。 */
+.al-landing .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 .al-landing .eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.28em;text-transform:uppercase;
   color:var(--gold);margin-bottom:22px;display:flex;align-items:center;gap:10px}
 .al-landing .eyebrow::before{content:"";width:22px;height:1px;background:var(--gold);opacity:.6}
 .al-landing .gold{color:var(--gold)}
-.al-landing .grad-gold{color:var(--gold);font-weight:900}
 .al-landing .reveal{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1)}
 .al-landing .reveal.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.al-landing .reveal{opacity:1;transform:none;transition:none}}
@@ -54,12 +57,15 @@
 .al-landing .btn-primary{color:#ffffff;background:linear-gradient(105deg,var(--gold),var(--gold-bright));
   box-shadow:0 6px 26px rgba(0,113,227,.22)}
 .al-landing .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,113,227,.34)}
-.al-landing .btn-ghost{color:var(--text);background:transparent;border:1px solid var(--line-strong)}
+.al-landing .btn-ghost{color:var(--text);background:transparent;border:1px solid var(--line-strong);box-shadow:none}
 .al-landing .btn-ghost:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-2px)}
 .al-landing .btn .arw{transition:transform .28s}
 .al-landing .btn:hover .arw{transform:translateX(3px)}
 .al-landing section{position:relative}
-.al-landing .sec{padding:140px 0}
+/* 主节奏档：全页所有 .sec 统一 96px，替代原先 140px——那一档只在桌面端成立，
+   和 88px 的移动端档拼在一起，滚动节奏忽大忽小。96/72 两档差 24px，
+   恰好是一个标准 gutter，视觉上仍然读得出"换了设备"但不再跳变。 */
+.al-landing .sec{padding:96px 0}
 /* 全页固定视频背景上线后，sec-alt 改为半透明深色：既保留区块分隔感，又让
    底层视频透出来——否则不透明背景会把固定背景整个盖住，滚动时看不到画面。 */
 .al-landing .sec-alt{background:rgba(20,22,28,.55)}
@@ -170,12 +176,6 @@
   font-size:.72rem;color:var(--mint);margin:2px 0 14px;padding:8px 0;
   border-top:1px dashed var(--line);border-bottom:1px dashed var(--line)}
 .al-landing .debate-meter{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
-.al-landing .meter-row{display:flex;align-items:center;gap:10px;font-size:.76rem;color:var(--text-mute)}
-.al-landing .meter-row span{width:52px;flex:none}
-.al-landing .meter-row .bar{flex:1;height:6px;border-radius:99px;background:var(--bg-elev);overflow:hidden}
-.al-landing .meter-row .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--gold-bright))}
-.al-landing .meter-row .bar.mint i{background:linear-gradient(90deg,var(--mint),#7fcdf0)}
-.al-landing .meter-row b{width:32px;flex:none;text-align:right;color:var(--text-dim);font-weight:600}
 .al-landing .debate-foot{font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;color:var(--text-mute);
   text-align:center;padding-top:14px;border-top:1px solid var(--line)}
 @media(max-width:920px){.al-landing .hero-inner{grid-template-columns:1fr;text-align:center;gap:44px}
@@ -203,9 +203,9 @@
 .al-landing .pain-card .cost{margin-top:auto;font-family:var(--mono);font-size:.8rem;color:var(--gold);
   /* P1-4: margin-top:auto 把 cost 推到卡底，让三张卡等高；用 padding-top:18px 替代原先的 margin-top:18px，避免 flex 布局下与 auto 冲突 */
   padding-top:18px}
-/* P2-c：常规 section 是 140px、.gap 原来只比它多 20px，视觉上感知不到
-   "呼吸点"。.gap 承载全篇最重的一句论点，加大到 190px 和常规区块拉开明显断层。 */
-.al-landing .gap{padding:190px 0;text-align:center;position:relative;overflow:hidden}
+/* .gap 是呼吸点特例（不随 .sec 的 96px 档）：承载全篇最重的一句论点，
+   用 128px 和普通区块拉开断层，又不至于到原先 190px 那样像"空了一屏"。 */
+.al-landing .gap{padding:128px 0;text-align:center;position:relative;overflow:hidden}
 .al-landing .gap::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:700px;height:700px;pointer-events:none;background:radial-gradient(circle,rgba(0,113,227,.06) 0%,transparent 60%)}
 .al-landing .gap p{font-size:clamp(1.6rem,3.6vw,2.6rem);font-weight:800;letter-spacing:-.03em;line-height:1.28;
@@ -295,7 +295,9 @@
 .al-landing .stat .num{font-size:3.3rem;font-weight:800;letter-spacing:-.03em;line-height:1;
   color:var(--gold);font-weight:900}
 .al-landing .stat .lbl{margin-top:12px;font-size:.84rem;color:var(--text-dim)}
-.al-landing .final{text-align:center;padding:160px 0;position:relative;overflow:hidden}
+/* 收口大 CTA 特例（不随 .sec 档）：128px 与 .gap 呼吸点同档，
+   首尾两个"非内容区块"节奏呼应；原 160px 在 96px 主节奏下跳变太陡。 */
+.al-landing .final{text-align:center;padding:128px 0;position:relative;overflow:hidden}
 .al-landing .final::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:900px;height:900px;max-width:130vw;pointer-events:none;
   background:radial-gradient(circle,rgba(0,113,227,.1) 0%,rgba(0,113,227,.03) 40%,transparent 65%)}
@@ -303,22 +305,11 @@
 .al-landing .final h2{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-bottom:18px}
 .al-landing .final p{color:var(--text-dim);font-size:1.1rem;margin-bottom:38px}
 .al-landing .final .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.al-landing footer{border-top:1px solid var(--line);padding:56px 0 44px}
-.al-landing .foot-inner{max-width:var(--maxw);margin:0 auto;padding:0 28px;
-  display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap;align-items:flex-start}
-.al-landing .foot-brand .brand{margin-bottom:12px}
-.al-landing .foot-brand p{color:var(--text-mute);font-size:.85rem;max-width:280px}
-.al-landing .foot-cols{display:flex;gap:56px;flex-wrap:wrap}
-.al-landing .foot-col h5{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute);
-  font-family:var(--mono);margin-bottom:16px;font-weight:400}
-.al-landing .foot-col a{display:block;color:var(--text-dim);font-size:.9rem;margin-bottom:10px}
-.al-landing .foot-col a:hover{color:var(--gold)}
-.al-landing .foot-bottom{max-width:var(--maxw);margin:44px auto 0;padding:24px 28px 0;border-top:1px solid var(--line);
-  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--text-mute);font-size:.82rem}
-.al-landing .foot-bottom .license{color:var(--mint)}
 
 /* P1-6：中间路径次要 CTA，视觉语言参考 hero-ask 但更克制——不抢主转化按钮的
-   注意力，只在用户已经被说服到一半时给一个顺手的出口。 */
+   注意力，只在用户已经被说服到一半时给一个顺手的出口。
+   特例不随 .sec 的 96px 档：64px 让它读起来是"插在两个内容区块之间的一句提示"，
+   而不是又一个独立章节。 */
 .al-landing .sec-midcta{padding:64px 0;text-align:center}
 .al-landing .midcta-text{font-size:1.1rem;color:var(--text-dim);margin-bottom:18px}
 .al-landing .midcta-btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:.92rem;
@@ -357,9 +348,11 @@
 .al-landing .stage-key{position:static}
 /* P2-h：单列降级后 .kw 仍是桌面端 1.7rem 配 200px 原宽度的排版习惯，窄屏下偏大突兀 */
 .al-landing .stage-key .kw{font-size:1.4rem}}
-@media(max-width:640px){.al-landing .sec{padding:88px 0}
-.al-landing .pain-grid, .al-landing .use-grid, .al-landing .cap-grid, .al-landing .flow, .al-landing .stats{grid-template-columns:1fr}
-.al-landing .foot-inner{flex-direction:column;gap:36px}}
+@media(max-width:640px){.al-landing .wrap{padding:0 16px}
+/* 移动端节奏档：96→72，与桌面档差 24px（一个 gutter），见 .sec 规则注释 */
+.al-landing .sec{padding:72px 0}
+.al-landing .gap,.al-landing .final{padding:96px 0}
+.al-landing .pain-grid, .al-landing .use-grid, .al-landing .cap-grid, .al-landing .flow, .al-landing .stats{grid-template-columns:1fr}}
 
 /* ============================================================
    Hero 全幅 3D 背景
@@ -514,6 +507,8 @@
 
 /* 信任条：从 hero 内部移出来的独立区块（hero 文本元素原本有 8 个，上限 4）。
    放在首屏正下方，滚动一点就能看到，但不再和主张挤在同一列。 */
+/* 信任条特例（不随 .sec 档）：它是 hero 的附属信息条，不是一个章节，
+   用 26/30px 的小呼吸，靠下边框线和背景色与 PAIN 分开。 */
 .al-landing .sec-trust{padding:26px 0 30px;border-bottom:1px solid var(--line);background:rgba(10,16,32,.45)}
 .al-landing .sec-trust .wrap{display:flex;align-items:center;justify-content:space-between;
   gap:20px 34px;flex-wrap:wrap}

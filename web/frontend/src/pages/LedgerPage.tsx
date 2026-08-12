@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 判断复利闭环 —— 产品的护城河页面。
  *
  * 一次性评审工具跑完就断了；这一页把每条预测留档，
@@ -11,7 +11,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError, api } from '@/lib/apiClient'
-import type { HitRate, Judgment, LeaderboardEntry, ValidationMetrics, Verdict } from '@/lib/types'
+import type {
+  ConfidenceCalibration,
+  HitRate,
+  Judgment,
+  LeaderboardEntry,
+  ValidationMetrics,
+  Verdict,
+} from '@/lib/types'
+import { PageShell, PageHeader, SectionCard, EmptyState } from '@/components/ui'
+import { Inbox } from 'lucide-react'
 
 const VERDICT_LABELS: Record<Verdict, string> = {
   hit: '说中了',
@@ -34,6 +43,7 @@ export default function LedgerPage() {
   const [stats, setStats] = useState<HitRate | null>(null)
   const [board, setBoard] = useState<LeaderboardEntry[]>([])
   const [valueMetrics, setValueMetrics] = useState<ValidationMetrics | null>(null)
+  const [calibration, setCalibration] = useState<ConfidenceCalibration | null>(null)
   const [onlyUnverified, setOnlyUnverified] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -46,16 +56,18 @@ export default function LedgerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [j, s, b, v] = await Promise.all([
+      const [j, s, b, v, c] = await Promise.all([
         api.listJudgments({ onlyUnverified }),
         api.hitRate(),
         api.leaderboard(),
         api.validationMetrics(),
+        api.calibration(),
       ])
       setJudgments(j.judgments)
       setStats(s)
       setBoard(b.personas)
       setValueMetrics(v)
+      setCalibration(c)
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)))
     } finally {
@@ -82,14 +94,11 @@ export default function LedgerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
-      <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-text-primary">判断复利</h1>
-        <p className="mt-2 text-text-secondary">
-          每次评审的预测都盖了时间戳留档。真人测试回来后回填结果——
-          判断准不准，从此有据可查。
-        </p>
-      </header>
+    <PageShell size="reading">
+      <PageHeader
+        title="判断复利"
+        subtitle="每次评审的预测都盖了时间戳留档。真人测试回来后回填结果——判断准不准，从此有据可查。"
+      />
 
       {error && (
         <div className="mb-6 rounded-lg border border-severity-critical/40 bg-severity-critical/10 p-4 text-sm text-text-primary">
@@ -121,7 +130,7 @@ export default function LedgerPage() {
       )}
 
       {valueMetrics && (
-        <section className="mb-8 rounded-xl border border-brand-primary/30 bg-bg-card p-6">
+        <SectionCard className="mb-6 border-brand-primary/30">
           <h2 className="mb-4 font-display text-sm font-semibold text-text-primary">产品价值验证</h2>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
             <Stat label="反馈覆盖" value={percent(valueMetrics.feedback_coverage)} />
@@ -163,12 +172,12 @@ export default function LedgerPage() {
             </div>
           )}
           {valueMetrics.note && <p className="mt-4 text-xs text-warm-orange">⚠️ {valueMetrics.note}</p>}
-        </section>
+        </SectionCard>
       )}
 
       {/* 命中率总览 */}
       {stats && (
-        <section className="mb-8 rounded-xl border border-border bg-bg-card p-6">
+        <SectionCard className="mb-6">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             <Stat label="累计预测" value={stats.total_judgments} />
             <Stat label="待验证" value={stats.pending_verification} />
@@ -184,12 +193,12 @@ export default function LedgerPage() {
               ⚠️ {stats.note}
             </p>
           )}
-        </section>
+        </SectionCard>
       )}
 
       {/* 人格命中率排行 */}
       {board.length > 0 && (
-        <section className="mb-8 rounded-xl border border-border bg-bg-card p-6">
+        <SectionCard className="mb-6">
           <h2 className="mb-4 font-display text-sm font-semibold text-text-primary">谁的判断最值得听</h2>
           <div className="space-y-2">
             {board.map((p) => (
@@ -211,11 +220,17 @@ export default function LedgerPage() {
               </div>
             ))}
           </div>
-        </section>
+        </SectionCard>
       )}
 
+      {/* 置信度校准。
+          与上面「谁的判断最值得听」的分工：那张榜回答"说中了几次"，
+          这一块回答"说自己有把握的时候准不准"——一个恒说 90% 却只对一半的面板，
+          命中率榜上看不出问题，校准能。 */}
+      <CalibrationSection data={calibration} />
+
       {/* 预测清单 + 回填 */}
-      <section className="rounded-xl border border-border bg-bg-card">
+      <SectionCard className="p-0">
         <div className="flex items-center gap-3 border-b border-border px-6 py-4">
           <h2 className="font-display text-sm font-semibold text-text-primary">历史预测</h2>
           <label className="ml-auto flex items-center gap-2 text-xs text-text-secondary">
@@ -236,9 +251,12 @@ export default function LedgerPage() {
           // 正是本仓库要根除的那种伪装。原因和重试按钮在上方横幅里。
           <p className="p-6 text-sm text-text-secondary">没能加载到预测记录，原因见上方。</p>
         ) : judgments.length === 0 ? (
-          <p className="p-6 text-sm text-text-secondary">
-            还没有预测记录。跑一次评审，系统会自动把结论留档。
-          </p>
+          <EmptyState
+            icon={Inbox}
+            title="还没有预测记录"
+            description="跑一次评审，系统会自动把结论留档。"
+            className="border-0 rounded-none"
+          />
         ) : (
           <ul className="divide-y divide-border">
             {judgments.map((j) => (
@@ -299,8 +317,8 @@ export default function LedgerPage() {
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </SectionCard>
+    </PageShell>
   )
 }
 
@@ -330,4 +348,117 @@ function percent(value: number | null): string {
 
 function money(value: number | null): string {
   return value === null ? '—' : `$${value.toFixed(2)}`
+}
+
+/**
+ * 置信度校准区块。
+ *
+ * 展示纪律（和本页其它指标一致）：
+ *   · 样本不足时挂 low_confidence，如实说"不具统计意义"，不拿几个样本谈校准
+ *   · 所有指标为 null 时显示「—」而不是 0——Brier 越低越好，把"没数据"画成 0
+ *     等于把空账本显示成满分预测
+ *   · Brier / ECE 这类术语必须自带一句人话解释，否则它只是看起来专业
+ */
+function CalibrationSection({ data }: { data: ConfidenceCalibration | null }) {
+  // 一条都没回填过就不显示——空区块只会让页面显得更长，不会让人更懂
+  if (!data || data.sample_size === 0) return null
+
+  const bins = data.bins.filter((b) => b.sample_size > 0)
+
+  return (
+    <SectionCard className="mb-6">
+      <h2 className="mb-1 font-display text-sm font-semibold text-text-primary">
+        置信度校准
+      </h2>
+      <p className="mb-4 text-xs leading-relaxed text-text-muted">
+        评审说自己有多大把握，和真实结果对得上吗。
+        上面的命中率回答「说中了几次」，这里回答「说有把握的时候准不准」。
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <CalibStat
+          label="平均声称把握"
+          value={data.mean_predicted_confidence === null ? '—' : percent(data.mean_predicted_confidence)}
+        />
+        <CalibStat
+          label="真实命中得分"
+          value={data.observed_hit_score === null ? '—' : percent(data.observed_hit_score)}
+          hint="hit=1 / partial=0.5 / miss=0"
+        />
+        <CalibStat
+          label="Brier 分数"
+          value={data.brier_score === null ? '—' : data.brier_score.toFixed(3)}
+          hint="越低越好，0=完美"
+        />
+        <CalibStat
+          label="校准误差"
+          value={
+            data.expected_calibration_error === null
+              ? '—'
+              : data.expected_calibration_error.toFixed(3)
+          }
+          hint="说的把握与实际的平均差距"
+        />
+      </div>
+
+      {bins.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold text-text-secondary">分区间对照</p>
+          <div className="space-y-1.5">
+            {bins.map((b) => {
+              const over = (b.mean_confidence ?? 0) > (b.observed_hit_score ?? 0)
+              return (
+                <div key={`${b.lower}-${b.upper}`} className="flex items-center gap-3 text-xs">
+                  <span className="w-20 shrink-0 font-mono text-text-muted">
+                    {(b.lower * 100).toFixed(0)}–{(b.upper * 100).toFixed(0)}%
+                  </span>
+                  <span className="w-24 shrink-0 font-mono tabular-nums text-text-secondary">
+                    说 {percent(b.mean_confidence)}
+                  </span>
+                  <span className="w-24 shrink-0 font-mono tabular-nums text-text-primary">
+                    实 {percent(b.observed_hit_score)}
+                  </span>
+                  {/* 高估/低估都要标出来：只标高估会让人以为低估无害，
+                      而系统性低估同样意味着这套权重没校准 */}
+                  <span
+                    className={
+                      (b.gap ?? 0) >= 0.2
+                        ? over
+                          ? 'text-severity-critical'
+                          : 'text-warm-orange'
+                        : 'text-text-muted'
+                    }
+                  >
+                    {b.gap === null ? '' : over ? `高估 ${percent(b.gap)}` : `低估 ${percent(b.gap)}`}
+                  </span>
+                  <span className="ml-auto font-mono text-text-muted">n={b.sample_size}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-text-muted">
+        {data.low_confidence && (
+          <span className="text-warm-orange">
+            ⚠️ {data.note ?? `样本量 ${data.sample_size} 偏小，以下数字仅供参考，不具统计意义。`}{' '}
+          </span>
+        )}
+        已回填 {data.verified_rows} 条
+        {data.excluded_rows > 0 && `（其中 ${data.excluded_rows} 条因缺少置信度或结果无法映射而未计入）`}。
+        置信度来源是合成面板的启发式权重，尚未经真实结果重新校准——这张表正是用来做那件事的。
+      </p>
+    </SectionCard>
+  )
+}
+
+function CalibStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-bg-secondary p-3">
+      <p className="text-xs text-text-muted">{label}</p>
+      <p className="mt-1 font-display text-lg tabular-nums text-text-primary">{value}</p>
+      {hint && <p className="mt-0.5 text-[10px] leading-tight text-text-muted">{hint}</p>}
+    </div>
+  )
 }

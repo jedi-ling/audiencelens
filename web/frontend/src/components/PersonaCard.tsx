@@ -49,7 +49,8 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
     <div
       onClick={onClick}
       className={cn(
-        'rounded-xl border-2 p-4 transition-all duration-200',
+        // h-full：在卡片网格里与同行卡片等高
+        'h-full rounded-xl border-2 p-4 transition-all duration-200',
         'bg-bg-card hover:bg-bg-card-hover',
         selected ? 'border-brand-primary border-glow-green' : 'border-border',
         onClick && 'cursor-pointer'

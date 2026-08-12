@@ -1,4 +1,4 @@
-﻿/** 用邮件里的链接重置密码。成功后不自动登录——让用户用新密码正常登录一次，
+/** 用邮件里的链接重置密码。成功后不自动登录——让用户用新密码正常登录一次，
  *  免得链接被中途截获的人直接拿到会话（与后端同一口径）。 */
 
 import { useState } from 'react'
@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
             <button
               type="button" // 在 <form> 里不写 type 就是 submit，点它会把表单再提交一次
               onClick={() => navigate('/login')}
-              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
+              className="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-primary text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
             >
               去登录
             </button>
@@ -129,7 +129,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
+              className="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-primary text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
               {busy ? '提交中…' : '重置密码'}
             </button>

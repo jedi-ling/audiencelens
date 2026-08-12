@@ -394,17 +394,23 @@ export default function CreateReviewPage() {
   const filledMaterialsCount = Object.entries(materialFields).filter(([, v]) => v.trim() !== '').length
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 animate-fade-in">
+      <div
+      // 表单列收窄为 3xl 并居中：多步表单是阅读+填写型内容，超宽屏上
+      // 拉满会让标签和输入框的视线跨距过长、卡片网格变得稀疏
+      className="max-w-3xl mx-auto px-4 py-8 animate-fade-in overflow-x-hidden"
+      >
       <div className="flex items-center gap-2 md:gap-4 mb-8">
         {Array.from({ length: 6 }, (_, i) => i).map((s) => (
           <div key={s} className="flex items-center gap-1 md:gap-2 flex-1">
             <div
+              aria-current={s === step ? 'step' : undefined}
               className={cn(
                 'w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-mono font-bold shrink-0 transition-all',
                 s < step
                   ? 'bg-brand-primary text-white'
                   : s === step
-                    ? 'bg-brand-primary/20 text-brand-primary border-2 border-brand-primary'
+                    // 当前步骤加光环：在一条水平指示器里仅靠描边区分"当前"太弱
+                    ? 'bg-brand-primary/20 text-brand-primary border-2 border-brand-primary ring-4 ring-brand-primary/15'
                     : 'bg-bg-card text-text-muted border border-border'
               )}
             >
@@ -412,7 +418,11 @@ export default function CreateReviewPage() {
             </div>
             <span className={cn(
               'text-xs md:text-sm hidden md:inline font-display',
-              s <= step ? 'text-text-primary' : 'text-text-muted'
+              s === step
+                ? 'text-text-primary font-semibold'
+                : s < step
+                  ? 'text-text-secondary'
+                  : 'text-text-muted'
             )}>
               {stepLabels[s as Step]}
             </span>
@@ -613,7 +623,7 @@ export default function CreateReviewPage() {
               })}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {filteredTaskTypes
                 .filter((tt) => selectedCategory === 'all' || tt.category === selectedCategory)
                 .map((tt) => (
@@ -680,7 +690,8 @@ export default function CreateReviewPage() {
             <h2 className="text-xl font-semibold text-text-primary mb-2">上传评审材料</h2>
             <p className="text-sm text-text-secondary mb-6">手动填写文本，或上传文件让 AI 自动提取材料</p>
 
-            <div className="flex items-center gap-2 mb-6">
+            <div className="space-y-6">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setMaterialInputMode('text')}
                 className={cn(
@@ -791,7 +802,7 @@ export default function CreateReviewPage() {
               </div>
             )}
 
-            <div className="mb-6">
+            <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">评审目标</label>
               <input
                 type="text"
@@ -869,6 +880,7 @@ export default function CreateReviewPage() {
                 </div>
               )}
             </div>
+            </div>
           </div>
         )}
 
@@ -877,7 +889,9 @@ export default function CreateReviewPage() {
             <h2 className="text-xl font-semibold text-text-primary mb-2">选择角色包</h2>
             <p className="text-sm text-text-secondary mb-6">选择一个角色包快速填充，或手动选择角色</p>
 
-            <div className="mb-6 rounded-xl border border-border bg-bg-card p-4">
+            {/* 本步各块间距统一一档（space-y-6），不再各自带 mb-4/mb-6/mb-8 */}
+            <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-bg-card p-4">
               <h3 className="text-sm font-medium text-text-muted mb-3">当前评审模式</h3>
               <div className="flex items-center gap-2">
                 <span className="text-lg">{modeConfig[selectedMode].icon}</span>
@@ -890,7 +904,7 @@ export default function CreateReviewPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {packs.map((pack) => (
                 <button
                   key={pack.panel_id}
@@ -943,7 +957,7 @@ export default function CreateReviewPage() {
               )
             })()}
 
-            <h3 className="text-lg font-semibold text-text-primary mb-4">
+            <h3 className="text-lg font-semibold text-text-primary">
               角色列表
               <span className="text-sm font-normal text-text-muted ml-2">
                 已选择 {selectedPersonaIds.size} / 上限 {modeMax} 个
@@ -952,7 +966,7 @@ export default function CreateReviewPage() {
 
             {/* 会被后端静默改写的组合，在这里就说清楚，而不是等报告出来人对不上 */}
             {packConflict && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-severity-critical/40 bg-severity-critical/5 p-3">
+              <div className="flex items-start gap-2.5 rounded-xl border border-severity-critical/40 bg-severity-critical/5 p-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-severity-critical" strokeWidth={1.5} />
                 <div className="text-xs text-text-secondary leading-relaxed">
                   <p className="text-severity-critical font-medium mb-1">
@@ -967,7 +981,7 @@ export default function CreateReviewPage() {
               </div>
             )}
             {!packConflict && overModeMax && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
+              <div className="flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
                 <div className="text-xs text-text-secondary leading-relaxed">
                   <p className="text-warm-orange font-medium mb-1">
@@ -992,6 +1006,7 @@ export default function CreateReviewPage() {
                   onToggle={() => togglePersona(persona.id)}
                 />
               ))}
+            </div>
             </div>
           </div>
         )}
@@ -1087,7 +1102,7 @@ export default function CreateReviewPage() {
             <h2 className="text-xl font-semibold text-text-primary mb-2">确认评审配置</h2>
             <p className="text-sm text-text-secondary mb-6">检查以下信息，确认无误后启动评审</p>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {selectedSkill && (
                 <div className={cn('rounded-xl border p-4 md:p-5', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
                   <h3 className="text-sm font-medium text-text-muted mb-2">评审技能</h3>
@@ -1245,6 +1260,8 @@ export default function CreateReviewPage() {
         )}
       </div>
 
+      {/* 底部操作区：主按钮（下一步/启动）始终右对齐，错误说明放在主按钮上方
+          而不是挤在它旁边，窄屏不再被长错误文案顶歪 */}
       <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
         <button
           onClick={handlePrev}
@@ -1275,9 +1292,9 @@ export default function CreateReviewPage() {
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />
           </button>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end gap-2">
             {launchError && (
-              <p className="max-w-md text-sm text-severity-critical">{launchError}</p>
+              <p className="max-w-md text-right text-sm text-severity-critical">{launchError}</p>
             )}
             <button
               onClick={handleLaunch}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
@@ -364,12 +364,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
+    // 表单/阅读型页面：与其他设置类页面同一档容器
+    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">
-        <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-green mb-2">
+        <h1 className="font-display text-2xl font-bold text-text-primary">
           设置
         </h1>
-        <p className="text-text-secondary">
+        <p className="text-sm text-text-secondary mt-1">
           账户、模型接入、用量与数据，都在这里管理。
         </p>
       </div>
@@ -396,7 +397,7 @@ export default function SettingsPage() {
                           'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left transition-colors',
                           isActive
                             ? 'bg-brand-primary/10 text-brand-primary font-medium'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-bg-card-hover'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                         )}
                       >
                         <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
@@ -426,7 +427,7 @@ export default function SettingsPage() {
         {/* ---------------- 账户：个人信息 ---------------- */}
         {activeSection === 'account' && (
           identity?.is_anonymous ? (
-            <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+            <section className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
                   <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
@@ -448,7 +449,7 @@ export default function SettingsPage() {
               </Link>
             </section>
           ) : (
-            <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+            <section className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
                   <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
@@ -463,20 +464,20 @@ export default function SettingsPage() {
                 </div>
               </div>
               {/* 昵称 */}
-              <div className="mt-4 rounded-lg border border-border bg-bg-card p-4">
+              <div className="mt-4 rounded-lg border border-border bg-black/30 p-4">
                 <label className="block text-xs font-medium text-text-secondary">昵称</label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <input
                     value={nameDraft}
                     onChange={(e) => { setNameDraft(e.target.value); setNameMsg(null); setNameError(null) }}
                     maxLength={50}
-                    className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
                     placeholder="怎么称呼你"
                   />
                   <button
                     onClick={() => void handleSaveName()}
                     disabled={nameBusy || !nameDraft.trim() || nameDraft.trim() === (identity?.display_name ?? '')}
-                    className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
                   >
                     {nameBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <Save className="h-4 w-4" strokeWidth={1.5} />}
                     保存
@@ -490,32 +491,32 @@ export default function SettingsPage() {
               </div>
 
               {/* 密码 */}
-              <div className="mt-3 rounded-lg border border-border bg-bg-card p-4">
+              <div className="mt-3 rounded-lg border border-border bg-black/30 p-4">
                 <label className="block text-xs font-medium text-text-secondary">修改密码</label>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   <input
                     type="password" value={pwCurrent} autoComplete="current-password"
                     onChange={(e) => { setPwCurrent(e.target.value); setPwMsg(null); setPwError(null) }}
                     placeholder="当前密码"
-                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                    className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
                   />
                   <input
                     type="password" value={pwNext} autoComplete="new-password"
                     onChange={(e) => { setPwNext(e.target.value); setPwMsg(null); setPwError(null) }}
                     placeholder="新密码（至少 8 位）"
-                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                    className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
                   />
                   <input
                     type="password" value={pwConfirm} autoComplete="new-password"
                     onChange={(e) => { setPwConfirm(e.target.value); setPwMsg(null); setPwError(null) }}
                     placeholder="再输一次新密码"
-                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
+                    className="rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary/50"
                   />
                 </div>
                 <button
                   onClick={() => void handleChangePassword()}
                   disabled={pwBusy || !pwCurrent || !pwNext || !pwConfirm}
-                  className="mt-3 flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+                  className="mt-3 flex items-center gap-1.5 rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
                 >
                   {pwBusy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <KeyRound className="h-4 w-4" strokeWidth={1.5} />}
                   修改密码
@@ -532,7 +533,7 @@ export default function SettingsPage() {
 
         {/* ---------------- 模型配置：API Key（BYOK） ---------------- */}
         {activeSection === 'model' && (
-        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+        <section className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
               <KeyRound className="w-5 h-5 text-brand-primary" strokeWidth={1.5} />
@@ -561,7 +562,7 @@ export default function SettingsPage() {
               {keyStatus.keys.map((k) => (
                 <div
                   key={k.provider}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-bg-secondary border border-brand-primary/20 shadow-sm"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-black/30 border border-brand-primary/20 shadow-sm"
                 >
                   <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0" strokeWidth={1.25} />
                   <div className="min-w-0 flex-1">
@@ -606,7 +607,7 @@ export default function SettingsPage() {
                   }}
                   className={cn(
                     'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer relative overflow-hidden',
-                    'bg-bg-card hover:bg-bg-card-hover',
+                    'bg-black/30 hover:bg-white/5',
                     isSelected
                       ? cn(cfg.color.border, cfg.color.glow, 'shadow-sm')
                       : 'border-border hover:border-border-hover'
@@ -615,7 +616,7 @@ export default function SettingsPage() {
                   {isSelected && <div className={cn('absolute inset-0 opacity-[0.07]', cfg.color.bg)} />}
                   <div className={cn(
                     'flex h-10 w-10 items-center justify-center rounded-lg transition-colors relative z-10',
-                    isSelected ? cfg.color.bg : 'bg-bg-secondary'
+                    isSelected ? cfg.color.bg : 'bg-black/30'
                   )}>
                     <Icon
                       className={cn('w-5 h-5 transition-colors', isSelected ? cfg.color.text : 'text-text-muted')}
@@ -645,13 +646,13 @@ export default function SettingsPage() {
                     onClick={() => applyPreset(preset)}
                     className={cn(
                       'flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all cursor-pointer text-left',
-                      'bg-bg-card hover:bg-bg-card-hover',
+                      'bg-black/30 hover:bg-white/5',
                       isMatch ? 'border-cyan/50 bg-cyan/[0.06] shadow-sm' : 'border-border hover:border-border-hover'
                     )}
                   >
                     <div className={cn(
                       'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                      isMatch ? 'bg-cyan/10' : 'bg-bg-secondary'
+                      isMatch ? 'bg-cyan/10' : 'bg-black/30'
                     )}>
                       <Icon className={cn('w-3.5 h-3.5', isMatch ? 'text-cyan' : 'text-text-muted')} strokeWidth={1.5} />
                     </div>
@@ -684,7 +685,7 @@ export default function SettingsPage() {
                   resetTest()
                 }}
                 placeholder={byokProvider === 'anthropic' ? 'claude-sonnet-4-5-20250929（留空自动选）' : 'deepseek-v4-pro'}
-                className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
+                className="w-full px-3 py-2.5 rounded-lg bg-black/30 border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
               />
             </div>
             <div>
@@ -699,7 +700,7 @@ export default function SettingsPage() {
                   resetTest()
                 }}
                 placeholder={byokProvider === 'anthropic' ? 'https://api.anthropic.com（或第三方中转地址）' : 'https://api.deepseek.com'}
-                className="w-full px-3 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
+                className="w-full px-3 py-2.5 rounded-lg bg-black/30 border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan transition-colors font-mono text-sm"
               />
             </div>
           </div>
@@ -716,11 +717,11 @@ export default function SettingsPage() {
                 }}
                 aria-label="API Key"
                 placeholder={byokProvider === 'anthropic' ? 'sk-ant-…（输入 Anthropic API Key）' : '输入对应服务商的 API Key（Ollama 本地可留空）'}
-                className="w-full px-4 py-3 pr-12 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
+                className="w-full px-4 py-3 pr-12 rounded-lg bg-black/30 border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors font-mono text-sm"
               />
               <button
                 onClick={() => setShowByokKey(!showByokKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-bg-card-hover text-text-muted hover:text-text-secondary transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-white/5 text-text-muted hover:text-text-secondary transition-colors"
               >
                 {showByokKey ? <EyeOff className="w-4 h-4" strokeWidth={1.25} /> : <Eye className="w-4 h-4" strokeWidth={1.25} />}
               </button>
@@ -731,7 +732,7 @@ export default function SettingsPage() {
               className={cn(
                 'flex items-center gap-1.5 px-4 py-3 rounded-lg text-sm font-medium transition-all shrink-0',
                 testStatus === 'testing' || (byokProvider === 'openai_compatible' && !byokModel.trim())
-                  ? 'bg-bg-secondary text-text-muted cursor-not-allowed'
+                  ? 'bg-black/30 text-text-muted cursor-not-allowed'
                   : 'bg-cyan/10 text-cyan hover:bg-cyan/20'
               )}
             >
@@ -748,7 +749,7 @@ export default function SettingsPage() {
               className={cn(
                 'flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all shrink-0',
                 byokSaving || !byokKey.trim()
-                  ? 'bg-bg-card text-text-muted cursor-not-allowed'
+                  ? 'bg-black/30 text-text-muted cursor-not-allowed'
                   : 'bg-brand-primary text-white hover:bg-brand-primary-dim'
               )}
             >
@@ -784,7 +785,7 @@ export default function SettingsPage() {
             API Key 加密存储，本页面不会明文回显
           </p>
 
-          <div className="mt-4 flex items-start gap-2 text-xs text-text-muted rounded-lg border border-border bg-bg-card p-3">
+          <div className="mt-4 flex items-start gap-2 text-xs text-text-muted rounded-lg border border-border bg-black/30 p-3">
             <ImagePlus className="w-3.5 h-3.5 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.25} />
             <span>
               多模态支持：评审时可上传截图、设计稿、BP 页面。支持视觉的模型（Claude、GPT-4o、Qwen-VL、GLM-4V 等）会直接看图；不支持视觉的模型仅按文字评审，流程不会中断。
@@ -797,7 +798,7 @@ export default function SettingsPage() {
         {activeSection === 'usage' && (
         <div className="space-y-6">
           {/* CDK 兑换码：无需登录，兑换后自动获得游客身份 */}
-          <div className="rounded-xl border border-border bg-bg-secondary/60 p-5">
+          <div className="rounded-xl border border-border bg-black/30 p-5">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-warm-orange/10 border border-warm-orange/20">
                 <Ticket className="w-3.5 h-3.5 text-warm-orange" strokeWidth={1.5} />
@@ -825,7 +826,7 @@ export default function SettingsPage() {
                   if (e.key === 'Enter') void handleRedeemCdk()
                 }}
                 placeholder="AL-XXXX-XXXX-XXXX"
-                className="flex-1 px-4 py-2.5 rounded-lg bg-bg-secondary border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-warm-orange transition-colors font-mono text-sm tracking-wider"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-black/30 border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-warm-orange transition-colors font-mono text-sm tracking-wider"
               />
               <button
                 onClick={() => void handleRedeemCdk()}
@@ -833,7 +834,7 @@ export default function SettingsPage() {
                 className={cn(
                   'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all shrink-0',
                   cdkBusy || !cdkCode.trim()
-                    ? 'bg-bg-secondary text-text-muted cursor-not-allowed'
+                    ? 'bg-black/30 text-text-muted cursor-not-allowed'
                     : 'bg-warm-orange/15 text-warm-orange hover:bg-warm-orange/25'
                 )}
               >
@@ -864,7 +865,7 @@ export default function SettingsPage() {
 
           {/* 24h 用量：quota 关闭时只报数字，不画配额条 */}
           {usage && (
-            <div className="mt-6 rounded-xl border border-border bg-bg-secondary/60 p-5">
+            <div className="mt-6 rounded-xl border border-border bg-black/30 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan/10 border border-cyan/20">
                   <BarChart3 className="w-3.5 h-3.5 text-cyan" strokeWidth={1.5} />
@@ -874,7 +875,7 @@ export default function SettingsPage() {
                 </h3>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-lg bg-bg-card border border-border p-3">
+                <div className="rounded-lg bg-black/30 border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">评审次数</div>
                   <div className="font-display text-2xl font-bold text-text-primary">
                     {usage.reviews_used_all}
@@ -885,7 +886,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
-                <div className="rounded-lg bg-bg-card border border-border p-3">
+                <div className="rounded-lg bg-black/30 border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">
                     {usage.quota_mode === 'credits' ? '剩余次数' : '加量余额'}
                   </div>
@@ -894,18 +895,18 @@ export default function SettingsPage() {
                     <span className="text-text-muted font-normal text-sm"> 次</span>
                   </div>
                 </div>
-                <div className="rounded-lg bg-bg-card border border-border p-3">
+                <div className="rounded-lg bg-black/30 border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">总费用</div>
                   <div className="font-display text-2xl font-bold text-warm-orange">${usage.cost_usd_total.toFixed(2)}</div>
                 </div>
-                <div className="rounded-lg bg-bg-card border border-border p-3">
+                <div className="rounded-lg bg-black/30 border border-border p-3">
                   <div className="text-xs text-text-muted mb-1">其中服务器 Key</div>
                   <div className="font-display text-2xl font-bold text-text-secondary">${usage.cost_usd_on_server_key.toFixed(2)}</div>
                 </div>
               </div>
               {usage.quota_enabled && usage.reviews_limit != null && usage.reviews_limit > 0 && (
                 <div className="mt-3">
-                  <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
+                  <div className="h-2 bg-black/30 rounded-full overflow-hidden">
                     <div
                       className={cn(
                         'h-full rounded-full transition-all duration-700',
@@ -940,7 +941,7 @@ export default function SettingsPage() {
                   </div>
                   {usage.tokens_limit != null && usage.tokens_limit > 0 && (
                     <>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-secondary">
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/30">
                         <div
                           className={cn(
                             'h-full rounded-full transition-all',
@@ -966,7 +967,7 @@ export default function SettingsPage() {
          * "你的东西归你"不能只写在隐私政策里——给两个用户能亲手按的按钮，
          * 承诺才变成可验证的事实。 */}
         {activeSection === 'data' && (
-        <section className="rounded-2xl border border-border bg-bg-card p-6 glow-green">
+        <section className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
               <ShieldCheck className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
@@ -998,7 +999,7 @@ export default function SettingsPage() {
             <button
               onClick={() => void handleExport()}
               disabled={exporting}
-              className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary transition-colors hover:border-brand-primary/40 disabled:opacity-50"
             >
               {exporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
@@ -1040,7 +1041,7 @@ export default function SettingsPage() {
                     value={deleteConfirm}
                     onChange={(e) => setDeleteConfirm(e.target.value)}
                     placeholder="删除我的账号"
-                    className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-severity-critical/50"
+                    className="mt-1 w-full rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-severity-critical/50"
                   />
                 </div>
                 {!identity?.is_anonymous && (
@@ -1050,7 +1051,7 @@ export default function SettingsPage() {
                       type="password"
                       value={deletePassword}
                       onChange={(e) => setDeletePassword(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-severity-critical/50"
+                      className="mt-1 w-full rounded-md border border-border bg-black/30 px-3 py-2 text-sm text-text-primary outline-none focus:border-severity-critical/50"
                     />
                   </div>
                 )}

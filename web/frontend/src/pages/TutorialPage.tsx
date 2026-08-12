@@ -17,6 +17,7 @@ import {
   BarChart3,
   BrainCircuit,
 } from 'lucide-react'
+import { PageShell, PageHeader, SectionCard, PRIMARY_BUTTON_CLASS } from '@/components/ui'
 
 const steps = [
   { icon: ListChecks, label: '选择任务类型', desc: '根据评审目标选择对应的任务类型' },
@@ -124,19 +125,15 @@ export default function TutorialPage() {
   const uploadMethods = buildUploadMethods(exampleCount)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary font-display">
-          使用教程
-        </h1>
-        <p className="text-sm text-text-secondary mt-1">
-          了解 AudienceLens 评审系统的完整流程与材料要求
-        </p>
-      </div>
+    <PageShell size="reading">
+      <PageHeader
+        title="使用教程"
+        subtitle="了解 AudienceLens 评审系统的完整流程与材料要求"
+      />
 
       <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-bg-card p-6">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             评审流程总览
           </h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -166,10 +163,10 @@ export default function TutorialPage() {
               )
             })}
           </div>
-        </section>
+        </SectionCard>
 
-        <section className="rounded-xl border border-border bg-bg-card p-6">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             上传文件，AI 自动提取
           </h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -210,10 +207,10 @@ export default function TutorialPage() {
               AI 提取完成后，所有字段均可手动修改。你可以补充 AI 遗漏的信息、修正不准确的内容、或添加额外说明。最终提交的内容以你的编辑为准。
             </p>
           </div>
-        </section>
+        </SectionCard>
 
-        <section className="rounded-xl border border-border bg-bg-card p-6">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             适合上传的文件类型
           </h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -246,10 +243,10 @@ export default function TutorialPage() {
               其他格式的文档请先转换为以上格式再上传。
             </p>
           )}
-        </section>
+        </SectionCard>
 
-        <section className="rounded-xl border border-border bg-bg-card p-6">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             任务类型材料需求
           </h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -291,10 +288,10 @@ export default function TutorialPage() {
               </tbody>
             </table>
           </div>
-        </section>
+        </SectionCard>
 
-        <section className="rounded-xl border border-border bg-bg-card p-6">
-          <h2 className="text-xl font-semibold text-text-primary mb-1">
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
             评审结果说明
           </h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -314,18 +311,15 @@ export default function TutorialPage() {
               )
             })}
           </div>
-        </section>
+        </SectionCard>
 
         <div className="flex items-center justify-center py-4">
-          <Link
-            to="/review/new"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-dim glow-green transition-all"
-          >
+          <Link to="/review/new" className={PRIMARY_BUTTON_CLASS}>
             开始创建评审
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />
           </Link>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

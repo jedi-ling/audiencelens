@@ -27,7 +27,8 @@ import type { SharedReport } from '@/lib/types'
 import { SyntheticBanner, LimitationsSection, type RealReport } from './ReportPage'
 import SeverityBadge from '@/components/SeverityBadge'
 import type { Severity } from '@/lib/mock-data'
-import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight } from 'lucide-react'
+import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight, AlertCircle } from 'lucide-react'
+import { EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
 /** 引擎的 severity 串收敛成 SeverityBadge 认识的档位；认不出来就不画徽章，
  *  不硬塞一个默认值假装知道严重程度。 */
@@ -79,33 +80,35 @@ export default function SharedReportPage() {
 
   if (revoked) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center animate-fade-in">
-        <Link2Off className="mx-auto h-10 w-10 text-text-muted" strokeWidth={1.25} />
-        <h1 className="mt-4 text-xl font-semibold text-text-primary">链接已失效</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          这条分享链接不存在，或者已经被作者撤销了。如果你需要查看，请向分享给你的人重新索取。
-        </p>
-        <Link
-          to="/"
-          className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
-        >
-          了解 AudienceLens
-        </Link>
+      <div className="mx-auto max-w-2xl px-4 py-20 animate-fade-in">
+        <EmptyState
+          icon={Link2Off}
+          title="链接已失效"
+          description="这条分享链接不存在，或者已经被作者撤销了。如果你需要查看，请向分享给你的人重新索取。"
+          action={
+            <Link to="/" className={PRIMARY_BUTTON_CLASS}>
+              了解 AudienceLens
+            </Link>
+          }
+        />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center animate-fade-in">
-        <h1 className="text-xl font-semibold text-text-primary">加载失败</h1>
-        <p className="mt-2 break-all text-sm text-text-secondary">{error ?? '没有拿到报告内容'}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-6 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
-        >
-          重试
-        </button>
+      <div className="mx-auto max-w-2xl px-4 py-20 animate-fade-in">
+        <EmptyState
+          icon={Loader2}
+          tone="error"
+          title="加载失败"
+          description={error ?? '没有拿到报告内容'}
+          action={
+            <button onClick={() => window.location.reload()} className={SECONDARY_BUTTON_CLASS}>
+              重试
+            </button>
+          }
+        />
       </div>
     )
   }
@@ -117,12 +120,13 @@ export default function SharedReportPage() {
   const notes = report.persona_notes ?? []
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 animate-fade-in">
+    // 阅读型页面：正文列收窄居中，与评估报告同一档容器
+    <div className="mx-auto max-w-3xl px-4 py-8 animate-fade-in">
       {/* ETHICS.md 强制项之一。公开链接的访客没有任何上下文，这块尤其不能省。 */}
       <SyntheticBanner />
 
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-text-primary">
+        <h1 className="font-display text-2xl font-bold text-text-primary">
           {data.target_title || report.meta?.target || '评审报告'}
         </h1>
         <p className="mt-1 text-sm text-text-secondary">

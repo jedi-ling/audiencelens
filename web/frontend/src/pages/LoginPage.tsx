@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogIn } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
@@ -46,7 +46,7 @@ export default function LoginPage() {
           代价不只是"不够规范"——回车提交要靠每个输入框自己挂 onKeyDown（漏一个就不灵）、
           浏览器和密码管理器认不出这是登录表单（不提示保存、自动填充后无法提交）、
           读屏软件也拿不到表单语义。 */}
-      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-6">
+      <form onSubmit={submit} className="rounded-xl border border-white/[0.08] bg-black/30 p-6">
         <label htmlFor="login-email" className="block text-xs text-text-muted">
           邮箱
         </label>
@@ -95,7 +95,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy || !email.trim() || !password}
-          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
+          className="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
           {busy ? '登录中…' : '登录'}
         </button>
