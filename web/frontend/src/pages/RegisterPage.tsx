@@ -113,6 +113,20 @@ export default function RegisterPage() {
         >
           {busy ? '注册中…' : '注册'}
         </button>
+
+        {/* 注册前必须能看到条款。放在按钮下方而不是做成勾选框：
+            这两份文档写的都是本服务真实的边界（不承诺可用率、AI 输出仅供参考），
+            值得被读到，而不是被一个"我已阅读"的勾选框代替。 */}
+        <p className="mt-3 text-center text-xs leading-relaxed text-text-muted">
+          注册即表示你同意
+          <Link to="/terms" className="mx-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim">
+            服务条款
+          </Link>
+          与
+          <Link to="/privacy" className="mx-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim">
+            隐私政策
+          </Link>
+        </p>
       </form>
 
       <p className="mt-4 text-center text-sm text-text-muted">

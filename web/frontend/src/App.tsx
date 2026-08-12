@@ -12,6 +12,7 @@ const TutorialPage = lazy(() => import('@/pages/TutorialPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const PlansPage = lazy(() => import('@/pages/PlansPage'))
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'))
+const TermsPage = lazy(() => import('@/pages/TermsPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 const VerifyEmailPage = lazy(() => import('@/pages/VerifyEmailPage'))
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/skills" element={<SkillSelectPage />} />
             <Route path="/evaluations/:id" element={<EvaluationPage />} />
             {/* 未知路径统一回首页——此前完全没有兜底，/home 下线后验证出这个空白页问题 */}

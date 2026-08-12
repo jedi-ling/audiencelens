@@ -385,6 +385,13 @@ export default function Layout() {
             >
               <span>隐私政策</span>
             </Link>
+            <Link
+              to="/terms"
+              onClick={() => setMenuOpen(false)}
+              className="flex shrink-0 items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
+            >
+              <span>服务条款</span>
+            </Link>
           </nav>
         </div>
       )}
@@ -467,6 +474,12 @@ export default function Layout() {
               className="text-xs text-text-muted hover:text-text-secondary transition-colors"
             >
               隐私政策
+            </Link>
+            <Link
+              to="/terms"
+              className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+            >
+              服务条款
             </Link>
           </nav>
 
