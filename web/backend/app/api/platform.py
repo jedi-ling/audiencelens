@@ -1342,6 +1342,62 @@ def _valid_persona_packs() -> set:
     return {pid for pid, personas in packs.items() if personas}
 
 
+def _validate_artifact(artifact: dict) -> None:
+    """入队**前**把材料包的形状问题拦下来。
+
+    此前 artifact 只声明成 `dict`，没有任何结构校验。形状写错时的实际表现是：
+    接口 200 收下 → 评审入队 → 跑到最后抛 AllPersonasFailedError，
+    错误消息是「本次没有任何人格进入评审（预设面板为空，或全部被证据预检
+    跳过）」——指向的是人格面板，而真正的原因是**材料里根本没有 materials
+    数组**（evidence_precheck.load_evidence_types 只读这个键，读不到就等于
+    没有任何证据类型，于是全部人格被跳过）。
+
+    这个失败形态有三重代价：
+      · 用户/接入方按错误提示去查人格配置，方向完全是错的
+      · 用平台 key 时已经占了一次配额（放行瞬间就预留）
+      · 真跑起来的话还会产生模型调用费用
+
+    实测踩过一次：传 {"text": "..."} 而不是 {"materials": [...]}，
+    全程无警告，直到最后才失败。校验放在入队前，错误说清楚该怎么改。
+
+    刻意只校验**形状**，不校验内容长短：材料多短算够用是引擎的判断
+    （evidence_precheck 的 coverage 阈值），不该在 API 层再设一道
+    口径不同的门槛。
+    """
+    materials = artifact.get("materials")
+    if materials is None:
+        raise BadRequest(
+            "artifact 缺少 materials 数组。正确形状："
+            '{"title": "标题", "materials": [{"type": "text", "text": "材料正文"}]}。'
+            "只传 title 或把正文直接放在 artifact 顶层都不行——评审会因为读不到"
+            "任何证据而把全部人格跳过，最终失败。"
+        )
+    if not isinstance(materials, list):
+        raise BadRequest(f"artifact.materials 必须是数组，收到的是 {type(materials).__name__}")
+    if not materials:
+        raise BadRequest("artifact.materials 是空数组，没有任何材料可供评审")
+
+    for i, m in enumerate(materials):
+        if not isinstance(m, dict):
+            raise BadRequest(f"artifact.materials[{i}] 必须是对象，收到的是 {type(m).__name__}")
+        mtype = m.get("type")
+        if not mtype:
+            raise BadRequest(f'artifact.materials[{i}] 缺少 type（文本材料用 "text"，图片用 "image"）')
+        if mtype == "image":
+            if not m.get("image_data"):
+                raise BadRequest(f"artifact.materials[{i}] 是图片但没有 image_data")
+        elif not (m.get("text") or m.get("description")):
+            # 这里点名 text 是因为引擎读的就是它（runner/cli.py 组装
+            # artifact_texts 时取 description or text）。写成别的键名不会报错，
+            # 只会让人格收到一份空材料——照样调用模型、照样计费、
+            # 产出一份基于空白的报告。那比直接失败更糟。
+            raise BadRequest(
+                f'artifact.materials[{i}] 缺少 text（文本材料的正文字段名是 "text"）。'
+                "用别的键名不会报错，但人格会收到空材料——照样调用模型、照样计费，"
+                "产出一份基于空白的报告。"
+            )
+
+
 class CreateReviewRequest(BaseModel):
     task_type: str
     artifact: dict = Field(description="材料包：{title, materials:[{type,text}]}")
@@ -1415,6 +1471,9 @@ async def create_review_v2(
         raise BadRequest(f"未知任务类型：{body.task_type}")
     if body.mode not in intent_service.VALID_MODES:
         raise BadRequest(f"未知模式：{body.mode}")
+    # 放在配额检查**之前**：材料形状错了不该白占一次配额
+    # （check_quota 在放行的瞬间就预留名额，见 _reserve_review_slot）。
+    _validate_artifact(body.artifact)
     # persona_pack 拼错此前静默回落 game-core——用户选 A 包，跑的是 B 包。
     # 报告的每一条人格都来自 B 包，而用户以为看到的是 A 包的视角。
     persona_pack = (body.persona_pack or "game-core").strip()
