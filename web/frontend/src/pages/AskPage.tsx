@@ -1145,7 +1145,10 @@ export default function AskPage() {
           // 空会话时改成 flex 容器把引导内容垂直居中
           'chat-backdrop relative isolate flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
           isEmptyChat && 'flex flex-col justify-center',
-          dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border bg-bg-card/60'
+          // /90 而不是 /60：背景素材最亮处接近纯白（bg-4 实测 rgb(240,255,255)），
+          // 透到 0.6 的面板底下会把气泡里的正文压出一层蓝雾。留 10% 透明是刻意的——
+          // 完全做实会让整块面板像一张贴上去的卡片，失去与背景的层次关系。
+          dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border bg-bg-card/90'
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1715,7 +1718,11 @@ function HistorySidebar({
   return (
     <aside
       className={cn(
-        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary/60 transition-all duration-200',
+        // 不透明而不是 /60：侧栏是导航底板，没有理由让全页背景图从它底下透上来。
+        // 背景素材的高光弧线正好横穿侧栏区域，对话标题这类小字压在弧线上会糊成一片，
+        // 而且滚动列表时字随背景明暗忽明忽暗，比单纯的对比度问题更难受。
+        // 页面的通透感由侧栏**之外**的大片区域承担，那里背景是完整的。
+        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary transition-all duration-200',
         open ? 'w-64' : 'w-0 border-r-0'
       )}
     >
