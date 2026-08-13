@@ -10,8 +10,12 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { KeyRound } from 'lucide-react'
 import { api } from '@/lib/apiClient'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { tApiError } from '@/i18n/api-error'
 
 export default function ForgotPasswordPage() {
+  useDocumentTitle('page.forgot.meta.title')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
@@ -28,7 +32,7 @@ export default function ForgotPasswordPage() {
       await api.forgotPassword(email.trim())
       setSent(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '发送失败')
+      setError(tApiError(e, 'page.forgot.submit.error'))
     } finally {
       setBusy(false)
     }
@@ -38,8 +42,10 @@ export default function ForgotPasswordPage() {
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-6 py-16">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
         <KeyRound className="h-6 w-6 text-brand-primary" strokeWidth={1.5} />
-        <h1 className="text-xl font-semibold text-text-primary font-display">找回密码</h1>
-        <p className="text-sm text-text-secondary">输入注册邮箱，我们会发一个重置链接给你</p>
+        <h1 className="text-xl font-semibold text-text-primary font-display">
+          {t('page.forgot.header.title')}
+        </h1>
+        <p className="text-sm text-text-secondary">{t('page.forgot.header.desc')}</p>
       </div>
 
       {/* 必须是真的 <form>：此前是「input + onKeyDown + 按钮 onClick」的拼装式提交，
@@ -48,21 +54,19 @@ export default function ForgotPasswordPage() {
       <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-8">
         {sent ? (
           <div className="text-center">
-            <p className="text-sm text-text-primary">如果该邮箱已注册，重置链接已经发出。</p>
-            <p className="mt-2 text-xs text-text-muted">
-              链接 60 分钟内有效，只能使用一次。没收到请检查垃圾邮件箱。
-            </p>
+            <p className="text-sm text-text-primary">{t('page.forgot.sent.success')}</p>
+            <p className="mt-2 text-xs text-text-muted">{t('page.forgot.sent.hint')}</p>
             <Link
               to="/login"
               className="mt-5 inline-block text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
             >
-              返回登录
+              {t('page.forgot.sent.link')}
             </Link>
           </div>
         ) : (
           <>
             <label htmlFor="forgot-email" className="block text-xs text-text-muted">
-              注册邮箱
+              {t('page.forgot.email.label')}
             </label>
             <input
               id="forgot-email"
@@ -72,7 +76,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
-              placeholder="you@example.com"
+              placeholder={t('page.forgot.email.placeholder')}
               autoFocus
             />
 
@@ -88,17 +92,28 @@ export default function ForgotPasswordPage() {
               disabled={busy || !email.trim()}
               className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
             >
-              {busy ? '发送中…' : '发送重置链接'}
+              {/* 进行中用通用词（契约 11 的判断树第 2 条）：这里的"发送中…"没有
+                  任何这一页独有的语义，各页各写会攒出 5 种省略号写法。 */}
+              {busy ? t('common.ui.sending') : t('page.forgot.submit.cta')}
             </button>
           </>
         )}
       </form>
 
       <p className="mt-4 text-center text-sm text-text-muted">
-        想起来了？
-        <Link to="/login" className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim">
-          直接登录
-        </Link>
+        <Trans
+          k="page.forgot.signin.hint"
+          slots={{
+            link: (s) => (
+              <Link
+                to="/login"
+                className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
+              >
+                {s}
+              </Link>
+            ),
+          }}
+        />
       </p>
     </div>
   )

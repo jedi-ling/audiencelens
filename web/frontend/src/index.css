@@ -92,7 +92,7 @@ html, body {
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  opacity: 0.85;
+  opacity: 0.35;
 }
 
 ::selection {
@@ -214,6 +214,41 @@ html, body {
   backdrop-filter: blur(12px) saturate(180%);
   -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.glass-card {
+  background: rgba(28, 28, 30, 0.75);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hover-lift {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+.badge-evidence-direct {
+  background: rgba(50, 215, 75, 0.12);
+  color: #32d74b;
+  border: 1px solid rgba(50, 215, 75, 0.25);
+}
+
+.badge-evidence-inferred {
+  background: rgba(255, 159, 10, 0.12);
+  color: #ff9f0a;
+  border: 1px solid rgba(255, 159, 10, 0.25);
+}
+
+.badge-evidence-gap {
+  background: rgba(142, 142, 147, 0.12);
+  color: #8e8e93;
+  border: 1px solid rgba(142, 142, 147, 0.25);
 }
 
 .scanline-overlay {

@@ -5,8 +5,12 @@ import PersonaRadarChart from '@/components/PersonaRadarChart'
 import { Search, X, GitCompare, ChevronDown, ChevronUp, Loader2, SlidersHorizontal, Bot } from 'lucide-react'
 import { PACK_CATEGORIES } from '@/lib/mock-data'
 import { PageShell, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
+import { t } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatNumber } from '@/i18n/format'
 
 export default function PersonasPage() {
+  useDocumentTitle('page.personas.meta.title')
   const {
     personas,
     packs,
@@ -83,7 +87,7 @@ export default function PersonasPage() {
 
   const sidebarContent = (
     <>
-      <h3 className="text-sm font-medium text-text-muted mb-3">角色包筛选</h3>
+      <h3 className="text-sm font-medium text-text-muted mb-3">{t('page.personas.filter.title')}</h3>
       <div className="flex flex-col gap-1.5">
         <button
           onClick={() => { setSelectedPack(null); setDrawerOpen(false) }}
@@ -94,7 +98,7 @@ export default function PersonasPage() {
               : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
           )}
         >
-          全部 <span className="text-text-muted">{personas.length}</span>
+          {t('page.personas.filter_all')} <span className="text-text-muted">{formatNumber(personas.length)}</span>
         </button>
 
         {PACK_CATEGORIES.map((category) => {
@@ -108,9 +112,11 @@ export default function PersonasPage() {
                 onClick={() => toggleCategory(category.id)}
                 className="flex items-center justify-between w-full px-1 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wider hover:text-text-secondary transition-colors"
               >
+                {/* 分类名与角色包名是**目录数据**，事实源与 owner 都是 batch-0
+                    （契约 D5 / 4.3）。页面只渲染，不在这里再写一份译名。 */}
                 <span>{category.name}</span>
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[10px] normal-case tracking-normal opacity-60">{categoryPacks.length}</span>
+                  <span className="text-[10px] normal-case tracking-normal opacity-60">{formatNumber(categoryPacks.length)}</span>
                   {isExpanded ? (
                     <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.25} />
                   ) : (
@@ -137,7 +143,7 @@ export default function PersonasPage() {
                       )}
                     >
                       <span>{pack.name}</span>
-                      <span className="text-text-muted">{packCount}</span>
+                      <span className="text-text-muted">{formatNumber(packCount)}</span>
                     </button>
                   )
                 })}
@@ -153,7 +159,7 @@ export default function PersonasPage() {
     return (
       <PageShell size="grid" animate={false} className="py-16 text-center">
         <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-4" strokeWidth={1.25} />
-        <p className="text-text-secondary">加载角色数据...</p>
+        <p className="text-text-secondary">{t('page.personas.list.pending')}</p>
       </PageShell>
     )
   }
@@ -163,13 +169,13 @@ export default function PersonasPage() {
       {/* 页头：标题规格与全站统一（text-2xl bold）；右侧操作在小屏折行 */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-2xl font-bold text-text-primary">角色库</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary">{t('page.personas.header.title')}</h1>
           <button
             onClick={() => setDrawerOpen(true)}
             className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm bg-bg-card border border-border text-text-secondary hover:border-cyan/30 hover:text-cyan transition-all"
           >
             <SlidersHorizontal className="w-4 h-4" strokeWidth={1.25} />
-            筛选
+            {t('page.personas.filter.cta')}
           </button>
         </div>
         <button
@@ -182,7 +188,7 @@ export default function PersonasPage() {
           )}
         >
           <GitCompare className="w-4 h-4" strokeWidth={1.25} />
-          {compareMode ? '退出对比' : '对比模式'}
+          {compareMode ? t('page.personas.compare_exit') : t('page.personas.compare_enter')}
         </button>
       </div>
 
@@ -194,7 +200,9 @@ export default function PersonasPage() {
           />
           <div className="absolute bottom-0 left-0 right-0 bg-bg-primary border-t border-border rounded-t-2xl max-h-[70vh] overflow-y-auto p-5 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-text-primary">角色包筛选</h3>
+              {/* 抽屉标题与 sidebarContent 里那条是同一个结构块的同一个标题，
+                  共用一条 key（契约 §11 判断树：这不是"两处措辞碰巧相同"）。 */}
+              <h3 className="text-sm font-medium text-text-primary">{t('page.personas.filter.title')}</h3>
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="p-1.5 rounded-lg hover:bg-bg-card text-text-muted hover:text-text-primary transition-colors"
@@ -209,7 +217,7 @@ export default function PersonasPage() {
 
       {compareMode && comparePersonas.length === 2 && (
         <div className="rounded-xl border border-cyan/30 bg-bg-card p-4 md:p-6 mb-6 glow-cyan">
-          <h3 className="text-sm font-medium text-cyan mb-4 font-display">角色对比</h3>
+          <h3 className="text-sm font-medium text-cyan mb-4 font-display">{t('page.personas.compare.title')}</h3>
           <div className="flex items-center justify-center">
             <PersonaRadarChart
               data={comparePersonas[0].behavior_profile}
@@ -246,7 +254,7 @@ export default function PersonasPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索角色..."
+                placeholder={t('page.personas.search.placeholder')}
                 className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-cyan/50 transition-colors text-sm"
               />
               {searchQuery && (
@@ -294,7 +302,10 @@ export default function PersonasPage() {
 
                     <div className="flex items-center justify-between mt-3">
                       <span className="text-xs text-text-muted">
-                        {packs.find((p) => p.panel_id === persona.pack)?.name ?? '未知'}
+                        {/* 找不到包时说"未知"，不是缺译（缺译走 ⟦missing:…⟧），
+                            是后端没回这个包的**数据缺口**。不拿 persona.pack 这个
+                            内部 id 顶上去——那会让用户以为 "game-core" 是包名。 */}
+                        {packs.find((p) => p.panel_id === persona.pack)?.name ?? t('page.personas.pack_unknown')}
                       </span>
                       <div className="flex items-center gap-2">
                         {compareMode && (
@@ -307,7 +318,7 @@ export default function PersonasPage() {
                                 : 'bg-bg-secondary text-text-muted hover:text-cyan'
                             )}
                           >
-                            对比
+                            {t('page.personas.compare.label')}
                           </button>
                         )}
                         {isExpanded ? (
@@ -327,7 +338,7 @@ export default function PersonasPage() {
 
                       {persona.decisionRules && persona.decisionRules.length > 0 && (
                         <div className="mb-3">
-                          <h4 className="text-xs font-medium text-text-muted mb-1.5 font-display">决策规则</h4>
+                          <h4 className="text-xs font-medium text-text-muted mb-1.5 font-display">{t('page.personas.rules.title')}</h4>
                           <ul className="space-y-1">
                             {persona.decisionRules.map((rule, i) => (
                               <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
@@ -341,7 +352,7 @@ export default function PersonasPage() {
 
                       {persona.triggers && persona.triggers.length > 0 && (
                         <div>
-                          <h4 className="text-xs font-medium text-text-muted mb-1.5 font-display">触发器</h4>
+                          <h4 className="text-xs font-medium text-text-muted mb-1.5 font-display">{t('page.personas.triggers.title')}</h4>
                           <div className="flex flex-wrap gap-1.5">
                             {persona.triggers.map((trigger, i) => (
                               <span key={i} className="px-2 py-0.5 rounded bg-bg-secondary text-text-secondary border border-border text-xs">
@@ -361,13 +372,13 @@ export default function PersonasPage() {
           {filteredPersonas.length === 0 && (
             <EmptyState
               icon={Bot}
-              title="没有匹配的角色"
-              description="试试清除搜索词或选择「全部」"
+              title={t('page.personas.list_empty.title')}
+              description={t('page.personas.list_empty.desc')}
               className="bg-transparent"
               action={
                 searchQuery ? (
                   <button onClick={() => setSearchQuery('')} className={SECONDARY_BUTTON_CLASS}>
-                    清除搜索
+                    {t('page.personas.list_empty.cta')}
                   </button>
                 ) : undefined
               }

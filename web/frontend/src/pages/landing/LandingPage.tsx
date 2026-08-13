@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { createRoot } from 'react-dom/client'
+import { useLocale, type Locale } from '@/i18n/locale'
+import { useDocumentTitle } from '@/i18n/head'
 import './landing.css'
 import './landing-in-app.css' // hero 顶距等适配，与共享 Layout 拼接用
 
@@ -18,7 +20,17 @@ const stageRoots = new WeakMap<HTMLElement, ReturnType<typeof createRoot>>()
 const stageGen = new WeakMap<HTMLElement, number>()
 // landing-body.html / landing.css 就是落地页的正文本体——直接改这两个文件即可，
 // 不再有独立的静态设计源（曾经有过，已下线；本 React 版就是唯一权威版本）。
-import landingBody from './landing-body.html?raw'
+import landingBodyZh from './landing-body.html?raw'
+// 英文正文是**兄弟文件**，不是就地翻译（契约 4.4）：
+// tests/test_landing_capability_claims.py:96-105 在中文关键短语找不到时走
+// pytest.skip 而不是 fail——就地翻译会让 6 条「文案 ↔ 实现」断言全部静默跳过
+// 而测试套件依然全绿。中文原件一个字不动，英文另起一份，各自有各自的断言测试。
+import landingBodyEn from './landing-body.en.html?raw'
+
+/** ui_lang → 正文 HTML。两份都静态打进 landing 分包（约 20KB 未压缩／份）：
+ *  这个页面本来就是 lazy 分割的，多带一份原始字符串换来的是「切语言即刻生效、
+ *  不引入第二次网络往返、也不需要为 innerHTML 再造一套异步加载态」。 */
+const LANDING_BODY: Record<Locale, string> = { zh: landingBodyZh, en: landingBodyEn }
 
 /**
  * 营销落地页 —— 作为 `/` 路由，与 app 共用同一套 Layout（导航/页脚）。
@@ -34,6 +46,8 @@ import landingBody from './landing-body.html?raw'
 export default function LandingPage() {
   const rootRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const locale = useLocale()
+  useDocumentTitle('page.landing.meta.title')
 
   useEffect(() => {
     const root = rootRef.current
@@ -100,6 +114,14 @@ export default function LandingPage() {
     // 两组文案风格不同：hero 顶部 .chips 是名词短语（"Steam 商店页"），需要拼前缀；
     // 输入框下方 .chips-examples 是完整祈使句（"评审我的 Steam 商店页"），直接透传，
     // 否则会拼成"帮我评审一下我的评审我的 Steam 商店页"这种病句。
+    //
+    // ⚠ 这段是**死代码**：landing-body.html 里已经没有任何 class="chip" 的元素了
+    // （landing-body.html:31 的注释记录了 chips-examples 被砍掉），querySelectorAll 恒返回空集，
+    // 下面那句拼给 /ask 的中文永远不会被执行到。
+    // i18n 期刻意不删也不翻（契约 4.4）：删它是另一件事，而给一段跑不到的分支
+    // 写译文只会在语料里留下一条永远无法验证的文案。要恢复 chips 的那天，
+    // 那句前缀是拼给后端意图解析的**中文关键词输入**（同 AskPage 的 engine-prompt），
+    // 到时候按契约 12.2 处理，不要顺手 t() 掉。
     const chipHandlers: Array<[Element, () => void]> = []
     root.querySelectorAll<HTMLElement>('.chip').forEach((c) => {
       const isExample = c.closest('.chips-examples') !== null
@@ -278,11 +300,33 @@ export default function LandingPage() {
       )
     }
 
-    // 从别的路由进来时回到顶部
-    window.scrollTo(0, 0)
-
     return () => cleanups.forEach((fn) => fn())
-  }, [navigate])
+    // locale 必须进依赖：切语言会换掉 __html，React 重新 setInnerHTML，
+    // **整棵子树的节点全部被替换**。不重跑这个 effect 的话，所有监听器、
+    // IntersectionObserver、3D 舞台挂载点指向的都是已经脱离文档的旧节点——
+    // 表现是"切成英文之后首页不再有渐显动画、粒子背景消失、输入框回车没反应"，
+    // 而控制台一行报错都没有。
+    //
+    // 旧的 HeroScene 不会泄漏：stageGen 是按节点存的世代号，旧节点的世代号没被
+    // 新挂载抬高（新挂载发生在**另一个**节点上），所以旧 root 的 render(null)
+    // 会照常执行，three 的 renderer/geometry/material 正常释放。
+  }, [navigate, locale])
 
-  return <div className="al-landing" ref={rootRef} dangerouslySetInnerHTML={{ __html: landingBody }} />
+  // 从别的路由进来时回到顶部。
+  // 这句原本在上面那个 effect 的末尾，因为 locale 进了那个 effect 的依赖数组，
+  // 留在那里会变成"切一次语言就把人弹回页首"——用户正在看底部的对比表，
+  // 切成英文之后要重新滚 6 屏。挂载时回顶是路由行为，与 ui_lang 无关，所以单列。
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
+  return (
+    <div
+      className="al-landing"
+      ref={rootRef}
+      // 注入的是整块正文 HTML 文件（?raw），不是 i18n 消息串——
+      // 契约 12.3 禁止的是把 t() 的返回值塞进 innerHTML，这里不是那种情况。
+      dangerouslySetInnerHTML={{ __html: LANDING_BODY[locale] }}
+    />
+  )
 }

@@ -24,6 +24,11 @@ import { connectReviewSocket } from '@/lib/ws'
 import type { WsStatus } from '@/lib/ws'
 import { useSessionStore } from '@/store/session-store'
 import { TASK_TYPES, SKILLS } from '@/lib/mock-data'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatNumber, formatPercent, formatTime, formatUsd } from '@/i18n/format'
+import { tApiError } from '@/i18n/api-error'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 import type { ConversationSummary, IntentResult, Material, Project, ReviewDetail, WsEvent } from '@/lib/types'
 import type { Review, ReviewListItem } from '@/lib/mock-data'
 
@@ -38,12 +43,30 @@ interface ImageAttachment {
   fileId?: string
 }
 
-const EXAMPLES = [
-  '帮我评审一下这个产品的定价页，用户会不会觉得贵',
-  '这是我们的新手引导流程，看看用户会不会中途放弃',
-  '这是我的创业项目申报表，帮我用投资人的眼光过一遍',
+/**
+ * 示例提问。**存 key 不存文案**：这个数组在模块求值时就固定了，存翻译结果的话
+ * 切换语言不会重新求值，示例会一直停在打开页面时的那种语言。
+ *
+ * 注意这三条同时是**发出去的用户消息**（点一下等于替用户把这句话打进输入框再发送），
+ * 所以英文侧写的是英文用户真会说的话，不是中文句子的逐字对应。发英文过去时，
+ * 后端意图解析的中文关键词档命中率会掉——但那和英文用户自己打英文是同一件事，
+ * 而且置信度不够时确认卡片上本来就会明说"本次为规则解析，可能判得不准"。
+ */
+const EXAMPLE_KEYS: PlainMessageKey[] = [
+  'page.ask.example_pricing.value',
+  'page.ask.example_onboarding.value',
+  'page.ask.example_pitch.value',
 ]
 
+/**
+ * 任务类型 / 技能的展示名。
+ *
+ * ⚠ **不外化，也不要在 page.ask.* 里抄一份英文。** 这两张表是目录文案，
+ * 英文事实源在后端 catalog.en-US.json，前端那份 overlay 由
+ * `npm run i18n:sync-catalog` 生成、不许手写（契约 D5）。在这里手写一份
+ * 就是给同一批文案造了第二个 owner，表现是"同一个任务类型在两个页面
+ * 显示两个英文名"。overlay 到位后这两张表整个换成 catalog 读取器。
+ */
 const TASK_LABELS: Record<string, string> = {
   steam_page_review: 'Steam 商店页评审',
   demo_first_play: 'Demo 首玩评审',
@@ -82,15 +105,14 @@ function nextId(): string {
   return `m${seq}`
 }
 
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
 /** 置信度 → 用户可理解的把握档位与配色 */
-function confidenceLevel(confidence: number): { label: string; barClass: string } {
-  if (confidence >= 0.8) return { label: '高', barClass: 'bg-brand-primary' }
-  if (confidence >= 0.6) return { label: '中', barClass: 'bg-cyan' }
-  return { label: '偏低', barClass: 'bg-warm-orange' }
+// 返回 key 不返回文案：模块级函数在渲染时才被调用，但存文案会诱使别人把结果缓存
+// 到模块级常量里，那样切语言就不重新求值了。只有 label 进 key 表，配色留在这里
+// （样式不是文案，契约 §3.4 例 7）。
+function confidenceLevel(confidence: number): { labelKey: PlainMessageKey; barClass: string } {
+  if (confidence >= 0.8) return { labelKey: 'page.ask.confidence_high.label', barClass: 'bg-brand-primary' }
+  if (confidence >= 0.6) return { labelKey: 'page.ask.confidence_medium.label', barClass: 'bg-cyan' }
+  return { labelKey: 'page.ask.confidence_low.label', barClass: 'bg-warm-orange' }
 }
 
 /** 助手身份头像 —— 蓝色渐变徽记，让对话双方一眼可辨 */
@@ -123,6 +145,9 @@ function ThinkingIndicator() {
 export default function AskPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  // 顺带订阅 ui_lang：t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
+  // 本页所有子组件（侧栏 / 气泡 / 报告弹窗）都挂在这棵树下，这里订阅就够全页跟着变。
+  useDocumentTitle('page.ask.meta.title')
   const { config, bootstrap, canReview } = useSessionStore()
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -130,7 +155,7 @@ export default function AskPage() {
       id: nextId(),
       role: 'assistant',
       kind: 'text',
-      text: '你好，说说你想评审什么——一个页面、一份文案、一个产品概念都可以。',
+      text: t('page.ask.greeting.value'),
       // 开场白的发出时间；惰性初始化保证只在挂载时取一次
       ts: Date.now(),
     },
@@ -307,7 +332,7 @@ export default function AskPage() {
         setProjects(null)
       }
     } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : '加载失败')
+      setHistoryError(tApiError(e, 'page.ask.history.error'))
     }
   }, [])
 
@@ -330,7 +355,7 @@ export default function AskPage() {
         id: nextId(),
         role: 'assistant',
         kind: 'text',
-        text: '你好，说说你想评审什么——一个页面、一份文案、一个产品概念都可以。',
+        text: t('page.ask.greeting.value'),
         ts: Date.now(),
       },
     ])
@@ -356,7 +381,7 @@ export default function AskPage() {
       setNewProjectDraft('')
       setNewProjectOpen(false)
     } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : '创建项目失败')
+      setHistoryError(tApiError(e, 'page.ask.project_create.error'))
     }
   }
 
@@ -368,7 +393,7 @@ export default function AskPage() {
       const p = await api.renameProject(id, trimmed)
       setProjects((prev) => (prev ?? []).map((x) => (x.id === id ? p : x)))
     } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : '重命名失败')
+      setHistoryError(tApiError(e, 'page.ask.project_rename.error'))
     }
   }
 
@@ -383,7 +408,7 @@ export default function AskPage() {
         prev.map((c) => (c.project_id === id ? { ...c, project_id: null } : c)),
       )
     } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : '删除项目失败')
+      setHistoryError(tApiError(e, 'page.ask.project_delete.error'))
     }
   }
 
@@ -399,7 +424,7 @@ export default function AskPage() {
       await api.setConversationProject(conversationId, projectId)
     } catch (e) {
       setConversations(prevSnapshot)
-      setHistoryError(e instanceof Error ? e.message : '移动对话失败')
+      setHistoryError(tApiError(e, 'page.ask.conversation_move.error'))
     }
   }
 
@@ -413,8 +438,8 @@ export default function AskPage() {
     const userText =
       bundle?.materials?.find((m) => m.type === 'text' && m.text)?.text ||
       r.target_title ||
-      TASK_TYPES.find((t) => t.id === r.task_type)?.name ||
-      '（历史评审）'
+      TASK_TYPES.find((tt) => tt.id === r.task_type)?.name ||
+      t('page.ask.restored_review.label')
     historyRef.current = [userText]
     sessionImagesRef.current = []
     setAttachments([])
@@ -503,7 +528,9 @@ export default function AskPage() {
       if (searchParams.get('review') === id) startNewConversation()
     } catch (err) {
       setHistoryError(
-        err instanceof Error ? `删除失败：${err.message}` : '删除失败，请检查网络后重试',
+        t('page.ask.history_delete.error', {
+          detail: tApiError(err, 'page.ask.history_delete.hint'),
+        }),
       )
     } finally {
       setDeletingId(null)
@@ -691,7 +718,7 @@ export default function AskPage() {
         case 'review':
           // 卡片正文是空的（只有 reviewId）。存一句可读的占位，让导出的
           // 对话记录仍然连贯；真正还原成卡片靠 meta.kind。
-          content = '[评审已创建]'
+          content = t('page.ask.persisted_review.value')
           meta = { kind: 'review', reviewId: m.reviewId }
           break
         case 'clarify':
@@ -700,7 +727,9 @@ export default function AskPage() {
           content = m.question
           break
         case 'confirm':
-          content = `[确认评审方案：${m.intent.task_type || '未定'}]`
+          content = t('page.ask.persisted_confirm.value', {
+            taskType: m.intent.task_type || t('page.ask.persisted_confirm.empty'),
+          })
           break
         case 'error':
           // 瞬时错误提示不入库：重放时它没有意义，只会让历史对话里
@@ -743,6 +772,9 @@ export default function AskPage() {
     // input.trim()，完全没考虑附件），点了跟没点一样，图片就一直卡在附件栏，
     // 零提示零反馈。现在只要有图或有字任一项就放行；纯图时补一句占位文字，
     // 后端 message 不能为空，且这句话也让追问历史看得懂"这轮问的是什么"。
+    //
+    // ⚠ 这句**不外化、恒中文**：它不是 UI 文案，是发给后端的消息正文（engine-prompt）。
+    // 见 send() 里同一句的说明与契约 12.2。
     const text = rawText.trim() || (imageCount > 0 ? '（仅附图，无文字说明）' : '')
     if (!text) return
     setInput('')
@@ -780,7 +812,7 @@ export default function AskPage() {
         id: nextId(),
         role: 'assistant',
         kind: 'error',
-        text: e instanceof Error ? e.message : '追问失败，请再试一次',
+        text: tApiError(e, 'page.ask.follow_up.error'),
       })
     } finally {
       setBusy(false)
@@ -796,6 +828,11 @@ export default function AskPage() {
     // 纯图时按钮是禁用的，点了没反应，图片就一直卡在附件栏。这里放开：
     // 有图没字时用占位文字撑住"这条消息说了什么"，intent 解析拿不到有效
     // 文字信号大概率会追问，那也是诚实的行为，好过按钮直接摁不动。
+    //
+    // ⚠ 这句**不外化、恒中文**：它会作为用户消息进 api.parseIntent，而后端意图解析
+    // 的启发式档是中文关键词打分。发英文 → 命中数归零 → 静默退化到默认任务类型，
+    // 用户点了"Steam 商店页"却跑出概念评审且不报错。它是 engine-prompt 不是 UI 文案
+    // （契约 12.2）。
     const text = raw.trim() || (attachments.length > 0 ? '（仅附图，无文字说明）' : '')
     if (!text) return
     setInput('')
@@ -838,7 +875,7 @@ export default function AskPage() {
           id: nextId(),
           role: 'assistant',
           kind: 'clarify',
-          question: intent.clarifying_question ?? '能再说得具体一点吗？',
+          question: intent.clarifying_question ?? t('page.ask.clarify.hint'),
           candidates: intent.candidates,
         })
       } else {
@@ -849,7 +886,7 @@ export default function AskPage() {
         id: nextId(),
         role: 'assistant',
         kind: 'error',
-        text: e instanceof Error ? e.message : '解析失败，请再说一次',
+        text: tApiError(e, 'page.ask.parse.error'),
       })
     } finally {
       setBusy(false)
@@ -903,7 +940,10 @@ export default function AskPage() {
             id: nextId(),
             role: 'assistant',
             kind: 'error',
-            text: `「${file.name}」上传失败：${e instanceof Error ? e.message : '未知错误'}`,
+            text: t('page.ask.upload.error', {
+              filename: file.name,
+              detail: tApiError(e, 'common.ui.unknown_error'),
+            }),
           })
         }
       }
@@ -912,7 +952,7 @@ export default function AskPage() {
           id: nextId(),
           role: 'assistant',
           kind: 'error',
-          text: `最多附带 ${MAX_ATTACHMENTS} 张图片——先移除几张再继续上传`,
+          text: t('page.ask.attachment_limit.error', { count: MAX_ATTACHMENTS }),
         })
       }
     } finally {
@@ -951,6 +991,10 @@ export default function AskPage() {
 
   const pickCandidate = (candidate: string) => {
     // 用户点了候选任务类型，等价于告诉助手"就是这个"，直接推进到确认卡片
+    //
+    // ⚠ 这句**不外化、恒中文**：它是 engine-prompt——会当成用户消息进
+    // api.parseIntent，后端靠中文关键词打分命中任务类型。翻成英文 → 命中数归零
+    // → 用户点的是"Steam 商店页"，跑出来的却是概念评审，且全程不报错（契约 12.2）。
     void send(`就是${TASK_LABELS[candidate] ?? candidate}`)
   }
 
@@ -990,7 +1034,9 @@ export default function AskPage() {
           id: nextId(),
           role: 'assistant',
           kind: 'text',
-          text: `${res.skill_degraded}。想继续用可以兑换 CDK，或在设置页填写自己的 API Key（BYOK 不受此限制）。`,
+          // res.skill_degraded 是后端给的中文自由文本（不是稳定 code），只能原样插进来。
+          // 英文界面上这一段会保持中文——真解在后端补稳定 code，见契约 D2 与第 13 节。
+          text: t('page.ask.skill_degraded.value', { reason: res.skill_degraded }),
         })
       }
       // 评审卡片直接嵌进这条对话——不跳走，用户可以边等边继续聊
@@ -1019,13 +1065,19 @@ export default function AskPage() {
       )
     } catch (e) {
       if (e instanceof ApiError && e.needsApiKey) {
-        appendMessage({ id: nextId(), role: 'assistant', kind: 'error', text: e.message, needsKey: true })
+        appendMessage({
+          id: nextId(),
+          role: 'assistant',
+          kind: 'error',
+          text: tApiError(e, 'page.ask.create.error'),
+          needsKey: true,
+        })
       } else {
         appendMessage({
           id: nextId(),
           role: 'assistant',
           kind: 'error',
-          text: e instanceof Error ? e.message : '发起评审失败',
+          text: tApiError(e, 'page.ask.create.error'),
         })
       }
     } finally {
@@ -1034,6 +1086,9 @@ export default function AskPage() {
   }
 
   const ready = canReview()
+  // 取一次给下面的徽章用：t() 的插值实参不接受 null，而 `?? ''` 那种写法会把
+  //"没读到项目名"伪装成"项目名是空的"。这里就是那个显式的一次读取。
+  const pinnedProjectName = activeProjectName()
   // 只有开场白、用户还没开口 —— 对话区此时是「空状态」，才允许挂环境浮尘
   const isEmptyChat = messages.length === 1 && !messages.some((m) => m.role === 'user')
 
@@ -1109,15 +1164,15 @@ export default function AskPage() {
         <button
           onClick={() => setSidebarOpen((v) => !v)}
           className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-secondary hover:text-text-primary transition-colors"
-          aria-label={sidebarOpen ? '收起历史侧栏' : '展开历史侧栏'}
-          title={sidebarOpen ? '收起历史侧栏' : '展开历史侧栏'}
+          aria-label={sidebarOpen ? t('page.ask.sidebar_collapse.aria') : t('page.ask.sidebar_expand.aria')}
+          title={sidebarOpen ? t('page.ask.sidebar_collapse.tooltip') : t('page.ask.sidebar_expand.tooltip')}
         >
           {sidebarOpen ? <PanelLeftClose className="h-4 w-4" strokeWidth={1.5} /> : <PanelLeftOpen className="h-4 w-4" strokeWidth={1.5} />}
         </button>
         <Sparkles className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
         <div>
-          <h1 className="text-lg font-semibold text-text-primary font-display">对话评审</h1>
-          <p className="text-xs text-text-muted">描述你要评审的内容，剩下的交给评审团</p>
+          <h1 className="text-lg font-semibold text-text-primary font-display">{t('page.ask.header.title')}</h1>
+          <p className="text-xs text-text-muted">{t('page.ask.header.desc')}</p>
         </div>
       </header>
 
@@ -1125,14 +1180,14 @@ export default function AskPage() {
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warm-orange/40 bg-warm-orange/10 p-3 text-sm shrink-0">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warm-orange" strokeWidth={2} />
           <div>
-            <p className="font-medium text-text-primary">请先配置 API Key</p>
+            <p className="font-medium text-text-primary">{t('page.ask.no_key.title')}</p>
             <p className="mt-1 text-text-secondary">
-              评审需要调用真实模型，未配置 Key 无法开始。
+              {t('page.ask.no_key.desc')}
               <button
                 className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
                 onClick={() => navigate('/settings')}
               >
-                去设置页填写
+                {t('page.ask.no_key.cta')}
               </button>
             </p>
           </div>
@@ -1161,24 +1216,6 @@ export default function AskPage() {
             此时对话区基本是空的，需要一点氛围；一旦有真实对话就摘掉——
             正文文字底下飘东西会持续偷注意力。DOM 放在气泡前，天然在内容层下面 */}
         {isEmptyChat && <AmbientMotes className="-z-10" />}
-        {isEmptyChat && (
-          // 空会话引导：空滚动区不能只有一行开场白悬在顶上——给出明确的下一步动作
-          <div className="mx-auto max-w-sm space-y-4 text-center">
-            <p className="text-base font-medium text-text-primary font-display">从一句话开始</p>
-            <div className="flex flex-col gap-2">
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex}
-                  className="rounded-lg border border-border bg-bg-card px-4 py-2.5 text-sm text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary"
-                  onClick={() => void send(ex)}
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-text-muted">也可以直接在下方输入框描述你要评审的内容</p>
-          </div>
-        )}
         {messages.map((m) => (
           <ChatBubble
             key={m.id}
@@ -1192,19 +1229,37 @@ export default function AskPage() {
             onStartFollowUp={(reviewId, personaId, label) => setActiveChatContext({ reviewId, personaId, label })}
           />
         ))}
+        {isEmptyChat && (
+          // 空会话引导：空滚动区不能只有一行开场白悬在顶上——给出明确的下一步动作
+          <div className="mx-auto max-w-sm space-y-4 text-center">
+            <p className="text-base font-medium text-text-primary font-display">{t('page.ask.examples.title')}</p>
+            <div className="flex flex-col gap-2">
+              {EXAMPLE_KEYS.map((k) => (
+                <button
+                  key={k}
+                  className="rounded-lg border border-border bg-bg-card px-4 py-2.5 text-sm text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary"
+                  onClick={() => void send(t(k))}
+                >
+                  {t(k)}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted">{t('page.ask.examples.hint')}</p>
+          </div>
+        )}
         {busy && <ThinkingIndicator />}
         {dragging && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed border-brand-primary/60 bg-bg-primary/70 backdrop-blur-sm">
             <p className="flex items-center gap-2 text-sm font-medium text-brand-primary">
               <ImageIcon className="h-5 w-5" strokeWidth={1.5} />
-              松开以上传截图/文件
+              {t('page.ask.drop.hint')}
             </p>
           </div>
         )}
       </div>
       <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted shrink-0">
         <Paperclip className="h-3 w-3" strokeWidth={1.5} />
-        支持拖拽文件到对话区，或 Ctrl+V 粘贴截图
+        {t('page.ask.attach.hint')}
       </p>
 
       {/* 示例入口常驻：首轮后自动收起，随时可再展开。
@@ -1217,7 +1272,7 @@ export default function AskPage() {
           aria-expanded={showExamples}
         >
           <Lightbulb className="h-3.5 w-3.5" strokeWidth={1.5} />
-          试试这些例子
+          {t('page.ask.examples.cta')}
           <ChevronDown
             className={`h-3.5 w-3.5 transition-transform ${showExamples ? 'rotate-180' : ''}`}
             strokeWidth={1.5}
@@ -1225,13 +1280,13 @@ export default function AskPage() {
         </button>
         {showExamples && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
+            {EXAMPLE_KEYS.map((k) => (
               <button
-                key={ex}
+                key={k}
                 className="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/40 hover:text-text-primary hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)]"
-                onClick={() => void send(ex)}
+                onClick={() => void send(t(k))}
               >
-                {ex}
+                {t(k)}
               </button>
             ))}
           </div>
@@ -1249,7 +1304,7 @@ export default function AskPage() {
               <button
                 className="flex items-center gap-1.5"
                 onClick={() => setPreview(a)}
-                title="点击放大预览"
+                title={t('page.ask.attachment_preview.tooltip')}
               >
                 <img src={a.image_data} alt={a.filename} className="h-8 w-8 rounded object-cover" />
                 <span className="max-w-[8rem] truncate">{a.filename}</span>
@@ -1257,7 +1312,7 @@ export default function AskPage() {
               <button
                 className="ml-1 text-text-muted hover:text-severity-critical transition-colors"
                 onClick={() => removeAttachment(a.id)}
-                aria-label={`移除 ${a.filename}`}
+                aria-label={t('page.ask.attachment_remove.aria', { filename: a.filename })}
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
@@ -1270,12 +1325,12 @@ export default function AskPage() {
         <div className="mt-3 flex shrink-0 items-center justify-between gap-2 rounded-md border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1.5 text-xs text-brand-primary">
           <span className="flex items-center gap-1.5 truncate">
             <Sparkles className="h-3 w-3 shrink-0" strokeWidth={2} />
-            正在追问 · {activeChatContext.label}
+            {t('page.ask.follow_up.badge', { label: activeChatContext.label })}
           </span>
           <button
             onClick={() => setActiveChatContext(null)}
             className="shrink-0 hover:text-text-primary transition-colors"
-            aria-label="退出追问模式"
+            aria-label={t('page.ask.follow_up_exit.aria')}
           >
             <X className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
@@ -1287,8 +1342,8 @@ export default function AskPage() {
           {pinnedSkill && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
               <Zap className="h-3 w-3" strokeWidth={2} />
-              技能 · {pinnedSkill.name}
-              <button onClick={() => setPinnedSkill(null)} className="hover:text-text-primary transition-colors" aria-label="取消技能">
+              {t('page.ask.pinned_skill.badge', { name: pinnedSkill.name })}
+              <button onClick={() => setPinnedSkill(null)} className="hover:text-text-primary transition-colors" aria-label={t('page.ask.pinned_skill.aria')}>
                 <X className="h-3 w-3" strokeWidth={2} />
               </button>
             </span>
@@ -1296,8 +1351,8 @@ export default function AskPage() {
           {pinnedTaskType && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
               <Target className="h-3 w-3" strokeWidth={2} />
-              类型 · {pinnedTaskType.name}
-              <button onClick={() => setPinnedTaskType(null)} className="hover:text-text-primary transition-colors" aria-label="取消类型">
+              {t('page.ask.pinned_type.badge', { name: pinnedTaskType.name })}
+              <button onClick={() => setPinnedTaskType(null)} className="hover:text-text-primary transition-colors" aria-label={t('page.ask.pinned_type.aria')}>
                 <X className="h-3 w-3" strokeWidth={2} />
               </button>
             </span>
@@ -1308,17 +1363,17 @@ export default function AskPage() {
           {conversationIdRef.current && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
               <FolderOpen className="h-3 w-3 shrink-0" strokeWidth={2} />
-              {activeProjectName() ? (
+              {pinnedProjectName ? (
                 <>
-                  项目 · {activeProjectName()}
+                  {t('page.ask.pinned_project.badge', { name: pinnedProjectName })}
                   <button
                     onClick={() => {
                       const cid = conversationIdRef.current
                       if (cid) void moveConversationToProject(cid, null)
                     }}
                     className="hover:text-text-primary transition-colors"
-                    aria-label="移出项目"
-                    title="移回未分组"
+                    aria-label={t('page.ask.pinned_project.aria')}
+                    title={t('page.ask.pinned_project.tooltip')}
                   >
                     <X className="h-3 w-3" strokeWidth={2} />
                   </button>
@@ -1331,15 +1386,15 @@ export default function AskPage() {
                     if (cid && e.target.value) void moveConversationToProject(cid, e.target.value)
                   }}
                   className="bg-transparent text-xs text-warm-orange outline-none"
-                  aria-label="移到项目"
+                  aria-label={t('page.ask.project_select.aria')}
                 >
-                  <option value="" disabled>移到项目…</option>
+                  <option value="" disabled>{t('page.ask.project_select.placeholder')}</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               ) : (
-                <span className="text-warm-orange/70">还没有项目，去侧栏新建一个</span>
+                <span className="text-warm-orange/70">{t('page.ask.project_select.empty')}</span>
               )}
             </span>
           )}
@@ -1363,8 +1418,8 @@ export default function AskPage() {
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-text-muted hover:bg-bg-secondary hover:text-text-primary transition-colors disabled:opacity-50"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          aria-label="上传截图或文件"
-          title="上传截图 / demo 图 / 文件（图片会作为多模态材料让模型直接看）"
+          aria-label={t('page.ask.upload.aria')}
+          title={t('page.ask.upload.tooltip')}
         >
           {uploading ? (
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-text-muted border-t-transparent" />
@@ -1390,8 +1445,8 @@ export default function AskPage() {
               setSkillPickerOpen((v) => !v)
               setTypePickerOpen(false)
             }}
-            aria-label="选择技能"
-            title="选技能——不用等 AI 猜，直接指定评审视角"
+            aria-label={t('page.ask.skill_picker.aria')}
+            title={t('page.ask.skill_picker.tooltip')}
           >
             <Zap className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -1418,8 +1473,8 @@ export default function AskPage() {
                         )}
                       >
                         {(skillQuota[s.type] as number) > 0
-                          ? `剩 ${skillQuota[s.type]} 次免费`
-                          : '免费次数已用完'}
+                          ? t('page.ask.skill_quota.badge', { count: skillQuota[s.type] as number })
+                          : t('page.ask.skill_quota.empty')}
                       </span>
                     )}
                   </span>
@@ -1429,7 +1484,7 @@ export default function AskPage() {
               {/* 配额没取到时如实交代，而不是让"没数字"看上去等于"不受限" */}
               {skillQuota === null && (
                 <p className="px-3 pb-1.5 pt-1 text-[10px] leading-relaxed text-text-muted">
-                  剩余免费次数暂时没取到。技能仍可选用，实际是否计次以创建评审时后端判定为准。
+                  {t('page.ask.skill_quota.hint')}
                 </p>
               )}
             </div>
@@ -1447,8 +1502,8 @@ export default function AskPage() {
               setTypePickerOpen((v) => !v)
               setSkillPickerOpen(false)
             }}
-            aria-label="选择评审类型"
-            title="选评审类型——直接指定，不用等 AI 猜"
+            aria-label={t('page.ask.type_picker.aria')}
+            title={t('page.ask.type_picker.tooltip')}
           >
             <Target className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -1460,23 +1515,25 @@ export default function AskPage() {
                   autoFocus
                   value={typeSearch}
                   onChange={(e) => setTypeSearch(e.target.value)}
-                  placeholder="搜索评审类型…"
+                  placeholder={t('page.ask.type_picker.placeholder')}
                   className="w-full bg-transparent text-sm text-text-primary placeholder-text-muted outline-none"
                 />
               </div>
               <div className="max-h-64 overflow-y-auto">
-                {TASK_TYPES.filter((t) => t.name.includes(typeSearch) || t.id.includes(typeSearch)).map((t) => (
+                {/* 形参从 t 改名成 tt：t 现在是 i18n 的取文案函数，同名会把它遮住。
+                    列表里的 name / description 仍是目录数据，英文走后端 catalog（契约 D5）。 */}
+                {TASK_TYPES.filter((tt) => tt.name.includes(typeSearch) || tt.id.includes(typeSearch)).map((tt) => (
                   <button
-                    key={t.id}
+                    key={tt.id}
                     className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-card-hover"
                     onClick={() => {
-                      setPinnedTaskType({ id: t.id, name: t.name })
+                      setPinnedTaskType({ id: tt.id, name: tt.name })
                       setTypePickerOpen(false)
                       setTypeSearch('')
                     }}
                   >
-                    <span className="text-sm font-medium text-text-primary">{t.name}</span>
-                    <span className="text-xs text-text-muted">{t.description}</span>
+                    <span className="text-sm font-medium text-text-primary">{tt.name}</span>
+                    <span className="text-xs text-text-muted">{tt.description}</span>
                   </button>
                 ))}
               </div>
@@ -1504,9 +1561,11 @@ export default function AskPage() {
           // 超了内部滚动。这时 items-end 才真正发挥作用——框变高，按钮跟着停在底部。
           className="min-h-[36px] max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
           rows={1}
-          aria-label="评审输入"
+          aria-label={t('page.ask.input.aria')}
           placeholder={
-            activeChatContext ? `问问${activeChatContext.label}…（Enter 发送）` : '说说你想评审什么…（Enter 发送，Shift+Enter 换行）'
+            activeChatContext
+              ? t('page.ask.input_follow_up.placeholder', { label: activeChatContext.label })
+              : t('page.ask.input.placeholder')
           }
           value={input}
           disabled={busy}
@@ -1523,7 +1582,7 @@ export default function AskPage() {
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-primary text-white shadow-[0_2px_10px_rgba(0,113,227,0.30)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.40)] disabled:opacity-50 disabled:shadow-none"
           onClick={() => void send(input)}
           disabled={busy || (!input.trim() && attachments.length === 0)}
-          aria-label="发送"
+          aria-label={t('page.ask.send.aria')}
         >
           {busy ? (
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1535,7 +1594,11 @@ export default function AskPage() {
       {attachments.length > 0 && (
         <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted shrink-0">
           <ImageIcon className="h-3 w-3" strokeWidth={1.5} />
-          {attachments.length} 张图片将随{activeChatContext ? '追问' : '评审'}一起发送给支持视觉的模型
+          {/* 两条完整句子而不是把"追问/评审"当变量插进同一句：
+              英文里这两句的语序和冠词都不一样，插值版翻不动。 */}
+          {activeChatContext
+            ? t('page.ask.attachment_note_follow_up.hint', { count: attachments.length })
+            : t('page.ask.attachment_note_review.hint', { count: attachments.length })}
         </p>
       )}
 
@@ -1555,7 +1618,7 @@ export default function AskPage() {
             <button
               className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary hover:text-text-primary transition-colors"
               onClick={() => setPreview(null)}
-              aria-label="关闭预览"
+              aria-label={t('page.ask.preview_close.aria')}
             >
               <X className="h-4 w-4" strokeWidth={2} />
             </button>
@@ -1693,13 +1756,13 @@ function HistorySidebar({
           : 'text-text-secondary hover:bg-bg-card',
         draggingConvId === c.id && 'opacity-40',
       )}
-      title={c.title || '未命名对话'}
+      title={c.title || t('page.ask.conversation_untitled.label')}
     >
       {/* 已经产出评审的对话给个小圆点提示——纯装饰性区分，不影响可点性 */}
       {c.review_id && (
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-primary/50" aria-hidden="true" />
       )}
-      <span className="min-w-0 flex-1 truncate">{c.title || '未命名对话'}</span>
+      <span className="min-w-0 flex-1 truncate">{c.title || t('page.ask.conversation_untitled.label')}</span>
     </button>
   )
 
@@ -1742,7 +1805,7 @@ function HistorySidebar({
             className="flex w-full items-center gap-2 rounded-xl border border-brand-primary/30 bg-brand-primary/10 px-3 py-2.5 text-sm font-semibold text-brand-primary transition-all hover:bg-brand-primary/20 hover:shadow-[0_2px_12px_rgba(0,113,227,0.12)]"
           >
             <Plus className="h-4 w-4" strokeWidth={2} />
-            新建对话
+            {t('page.ask.new_conversation.cta')}
           </button>
           {/* "新建项目"从输入框工具栏里一个不起眼的悬浮弹窗，改成侧栏里
               一个常驻、点了就知道在做什么的入口——原来的位置太容易被当成
@@ -1757,7 +1820,7 @@ function HistorySidebar({
                   if (e.key === 'Enter') onCreateProject()
                   if (e.key === 'Escape') onNewProjectOpenChange(false)
                 }}
-                placeholder="给项目起个名字…"
+                placeholder={t('page.ask.new_project.placeholder')}
                 className="w-full rounded-lg border border-border bg-bg-secondary px-2.5 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary/40"
               />
               <button
@@ -1765,7 +1828,7 @@ function HistorySidebar({
                 onClick={onCreateProject}
                 className="shrink-0 rounded-lg bg-brand-primary px-2.5 py-2 text-xs font-medium text-white disabled:opacity-40"
               >
-                创建
+                {t('page.ask.new_project.confirm')}
               </button>
             </div>
           ) : (
@@ -1774,7 +1837,7 @@ function HistorySidebar({
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-card hover:text-text-primary"
             >
               <FolderOpen className="h-4 w-4" strokeWidth={2} />
-              新建项目
+              {t('page.ask.new_project.cta')}
             </button>
           )}
         </div>
@@ -1784,7 +1847,7 @@ function HistorySidebar({
           {projects === null ? (
             <div className="flex items-center gap-2 px-1 py-2 text-xs text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-              加载项目…
+              {t('page.ask.projects.loading')}
             </div>
           ) : (
             projects.length > 0 && (
@@ -1799,13 +1862,17 @@ function HistorySidebar({
                       {isConfirming ? (
                         <div
                           role="alertdialog"
-                          aria-label={`确认删除项目「${p.name}」`}
+                          aria-label={t('page.ask.project_delete_confirm.aria', { name: p.name })}
                           className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
                         >
                           <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
-                            删除项目「<span className="text-text-primary">{p.name}</span>」？
-                            <br />
-                            里面 {items.length} 段对话会回到"未分组"，不会被删除。
+                            {/* 整句一条 key：项目名的高亮是句子内部的排版，拆成三段拼接
+                                会让英文语序改不了（契约 D13 的具名 slot）。 */}
+                            <Trans
+                              k="page.ask.project_delete_confirm.confirm"
+                              vars={{ name: p.name, count: items.length }}
+                              slots={{ name: (s) => <span className="text-text-primary">{s}</span> }}
+                            />
                           </p>
                           <div className="flex gap-1.5">
                             <button
@@ -1813,13 +1880,13 @@ function HistorySidebar({
                               onClick={() => onConfirmDeleteProject(p.id)}
                               className="rounded bg-severity-critical/85 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-severity-critical"
                             >
-                              删除项目
+                              {t('page.ask.project_delete_confirm.cta')}
                             </button>
                             <button
                               onClick={onCancelDeleteProject}
                               className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                             >
-                              取消
+                              {t('common.action.cancel')}
                             </button>
                           </div>
                         </div>
@@ -1859,8 +1926,8 @@ function HistorySidebar({
                               <button
                                 onClick={() => onStartRenameProject(p.id, p.name)}
                                 className="rounded p-1 text-text-muted/60 hover:bg-bg-card-hover hover:text-text-primary"
-                                aria-label={`重命名「${p.name}」`}
-                                title="重命名"
+                                aria-label={t('page.ask.project_rename.aria', { name: p.name })}
+                                title={t('page.ask.project_rename.tooltip')}
                               >
                                 <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <path d="M12 20h9" />
@@ -1870,8 +1937,8 @@ function HistorySidebar({
                               <button
                                 onClick={() => onAskDeleteProject(p.id)}
                                 className="rounded p-1 text-text-muted/60 hover:bg-severity-critical/10 hover:text-severity-critical"
-                                aria-label={`删除「${p.name}」`}
-                                title="删除项目（对话会回到未分组）"
+                                aria-label={t('page.ask.project_delete.aria', { name: p.name })}
+                                title={t('page.ask.project_delete.tooltip')}
                               >
                                 <Trash2 className="h-3 w-3" strokeWidth={1.5} />
                               </button>
@@ -1886,7 +1953,7 @@ function HistorySidebar({
                       )}
                       {isExpanded && items.length === 0 && (
                         <p className="ml-4 border-l-2 border-border/60 py-1 pl-4 text-[10px] text-text-muted/60">
-                          把对话拖到这里
+                          {t('page.ask.project.empty')}
                         </p>
                       )}
                     </div>
@@ -1901,12 +1968,12 @@ function HistorySidebar({
             <div className="mb-4" {...dropZoneProps(null)}>
               <div className="mb-1.5 flex items-center gap-1.5 px-1">
                 <div className="h-4 w-[3px] rounded-full bg-text-muted/40" />
-                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">未分组</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">{t('page.ask.ungrouped.title')}</p>
               </div>
               {ungroupedConvs.length > 0 ? (
                 <div className="space-y-0.5">{ungroupedConvs.map(convRow)}</div>
               ) : (
-                <p className="px-2 py-1 text-[10px] text-text-muted/60">没有未分组的对话</p>
+                <p className="px-2 py-1 text-[10px] text-text-muted/60">{t('page.ask.ungrouped.empty')}</p>
               )}
             </div>
           )}
@@ -1923,7 +1990,7 @@ function HistorySidebar({
               <div>
                 <div className="mb-1.5 flex items-center gap-1.5 px-1">
                   <div className="h-4 w-[3px] rounded-full bg-brand-primary/40" />
-                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">早期评审记录</p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-muted">{t('page.ask.legacy.title')}</p>
                 </div>
 
                 {/* 加载失败 / 删除失败都走这里，必须是明确可见的一块，不能只是一行灰字 */}
@@ -1940,7 +2007,7 @@ function HistorySidebar({
                 {history === null ? (
                   <div className="flex items-center gap-2 px-1 py-3 text-xs text-text-muted">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                    加载中…
+                    {t('common.ui.loading')}
                   </div>
                 ) : legacyHistory.length === 0 ? (
                   requiresLogin && (
@@ -1952,15 +2019,15 @@ function HistorySidebar({
                         <LogIn className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
                       </div>
                       <span className="leading-relaxed">
-                        登录后可以看到自己的评审历史
+                        {t('page.ask.login_required.title')}
                         <br />
-                        <span className="text-text-muted/70">未登录时的评审不会归到任何账号下</span>
+                        <span className="text-text-muted/70">{t('page.ask.login_required.desc')}</span>
                       </span>
                       <Link
                         to="/login"
                         className="rounded-lg border border-brand-primary/40 bg-brand-primary/10 px-3 py-1.5 text-[11px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
                       >
-                        去登录
+                        {t('page.ask.login_required.cta')}
                       </Link>
                     </div>
                   )
@@ -1968,20 +2035,22 @@ function HistorySidebar({
                   (() => {
                     const { projects: legacyGroups, ungrouped } = groupHistoryByProject(legacyHistory)
                     const renderItem = (r: ReviewListItem) => {
-                      const label = r.target_title || TASK_TYPES.find((t) => t.id === r.task_type)?.name || r.task_type
+                      const label = r.target_title || TASK_TYPES.find((tt) => tt.id === r.task_type)?.name || r.task_type
                       // 二次确认直接长在这一行里。整行不再可点（避免"想点取消结果打开了评审"）。
                       if (confirmingId === r.id) {
                         return (
                           <div
                             key={r.id}
                             role="alertdialog"
-                            aria-label={`确认删除「${label}」`}
+                            aria-label={t('page.ask.review_delete_confirm.aria', { title: label })}
                             className="rounded-lg border border-severity-critical/40 bg-severity-critical/10 px-2 py-2"
                           >
                             <p className="mb-1.5 text-[11px] leading-snug text-text-secondary">
-                              删除「<span className="text-text-primary">{label}</span>」？
-                              <br />
-                              报告、各角色意见、全部追问记录一起没，无法撤销。
+                              <Trans
+                                k="page.ask.review_delete_confirm.confirm"
+                                vars={{ title: label }}
+                                slots={{ name: (s) => <span className="text-text-primary">{s}</span> }}
+                              />
                             </p>
                             <div className="flex gap-1.5">
                               <button
@@ -1993,7 +2062,7 @@ function HistorySidebar({
                                 {deletingId === r.id && (
                                   <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />
                                 )}
-                                删除
+                                {t('common.action.delete')}
                               </button>
                               <button
                                 onClick={(e) => {
@@ -2002,7 +2071,7 @@ function HistorySidebar({
                                 }}
                                 className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                               >
-                                取消
+                                {t('common.action.cancel')}
                               </button>
                             </div>
                           </div>
@@ -2023,8 +2092,8 @@ function HistorySidebar({
                           <button
                             onClick={(e) => onAskDelete(e, r.id)}
                             className="shrink-0 rounded p-1.5 text-text-muted/40 transition-colors hover:bg-severity-critical/10 hover:text-severity-critical focus-visible:bg-severity-critical/10 focus-visible:text-severity-critical focus-visible:outline-none group-hover:text-text-muted"
-                            aria-label={`删除「${label}」`}
-                            title="删除这条评审（会二次确认）"
+                            aria-label={t('page.ask.review_delete.aria', { title: label })}
+                            title={t('page.ask.review_delete.tooltip')}
                           >
                             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                           </button>
@@ -2068,8 +2137,8 @@ function HistorySidebar({
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-secondary">
                   <Inbox className="h-5 w-5 text-text-muted" strokeWidth={1.5} />
                 </div>
-                <span>还没有对话或评审记录</span>
-                <span className="text-[10px] text-text-muted/70">开始一段新对话，它会出现在这里</span>
+                <span>{t('page.ask.sidebar_empty.title')}</span>
+                <span className="text-[10px] text-text-muted/70">{t('page.ask.sidebar_empty.desc')}</span>
               </div>
             )}
         </div>
@@ -2142,15 +2211,17 @@ function useReviewStatus(reviewId: string | null): ReviewState {
       if (!active || done) return
       const idle = Math.round((Date.now() - lastActivity) / 1000)
       const syncSec = (wsStatus === 'open' ? POLL_SLOW_MS : POLL_FAST_MS) / 1000
+      // 四条各一条 key，不是插值：分支条件是行为逻辑（同步失败 / 通道不可用 /
+      // 正在重连 / 长时间无进展），不该被 i18n 层吃掉。
       const notice =
         failures >= 2
-          ? `无法同步评审进度（已连续失败 ${failures} 次），正在自动重试。评审在后台继续跑，不会因此中断。`
+          ? t('page.ask.sync_failed.error', { count: failures })
           : wsStatus === 'unavailable'
-            ? `实时连接不可用，已改为每 ${POLL_FAST_MS / 1000} 秒主动同步一次进度。进度仍会更新，只是稍慢。`
+            ? t('page.ask.realtime_unavailable.hint', { seconds: POLL_FAST_MS / 1000 })
             : wsStatus === 'reconnecting'
-              ? '实时连接中断，正在重连；期间改用轮询同步进度。'
+              ? t('page.ask.realtime_reconnecting.hint')
               : idle >= STALL_HINT_SEC
-                ? `已有 ${idle} 秒没有新进展 —— 仍在处理中（某个人格的长文本推理可能比较久），每 ${syncSec} 秒会主动同步一次状态。`
+                ? t('page.ask.stalled.hint', { idle, seconds: syncSec })
                 : undefined
       setState((s) => (s.notice === notice ? s : { ...s, notice }))
     }
@@ -2161,7 +2232,7 @@ function useReviewStatus(reviewId: string | null): ReviewState {
         setState({ status: 'completed', progress: 100, detail })
         stopAll()
       } else if (detail.status === 'failed') {
-        setState({ status: 'failed', progress: 0, error: detail.error_message ?? '评审失败' })
+        setState({ status: 'failed', progress: 0, error: detail.error_message ?? t('page.ask.review_failed.error') })
         stopAll()
       }
     }
@@ -2226,7 +2297,7 @@ function useReviewStatus(reviewId: string | null): ReviewState {
             void refreshOnce()
           } else if (evt.event === 'review.failed') {
             const err = (evt.data as { error?: string }).error
-            setState({ status: 'failed', progress: 0, error: err ?? '评审失败' })
+            setState({ status: 'failed', progress: 0, error: err ?? t('page.ask.review_failed.error') })
             stopAll()
           }
         },
@@ -2256,11 +2327,24 @@ function useReviewStatus(reviewId: string | null): ReviewState {
 }
 
 /** 评审状态的展示内容——聊天气泡和弹窗只是外壳不同，内容完全一致。 */
-const RISK_BADGE: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  low: { label: '低风险', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
-  medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
-  high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
-  critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
+/**
+ * ⚠ 这四条 label **不外化到 page.ask.***：它们是后端枚举 `release_risk` 的标签，
+ * 归属 `enum.release_risk.*`（owner: batch-0，见契约 4.3 与 §3.4 例 7），
+ * ReportPage 里是同一张表。在这里抄一份就是第二个 owner，会漂成两套译名。
+ * `enum.release_risk.*` 交付后，这里换成 t()，color/bg/border 留下（样式不是文案）。
+ *
+ * 集成期补充：`enum.release_risk.*` 已由 agent-1 交付，上面那句"交付后换成 t()"
+ * 兑现在这里 —— 存的是 labelKey 不是文案。模块级常量存翻译结果会把语种冻在模块
+ * 求值那一刻，切语言时这个徽章不会跟着变。
+ */
+const RISK_BADGE: Record<
+  string,
+  { labelKey: PlainMessageKey; color: string; bg: string; border: string }
+> = {
+  low: { labelKey: 'enum.release_risk.low', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
+  medium: { labelKey: 'enum.release_risk.medium', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
+  high: { labelKey: 'enum.release_risk.high', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
+  critical: { labelKey: 'enum.release_risk.critical', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
 }
 
 const SEVERITY_DOT: Record<string, string> = {
@@ -2286,7 +2370,7 @@ function ReviewStatusBody({
         <>
           <p className="flex items-center gap-2 font-medium text-text-primary">
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-primary" strokeWidth={2} />
-            评审团正在评审中…
+            {t('page.ask.progress.pending')}
           </p>
           {/* shimmer-bar 挂在轨道外层：跑批时百分比会在某个人格思考时卡住十几秒，
               静止的条会被读成「卡死」，流光负责传达「还在跑」。仅此分支（pending/running）渲染 */}
@@ -2296,7 +2380,7 @@ function ReviewStatusBody({
               style={{ width: `${reviewState.progress}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-text-muted">跑完之前你可以继续在这聊别的，我不会打断你。</p>
+          <p className="mt-2 text-xs text-text-muted">{t('page.ask.progress.hint')}</p>
           {/* 同步 / 停滞交代：进度条静止时必须说明白是"还在跑"还是"连不上了"，
               否则用户只能靠猜。文案由 useReviewStatus 按真实连接状态给出。 */}
           {reviewState.notice && (
@@ -2312,7 +2396,7 @@ function ReviewStatusBody({
         <div className="flex items-start gap-2">
           <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-severity-critical" strokeWidth={2} />
           <div>
-            <p className="font-medium text-text-primary">评审失败了</p>
+            <p className="font-medium text-text-primary">{t('page.ask.review_failed.title')}</p>
             <p className="mt-1 text-text-secondary">{reviewState.error}</p>
           </div>
         </div>
@@ -2324,11 +2408,13 @@ function ReviewStatusBody({
         <div className="animate-pop-in rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <h3 className="min-w-0 truncate text-[15px] font-semibold text-text-primary font-display">
-              {TASK_LABELS[reviewState.detail?.task_type ?? ''] ?? reviewState.detail?.task_type ?? '评审报告'}
+              {TASK_LABELS[reviewState.detail?.task_type ?? ''] ??
+                reviewState.detail?.task_type ??
+                t('page.ask.report_card.title')}
             </h3>
             {risk && (
               <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium', risk.color, risk.bg, risk.border)}>
-                {risk.label}
+                {t(risk.labelKey)}
               </span>
             )}
           </div>
@@ -2355,7 +2441,7 @@ function ReviewStatusBody({
                 return (
                   <span className="flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.75} />
-                    读取报告中…
+                    {t('page.ask.report_card.loading')}
                   </span>
                 )
               }
@@ -2363,7 +2449,7 @@ function ReviewStatusBody({
                 return (
                   <span className="flex items-center gap-1 text-warm-orange">
                     <FileWarning className="h-3 w-3" strokeWidth={1.75} />
-                    报告内容为空（没读到角色意见）
+                    {t('page.ask.report_card.empty')}
                   </span>
                 )
               }
@@ -2371,25 +2457,30 @@ function ReviewStatusBody({
                 <>
                   <span className="flex items-center gap-1">
                     <FileWarning className="h-3 w-3" strokeWidth={1.75} />
-                    {fixCount} 条修复项
+                    {t('page.ask.count.fixes', { count: fixCount })}
                   </span>
                   <span className="flex items-center gap-1">
                     <Sparkles className="h-3 w-3" strokeWidth={1.75} />
-                    {personaCount} 位角色
+                    {t('page.ask.count.personas', { count: personaCount })}
                   </span>
                 </>
               )
             })()}
             {reviewState.detail?.total_cost_usd !== undefined && (
-              <span>${reviewState.detail.total_cost_usd.toFixed(3)}</span>
+              <span>{formatUsd(reviewState.detail.total_cost_usd, 3)}</span>
             )}
             {(reviewState.detail?.input_tokens || reviewState.detail?.output_tokens) ? (
               <span
                 className="flex items-center gap-1"
-                title={`输入 ${(reviewState.detail?.input_tokens ?? 0).toLocaleString('en-US')} · 输出 ${(reviewState.detail?.output_tokens ?? 0).toLocaleString('en-US')} token`}
+                title={t('page.ask.token.tooltip', {
+                  input: formatNumber(reviewState.detail?.input_tokens ?? 0),
+                  output: formatNumber(reviewState.detail?.output_tokens ?? 0),
+                })}
               >
                 <Coins className="h-3 w-3" strokeWidth={1.75} />
-                {((reviewState.detail?.input_tokens ?? 0) + (reviewState.detail?.output_tokens ?? 0)).toLocaleString('en-US')} tok
+                {t('page.ask.token.unit', {
+                  value: formatNumber((reviewState.detail?.input_tokens ?? 0) + (reviewState.detail?.output_tokens ?? 0)),
+                })}
               </span>
             ) : null}
           </div>
@@ -2399,16 +2490,16 @@ function ReviewStatusBody({
               onClick={() => setReportOpen(true)}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary/10 py-1.5 text-[13px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
             >
-              查看完整报告
+              {t('page.ask.report_card.cta')}
               <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
             </button>
             {reviewState.detail && (
               <button
-                onClick={() => onStartFollowUp(reviewState.detail!.id, null, '这份报告')}
+                onClick={() => onStartFollowUp(reviewState.detail!.id, null, t('page.ask.follow_up.label'))}
                 className="shrink-0 rounded-md border border-border bg-bg-card px-3 py-1.5 text-[13px] text-text-secondary transition-colors hover:text-text-primary"
-                title="就在这条对话里继续追问，不用打开报告"
+                title={t('page.ask.follow_up.tooltip')}
               >
-                追问
+                {t('page.ask.follow_up.cta')}
               </button>
             )}
           </div>
@@ -2445,7 +2536,7 @@ function ReportModal({
   // （不引图表库，弹窗里一行字就够看清"谁站哪边"）
   const stanceCounts = new Map<string, number>()
   for (const note of personaNotes) {
-    const s = note.primary_stance || '未表态'
+    const s = note.primary_stance || t('page.ask.stance.empty')
     stanceCounts.set(s, (stanceCounts.get(s) ?? 0) + 1)
   }
 
@@ -2463,12 +2554,12 @@ function ReportModal({
             <h2 className="truncate text-base font-semibold text-text-primary font-display">
               {TASK_LABELS[detail.task_type ?? ''] ?? detail.task_type}
             </h2>
-            <p className="text-xs text-text-muted">完整报告</p>
+            <p className="text-xs text-text-muted">{t('page.ask.report_modal.subtitle')}</p>
           </div>
           <button
             onClick={onClose}
             className="shrink-0 rounded p-1.5 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
-            aria-label="关闭"
+            aria-label={t('common.action.close')}
           >
             <X className="h-4 w-4" strokeWidth={2} />
           </button>
@@ -2476,15 +2567,17 @@ function ReportModal({
 
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
           <div className="flex items-center gap-2">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">结论</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{t('page.ask.conclusion.title')}</p>
             {risk && (
               <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', risk.color, risk.bg, risk.border)}>
-                {risk.label}
+                {t(risk.labelKey)}
               </span>
             )}
             {summary?.evidence_quality && (
               <span className="rounded-full border border-border bg-bg-card px-2 py-0.5 text-[11px] text-text-muted">
-                证据 · {summary.evidence_quality}
+                {/* evidence_quality 是后端枚举原值，它的标签归 enum.evidence_quality.*
+                    （owner: batch-0）。这里只翻包在外面的框架文案。 */}
+                {t('page.ask.evidence.badge', { quality: summary.evidence_quality })}
               </span>
             )}
           </div>
@@ -2495,7 +2588,7 @@ function ReportModal({
           {priorityFixes.length > 0 && (
             <div className="mt-5">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                优先修复项 · {priorityFixes.length}
+                {t('page.ask.count.priority_fixes', { count: priorityFixes.length })}
               </p>
               <div className="mt-2 space-y-2">
                 {priorityFixes.map((fix, i) => (
@@ -2507,7 +2600,7 @@ function ReportModal({
                       <p className="font-medium text-text-primary">{fix.title}</p>
                       {fix.why_it_matters && <p className="mt-0.5 text-xs text-text-secondary">{fix.why_it_matters}</p>}
                       {fix.suggested_fix && (
-                        <p className="mt-1 text-xs text-brand-primary">建议：{fix.suggested_fix}</p>
+                        <p className="mt-1 text-xs text-brand-primary">{t('page.ask.fix.hint', { text: fix.suggested_fix })}</p>
                       )}
                     </div>
                   </div>
@@ -2520,7 +2613,7 @@ function ReportModal({
             <div className="mt-5">
               <div className="flex items-center justify-between">
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                  角色简报 · {personaNotes.length}
+                  {t('page.ask.count.persona_notes', { count: personaNotes.length })}
                 </p>
                 {stanceCounts.size > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -2538,8 +2631,14 @@ function ReportModal({
                     <span className="min-w-0 truncate text-text-primary">{note.persona_name ?? note.persona_id}</span>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="text-xs text-text-muted">
-                        {note.primary_stance ?? '—'}
-                        {note.key_issues && note.key_issues.length > 0 ? ` · ${note.key_issues.length} 条意见` : ''}
+                        {/* primary_stance 是后端的中文立场词（stance_enum，永不翻译）。
+                            后端没给时用破折号占位——留空会让人以为这一行渲染坏了。 */}
+                        {note.primary_stance ?? t('page.ask.stance_row.empty')}
+                        {/* 分隔符连同前导空格一起放进消息串：英文侧的连接方式
+                            未必是「· 3 issues」，把它留在代码里就改不动了。 */}
+                        {note.key_issues && note.key_issues.length > 0
+                          ? t('page.ask.count.issues', { count: note.key_issues.length })
+                          : ''}
                       </span>
                       <button
                         onClick={() => {
@@ -2548,7 +2647,7 @@ function ReportModal({
                         }}
                         className="rounded-full border border-brand-primary/30 bg-brand-primary/10 px-2 py-0.5 text-[11px] text-brand-primary transition-colors hover:bg-brand-primary/20"
                       >
-                        跟TA聊聊
+                        {t('page.ask.persona_chat.cta')}
                       </button>
                     </div>
                   </div>
@@ -2560,7 +2659,7 @@ function ReportModal({
           {disagreements.length > 0 && (
             <div className="mt-5">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                主要分歧 · {disagreements.length}
+                {t('page.ask.count.disagreements', { count: disagreements.length })}
               </p>
               <div className="mt-2 space-y-2">
                 {disagreements.map((d, i) => (
@@ -2570,14 +2669,22 @@ function ReportModal({
                       <ul className="mt-1 space-y-0.5 text-xs text-text-secondary">
                         {d.persona_stances.map((ps, j) => (
                           <li key={j}>
-                            {ps.persona_id}：{ps.stance}
-                            {ps.evidence ? `（${ps.evidence}）` : ''}
+                            {/* persona_id / stance 在后端类型上是可选的。原来的写法把 undefined
+                                直接丢进 JSX，React 渲染成空，结果是界面上只剩一个孤零零的冒号，
+                                看不出是"后端没给这个字段"还是"这个人格没有立场"。
+                                这里用 common.ui.not_recorded 如实说"未记录"——它不是缺译兜底
+                                （缺译走 ⟦missing:…⟧），是数据缺失的诚实表达，同 report_lang === null。 */}
+                            {t('page.ask.disagreement_stance.value', {
+                              persona: ps.persona_id ?? t('common.ui.not_recorded'),
+                              stance: ps.stance ?? t('common.ui.not_recorded'),
+                            })}
+                            {ps.evidence ? t('page.ask.disagreement_evidence.value', { evidence: ps.evidence }) : ''}
                           </li>
                         ))}
                       </ul>
                     )}
                     {d.resolution_suggestion && (
-                      <p className="mt-1.5 text-xs text-brand-primary">调解建议：{d.resolution_suggestion}</p>
+                      <p className="mt-1.5 text-xs text-brand-primary">{t('page.ask.disagreement.hint', { text: d.resolution_suggestion })}</p>
                     )}
                   </div>
                 ))}
@@ -2588,7 +2695,7 @@ function ReportModal({
           {informationGaps.length > 0 && (
             <div className="mt-5">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                信息缺口 · {informationGaps.length}
+                {t('page.ask.count.information_gaps', { count: informationGaps.length })}
               </p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-text-secondary">
                 {informationGaps.map((gap, i) => (
@@ -2601,16 +2708,16 @@ function ReportModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-3 text-xs text-text-muted">
-          <span>花费 ${detail.total_cost_usd.toFixed(3)}</span>
+          <span>{t('page.ask.cost.value', { amount: formatUsd(detail.total_cost_usd, 3) })}</span>
           <button
             onClick={() => {
-              onStartFollowUp(detail.id, null, '这份报告')
+              onStartFollowUp(detail.id, null, t('page.ask.follow_up.label'))
               onClose()
             }}
             className="flex items-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary/10 px-2.5 py-1.5 text-[13px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/20"
           >
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-            追问这份报告
+            {t('page.ask.follow_up_report.cta')}
           </button>
         </div>
       </div>
@@ -2660,7 +2767,7 @@ function ChatBubble({
                 <img
                   key={i}
                   src={src}
-                  alt={`附图 ${i + 1}`}
+                  alt={t('page.ask.attachment_image.aria', { index: i + 1 })}
                   className="h-20 w-20 rounded-lg border border-brand-primary/30 object-cover shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                 />
               ))}
@@ -2694,13 +2801,15 @@ function ChatBubble({
             {message.isGated && (
               <div className="mt-2 flex items-center gap-2 border-t border-warm-orange/20 pt-2 text-xs text-text-muted">
                 <span>
-                  还有 {Math.max(0, (message.fullLength ?? 0) - message.text.length)} 字被隐藏
+                  {t('page.ask.gated.hint', {
+                    count: Math.max(0, (message.fullLength ?? 0) - message.text.length),
+                  })}
                 </span>
                 <button
                   onClick={onGoLogin}
                   className="font-medium text-brand-primary underline underline-offset-2 hover:text-text-primary"
                 >
-                  登录看完整回答
+                  {t('page.ask.gated.cta')}
                 </button>
               </div>
             )}
@@ -2726,7 +2835,7 @@ function ChatBubble({
                     className="ml-2 text-brand-primary underline underline-offset-2 hover:text-text-primary"
                     onClick={onGoSettings}
                   >
-                    去填写 API Key
+                    {t('page.ask.need_key.cta')}
                   </button>
                 )}
               </div>
@@ -2788,26 +2897,28 @@ function ChatBubble({
       <AssistantAvatar />
       <div className="flex w-full max-w-[85%] min-w-0 flex-col">
         <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)] break-words">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">我明白了，你想做的是</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{t('page.ask.confirm.label')}</p>
           <h3 className="mt-1.5 text-base font-semibold text-text-primary font-display">
             {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
           </h3>
 
           <div className="mt-2.5 flex flex-wrap gap-2">
+            {/* mode / persona_pack 是后端枚举原值，标签归 enum.*（owner: batch-0）。
+                这里只翻框架文案，值本身原样透出。 */}
             <span className="rounded-md border border-border bg-bg-card px-2.5 py-1 text-xs text-text-secondary">
-              深度 · {intent.mode}
+              {t('page.ask.mode.badge', { mode: intent.mode })}
             </span>
             <span className="rounded-md border border-border bg-bg-card px-2.5 py-1 text-xs text-text-secondary">
-              评审团 · {intent.persona_pack}
+              {t('page.ask.pack.badge', { pack: intent.persona_pack })}
             </span>
             {intent.skill_type && (
               <span className="rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
-                技能 · {SKILL_LABELS[intent.skill_type] ?? intent.skill_type}
+                {t('page.ask.skill.badge', { name: SKILL_LABELS[intent.skill_type] ?? intent.skill_type })}
               </span>
             )}
             {intent.project_key && (
               <span className="rounded-md border border-warm-orange/30 bg-warm-orange/10 px-2.5 py-1 text-xs text-warm-orange">
-                项目 · {intent.project_key}
+                {t('page.ask.project.badge', { name: intent.project_key })}
               </span>
             )}
           </div>
@@ -2815,7 +2926,7 @@ function ChatBubble({
           {intent.matched_personas.length > 0 && (
             <div className="mt-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                指定角色（点 × 可移除，移除全部则回到自动选人）
+                {t('page.ask.personas.label')}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {intent.matched_personas.map((pid) => {
@@ -2842,8 +2953,12 @@ function ChatBubble({
                           })
                         }
                         className="ml-0.5 hover:text-text-primary transition-colors"
-                        aria-label={removed ? `恢复 ${label}` : `移除 ${label}`}
-                        title={removed ? '点击恢复' : '点击移除'}
+                        aria-label={
+                          removed
+                            ? t('page.ask.persona_restore.aria', { name: label })
+                            : t('page.ask.persona_remove.aria', { name: label })
+                        }
+                        title={removed ? t('page.ask.persona_restore.tooltip') : t('page.ask.persona_remove.tooltip')}
                       >
                         {removed ? '↺' : '×'}
                       </button>
@@ -2856,9 +2971,12 @@ function ChatBubble({
 
           <div className="mt-3.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">匹配把握</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{t('page.ask.confidence.label')}</span>
               <span className="font-medium text-text-secondary">
-                {conf.label}（{(intent.confidence * 100).toFixed(0)}%）
+                {t('page.ask.confidence.value', {
+                  level: t(conf.labelKey),
+                  percent: formatPercent(intent.confidence),
+                })}
               </span>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-card">
@@ -2869,7 +2987,7 @@ function ChatBubble({
             </div>
             {intent.method !== 'llm' && (
               <p className="mt-2 text-xs text-text-muted">
-                未配置 API Key，本次为规则解析，任务类型可能判得不准——填 Key 后用模型解析会更靠谱。
+                {t('page.ask.rule_parse.hint')}
               </p>
             )}
           </div>
@@ -2879,7 +2997,7 @@ function ChatBubble({
             onClick={() => onConfirm(intent, activePersonas)}
             disabled={busy}
           >
-            {busy ? '开庭中…' : '开庭评审 →'}
+            {busy ? t('page.ask.submit.pending') : t('page.ask.submit.cta')}
           </button>
         </div>
         <span className="mt-1 font-mono text-[10px] tracking-wider text-text-muted">{timeLabel}</span>

@@ -28,6 +28,10 @@ import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
 import { cn } from '@/lib/utils'
 import { useSessionStore } from '@/store/session-store'
 import type { Plan, UsageSummary } from '@/lib/types'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
+import { tApiError } from '@/i18n/api-error'
 
 /** 人工开通的联系方式。必须是真地址——example.com 是 RFC 2606 保留域名，
  *  写在这里等于告诉用户"想付钱请发邮件到黑洞"。 */
@@ -36,9 +40,19 @@ const REPO_ISSUES_URL = 'https://github.com/jedilpf/audiencelens/issues'
 
 /** 后台可以把价格改成小数，所以不能无脑 toFixed(0)，也不该给整数补 ".00" */
 function money(n: number): string {
-  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
+  // 走 @/i18n/format 而不是自己拼 `$${n}`：千分位与小数点要跟界面语言走
+  // （契约 6.5）。货币符号恒 '$'，不做汇率换算——我们没有汇率事实源。
+  return Number.isInteger(n) ? formatUsd(n, 0) : formatUsd(n, 2)
 }
 
+/**
+ * ⚠ 这封信的 subject / body **恒为中文，不进 key 表**（契约 12.2）。
+ *
+ * 理由是收件人：这是发给站方（solo dev）本人的询价邮件，不是给终端用户看的界面。
+ * 跟着 ui_lang 翻的话，一个把界面切成英文的中文用户会给同一个中国人发出一封
+ * 英文询价邮件——语言选错的是**信**，而用户完全不知道自己发出去的是什么。
+ * 界面语言表达的是"我想用什么语言读界面"，不是"我想用什么语言写信给作者"。
+ */
 function upgradeMailto(plan: Plan): string {
   const subject = `AudienceLens 升级到 ${plan.name} 档`
   // 正文不带用户邮箱等个人信息——收件人从发件地址就能看到，没必要塞进 URL
@@ -47,16 +61,21 @@ function upgradeMailto(plan: Plan): string {
 }
 
 export default function PlansPage() {
+  useDocumentTitle('page.plans.meta.title')
   const { config, identity, bootstrap } = useSessionStore()
 
   const [plans, setPlans] = useState<Plan[] | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [plansError, setPlansError] = useState<string | null>(null)
+  // 存的是**错误对象**不是已翻好的字符串。存字符串的话文案在 catch 的那一刻
+  // 就固定了，用户之后切语言错误横幅还留在旧语言里——和"模块级常量存 key
+  // 不存文案"是同一个坑，只是换到了组件 state 上。包一层对象是为了让
+  // `null = 没出错` 与 `{ e: undefined } = 出错了但拿到的是 undefined` 可分。
+  const [plansError, setPlansError] = useState<{ e: unknown } | null>(null)
 
   const [cdkCode, setCdkCode] = useState('')
   const [cdkBusy, setCdkBusy] = useState(false)
-  const [cdkError, setCdkError] = useState<string | null>(null)
+  const [cdkError, setCdkError] = useState<{ e: unknown } | null>(null)
   const [cdkSuccess, setCdkSuccess] = useState<{ granted: number; balance: number; guest: boolean } | null>(null)
 
   const load = useCallback(async () => {
@@ -68,7 +87,7 @@ export default function PlansPage() {
     if (plansRes.status === 'fulfilled') {
       setPlans(plansRes.value.plans)
     } else {
-      setPlansError(plansRes.reason instanceof Error ? plansRes.reason.message : '套餐信息加载失败')
+      setPlansError({ e: plansRes.reason })
     }
     setUsage(usageRes.status === 'fulfilled' ? usageRes.value : null)
     setLoading(false)
@@ -105,7 +124,7 @@ export default function PlansPage() {
       const fresh = await api.usage().catch(() => null)
       if (fresh) setUsage(fresh)
     } catch (e) {
-      setCdkError(e instanceof Error ? e.message : '兑换失败')
+      setCdkError({ e })
     } finally {
       setCdkBusy(false)
     }
@@ -127,44 +146,52 @@ export default function PlansPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 border border-brand-primary/20">
             <Crown className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
           </div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-text-primary">套餐与额度</h1>
+          <h1 className="font-display text-3xl md:text-4xl font-bold text-text-primary">{t('page.plans.header.title')}</h1>
         </div>
         <p className="text-text-secondary max-w-2xl text-[15px] leading-relaxed">
-          使用自带 API Key（BYOK）跑评审不消耗平台额度。套餐额度仅适用于使用平台提供的 Key。
+          {t('page.plans.header.desc')}
         </p>
       </header>
 
       {/* ---------- 当前状态：这个部署到底按什么规则算额度 ---------- */}
       <section className="mb-8 space-y-2">
+        {/* 三条横幅是互斥分支，各一条整句 key：<mode> 槽就是原来那个 <strong>。
+            不拆成「当前部署 + {模式名} + 后半句」——那等于把语序锁死成中文的，
+            英文里强调词的位置和中文不在一处。 */}
         {byokOnly ? (
           <Banner tone="info">
-            当前部署为 <strong className="font-semibold">BYOK 模式</strong>：评审使用你自己填的 Key，套餐额度不生效。
+            <Trans k="page.plans.banner_byok" slots={{ mode: (s) => <strong className="font-semibold">{s}</strong> }} />
           </Banner>
         ) : !quotaEnabled ? (
           <Banner tone="info">
-            当前部署<strong className="font-semibold">未开启配额限制</strong>，评审暂不受次数约束。
+            <Trans k="page.plans.banner_no_quota" slots={{ mode: (s) => <strong className="font-semibold">{s}</strong> }} />
           </Banner>
         ) : creditsMode ? (
           <Banner tone="info">
-            当前部署按 <strong className="font-semibold">CDK 次数制</strong>计费：每次评审消耗 1 次，用完可再兑。
+            <Trans k="page.plans.banner_credits" slots={{ mode: (s) => <strong className="font-semibold">{s}</strong> }} />
           </Banner>
         ) : null}
         {authEnabled && isAnonymous && (
           <p className="text-xs text-text-muted">
-            未登录时用量保存在浏览器本地（共享匿名身份）。
-            <Link to="/register" className="underline underline-offset-2 hover:text-text-primary">
-              注册账号
-            </Link>
-            后，额度与账号绑定。
+            <Trans
+              k="page.plans.anon.hint"
+              slots={{
+                register: (s) => (
+                  <Link to="/register" className="underline underline-offset-2 hover:text-text-primary">
+                    {s}
+                  </Link>
+                ),
+              }}
+            />
           </p>
         )}
       </section>
 
       {/* ---------- 我的额度 ---------- */}
       <section className="mb-10">
-        <h2 className="mb-4 font-display text-lg font-semibold text-text-primary">我的额度（近 24 小时）</h2>
+        <h2 className="mb-4 font-display text-lg font-semibold text-text-primary">{t('page.plans.quota.title')}</h2>
         {loading ? (
-          <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-muted">正在读取用量…</div>
+          <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-muted">{t('page.plans.quota.pending')}</div>
         ) : usage ? (
           <div className="rounded-2xl border border-border bg-bg-card p-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -173,9 +200,11 @@ export default function PlansPage() {
                   <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-primary/10">
                     <Sparkles className="h-3.5 w-3.5 text-brand-primary" strokeWidth={2} />
                   </div>
-                  <div className="text-xs text-text-muted">当前档位</div>
+                  <div className="text-xs text-text-muted">{t('page.plans.tier.label')}</div>
                 </div>
                 <div className="font-display text-xl font-bold text-brand-primary">
+                  {/* 套餐名来自后端目录，不是本页文案。拉不到套餐表时退回 plan id
+                      （free / pro / team）——它是真实的档位标识，不是编出来的名字。 */}
                   {plans?.find((p) => p.id === currentPlanId)?.name ?? currentPlanId}
                 </div>
               </div>
@@ -184,12 +213,12 @@ export default function PlansPage() {
                   <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan/10">
                     <Zap className="h-3.5 w-3.5 text-cyan" strokeWidth={2} />
                   </div>
-                  <div className="text-xs text-text-muted">已用评审</div>
+                  <div className="text-xs text-text-muted">{t('page.plans.used.label')}</div>
                 </div>
                 <div className="font-display text-xl font-bold text-text-primary">
-                  {usage.reviews_used}
+                  {formatNumber(usage.reviews_used)}
                   {usage.reviews_limit != null && (
-                    <span className="font-normal text-text-muted text-sm ml-1">/ {usage.reviews_limit}</span>
+                    <span className="font-normal text-text-muted text-sm ml-1">/ {formatNumber(usage.reviews_limit)}</span>
                   )}
                 </div>
               </div>
@@ -198,11 +227,18 @@ export default function PlansPage() {
                   <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-warm-orange/10">
                     <Ticket className="h-3.5 w-3.5 text-warm-orange" strokeWidth={2} />
                   </div>
-                  <div className="text-xs text-text-muted">{creditsMode ? '剩余次数' : '兑换码加量'}</div>
+                  <div className="text-xs text-text-muted">
+                    {creditsMode ? t('page.plans.credits.label') : t('page.plans.bonus.label')}
+                  </div>
                 </div>
                 <div className="font-display text-xl font-bold text-warm-orange">
-                  {usage.bonus_credits ?? 0}
-                  <span className="text-xs font-normal text-text-muted ml-1">次</span>
+                  {/* 数字与单位是一句话：英文的 credit / credits 要按数量选词，
+                      拆成「数字 + 固定单位」两段就选不了了。<unit> 槽保留原来那个小字号 span。 */}
+                  <Trans
+                    k="page.plans.credits.value"
+                    vars={{ count: usage.bonus_credits ?? 0 }}
+                    slots={{ unit: (s) => <span className="text-xs font-normal text-text-muted ml-1">{s}</span> }}
+                  />
                 </div>
               </div>
             </div>
@@ -210,9 +246,11 @@ export default function PlansPage() {
             {usage.reviews_limit != null && usage.reviews_limit > 0 && (
               <div className="mt-5">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-text-muted">配额使用进度</span>
+                  <span className="text-xs text-text-muted">{t('page.plans.progress.label')}</span>
                   <span className="text-xs font-medium text-text-secondary">
-                    {Math.min(100, Math.round((usage.reviews_used / usage.reviews_limit) * 100))}%
+                    {/* formatPercent 收的是**比值**不是 87 这种已乘过 100 的数，
+                        百分号也由它按 locale 出（契约 6.5） */}
+                    {formatPercent(Math.min(1, usage.reviews_used / usage.reviews_limit))}
                   </span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-bg-primary">
@@ -227,34 +265,37 @@ export default function PlansPage() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  配额周期：{usage.window}
+                  {/* window 是后端给的窗口字面量（现在恒为 "24h"），不是文案，原样透出 */}
+                  {t('page.plans.progress.hint', { window: usage.window })}
                 </p>
               </div>
             )}
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-muted">
-            用量暂时无法读取
+            {t('page.plans.quota.error')}
           </div>
         )}
       </section>
 
       {/* ---------- 三档套餐（价格与限额来自后端，后台改价这里立刻跟着变） ---------- */}
       <section className="mb-10">
-        <h2 className="mb-5 font-display text-lg font-semibold text-text-primary">套餐</h2>
+        <h2 className="mb-5 font-display text-lg font-semibold text-text-primary">{t('page.plans.list.title')}</h2>
 
         {plansError ? (
           <div className="rounded-xl border border-severity-critical/30 bg-severity-critical/10 p-4">
-            <p className="text-sm text-severity-critical">{plansError}</p>
+            {/* 在渲染处翻，不在 catch 里翻：切语言时这条横幅要跟着变。
+                tApiError 保证后端中文不会混排进英文界面（契约 D2）。 */}
+            <p className="text-sm text-severity-critical">{tApiError(plansError.e, 'page.plans.list.error')}</p>
             <button
               onClick={() => void load()}
               className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
             >
-              重试
+              {t('common.action.retry')}
             </button>
           </div>
         ) : loading ? (
-          <div className="rounded-xl border border-border bg-bg-card p-6 text-sm text-text-muted">正在读取套餐…</div>
+          <div className="rounded-xl border border-border bg-bg-card p-6 text-sm text-text-muted">{t('page.plans.list.pending')}</div>
         ) : (
           <div className="grid gap-5 md:grid-cols-3 md:items-stretch">
             {(plans ?? []).map((plan) => {
@@ -292,7 +333,7 @@ export default function PlansPage() {
                     <div className="flex justify-end px-6 pt-4">
                       <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
                         <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
-                        当前使用
+                        {t('page.plans.card.badge')}
                       </span>
                     </div>
                   )}
@@ -306,7 +347,11 @@ export default function PlansPage() {
                       <div>
                         <h3 className="font-display text-base font-bold text-text-primary">{plan.name}</h3>
                         <p className="text-[11px] text-text-muted">
-                          {tierIndex === 0 ? '入门体验' : tierIndex === 1 ? '个人深度使用' : '团队高频评审'}
+                          {tierIndex === 0
+                            ? t('page.plans.tagline_free')
+                            : tierIndex === 1
+                              ? t('page.plans.tagline_pro')
+                              : t('page.plans.tagline_team')}
                         </p>
                       </div>
                     </div>
@@ -316,7 +361,7 @@ export default function PlansPage() {
                       <span className="font-display text-4xl font-extrabold tracking-tight text-text-primary tabular-nums">
                         {money(plan.price_usd_month)}
                       </span>
-                      <span className="text-sm text-text-muted">/ 月</span>
+                      <span className="text-sm text-text-muted">{t('page.plans.price.unit')}</span>
                     </div>
 
                     {/* 特性列表 */}
@@ -326,20 +371,26 @@ export default function PlansPage() {
                           <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
                         </div>
                         <span>
-                          每天 <strong className="text-text-primary tabular-nums">{plan.reviews_per_day}</strong> 次评审
+                          {/* 数字插在句子中间，中英语序不同（"每天 N 次评审" / "N reviews per day"）。
+                              整句一条 key，<n> 槽保留原来那个 tabular-nums 的 <strong>。 */}
+                          <Trans
+                            k="page.plans.feature_reviews"
+                            vars={{ count: plan.reviews_per_day }}
+                            slots={{ n: (s) => <strong className="text-text-primary tabular-nums">{s}</strong> }}
+                          />
                         </span>
                       </li>
                       <li className="flex items-start gap-2.5">
                         <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
                           <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
                         </div>
-                        <span>平台承担模型调用费用</span>
+                        <span>{t('page.plans.feature_cost')}</span>
                       </li>
                       <li className="flex items-start gap-2.5">
                         <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
                           <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
                         </div>
-                        <span>自带 Key 不限次，不受额度约束</span>
+                        <span>{t('page.plans.feature_byok')}</span>
                       </li>
                     </ul>
 
@@ -348,12 +399,12 @@ export default function PlansPage() {
                       {isCurrent ? (
                         <div className="flex items-center justify-center gap-2 rounded-xl border-2 border-brand-primary/30 bg-brand-primary/10 px-4 py-3 text-sm font-semibold text-brand-primary">
                           <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
-                          正在使用
+                          {t('page.plans.card.label')}
                         </div>
                       ) : isFree ? (
                         <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-bg-primary/50 px-4 py-3 text-sm font-medium text-text-muted">
                           <Sparkles className="h-4 w-4" strokeWidth={1.5} />
-                          免费档 · 无需付费
+                          {t('page.plans.card.hint')}
                         </div>
                       ) : (
                         <a
@@ -361,7 +412,7 @@ export default function PlansPage() {
                           className="flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-primary/90 hover:shadow-[0_4px_16px_rgba(0,113,227,0.3)] active:scale-[0.98]"
                         >
                           <Mail className="h-4 w-4" strokeWidth={1.5} />
-                          联系升级
+                          {t('page.plans.card.cta')}
                         </a>
                       )}
                     </div>
@@ -378,13 +429,14 @@ export default function PlansPage() {
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
             <Ticket className="h-4 w-4 text-warm-orange" strokeWidth={1.5} />
-            兑换码（CDK）
+            {t('page.plans.cdk.title')}
           </h2>
           <p className="mb-3 text-xs text-text-muted">
             {creditsMode
-              ? '兑换后获得评审次数，每次评审消耗 1 次。'
-              : '兑换后获得加量次数，套餐日限用完后自动垫上。'}
-            {authEnabled && ' 无需注册，匿名兑换后次数保存在当前浏览器。'}
+              ? t('page.plans.cdk_desc_credits')
+              : t('page.plans.cdk_desc_plan')}
+            {/* 句间空格留在 JSX 里，不写进译文——译文里的首尾空格看不见，改的人会顺手吃掉 */}
+            {authEnabled && ` ${t('page.plans.cdk.hint')}`}
           </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -399,8 +451,8 @@ export default function PlansPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleRedeem()
               }}
-              placeholder="AL-XXXX-XXXX-XXXX"
-              aria-label="兑换码"
+              placeholder={t('page.plans.cdk.placeholder')}
+              aria-label={t('page.plans.cdk.aria')}
               className="min-w-0 flex-1 rounded-lg border border-border bg-bg-secondary px-4 py-2.5 font-mono text-sm tracking-wider text-text-primary placeholder-text-muted transition-colors focus:border-warm-orange focus:outline-none"
             />
             <button
@@ -418,33 +470,43 @@ export default function PlansPage() {
               ) : (
                 <Ticket className="h-4 w-4" strokeWidth={1.5} />
               )}
-              兑换
+              {t('page.plans.cdk.cta')}
             </button>
           </div>
 
           {cdkSuccess && (
             <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-brand-primary animate-fade-in">
               <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} />
-              兑换成功 +{cdkSuccess.granted} 次，当前余额 {cdkSuccess.balance} 次
-              {cdkSuccess.guest && <span className="text-xs text-text-muted">（已为你创建游客身份并自动登录）</span>}
+              {/* 一句里两个数：复数只能挂一个（ICU 同限制），挂本次到账的 count，
+                  balance 当普通插值。 */}
+              {t('page.plans.cdk.success', { count: cdkSuccess.granted, balance: cdkSuccess.balance })}
+              {cdkSuccess.guest && <span className="text-xs text-text-muted">{t('page.plans.guest.hint')}</span>}
             </p>
           )}
           {cdkError && (
             <p className="mt-2 flex items-start gap-1.5 text-sm text-severity-critical">
               <XCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-              <span>{cdkError}</span>
+              <span>{tApiError(cdkError.e, 'page.plans.cdk.error')}</span>
             </p>
           )}
 
           <p className="mt-3 text-xs text-text-muted">
-            需要兑换码？发邮件至
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
-              className="ml-1 text-brand-primary underline underline-offset-2 hover:text-text-primary"
-            >
-              {CONTACT_EMAIL}
-            </a>
-            申请。
+            {/* 邮箱当变量传，不写死在译文里：改邮箱要改两份语料的话必然漏一份。
+                这封信的 subject 同样恒为中文——收件人是站方本人（契约 12.2）。 */}
+            <Trans
+              k="page.plans.request.hint"
+              vars={{ email: CONTACT_EMAIL }}
+              slots={{
+                mail: (s) => (
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
+                    className="text-brand-primary underline underline-offset-2 hover:text-text-primary"
+                  >
+                    {s}
+                  </a>
+                ),
+              }}
+            />
           </p>
         </div>
       </section>
@@ -454,10 +516,10 @@ export default function PlansPage() {
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
             <Mail className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            人工开通 Pro / Team
+            {t('page.plans.manual.title')}
           </h2>
           <p className="mb-3 text-sm text-text-secondary">
-            如需开通 Pro 或 Team 档，发邮件告知目标档位和账号邮箱即可。
+            {t('page.plans.manual.desc')}
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
@@ -480,17 +542,16 @@ export default function PlansPage() {
         <div className="rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-1 flex items-center gap-2 font-display text-base font-semibold text-text-primary">
             <KeyRound className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-            自带 API Key
+            {t('page.plans.byok.title')}
           </h2>
           <p className="mb-3 text-sm text-text-secondary">
-            填入自己的 API Key（Anthropic 原生，或任意 OpenAI 兼容服务），评审消耗你自己的 API 额度，
-            不受平台次数和日限约束，token 费用由服务商直接结算。
+            {t('page.plans.byok.desc')}
           </p>
           <Link
             to="/settings"
             className="inline-flex items-center gap-1.5 text-sm text-cyan underline underline-offset-2 hover:text-cyan-dim"
           >
-            去设置页填 Key
+            {t('page.plans.byok.cta')}
             <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </Link>
         </div>

@@ -17,63 +17,80 @@ import {
   BarChart3,
   BrainCircuit,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { PageShell, PageHeader, SectionCard, PRIMARY_BUTTON_CLASS } from '@/components/ui'
+import { t } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatBytes } from '@/i18n/format'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 
-const steps = [
-  { icon: ListChecks, label: '选择任务类型', desc: '根据评审目标选择对应的任务类型' },
-  { icon: Upload, label: '上传文件', desc: '上传任意文档，AI 自动提取结构化材料' },
-  { icon: FileText, label: '编辑材料', desc: '检查 AI 提取结果，手动修改补充' },
-  { icon: Users, label: '选择角色并启动', desc: '选择角色包，启动评审查看报告' },
+/**
+ * 四个流程步骤。
+ *
+ * 存的是 **key 不是文案**：这个数组在模块求值时就固定了，存翻译结果的话
+ * 切换语言不会重新求值，四张步骤卡会一直停在打开页面时的那种语言。
+ */
+const steps: { icon: LucideIcon; labelKey: PlainMessageKey; descKey: PlainMessageKey }[] = [
+  { icon: ListChecks, labelKey: 'page.tutorial.step_select_type.label', descKey: 'page.tutorial.step_select_type.desc' },
+  { icon: Upload, labelKey: 'page.tutorial.step_upload.label', descKey: 'page.tutorial.step_upload.desc' },
+  { icon: FileText, labelKey: 'page.tutorial.step_edit.label', descKey: 'page.tutorial.step_edit.desc' },
+  { icon: Users, labelKey: 'page.tutorial.step_panel.label', descKey: 'page.tutorial.step_panel.desc' },
 ]
 
 // 示例数量必须来自后端 /api/examples（examples/ 目录的真实文件数），
 // 写死数字的话改了 examples/ 目录这页就会撒谎。拿不到数量时退化成不含数字的说法，
 // 不能给一个占位数假装知道。
+// 这个函数在**渲染期**被调用（不是模块级常量），所以里面的 t() 每次重渲染都会
+// 重新求值，切语言时这三张卡会跟着变。放到模块级去算就不会。
 function buildUploadMethods(exampleCount: number | null) {
   const exampleLine =
     exampleCount === null
-      ? '预设示例覆盖多种任务类型'
-      : `${exampleCount} 个预设示例覆盖多种任务类型`
+      ? t('page.tutorial.count.unknown')
+      : t('page.tutorial.count.with_number', { count: exampleCount })
   return [
   {
     icon: Upload,
-    title: '文件上传（推荐）',
-    desc: '上传任意文档，AI 自动阅读并提取结构化材料',
+    title: t('page.tutorial.method_file.title'),
+    desc: t('page.tutorial.method_file.desc'),
     details: [
       // 这里不能写 .doc：后端对它有专门的拒绝分支（api/__init__.py:622，
       // python-docx 解不了旧版 .doc），用户照着教程传 .doc 会直接撞报错。
       // 教程页把一个后端明确拒收的格式写成"支持"，是最不该出的错。
       // 口径对齐 CreateReviewPage 的 accept 属性。
-      '支持 .txt .md .json .pdf .docx（旧版 .doc 需先另存为 .docx）',
-      'AI 阅读文档后自动填充所有字段',
-      '提取完成后可手动修改每个字段',
-      'GDD、设计文档、开发日志等均可直接上传',
+      t('page.tutorial.method_file_formats.hint'),
+      t('page.tutorial.method_file_autofill.hint'),
+      t('page.tutorial.method_file_editable.hint'),
+      t('page.tutorial.method_file_any_doc.hint'),
     ],
     highlight: true,
   },
   {
     icon: Sparkles,
-    title: '示例导入',
-    desc: '一键导入预设示例数据，快速体验评审流程',
+    title: t('page.tutorial.method_example.title'),
+    desc: t('page.tutorial.method_example.desc'),
     details: [
       exampleLine,
-      '适合首次使用时了解系统功能',
+      t('page.tutorial.method_example_first_use.hint'),
     ],
     highlight: false,
   },
   {
     icon: FileText,
-    title: '手动填写',
-    desc: '根据任务类型自动生成结构化表单，逐项填写',
+    title: t('page.tutorial.method_manual.title'),
+    desc: t('page.tutorial.method_manual.desc'),
     details: [
-      '每个任务类型有专属的必填/选填字段',
-      '适合材料较少或需要精确控制内容的场景',
+      t('page.tutorial.method_manual_fields.hint'),
+      t('page.tutorial.method_manual_when.hint'),
     ],
     highlight: false,
   },
   ]
 }
 
+// 表里的任务类型名与字段名是**目录数据**，不是本页文案：中文读 mock-data 的
+// TASK_TYPES / TASK_MATERIALS，英文的事实源是后端目录 + catalog.* overlay
+// （契约 D5/D6）。在这里 t() 一份等于给同一批字段名造第二套译名，
+// 教程写的字段名和创建评审页表单里的字段名会对不上。
 const taskTypeTable = TASK_TYPES.map((tt) => {
   const fields = TASK_MATERIALS[tt.id] ?? []
   const required = fields.filter((f) => f.required).map((f) => f.label)
@@ -81,18 +98,22 @@ const taskTypeTable = TASK_TYPES.map((tt) => {
   return { name: tt.name, required, optional }
 })
 
-const resultItems = [
-  { icon: ShieldCheck, label: '风险等级', desc: '绿/黄/橙/红 四级风险评估', color: 'text-brand-primary' },
+// 同样存 key 不存文案（理由见 steps）。color 是样式不是文案，留在这里。
+const resultItems: { icon: LucideIcon; labelKey: PlainMessageKey; descKey: PlainMessageKey; color: string }[] = [
+  { icon: ShieldCheck, labelKey: 'page.tutorial.result_risk.label', descKey: 'page.tutorial.result_risk.desc', color: 'text-brand-primary' },
   // 立场不是固定的四档。它由各任务类型自己定义（"加愿望单"/"值得推进"/"观望"…），
   // ReportPage 的 STANCE_PALETTE 就是因为无法穷举才改成按出现顺序配色的。
   // 原来写死的"支持/中立/怀疑/反对"在真实报告里基本不会原样出现。
-  { icon: Users, label: '立场分布', desc: '各角色的立场取向（具体档位由任务类型决定）', color: 'text-cyan' },
-  { icon: AlertTriangle, label: '优先问题列表', desc: '按严重程度排序的关键问题', color: 'text-severity-warning' },
-  { icon: Eye, label: '每个角色的详细视角', desc: '各角色的独立评审观点', color: 'text-text-primary' },
-  { icon: BarChart3, label: '校准指标', desc: '一致性、覆盖率、幻觉率等质量指标', color: 'text-text-secondary' },
+  { icon: Users, labelKey: 'page.tutorial.result_stance.label', descKey: 'page.tutorial.result_stance.desc', color: 'text-cyan' },
+  { icon: AlertTriangle, labelKey: 'page.tutorial.result_issues.label', descKey: 'page.tutorial.result_issues.desc', color: 'text-severity-warning' },
+  { icon: Eye, labelKey: 'page.tutorial.result_persona.label', descKey: 'page.tutorial.result_persona.desc', color: 'text-text-primary' },
+  { icon: BarChart3, labelKey: 'page.tutorial.result_calibration.label', descKey: 'page.tutorial.result_calibration.desc', color: 'text-text-secondary' },
 ]
 
 export default function TutorialPage() {
+  // useDocumentTitle 内部 useLocale()，本页借它一并订阅 ui_lang：
+  // t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
+  useDocumentTitle('page.tutorial.meta.title')
   // null 表示"数量未知"（加载中或接口失败），此时文案不出现数字。
   // 教程页不因为一个可选的计数而报错或阻塞，失败就静默降级。
   const [exampleCount, setExampleCount] = useState<number | null>(null)
@@ -127,17 +148,17 @@ export default function TutorialPage() {
   return (
     <PageShell size="reading">
       <PageHeader
-        title="使用教程"
-        subtitle="了解 AudienceLens 评审系统的完整流程与材料要求"
+        title={t('page.tutorial.header.title')}
+        subtitle={t('page.tutorial.header.subtitle')}
       />
 
       <div className="space-y-6">
         <SectionCard>
           <h2 className="text-lg font-semibold text-text-primary mb-1">
-            评审流程总览
+            {t('page.tutorial.flow.title')}
           </h2>
           <p className="text-sm text-text-secondary mb-6">
-            上传文件 → AI 提取 → 编辑确认 → 启动评审
+            {t('page.tutorial.flow.desc')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {steps.map((s, i) => {
@@ -149,9 +170,9 @@ export default function TutorialPage() {
                       <Icon className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
                     </div>
                     <div>
-                      <div className="text-xs text-brand-primary font-mono mb-1">Step {i + 1}</div>
-                      <div className="text-sm font-medium text-text-primary">{s.label}</div>
-                      <div className="text-xs text-text-secondary mt-1">{s.desc}</div>
+                      <div className="text-xs text-brand-primary font-mono mb-1">{t('page.tutorial.flow.step', { n: i + 1 })}</div>
+                      <div className="text-sm font-medium text-text-primary">{t(s.labelKey)}</div>
+                      <div className="text-xs text-text-secondary mt-1">{t(s.descKey)}</div>
                     </div>
                   </div>
                   {i < steps.length - 1 && (
@@ -167,10 +188,10 @@ export default function TutorialPage() {
 
         <SectionCard>
           <h2 className="text-lg font-semibold text-text-primary mb-1">
-            上传文件，AI 自动提取
+            {t('page.tutorial.upload.title')}
           </h2>
           <p className="text-sm text-text-secondary mb-6">
-            核心流程：上传文档 → AI 阅读提取 → 你来编辑确认
+            {t('page.tutorial.upload.desc')}
           </p>
           <div className="space-y-4">
             {uploadMethods.map((m, i) => {
@@ -183,7 +204,7 @@ export default function TutorialPage() {
                   <div>
                     <div className="text-sm font-medium text-text-primary">
                       {m.title}
-                      {m.highlight && <span className="ml-2 text-xs text-brand-primary">推荐</span>}
+                      {m.highlight && <span className="ml-2 text-xs text-brand-primary">{t('page.tutorial.method.badge')}</span>}
                     </div>
                     <div className="text-sm text-text-secondary mt-0.5">{m.desc}</div>
                     {m.details && (
@@ -204,61 +225,65 @@ export default function TutorialPage() {
           <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-cyan/5 border border-cyan/20">
             <BrainCircuit className="w-4 h-4 text-cyan shrink-0 mt-0.5" strokeWidth={1.25} />
             <p className="text-xs text-text-secondary">
-              AI 提取完成后，所有字段均可手动修改。你可以补充 AI 遗漏的信息、修正不准确的内容、或添加额外说明。最终提交的内容以你的编辑为准。
+              {t('page.tutorial.upload.hint')}
             </p>
           </div>
         </SectionCard>
 
         <SectionCard>
           <h2 className="text-lg font-semibold text-text-primary mb-1">
-            适合上传的文件类型
+            {t('page.tutorial.filetypes.title')}
           </h2>
           <p className="text-sm text-text-secondary mb-6">
-            任何包含游戏相关信息的文档都可以上传
+            {t('page.tutorial.filetypes.desc')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { title: '游戏设计文档 (GDD)', desc: '包含核心循环、系统设计、角色设定等' },
-              { title: '开发日志 / 更新说明', desc: '版本更新内容、开发进度、路线图' },
-              { title: 'Steam / 商店页文案', desc: '游戏描述、标签、截图说明、定价信息' },
-              { title: '众筹页面内容', desc: '项目介绍、回报层级、团队信息' },
-              { title: '社区运营文档', desc: 'Discord 频道规划、社区策略、活动计划' },
-              { title: '本地化翻译文件', desc: '翻译样本、文化适配说明、UI 适配问题' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-bg-secondary/30">
+            {([
+              ['page.tutorial.filetype_gdd.title', 'page.tutorial.filetype_gdd.desc'],
+              ['page.tutorial.filetype_devlog.title', 'page.tutorial.filetype_devlog.desc'],
+              ['page.tutorial.filetype_store.title', 'page.tutorial.filetype_store.desc'],
+              ['page.tutorial.filetype_crowdfunding.title', 'page.tutorial.filetype_crowdfunding.desc'],
+              ['page.tutorial.filetype_community.title', 'page.tutorial.filetype_community.desc'],
+              ['page.tutorial.filetype_localization.title', 'page.tutorial.filetype_localization.desc'],
+            ] as [PlainMessageKey, PlainMessageKey][]).map(([titleKey, descKey]) => (
+              <div key={titleKey} className="flex items-start gap-3 p-3 rounded-lg bg-bg-secondary/30">
                 <FileText className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" strokeWidth={1.25} />
                 <div>
-                  <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                  <div className="text-xs text-text-secondary mt-0.5">{item.desc}</div>
+                  <div className="text-sm font-medium text-text-primary">{t(titleKey)}</div>
+                  <div className="text-xs text-text-secondary mt-0.5">{t(descKey)}</div>
                 </div>
               </div>
             ))}
           </div>
           {uploadConfig && (
+            // 体积上限走 formatBytes：原来是 Math.round(bytes/1024/1024) + 写死的 "MB"，
+            // 那个写法在英文界面上会出现中文数字格式，而且后端把上限调到 GB 级时会显示
+            // "2048MB"。扩展名清单原样 join，它们是文件后缀不是文案。
             <p className="mt-4 text-xs text-text-secondary">
-              系统实际接受的文件格式：文本类 {uploadConfig.allowed_ext.join(' / ')}
-              （单个文件不超过 {Math.round(uploadConfig.max_bytes / 1024 / 1024)}MB），
-              图片类 {uploadConfig.allowed_image_ext.join(' / ')}
-              （单张不超过 {Math.round(uploadConfig.max_image_bytes / 1024 / 1024)}MB）。
-              其他格式的文档请先转换为以上格式再上传。
+              {t('page.tutorial.limits.hint', {
+                text_ext: uploadConfig.allowed_ext.join(' / '),
+                text_max: formatBytes(uploadConfig.max_bytes),
+                image_ext: uploadConfig.allowed_image_ext.join(' / '),
+                image_max: formatBytes(uploadConfig.max_image_bytes),
+              })}
             </p>
           )}
         </SectionCard>
 
         <SectionCard>
           <h2 className="text-lg font-semibold text-text-primary mb-1">
-            任务类型材料需求
+            {t('page.tutorial.materials.title')}
           </h2>
           <p className="text-sm text-text-secondary mb-6">
-            AI 会根据任务类型自动提取对应字段，你也可以手动补充
+            {t('page.tutorial.materials.desc')}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-3 text-text-secondary font-medium">任务类型</th>
-                  <th className="text-left py-3 px-3 text-text-secondary font-medium">必填字段</th>
-                  <th className="text-left py-3 px-3 text-text-secondary font-medium">选填字段</th>
+                  <th className="text-left py-3 px-3 text-text-secondary font-medium">{t('page.tutorial.materials_task_type.label')}</th>
+                  <th className="text-left py-3 px-3 text-text-secondary font-medium">{t('page.tutorial.materials_required.label')}</th>
+                  <th className="text-left py-3 px-3 text-text-secondary font-medium">{t('page.tutorial.materials_optional.label')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,10 +317,10 @@ export default function TutorialPage() {
 
         <SectionCard>
           <h2 className="text-lg font-semibold text-text-primary mb-1">
-            评审结果说明
+            {t('page.tutorial.results.title')}
           </h2>
           <p className="text-sm text-text-secondary mb-6">
-            评审报告包含以下核心内容
+            {t('page.tutorial.results.desc')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {resultItems.map((item, i) => {
@@ -304,8 +329,8 @@ export default function TutorialPage() {
                 <div key={i} className="flex items-start gap-3 p-4 rounded-lg bg-bg-secondary/30">
                   <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${item.color}`} strokeWidth={1.25} />
                   <div>
-                    <div className="text-sm font-medium text-text-primary">{item.label}</div>
-                    <div className="text-xs text-text-secondary mt-0.5">{item.desc}</div>
+                    <div className="text-sm font-medium text-text-primary">{t(item.labelKey)}</div>
+                    <div className="text-xs text-text-secondary mt-0.5">{t(item.descKey)}</div>
                   </div>
                 </div>
               )
@@ -315,7 +340,7 @@ export default function TutorialPage() {
 
         <div className="flex items-center justify-center py-4">
           <Link to="/review/new" className={PRIMARY_BUTTON_CLASS}>
-            开始创建评审
+            {t('page.tutorial.start.cta')}
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />
           </Link>
         </div>

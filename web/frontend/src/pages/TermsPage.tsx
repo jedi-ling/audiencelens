@@ -31,182 +31,196 @@ import {
   UserCog,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 
 /** 与隐私政策同一个联系邮箱。必须是真地址——example.com 是 RFC 2606 保留域名。 */
 const CONTACT_EMAIL = 'REMOVED'
 
-const sections = [
+/**
+ * 章节表。存的是 **key 不是文案**：这个数组在模块求值时就固定了，存翻译结果
+ * 的话切换语言不会重新求值，整页条款会一直停在打开页面时的那种语言。
+ * 与 Layout.tsx 的 navItems 同一条规矩。
+ */
+const sections: {
+  icon: React.ElementType
+  titleKey: PlainMessageKey
+  color: string
+  borderColor: string
+  bgColor: string
+  iconBg: string
+  items: { labelKey: PlainMessageKey; detailKeys: PlainMessageKey[] }[]
+}[] = [
   {
     icon: ScrollText,
-    title: '服务内容',
+    titleKey: 'page.terms.service.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
     iconBg: 'bg-brand-primary/10',
     items: [
       {
-        label: 'AudienceLens 提供什么',
-        details: [
-          '用多个 AI 人格从不同视角评审你提交的材料，产出一份结构化报告',
-          '把报告里的建议转成可证伪的假设，供你做真人验证后回填结果',
-          '你可以自带模型密钥（BYOK），也可以使用平台密钥（受额度限制）',
+        labelKey: 'page.terms.service_provides.label',
+        detailKeys: [
+          'page.terms.service_provides_review.desc',
+          'page.terms.service_provides_hypothesis.desc',
+          'page.terms.service_provides_byok.desc',
         ],
       },
       {
-        label: '它不是什么',
-        details: [
+        labelKey: 'page.terms.service_not.label',
+        detailKeys: [
           // 这三条不是免责套话，是这个产品的事实边界，报告页每次都会展示同样的说明
-          '不是真人用户测试。参与评审的是 AI 人格，不是任何真实用户群体的抽样',
-          '不是市场调研报告。立场分布反映的是模型输出，不具备统计代表性',
-          '不构成商业、法律、财务或投资建议。据此做出的任何决策由你自行负责',
+          'page.terms.service_not_usertest.desc',
+          'page.terms.service_not_research.desc',
+          'page.terms.service_not_advice.desc',
         ],
       },
     ],
   },
   {
     icon: AlertTriangle,
-    title: '服务可用性',
+    titleKey: 'page.terms.availability.title',
     color: 'text-warm-orange',
     borderColor: 'border-warm-orange/30',
     bgColor: 'bg-warm-orange/5',
     iconBg: 'bg-warm-orange/10',
     items: [
       {
-        label: '我们不承诺可用性指标',
-        details: [
+        labelKey: 'page.terms.availability_sla.label',
+        detailKeys: [
           // 说清楚而不是含糊其辞：单人运营 + 单机部署，给 SLA 就是空头支票
-          '本服务按「现状」提供，不承诺任何可用率（SLA）、响应时间或不中断运行',
-          '这不是免责话术，是事实：目前由个人独立运营，单机部署，无冗余副本',
-          '维护、升级或故障都可能导致服务临时不可用，我们会尽力但不保证提前通知',
-          '上游模型服务商（Anthropic / OpenAI 等）的中断会直接影响本服务，这部分不在我们控制范围内',
+          'page.terms.availability_sla_asis.desc',
+          'page.terms.availability_sla_solo.desc',
+          'page.terms.availability_sla_maintenance.desc',
+          'page.terms.availability_sla_upstream.desc',
         ],
       },
       {
-        label: '数据可靠性',
-        details: [
-          '数据库每日自动备份，并定期做恢复演练验证备份可用',
-          '尽管如此，仍建议你对重要材料自行留存副本——任何单点系统都可能丢数据',
-          '设置页提供「导出我的全部数据」，随时可以把内容带走',
+        labelKey: 'page.terms.availability_data.label',
+        detailKeys: [
+          'page.terms.availability_data_backup.desc',
+          'page.terms.availability_data_copy.desc',
+          'page.terms.availability_data_export.desc',
         ],
       },
     ],
   },
   {
     icon: UserCog,
-    title: '账号与使用规范',
+    titleKey: 'page.terms.account.title',
     color: 'text-cyan',
     borderColor: 'border-cyan/30',
     bgColor: 'bg-cyan/5',
     iconBg: 'bg-cyan/10',
     items: [
       {
-        label: '你的责任',
-        details: [
-          '妥善保管账号密码与 API 密钥；因密码泄露导致的损失由你自行承担',
-          '你对提交的材料拥有合法权利，且提交行为不侵犯任何第三方的权利',
-          '不得提交违法内容，或利用本服务生成、传播违法或侵权内容',
+        labelKey: 'page.terms.account_duty.label',
+        detailKeys: [
+          'page.terms.account_duty_password.desc',
+          'page.terms.account_duty_rights.desc',
+          'page.terms.account_duty_lawful.desc',
         ],
       },
       {
-        label: '禁止的行为',
-        details: [
-          '绕过或试图绕过额度限制、登录校验、付费墙',
-          '自动化批量刷取免费额度（含注册多账号、滥用兑换码）',
-          '对服务进行压力测试、漏洞扫描或其它未经授权的安全测试',
-          '转售、二次分发本服务的输出并声称其为真人用户研究',
+        labelKey: 'page.terms.account_forbidden.label',
+        detailKeys: [
+          'page.terms.account_forbidden_bypass.desc',
+          'page.terms.account_forbidden_farming.desc',
+          'page.terms.account_forbidden_probing.desc',
+          'page.terms.account_forbidden_resale.desc',
         ],
       },
       {
-        label: '违规处理',
-        details: [
+        labelKey: 'page.terms.account_enforcement.label',
+        detailKeys: [
           // 这个能力确实存在（admin PUT /users/{id} 的 is_active），所以敢写
-          '违反上述规范的账号，我们可以在不事先通知的情况下限制额度或停用',
-          '停用后你仍可通过下方邮箱申诉；数据不会因停用被立即删除',
+          'page.terms.account_enforcement_suspend.desc',
+          'page.terms.account_enforcement_appeal.desc',
         ],
       },
     ],
   },
   {
     icon: CreditCard,
-    title: '费用与退款',
+    titleKey: 'page.terms.billing.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
     iconBg: 'bg-brand-primary/10',
     items: [
       {
-        label: '当前的付费方式',
-        details: [
+        labelKey: 'page.terms.billing_payment.label',
+        detailKeys: [
           // 与定价页保持同一口径：在线支付确实还没接，不能在条款里假装有
-          '目前没有接入在线支付。付费开通通过兑换码或联系我们人工处理',
-          '免费额度、套餐限额都是运行时配置，我们可能调整——调整前会尽量提前说明',
-          '使用自带密钥（BYOK）时，模型调用费用由你的服务商直接向你计费，与我们无关',
+          'page.terms.billing_payment_manual.desc',
+          'page.terms.billing_payment_quota.desc',
+          'page.terms.billing_payment_byok.desc',
         ],
       },
       {
-        label: '退款',
-        details: [
-          '因为没有自助支付流程，退款同样是人工处理：写信到下方邮箱说明情况',
-          '已消耗的评审次数原则上不退；服务方原因导致评审失败的次数会退还到你的余额',
+        labelKey: 'page.terms.billing_refund.label',
+        detailKeys: [
+          'page.terms.billing_refund_manual.desc',
+          'page.terms.billing_refund_used.desc',
         ],
       },
     ],
   },
   {
     icon: ShieldQuestion,
-    title: '知识产权',
+    titleKey: 'page.terms.ip.title',
     color: 'text-cyan',
     borderColor: 'border-cyan/30',
     bgColor: 'bg-cyan/5',
     iconBg: 'bg-cyan/10',
     items: [
       {
-        label: '你的内容归你',
-        details: [
-          '你提交的材料、以及为你生成的报告，所有权和使用权都归你',
-          '我们不会用你的内容训练模型、做案例展示或转给第三方（详见隐私政策）',
-          '你可以自由使用、修改、商用生成的报告，无需署名',
+        labelKey: 'page.terms.ip_yours.label',
+        detailKeys: [
+          'page.terms.ip_yours_own.desc',
+          'page.terms.ip_yours_no_training.desc',
+          'page.terms.ip_yours_free_use.desc',
         ],
       },
       {
-        label: '本服务的知识产权',
-        details: [
-          '本项目代码开源，遵循仓库中声明的开源许可证',
-          '人格设定、评审方法与提示词模板同样在仓库内公开，可查证、可自建',
+        labelKey: 'page.terms.ip_ours.label',
+        detailKeys: [
+          'page.terms.ip_ours_oss.desc',
+          'page.terms.ip_ours_personas.desc',
         ],
       },
     ],
   },
   {
     icon: Gavel,
-    title: '责任限制与条款变更',
+    titleKey: 'page.terms.liability.title',
     color: 'text-warm-orange',
     borderColor: 'border-warm-orange/30',
     bgColor: 'bg-warm-orange/5',
     iconBg: 'bg-warm-orange/10',
     items: [
       {
-        label: '责任限制',
-        details: [
-          '在法律允许的最大范围内，我们不对使用本服务产生的间接损失负责——'
-            + '包括但不限于商业机会损失、数据丢失、因采纳评审建议导致的决策损失',
-          '如你已付费，我们的赔偿责任总额不超过你在此前 12 个月内实际支付的金额',
+        labelKey: 'page.terms.liability_cap.label',
+        detailKeys: [
+          'page.terms.liability_cap_indirect.desc',
+          'page.terms.liability_cap_amount.desc',
         ],
       },
       {
-        label: '条款变更',
-        details: [
-          '我们可能修订本条款。重大变更会在站内公告，并更新本页底部的生效日期',
-          '变更生效后继续使用即视为接受；不接受的话，可以导出数据并删除账号',
+        labelKey: 'page.terms.liability_change.label',
+        detailKeys: [
+          'page.terms.liability_change_notice.desc',
+          'page.terms.liability_change_accept.desc',
         ],
       },
       {
-        label: '这份条款的性质',
-        details: [
+        labelKey: 'page.terms.liability_nature.label',
+        detailKeys: [
           // 不写这一句，等于暗示它经过法律审阅
-          '这是一份通用条款，尚未经执业律师审阅。它反映的是本服务当前的真实运作方式，'
-            + '而不是一份完备的法律文件',
-          '如你所在司法辖区的强制性规定与本条款冲突，以强制性规定为准',
+          'page.terms.liability_nature_unreviewed.desc',
+          'page.terms.liability_nature_mandatory.desc',
         ],
       },
     ],
@@ -214,6 +228,8 @@ const sections = [
 ]
 
 export default function TermsPage() {
+  useDocumentTitle('page.terms.meta.title')
+
   return (
     // 与隐私政策同一套长文排版：max-w-3xl 收阅读宽度，段前距大于段后距
     <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
@@ -223,14 +239,13 @@ export default function TermsPage() {
           className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
-          返回首页
+          {t('page.terms.header.link')}
         </Link>
-        <h1 className="text-3xl font-display font-semibold text-text-primary mb-3">服务条款</h1>
+        <h1 className="text-3xl font-display font-semibold text-text-primary mb-3">{t('page.terms.header.title')}</h1>
         <p className="text-text-secondary">
-          使用 AudienceLens 即表示你同意以下条款。我们尽量把话说明白，
-          不用听不懂的措辞掩盖真实的边界。
+          {t('page.terms.header.subtitle')}
         </p>
-        <p className="mt-3 text-sm text-text-muted">最后更新：2026 年 8 月</p>
+        <p className="mt-3 text-sm text-text-muted">{t('page.terms.header.meta')}</p>
       </div>
 
       <div className="space-y-8">
@@ -238,7 +253,7 @@ export default function TermsPage() {
           const SectionIcon = section.icon
           return (
             <section
-              key={section.title}
+              key={section.titleKey}
               className={cn(
                 'rounded-2xl border p-6',
                 section.borderColor,
@@ -250,19 +265,19 @@ export default function TermsPage() {
                   <SectionIcon className={cn('w-5 h-5', section.color)} strokeWidth={1.25} />
                 </div>
                 <h2 className="text-lg font-display font-semibold text-text-primary">
-                  {section.title}
+                  {t(section.titleKey)}
                 </h2>
               </div>
 
               <div className="space-y-5">
                 {section.items.map((item) => (
-                  <div key={item.label}>
-                    <h3 className="text-sm font-medium text-text-primary mb-2">{item.label}</h3>
+                  <div key={item.labelKey}>
+                    <h3 className="text-sm font-medium text-text-primary mb-2">{t(item.labelKey)}</h3>
                     <ul className="space-y-2">
-                      {item.details.map((detail, di) => (
-                        <li key={di} className="flex items-start gap-2.5 text-sm text-text-secondary">
+                      {item.detailKeys.map((detailKey) => (
+                        <li key={detailKey} className="flex items-start gap-2.5 text-sm text-text-secondary">
                           <span className="mt-1.5 w-1 h-1 rounded-full bg-text-muted shrink-0" />
-                          <span className="leading-6">{detail}</span>
+                          <span className="leading-6">{t(detailKey)}</span>
                         </li>
                       ))}
                     </ul>
@@ -279,19 +294,17 @@ export default function TermsPage() {
           <div className="w-10 h-10 rounded-lg bg-bg-secondary flex items-center justify-center">
             <Ban className="w-5 h-5 text-text-muted" strokeWidth={1.25} />
           </div>
-          <h2 className="text-lg font-display font-semibold text-text-primary">终止服务</h2>
+          <h2 className="text-lg font-display font-semibold text-text-primary">{t('page.terms.termination.title')}</h2>
         </div>
         <p className="text-sm leading-6 text-text-secondary">
-          你可以随时在设置页删除账号与全部数据，无需申请、无需等待审核。
-          我们也可能因不可抗力或运营原因终止服务——若发生这种情况，
-          我们会提前公告并保留足够时间让你导出数据。
+          {t('page.terms.termination.desc')}
         </p>
       </section>
 
       <section className="mt-8 text-center">
         <div className="inline-flex items-center gap-2 mb-3 text-text-muted">
           <Mail className="w-4 h-4" strokeWidth={1.25} />
-          <span className="text-sm">对条款有疑问，或需要申诉、退款</span>
+          <span className="text-sm">{t('page.terms.contact.hint')}</span>
         </div>
         <div>
           <a
@@ -302,18 +315,28 @@ export default function TermsPage() {
             {CONTACT_EMAIL}
           </a>
         </div>
+        {/* 链接文字不拆成单独的 key：拆了之后英文语序改不动，只能硬凑成
+            "另请阅读 + 隐私政策 + ，了解…" 的中式语序（契约 3.4 例 6）。 */}
         <p className="mt-6 text-sm text-text-muted">
-          另请阅读{' '}
-          <Link to="/privacy" className="text-cyan hover:underline">
-            隐私政策
-          </Link>
-          ，了解我们如何处理你的数据。
+          <Trans
+            k="page.terms.related.desc"
+            slots={{
+              privacy: (s) => (
+                <Link to="/privacy" className="text-cyan hover:underline">
+                  {s}
+                </Link>
+              ),
+            }}
+          />
         </p>
 
         {/* 备案主体信息。条款是一份协议，用户有权知道对方是谁——
             只在页脚放一个备案号，等于告诉用户"有备案"但不告诉他跟谁签的约。 */}
         <p className="mt-4 text-xs text-text-muted">
-          本服务备案主体：
+          {t('page.terms.filing.label')}
+          {/* 备案号**刻意不进 key 表**：工信部要求逐字符原样公示，翻译或改写
+              都是违规；而写进语料又会因为 zh/en 逐字相同被 i18n:check 判成
+              "照抄中文"。所以它留在这里当字面量，和 Layout.tsx 页脚同一处理。 */}
           <a
             href="https://beian.miit.gov.cn/"
             target="_blank"

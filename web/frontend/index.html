@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AudienceLens - 多代理合成用户评审系统</title>
     <!--
+      静态中文 description：无 JS 时的诚实兜底，也是爬虫唯一能读到的那一份。
+      运行时由 src/i18n（initI18n / setLocale）按 ui_lang 覆盖 content。
+
+      ⚠ 这**不是 SEO 方案**。本站是纯客户端渲染，爬虫拿不到运行时改写的 meta，
+      这里做的只有"分享链接预览时不要显示错的语言"。见 src/i18n/head.ts 的文件头。
+
+      上面那条 <title> 同理保持中文不动——它是 JS 加载完成前的显示值，
+      运行时由每个页面的 useDocumentTitle 覆盖。
+    -->
+    <meta
+      name="description"
+      content="多代理合成用户评审系统：用一组有身份、有偏好的合成受众评审你的游戏概念、Demo 与商店页，给出可执行的分歧与共识。"
+    />
+    <!--
       不引 Google Fonts。字体走 src/index.css 里的系统栈
       （--font-sans/--font-display 已含 PingFang SC / 微软雅黑 等中文回退）。
 

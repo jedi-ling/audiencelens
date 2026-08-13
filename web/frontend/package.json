@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "typecheck": "tsc -b --pretty false",
+    "build": "npm run i18n:check && tsc -b && vite build",
+    "typecheck": "npm run i18n:check && tsc -b --pretty false",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n:gen": "node scripts/i18n-gen.mjs",
+    "i18n:check": "node scripts/i18n-gen.mjs --check",
+    "i18n:scan": "node scripts/i18n-scan.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",

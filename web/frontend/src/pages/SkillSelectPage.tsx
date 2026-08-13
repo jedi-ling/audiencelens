@@ -6,9 +6,14 @@ import { NON_REVIEW_SKILL_TYPES, loadSkillTruth } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import { AlertTriangle, ArrowRight, Layers, RefreshCw } from 'lucide-react'
 import { PageShell, PageHeader, EmptyState, CARD_GRID_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui'
+import { t } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { tApiErrorParts } from '@/i18n/api-error'
+import type { ApiErrorText } from '@/i18n/api-error'
 
 export default function SkillSelectPage() {
   const navigate = useNavigate()
+  useDocumentTitle('page.skills.meta.title')
 
   // 后端 /api/skills 是唯一事实源：哪些技能存在、叫什么、怎么描述，都以它为准。
   // 本地 SKILLS 只保留后端没有的展示装饰（图标/配色/用例）。名称和描述前端另存一份
@@ -16,7 +21,10 @@ export default function SkillSelectPage() {
   const [skills, setSkills] = useState<SkillTruth[] | null>(null)
   // 区分"后端说一个技能都没有"和"根本没加载上"：后者必须让用户看见，
   // 否则会被当成"我的技能没了"。
-  const [error, setError] = useState<string | null>(null)
+  // 存错误对象而不是拼好的字符串：拼好的那一刻语种就被冻住了，用户在错误态下
+  // 切语言这句话不会跟着变。后端原文进 detail，由渲染处放 title 属性，
+  // 不与英文界面并排显示（契约 D2）。
+  const [error, setError] = useState<ApiErrorText | null>(null)
   const [loading, setLoading] = useState(true)
 
   // 用递增的请求序号而不是每次调用各自的 cancelled 标志：后者只能在
@@ -41,7 +49,7 @@ export default function SkillSelectPage() {
         // 失败时不要退化成"本地全量列表"：那会把一份可能已经和后端不一致的
         // 名单当成真的展示出去，用户点进去才发现技能不可用。
         setSkills(null)
-        setError(e instanceof Error ? e.message : '加载技能列表失败')
+        setError(tApiErrorParts(e, 'error.fetch.skills'))
         setLoading(false)
       })
     return () => {
@@ -62,13 +70,13 @@ export default function SkillSelectPage() {
     <PageShell size="grid">
       <PageHeader
         center
-        title="技能中心"
+        title={t('page.skills.header.title')}
         subtitle={
           <>
             {/* 原文是「不同技能提供差异化的评审策略和角色配置」，对 4 个技能一视同仁。
                 实际只有红队对抗与受众面板会往提示词里加视角说明，合成试玩是默认流程、
                 人格生成压根没接进评审。改成只承诺「换一种视角」这件确实发生的事。 */}
-            选择评审技能：技能决定评审员以哪种视角来看你的材料，具体人数和角色仍由你在创建评审时选择
+            {t('page.skills.header.subtitle')}
           </>
         }
       />
@@ -85,19 +93,23 @@ export default function SkillSelectPage() {
         <EmptyState
           icon={AlertTriangle}
           tone="error"
-          title="技能列表没能加载出来"
-          description={`${error}——这不代表你的技能被停用了，只是这次没取到列表，请重试。`}
+          title={t('page.skills.list_error.title')}
+          // EmptyState.description 只收 string（components/ui 是 batch-0 的，不改它），
+          // 所以后端原文没地方挂 title 属性。它不丢：非 zh 界面下 tApiErrorParts 已经
+          // 把中文原文隔离在 detail 里不参与显示，这里只是不再额外露出——
+          // 与"把中文和英文并排渲染"相比，这是两害相权取其轻。记进交付报告。
+          description={t('page.skills.list_error.desc', { reason: error.text })}
           action={
             <button onClick={load} className={PRIMARY_BUTTON_CLASS}>
               <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
-              重新加载
+              {t('page.skills.list_error.cta')}
             </button>
           }
         />
       )}
 
       {!loading && !error && skills?.length === 0 && (
-        <EmptyState icon={Layers} title="当前账号下没有可用的评审技能" />
+        <EmptyState icon={Layers} title={t('page.skills.list.empty')} />
       )}
 
       {!loading && !error && skills && skills.length > 0 && (
@@ -169,7 +181,7 @@ export default function SkillSelectPage() {
                   {taskNames.length > 0 && (
                     <div className="mb-5">
                       <h3 className="text-xs font-medium text-text-muted mb-2">
-                        可选任务类型（{taskNames.length}）
+                        {t('page.skills.card_task_types.label', { count: taskNames.length })}
                       </h3>
                       <div className="flex flex-wrap gap-1.5">
                         {taskNames.map((name) => (
@@ -183,7 +195,9 @@ export default function SkillSelectPage() {
 
                   {deco && deco.use_cases.length > 0 && (
                     <div className="mb-5">
-                      <h3 className="text-xs font-medium text-text-muted mb-2">典型用例</h3>
+                      <h3 className="text-xs font-medium text-text-muted mb-2">
+                        {t('page.skills.card_use_cases.label')}
+                      </h3>
                       <div className="flex flex-wrap gap-1.5">
                         {deco.use_cases.map((uc) => (
                           <span
@@ -199,16 +213,13 @@ export default function SkillSelectPage() {
 
                   {startsReview ? (
                     <div className={cn('mt-auto flex items-center gap-2 text-sm font-medium transition-colors', color)}>
-                      <span>使用此技能创建评审</span>
+                      <span>{t('page.skills.card.cta')}</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" strokeWidth={1.25} />
                     </div>
                   ) : (
                     <div className="mt-auto flex items-start gap-2 text-xs text-text-muted leading-relaxed">
                       <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
-                      <span>
-                        该技能还没有接入评审流程：从这里创建评审不会改变评审的跑法，
-                        所以入口先关掉，等它真正可用再开放。
-                      </span>
+                      <span>{t('page.skills.card_disabled.hint')}</span>
                     </div>
                   )}
                 </div>

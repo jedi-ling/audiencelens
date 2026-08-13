@@ -3,6 +3,9 @@
  * 改动后端 schema 时，请同步这里 —— 这是前后端唯一的约定处。
  */
 
+// 只用于 OPENAI_COMPATIBLE_PRESETS 的展示名 key（type-only import，运行时不产生依赖）。
+import type { PlainMessageKey } from '@/i18n/keys.gen'
+
 export type TaskType =
   | 'steam_page_review'
   | 'demo_first_play'
@@ -52,13 +55,31 @@ export class ApiError extends Error {
   code: ApiErrorCode
   status: number
   detail?: unknown
+  /**
+   * 后端 message 的语种（BCP-47），来自信封里的 `error.message_lang`。
+   *
+   * 它**不是协商结果**，就是一句诚实的事实标注：「这条 message 是中文」。
+   * 本期后端恒给 "zh-CN"。undefined = 这个响应还没带这个字段（老后端 / 第二套
+   * `{"detail": ...}` 信封），前端按"语种未知"处理，不许猜。
+   *
+   * 为什么必须有：没有它，前端无法判断拿到的 message 是不是英文，只能猜；
+   * 猜错的表现是"英文界面混中文且没人发现"。见 docs/I18N_CONTRACT.md D2。
+   */
+  messageLang?: string
 
-  constructor(status: number, code: ApiErrorCode, message: string, detail?: unknown) {
+  constructor(
+    status: number,
+    code: ApiErrorCode,
+    message: string,
+    detail?: unknown,
+    messageLang?: string,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.detail = detail
+    this.messageLang = messageLang
   }
 
   /** 缺 key —— 前端应把用户引导到设置页填写，而不是弹一个干瘪的报错 */
@@ -135,7 +156,15 @@ export interface KeyStatus {
 /** 非 Anthropic 服务商预设——都遵循 OpenAI 兼容协议，见 src/runner/llm_client.py 同名表。 */
 export interface OpenAICompatiblePreset {
   id: string
-  name: string
+  /**
+   * 展示名的 **key，不是文案**：这张表在模块求值时就固定了，存翻译结果的话
+   * 切换语言不会重新求值，预设名会一直停在打开页面时的那种语言。
+   * 渲染处写 t(preset.nameKey)。
+   *
+   * 译文在 i18n/locales/{zh,en}/catalog.brand.ts —— 那里放的是**厂商官方英文名**
+   * 而不是直译（通义千问 → Qwen、智谱 GLM → Zhipu GLM），见契约 6.11 / 12.2。
+   */
+  nameKey: PlainMessageKey
   api_base: string
   model: string
 }
@@ -143,12 +172,12 @@ export interface OpenAICompatiblePreset {
 // 模型名核实于 2026-07-21（各厂商 API 文档/更新日志），见 docs/MAINTENANCE.md「4.3.5 服务商预设保鲜」
 // 「服务商预设」一节。这类默认值有时效性——厂商换代快，过一阵子要再核一遍。
 export const OPENAI_COMPATIBLE_PRESETS: OpenAICompatiblePreset[] = [
-  { id: 'openai', name: 'OpenAI', api_base: 'https://api.openai.com/v1', model: 'gpt-5.2' },
-  { id: 'deepseek', name: 'DeepSeek', api_base: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
-  { id: 'kimi', name: 'Kimi (月之暗面)', api_base: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
-  { id: 'qwen', name: '通义千问', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-  { id: 'glm', name: '智谱 GLM', api_base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5' },
-  { id: 'ollama', name: 'Ollama 本地模型', api_base: 'http://localhost:11434/v1', model: 'llama3' },
+  { id: 'openai', nameKey: 'catalog.brand.openai', api_base: 'https://api.openai.com/v1', model: 'gpt-5.2' },
+  { id: 'deepseek', nameKey: 'catalog.brand.deepseek', api_base: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
+  { id: 'kimi', nameKey: 'catalog.brand.kimi', api_base: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+  { id: 'qwen', nameKey: 'catalog.brand.qwen', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  { id: 'glm', nameKey: 'catalog.brand.glm', api_base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5' },
+  { id: 'ollama', nameKey: 'catalog.brand.ollama', api_base: 'http://localhost:11434/v1', model: 'llama3' },
 ]
 
 export interface TestConnectionResult {

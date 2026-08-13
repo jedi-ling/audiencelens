@@ -38,16 +38,17 @@ import type {
 import {
   EVALUATION_DIMENSIONS,
   ETHICS_SEVERITY_BADGE_CLASSES,
-  ETHICS_SEVERITY_LABELS,
-  CROSS_EXAM_MODE_LABELS,
-  CROSS_EXAM_MODE_DESCRIPTIONS,
-  REBUTTAL_STATUS_LABELS,
   REBUTTAL_STATUS_CLASSES,
   stereotypeRiskBadgeClass,
-  stereotypeRiskLabel,
   toCrossExamView,
   toEthicsReportView,
 } from '@/lib/mock-data'
+import type { EthicsSeverity, RebuttalStatus, StereotypeRisk } from '@/lib/mock-data'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
+import { tApiError, tApiErrorParts } from '@/i18n/api-error'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -148,6 +149,10 @@ export interface RealReport {
     is_synthetic?: boolean
     /** 引擎侧写入的逐条注意事项（目前只有模拟占位输出会带），有就照原样展示 */
     caveats?: string[]
+    /** 本次评审**产出物**的语言（BCP-47）。aggregator 按"取得到真值才写这个键"
+     *  的规矩写入，所以缺这个键 = 语言未记录，**不等于中文**（契约 D7 / 8.4）。
+     *  它与界面语言（ui_lang）是两件事，切界面语言不会改它。 */
+    language?: string
   } | null
   executive_summary?: { primary_recommendation?: string; release_risk?: string; evidence_quality?: string } | null
   consensus?: {
@@ -241,32 +246,100 @@ interface RealCalibration {
 
 // ---------- 展示映射 ----------
 
-const RISK_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  low: { label: '低风险', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
-  medium: { label: '中风险', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
-  high: { label: '高风险', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
-  critical: { label: '极高风险', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
+/**
+ * 展示映射一律**存 key 不存文案**（契约 3.4 例 7 / Layout.tsx 的样板）。
+ *
+ * 这些常量在模块求值时就固定了：存翻译结果的话，切换语言不会重新求值，
+ * 风险徽标会一直停在打开页面时的那种语言。文案在渲染处才 t()。
+ * color / bg / border 留在这里——样式不是文案，不进 key 表。
+ */
+const RISK_CONFIG: Record<string, { labelKey: PlainMessageKey; color: string; bg: string; border: string }> = {
+  low: { labelKey: 'enum.release_risk.low', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30' },
+  medium: { labelKey: 'enum.release_risk.medium', color: 'text-severity-medium', bg: 'bg-severity-medium/10', border: 'border-severity-medium/30' },
+  high: { labelKey: 'enum.release_risk.high', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30' },
+  critical: { labelKey: 'enum.release_risk.critical', color: 'text-severity-critical', bg: 'bg-severity-critical/10', border: 'border-severity-critical/30' },
 }
 
 /** release_risk 缺失/取值不认识时的显示。以前这里是 `?? RISK_CONFIG.medium`：
  *  报告里根本没有 executive_summary，页面照样打出"发布风险评估：中风险"——
  *  一个纯属编造的等级，而用户会拿它做发布决策。缺就显示「—」并说明缺了什么。 */
-const UNKNOWN_RISK = { label: '—', color: 'text-text-muted', bg: 'bg-bg-card', border: 'border-border' }
+const UNKNOWN_RISK = { color: 'text-text-muted', bg: 'bg-bg-card', border: 'border-border' }
 
-const EVIDENCE_QUALITY_LABELS: Record<string, string> = {
-  strong: '充分',
-  medium: '中等',
-  weak: '偏弱',
-  insufficient: '不足',
+/**
+ * 「这里没有值」的统一显示符号。
+ *
+ * **刻意不进 key 表**：它是排版符号不是文案，中英两侧写法完全相同（U+2014），
+ * 抽成 key 只会得到一条 zh 与 en 逐字相同的条目，外加 15 处运行时查表。
+ * i18n:scan 会报它——那是因为扫描器的 CJK 字符类把中文标点也算进去了，
+ * 不是漏外化。同理还有下面拼阶段标识用的 ' · '。
+ */
+const DASH = '—'
+
+const EVIDENCE_QUALITY_KEYS: Record<string, PlainMessageKey> = {
+  strong: 'enum.evidence_quality.strong',
+  medium: 'enum.evidence_quality.medium',
+  weak: 'enum.evidence_quality.weak',
+  insufficient: 'enum.evidence_quality.insufficient',
+}
+
+/**
+ * 证据充分度的显示值。
+ *
+ * 三条分支刻意分开：认识的档位出译文；不认识的档位**明说不认识并附上原值**
+ * （不把后端英文键当标签直出——那正是契约 D8 点名的反例）；根本没给就是「—」。
+ */
+function evidenceQualityLabel(raw?: string): string {
+  if (!raw) return DASH
+  const key = EVIDENCE_QUALITY_KEYS[raw]
+  return key ? t(key) : t('page.report.unknown_level.value', { raw })
 }
 
 // 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
 const STANCE_PALETTE = ['#0071e3', '#ff9f0a', '#ff6b35', '#ff3355', '#32ade6', '#a78bfa']
 
-const MODE_BADGE: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
-  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
-  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
-  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
+const MODE_BADGE: Record<ReviewMode, { labelKey: PlainMessageKey; color: string; bg: string; Icon: typeof Zap }> = {
+  quick: { labelKey: 'enum.mode_badge.quick', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
+  standard: { labelKey: 'enum.mode_badge.standard', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
+  full: { labelKey: 'enum.mode_badge.full', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
+}
+
+/** 交叉质询三档模式的 label / desc。原来读 mock-data 的 CROSS_EXAM_MODE_LABELS，
+ *  那两份常量是 zh 事实源，这里换成它们的 i18n 出口，措辞逐字一致。 */
+const CROSS_EXAM_MODE_LABEL_KEYS: Record<CrossExamMode, PlainMessageKey> = {
+  derived_summary: 'enum.cross_exam_mode.derived_summary.label',
+  moderated_rebuttal: 'enum.cross_exam_mode.moderated_rebuttal.label',
+  multi_agent_rebuttal: 'enum.cross_exam_mode.multi_agent_rebuttal.label',
+}
+
+const CROSS_EXAM_MODE_DESC_KEYS: Record<CrossExamMode, PlainMessageKey> = {
+  derived_summary: 'enum.cross_exam_mode.derived_summary.desc',
+  moderated_rebuttal: 'enum.cross_exam_mode.moderated_rebuttal.desc',
+  multi_agent_rebuttal: 'enum.cross_exam_mode.multi_agent_rebuttal.desc',
+}
+
+const REBUTTAL_STATUS_KEYS: Record<RebuttalStatus, PlainMessageKey> = {
+  ok: 'enum.rebuttal_status.ok',
+  partial: 'enum.rebuttal_status.partial',
+  failed: 'enum.rebuttal_status.failed',
+  skipped: 'enum.rebuttal_status.skipped',
+}
+
+const ETHICS_SEVERITY_KEYS: Record<EthicsSeverity, PlainMessageKey> = {
+  high: 'enum.ethics_severity.high',
+  medium: 'enum.ethics_severity.medium',
+  low: 'enum.ethics_severity.low',
+}
+
+const STEREOTYPE_RISK_KEYS: Record<StereotypeRisk, PlainMessageKey> = {
+  low: 'enum.stereotype_risk.low',
+  medium: 'enum.stereotype_risk.medium',
+  high: 'enum.stereotype_risk.high',
+}
+
+/** null 走 unknown 那一档：「没测出来」和「低风险」是两回事，不许合并。
+ *  原来读 mock-data 的 stereotypeRiskLabel()，它只出中文。 */
+function stereotypeRiskText(risk: StereotypeRisk | null): string {
+  return t(risk === null ? 'enum.stereotype_risk.unknown' : STEREOTYPE_RISK_KEYS[risk])
 }
 
 const VALID_SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low']
@@ -279,11 +352,13 @@ const DIMENSION_MAX_SCORE = 3
 
 /** 维度 id 不在本地词表里时明说不认识，不把 snake_case 当正常标题直出 */
 function dimensionLabel(id: string, name?: string): string {
-  return name ?? `${id}（未知维度）`
+  return name ?? t('page.report.evaluation_dimension.value', { id })
 }
 
+/** 立场是引擎的枚举原词（wire key），**永不翻译**；只有"两个字段都没给"
+ *  这种前端自造的分组名才走 key 表。 */
 function noteStance(note: RealPersonaNote): string {
-  return note.stance ?? note.primary_stance ?? '未表态'
+  return note.stance ?? note.primary_stance ?? t('page.report.stance.value')
 }
 
 // ---------- ETHICS.md 强制项：Synthetic Banner + Limitations & Caveats ----------
@@ -303,11 +378,10 @@ export function SyntheticBanner() {
         <Bot className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
         <div>
           <p className="text-sm font-bold text-warm-orange md:text-base">
-            合成评审面板：以下全部意见由 AI 人格生成，不是真实玩家/用户的反馈。
+            {t('page.report.synthetic_banner.title')}
           </p>
           <p className="mt-1.5 text-sm text-text-primary">
-            本报告不得作为「玩家调研结果」「用户调查数据」「真实玩家意见分布」对外展示或引用。
-            它是投入真人测试之前的预筛工具，不能替代真人 playtest 或用户访谈，也不应作为发布决策的唯一依据。
+            {t('page.report.synthetic_banner.desc')}
           </p>
         </div>
       </div>
@@ -322,9 +396,17 @@ export function SyntheticBanner() {
 function DegradationNotice({ degradation }: { degradation?: RealDegradation | null }) {
   if (!degradation?.degraded) return null
   const failed = degradation.failed_personas ?? []
+  // notice 是引擎/后端写的自由文本（产出物），有就原样透出，一个字不翻。
+  // 没有才用前端这句——succeeded_count 缺失时换一条不带数字的措辞，
+  // 不写"0 位"也不写"部分 位"：前者是编造，后者是原来那句拼出来的病句。
   const notice =
     degradation.notice?.trim() ||
-    `本次有 ${degradation.failed_count ?? failed.length} 位人格未能完成评审，以下结论仅基于 ${degradation.succeeded_count ?? '部分'} 位人格的输出。`
+    (typeof degradation.succeeded_count === 'number'
+      ? t('page.report.degradation.desc', {
+          count: degradation.failed_count ?? failed.length,
+          succeeded: degradation.succeeded_count,
+        })
+      : t('page.report.degradation_partial.desc', { count: degradation.failed_count ?? failed.length }))
   const failedLabels = failed.map((p) => p.persona_name || p.persona_id).filter(Boolean)
   return (
     <div className="mb-4 rounded-xl border-2 border-severity-critical bg-severity-critical/10 p-4">
@@ -333,7 +415,9 @@ function DegradationNotice({ degradation }: { degradation?: RealDegradation | nu
         <div>
           <p className="text-sm font-bold text-severity-critical md:text-base">{notice}</p>
           {failedLabels.length > 0 && (
-            <p className="mt-1.5 text-sm text-text-primary">未完成的人格：{failedLabels.join('、')}</p>
+            <p className="mt-1.5 text-sm text-text-primary">
+              {t('page.report.degradation.label', { names: failedLabels.join(t('page.report.sep_enum')) })}
+            </p>
           )}
         </div>
       </div>
@@ -366,10 +450,17 @@ function SkillDegradedNotice({ notice }: { notice?: string | null }) {
  *  所以**不计入**下面任何结论。引擎只回传英文的失败类型枚举
  *  （src/runner/cli.py 的 RETRY_SCHEMA / RETRY_ROLE_DRIFT / RETRY_HALLUCINATION），
  *  这里逐条翻译；认不出的枚举原样显示，不猜、也不吞。 */
-const GATE_REASON_LABELS: Record<string, string> = {
-  schema_failure: '输出结构不合格（关键字段缺失或格式不对）',
-  role_drift: '角色漂移（没有按这个人格的设定作答）',
-  hallucination: '证据核对不通过（引用的原文在材料里找不到）',
+const GATE_REASON_KEYS: Record<string, PlainMessageKey> = {
+  schema_failure: 'enum.gate_reason.schema_failure',
+  role_drift: 'enum.gate_reason.role_drift',
+  hallucination: 'enum.gate_reason.hallucination',
+}
+
+/** 三分支：认得的枚举出译文；认不出的**明说不认识并附原值**；引擎压根没回传就说没回传。 */
+function gateReasonLabel(raw?: string): string {
+  if (!raw) return t('page.report.gate.empty')
+  const key = GATE_REASON_KEYS[raw]
+  return key ? t(key) : t('page.report.gate.label', { raw })
 }
 
 function ValidationGateNotice({ validation }: { validation?: RealValidation | null }) {
@@ -381,16 +472,14 @@ function ValidationGateNotice({ validation }: { validation?: RealValidation | nu
         <Shield className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
         <div className="min-w-0">
           <p className="text-sm font-bold text-warm-orange">
-            有 {gatedOut.length} 位人格的输出没通过质量校验，已被排除在下面的结论之外
+            {t('page.report.gate.title', { count: gatedOut.length })}
           </p>
           <ul className="mt-2 space-y-1">
             {gatedOut.map((g, i) => (
               <li key={`${g.persona_id}-${i}`} className="text-sm text-text-primary">
                 <span className="font-mono text-xs text-text-muted">{g.persona_id}</span>
                 <span className="mx-1.5 text-text-muted">·</span>
-                {g.failure_reason
-                  ? GATE_REASON_LABELS[g.failure_reason] ?? `未知失败类型（${g.failure_reason}）`
-                  : '引擎没有回传失败类型'}
+                {gateReasonLabel(g.failure_reason)}
               </li>
             ))}
           </ul>
@@ -414,18 +503,20 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
   const rows = (predictions ?? []).filter((p) => p && (p.claim || p.intervention))
   if (rows.length === 0) return null
 
-  const DIRECTION_LABEL: Record<string, string> = { increase: '提升', decrease: '降低' }
+  const DIRECTION_KEYS: Record<string, PlainMessageKey> = {
+    increase: 'enum.direction.increase',
+    decrease: 'enum.direction.decrease',
+  }
 
   return (
     <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
       <div className="mb-1 flex items-center gap-2">
         <Target className="w-4 h-4 text-cyan" strokeWidth={1.25} />
-        <h3 className="text-sm font-semibold text-text-primary">可证伪预测</h3>
-        <span className="ml-auto text-xs text-text-muted">{rows.length} 条</span>
+        <h3 className="text-sm font-semibold text-text-primary">{t('page.report.predictions.title')}</h3>
+        <span className="ml-auto text-xs text-text-muted">{t('page.report.predictions.badge', { count: rows.length })}</span>
       </div>
       <p className="mb-4 text-xs leading-relaxed text-text-muted">
-        每条都写明了目标指标与判定标准，可以拿去做真实验证。
-        跑完真人测试后回填结果，就能反过来校准这套面板的准确率。
+        {t('page.report.predictions.desc')}
       </p>
 
       <ul className="space-y-3">
@@ -436,12 +527,14 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
             <dl className="mt-2 grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-2">
               {p.target_metric && (
                 <div className="flex gap-1.5">
-                  <dt className="shrink-0 text-text-muted">目标指标</dt>
+                  <dt className="shrink-0 text-text-muted">{t('page.report.prediction_metric.label')}</dt>
                   <dd className="text-text-secondary">
                     {p.target_metric}
-                    {p.direction && (
+                    {/* direction 不在枚举里就整块不渲染：括号里放一个后端原始码
+                        对读者没有任何意义，而它旁边就是指标名，会被读成指标的一部分 */}
+                    {p.direction && DIRECTION_KEYS[p.direction] && (
                       <span className="ml-1 text-cyan">
-                        （{DIRECTION_LABEL[p.direction] ?? p.direction}）
+                        {t('page.report.prediction_metric.hint', { direction: t(DIRECTION_KEYS[p.direction]) })}
                       </span>
                     )}
                   </dd>
@@ -449,19 +542,19 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
               )}
               {p.verification_window && (
                 <div className="flex gap-1.5">
-                  <dt className="shrink-0 text-text-muted">验证窗口</dt>
+                  <dt className="shrink-0 text-text-muted">{t('page.report.prediction_window.label')}</dt>
                   <dd className="text-text-secondary">{p.verification_window}</dd>
                 </div>
               )}
               {p.success_criterion && (
                 <div className="flex gap-1.5 sm:col-span-2">
-                  <dt className="shrink-0 text-text-muted">判定标准</dt>
+                  <dt className="shrink-0 text-text-muted">{t('page.report.prediction_criterion.label')}</dt>
                   <dd className="text-text-secondary">{p.success_criterion}</dd>
                 </div>
               )}
               {p.verification_method && (
                 <div className="flex gap-1.5 sm:col-span-2">
-                  <dt className="shrink-0 text-text-muted">验证方式</dt>
+                  <dt className="shrink-0 text-text-muted">{t('page.report.prediction_method.label')}</dt>
                   <dd className="text-text-secondary">{p.verification_method}</dd>
                 </div>
               )}
@@ -470,11 +563,11 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
             {typeof p.confidence === 'number' && (
               // 数字与口径同框：单独摆 0.72 会被读成实测置信度
               <p className="mt-2 border-t border-border pt-2 text-[11px] text-text-muted">
-                启发式置信度 {(p.confidence * 100).toFixed(0)}%
-                <span className="ml-1">
-                  —— 由合成面板规则算出，<b className="font-medium">尚未经真实结果校准</b>，
-                  不代表历史命中率
-                </span>
+                <Trans
+                  k="page.report.predictions.hint"
+                  vars={{ pct: formatPercent(p.confidence) }}
+                  slots={{ emph: (s) => <b className="font-medium">{s}</b> }}
+                />
               </p>
             )}
           </li>
@@ -496,30 +589,33 @@ function AdaptivePanelSection({ adaptive }: { adaptive?: RealAdaptivePanel | nul
   // 没请求过就整块不显示——固定面板是默认行为，没必要天天告诉用户"你没开这个功能"
   if (!adaptive?.requested) return null
 
-  const DISABLED_REASON_LABEL: Record<string, string> = {
-    explicit_persona_selection: '你显式点名了角色，少跑其中任何一个都会违背你的意图，因此本次保持固定面板',
+  const DISABLED_REASON_KEYS: Record<string, PlainMessageKey> = {
+    explicit_persona_selection: 'enum.disabled_reason.explicit_persona_selection',
   }
-  const STOP_REASON_LABEL: Record<string, string> = {
-    cost_budget_reached: '触发成本上限，停止扩面',
-    marginal_value_below_threshold: '继续扩面的边际价值低于阈值，停止',
+  const STOP_REASON_KEYS: Record<string, PlainMessageKey> = {
+    cost_budget_reached: 'enum.stop_reason.cost_budget_reached',
+    marginal_value_below_threshold: 'enum.stop_reason.marginal_value_below_threshold',
   }
 
   const saved = adaptive.saved_persona_calls ?? 0
+  const disabledReasonKey = adaptive.disabled_reason ? DISABLED_REASON_KEYS[adaptive.disabled_reason] : undefined
 
   return (
     <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center gap-2">
         <Layers className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
-        <h3 className="text-sm font-semibold text-text-primary">自适应面板</h3>
+        <h3 className="text-sm font-semibold text-text-primary">{t('page.report.adaptive.title')}</h3>
       </div>
 
       {!adaptive.enabled ? (
         <p className="text-sm text-text-secondary">
-          本次未启用。
+          {t('page.report.adaptive.empty')}
           {adaptive.disabled_reason && (
             <span className="text-text-muted">
               {' '}
-              {DISABLED_REASON_LABEL[adaptive.disabled_reason] ?? adaptive.disabled_reason}
+              {disabledReasonKey
+                ? t(disabledReasonKey)
+                : t('page.report.adaptive_reason.label', { raw: adaptive.disabled_reason })}
             </span>
           )}
         </p>
@@ -527,43 +623,52 @@ function AdaptivePanelSection({ adaptive }: { adaptive?: RealAdaptivePanel | nul
         <>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg border border-border bg-bg-secondary p-3">
-              <p className="text-xs text-text-muted">实际评审人格</p>
+              <p className="text-xs text-text-muted">{t('page.report.adaptive_executed.label')}</p>
               <p className="mt-1 font-display text-xl text-text-primary">
-                {adaptive.executed_personas ?? '—'}
-                <span className="text-sm text-text-muted"> / {adaptive.eligible_personas ?? '—'}</span>
+                {adaptive.executed_personas ?? DASH}
+                <span className="text-sm text-text-muted"> / {adaptive.eligible_personas ?? DASH}</span>
               </p>
             </div>
             <div className="rounded-lg border border-border bg-bg-secondary p-3">
-              <p className="text-xs text-text-muted">省下的调用</p>
+              <p className="text-xs text-text-muted">{t('page.report.adaptive_saved.label')}</p>
               <p className={cn('mt-1 font-display text-xl', saved > 0 ? 'text-brand-primary' : 'text-text-primary')}>
                 {saved}
               </p>
             </div>
             <div className="rounded-lg border border-border bg-bg-secondary p-3">
-              <p className="text-xs text-text-muted">起始面板</p>
-              <p className="mt-1 font-display text-xl text-text-primary">{adaptive.initial_size ?? '—'}</p>
+              <p className="text-xs text-text-muted">{t('page.report.adaptive_initial.label')}</p>
+              <p className="mt-1 font-display text-xl text-text-primary">{adaptive.initial_size ?? DASH}</p>
             </div>
           </div>
 
           {(adaptive.decisions ?? []).length > 0 && (
             <ol className="mt-4 space-y-1.5">
-              {(adaptive.decisions ?? []).map((d, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-text-secondary">
-                  <span className="shrink-0 text-text-muted">{(d.panel_size_before ?? 0)} 人后</span>
-                  <span>
-                    {d.should_continue
-                      ? `扩入 ${d.recommended_persona_id ?? '下一位人格'}`
-                      : STOP_REASON_LABEL[d.stop_reason ?? ''] ?? '停止扩面'}
-                  </span>
-                </li>
-              ))}
+              {(adaptive.decisions ?? []).map((d, i) => {
+                const stopKey = STOP_REASON_KEYS[d.stop_reason ?? '']
+                return (
+                  <li key={i} className="flex items-start gap-2 text-xs text-text-secondary">
+                    <span className="shrink-0 text-text-muted">
+                      {t('page.report.adaptive_step.label', { count: d.panel_size_before ?? 0 })}
+                    </span>
+                    <span>
+                      {d.should_continue
+                        ? t('page.report.adaptive_step.value', {
+                            persona: d.recommended_persona_id ?? t('page.report.adaptive_step.hint'),
+                          })
+                        : stopKey
+                          ? t(stopKey)
+                          : t('page.report.adaptive_stop.label')}
+                    </span>
+                  </li>
+                )
+              })}
             </ol>
           )}
 
           {adaptive.limitation && (
             // 引擎自带的局限声明，原样透出——这是"扩面分数是启发式而非实测信息增益"的自陈
             <p className="mt-3 border-t border-border pt-3 text-[11px] leading-relaxed text-text-muted">
-              扩面分数是可解释的启发式，不是实测信息增益，其权重仍需用真实验证结果校准。
+              {t('page.report.adaptive.hint')}
             </p>
           )}
         </>
@@ -584,11 +689,14 @@ function PanelSelectionNotice({ panelSelection }: { panelSelection?: RealPanelSe
       <div className="flex items-start gap-3">
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-warm-orange">你点名的人格没有全部参与本次评审</p>
+          <p className="text-sm font-bold text-warm-orange">{t('page.report.panel_selection.title')}</p>
+          {/* notice 是引擎写进报告的事实陈述（产出物），原样透出，不翻译 */}
           <p className="mt-1.5 text-sm text-text-primary">{notice}</p>
           {(panelSelection?.matched ?? []).length > 0 && (
             <p className="mt-1.5 text-xs text-text-muted">
-              实际参与：{(panelSelection?.matched ?? []).join('、')}
+              {t('page.report.panel_selection.label', {
+                names: (panelSelection?.matched ?? []).join(t('page.report.sep_enum')),
+              })}
             </p>
           )}
         </div>
@@ -605,8 +713,8 @@ function BudgetNotice({ budget }: { budget?: RealBudget | null }) {
   const spent = budget.persona_cost_usd
   const fallback =
     typeof cap === 'number' && typeof spent === 'number'
-      ? `本次评审在人格环节已花费约 $${spent.toFixed(2)}，达到单次上限 $${cap.toFixed(2)}（budget.yaml 的 max_cost_per_run_usd）。`
-      : '本次评审达到了单次成本上限。'
+      ? t('page.report.budget.desc', { spent: formatUsd(spent), cap: formatUsd(cap) })
+      : t('page.report.budget_generic.desc')
   const stages = budget.skipped_stages ?? []
   return (
     <div className="mb-4 rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-4">
@@ -614,13 +722,12 @@ function BudgetNotice({ budget }: { budget?: RealBudget | null }) {
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warm-orange" strokeWidth={1.75} />
         <div className="min-w-0">
           <p className="text-sm font-bold text-warm-orange md:text-base">
-            成本达到单次上限，本次少跑了环节
+            {t('page.report.budget.title')}
           </p>
           <p className="mt-1.5 text-sm text-text-primary">{budget.notice?.trim() || fallback}</p>
           {stages.includes('cross_examination') && (
             <p className="mt-1.5 text-sm text-text-primary">
-              交叉质询未执行。下面没有「交叉质询」这一节，不代表人格之间没有分歧，
-              只代表这一轮没有跑辩论。
+              {t('page.report.budget.hint')}
             </p>
           )}
         </div>
@@ -643,19 +750,13 @@ function CrossExamAbsentNotice({ budget }: { budget?: RealBudget | null }) {
     <div className="mb-6">
       <div className="mb-4 flex items-center gap-2">
         <Swords className="h-5 w-5 text-text-muted" strokeWidth={1.25} />
-        <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+        <h3 className="text-lg font-semibold text-text-primary">{t('page.report.cross_exam.title')}</h3>
       </div>
       <div className="rounded-xl border border-border bg-bg-secondary/40 p-4 text-sm text-text-secondary md:p-5">
         {skippedForCost ? (
-          <p>
-            本次没有执行交叉质询：人格环节的花费已达到单次成本上限，为免继续加钱而跳过（详见页面顶部的成本提示）。
-            这不代表人格之间没有分歧，只代表这一轮没有跑辩论。
-          </p>
+          <p>{t('page.report.cross_exam_skipped.desc')}</p>
         ) : (
-          <p>
-            这份报告里没有交叉质询记录。报告没有写明原因，可能是这一档评审模式不包含反驳环节，
-            也可能是人格之间没有出现值得反驳的对立观点。请不要把它读成"大家意见一致"。
-          </p>
+          <p>{t('page.report.cross_exam_absent.desc')}</p>
         )}
       </div>
     </div>
@@ -722,21 +823,24 @@ function ReviewFailedNotice({
         <div className="flex items-start gap-3">
           <AlertOctagon className="mt-0.5 h-6 w-6 shrink-0 text-severity-critical" strokeWidth={1.75} />
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-severity-critical md:text-xl">本次评审失败，没有生成报告</h1>
+            <h1 className="text-lg font-bold text-severity-critical md:text-xl">{t('page.report.failed.title')}</h1>
             <p className="mt-2 text-sm text-text-primary">
-              这不是一份"没发现问题"的报告——评审没跑完，任何风险等级、共识点、立场分布都不存在。
-              请不要据此做发布决策。
+              {t('page.report.failed.desc')}
             </p>
             {review?.target_title && (
-              <p className="mt-2 text-sm text-text-secondary">评审对象：{review.target_title}</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                {t('page.report.failed.label', { title: review.target_title })}
+              </p>
             )}
             <div className="mt-4 rounded-lg border border-severity-critical/40 bg-bg-card p-3">
-              <p className="text-xs text-text-muted">失败原因（后端原文）</p>
+              {/* 标题里就写明"后端原文"：下面那段可能是中文，而界面可能是英文。
+                  与其把它翻错，不如如实标注它的出处，让读者知道自己在读什么。 */}
+              <p className="text-xs text-text-muted">{t('page.report.failed.hint')}</p>
               {reason ? (
                 <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-text-primary">{reason}</p>
               ) : (
                 <p className="mt-1 text-xs text-text-primary">
-                  后端没有回传失败原因。评审详情页的角色执行记录里可能有更具体的报错。
+                  {t('page.report.failed.empty')}
                 </p>
               )}
             </div>
@@ -746,14 +850,14 @@ function ReviewFailedNotice({
                   to={`/review/${reviewId}`}
                   className="rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
                 >
-                  查看评审详情
+                  {t('page.report.link_detail.cta')}
                 </Link>
               )}
               <Link
                 to="/review/new"
                 className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
               >
-                重新发起评审
+                {t('page.report.link_new_review.cta')}
               </Link>
             </div>
           </div>
@@ -772,18 +876,22 @@ function ReviewFailedNotice({
 function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?: string; onRetry: () => void }) {
   const status = error instanceof ApiError ? error.status : null
   const needLogin = error instanceof ApiError && (error.status === 401 || error.status === 403)
+  // 后端 message 的语种可能与界面不一致：tApiErrorParts 把它拆成
+  // 「界面语言的主文案」+「后端原文 detail」，detail 只进 title 属性，
+  // 不与主文案并排显示——英文界面上并排一句中文，用户会以为界面坏了。
+  const { text, detail } = tApiErrorParts(error, 'common.ui.unknown_error')
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
       <div className="rounded-xl border-2 border-warm-orange bg-warm-orange/10 p-5 md:p-6">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-warm-orange" strokeWidth={1.75} />
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-warm-orange md:text-xl">报告加载失败</h1>
+            <h1 className="text-lg font-bold text-warm-orange md:text-xl">{t('page.report.load_error.title')}</h1>
             <p className="mt-2 text-sm text-text-primary">
-              没能把这份报告取回来，所以下面什么都不显示——这不代表评审没有结果。
+              {t('page.report.load_error.desc')}
             </p>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-secondary">
-              {error.message}
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-text-secondary" title={detail}>
+              {text}
               {status !== null && status > 0 && <span className="ml-1 font-mono text-xs text-text-muted">HTTP {status}</span>}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -792,14 +900,14 @@ function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?
                 className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
               >
                 <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-                重试
+                {t('common.action.retry')}
               </button>
               {needLogin && (
                 <Link
                   to="/login"
                   className="rounded-lg border border-brand-primary/30 bg-bg-card px-4 py-2 text-sm text-brand-primary hover:bg-brand-primary/10 transition-colors"
                 >
-                  登录 / 注册
+                  {t('page.report.link_login.cta')}
                 </Link>
               )}
               {reviewId && (
@@ -807,7 +915,7 @@ function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?
                   to={`/review/${reviewId}`}
                   className="rounded-lg border border-border bg-bg-card px-4 py-2 text-sm text-text-secondary hover:border-brand-primary/30 hover:text-brand-primary transition-all"
                 >
-                  查看评审详情
+                  {t('page.report.link_detail.cta')}
                 </Link>
               )}
             </div>
@@ -820,12 +928,14 @@ function ReportLoadError({ error, reviewId, onRetry }: { error: Error; reviewId?
 
 /** 逐条来自 ETHICS.md（「偏见与局限性」「预筛工具，不是决策依据」「材料决定质量」），
  *  不新增任何该文档里没有的说法——两份材料必须能对得上。 */
-const LIMITATIONS: string[] = [
-  '合成人格不是真人：立场分布反映的是 AI 人格的输出，不是任何真实用户群体的意见分布。',
-  '过度一致性：LLM 模拟特定群体时输出方差通常低于真实人群，真实世界里的分歧可能被低估。',
-  '材料决定质量：材料里缺少某类证据时人格会输出「未指定」，报告会标注信息缺口——「未指定」不等于「没有问题」。',
-  'Demographic 不是因果解释：性别、年龄、地域本身不能解释偏好，不要据此把结论推广到某个真实人群。',
-  '反馈循环风险：长期用同一套人格评审迭代版本，可能让产品过度迎合模拟出来的「平均偏好」，建议定期更换人格组合。',
+/** 存 key 不存文案：模块级常量存翻译结果的话，切语言时不会重新求值，
+ *  这五条会一直停在打开页面时的那种语言。渲染处才 t()。 */
+const LIMITATION_KEYS: PlainMessageKey[] = [
+  'page.report.limitation_synthetic',
+  'page.report.limitation_variance',
+  'page.report.limitation_materials',
+  'page.report.limitation_demographic',
+  'page.report.limitation_feedback_loop',
 ]
 
 /** ETHICS.md 强制项之二：Limitations & Caveats 章节（下载的 .md 一直有，网页端此前没有）。 */
@@ -835,10 +945,12 @@ export function LimitationsSection({ caveats }: { caveats?: string[] }) {
     <section className="mb-6 rounded-xl border border-warm-orange/40 bg-bg-card p-4 md:p-5">
       <div className="mb-3 flex items-center gap-2">
         <Info className="h-5 w-5 text-warm-orange" strokeWidth={1.5} />
-        <h3 className="text-base font-semibold text-text-primary">局限与注意事项（Limitations &amp; Caveats）</h3>
+        <h3 className="text-base font-semibold text-text-primary">{t('page.report.limitations.title')}</h3>
       </div>
       <ul className="space-y-2">
-        {[...extra, ...LIMITATIONS].map((item, i) => (
+        {/* caveats 是引擎写进 meta 的自由文本（产出物），原样在前；下面五条是
+            ETHICS.md 的固定条款，走 key 表。两批合成一个列表渲染，顺序不变。 */}
+        {[...extra, ...LIMITATION_KEYS.map((k) => t(k))].map((item, i) => (
           <li key={i} className="flex items-start gap-2 text-sm text-text-primary">
             <span className="mt-0.5 shrink-0 text-warm-orange">•</span>
             {item}
@@ -862,26 +974,30 @@ const CROSS_EXAM_MODE_BADGE: Record<CrossExamMode, string> = {
 /** 正反两方的准确叫法。引擎里 pro = 认为问题更严重的一方（A 系列），
  *  con = 认为更轻的一方（B 系列）——不是"支持/反对某个方案"，别简写成"支持方"。 */
 const CROSS_EXAM_SIDE_META = {
-  pro: { label: '认为问题更严重', color: 'text-warm-orange', border: 'border-warm-orange/25' },
-  con: { label: '认为问题更轻', color: 'text-cyan', border: 'border-cyan/25' },
-} as const
+  pro: { labelKey: 'page.report.argument_pro.label', color: 'text-warm-orange', border: 'border-warm-orange/25' },
+  con: { labelKey: 'page.report.argument_con.label', color: 'text-cyan', border: 'border-cyan/25' },
+} as const satisfies Record<'pro' | 'con', { labelKey: PlainMessageKey; color: string; border: string }>
 
 /** 0–1 小数转百分比。null（读不出来）显示 "—"，绝不产出 "NaN%"——本仓库刚因为
  *  把三档字符串当小数乘 100 而满页 NaN%。 */
 function confidencePct(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value * 100)}%`
+  return value === null ? DASH : formatPercent(value)
 }
 
 /** confidence_changes 的 before/after 已经是百分点整数，不能再乘 100。 */
 function pointPct(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}%`
+  return value === null ? DASH : formatPercent(Math.round(value) / 100)
 }
 
 /** 带正号的增量；null 显示 "—"。0 也照实显示成 0，不省略。 */
 function signedNumber(value: number | null, digits: number): string {
-  if (value === null) return '—'
+  if (value === null) return DASH
   const fixed = Number(value.toFixed(digits))
-  return `${fixed > 0 ? '+' : ''}${fixed}`
+  // 先按 digits 定精度，再交给 formatNumber 出千分位/小数点（英文界面是 "1.5"、
+  // 中文界面也是 "1.5"，但小数点在别的 locale 会变）。不传 digits 给 formatNumber：
+  // 那会把 0.1 补成 "0.10"，与原来 Number(toFixed()) 去尾零的显示不一致。
+  // 正号得自己补：负号由 Intl 出，正号不出。
+  return `${fixed > 0 ? '+' : ''}${formatNumber(fixed)}`
 }
 
 /**
@@ -906,7 +1022,7 @@ function CrossExamArgumentBlock({ arg, role, live }: { arg: CrossExamArgument; r
   return (
     <div className={cn('rounded-lg border bg-bg-secondary/40 p-3', meta.border)}>
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
-        <span className={cn('text-xs font-medium', meta.color)}>{meta.label}</span>
+        <span className={cn('text-xs font-medium', meta.color)}>{t(meta.labelKey)}</span>
         {arg.argument_id && (
           <span className="rounded bg-bg-card px-1.5 font-mono text-xs text-text-muted">{arg.argument_id}</span>
         )}
@@ -920,7 +1036,7 @@ function CrossExamArgumentBlock({ arg, role, live }: { arg: CrossExamArgument; r
         <div className="mt-2 border-l-2 border-brand-primary/50 bg-bg-card/60 py-1.5 pl-2.5">
           <p className="mb-0.5 flex items-center gap-1 text-[11px] text-text-muted">
             <MessageSquareQuote className="h-3 w-3" strokeWidth={1.5} />
-            这一方对对手论据的反驳
+            {t('page.report.argument.label')}
           </p>
           <p className="whitespace-pre-line text-xs text-text-secondary">{arg.rebuttal}</p>
         </div>
@@ -928,7 +1044,7 @@ function CrossExamArgumentBlock({ arg, role, live }: { arg: CrossExamArgument; r
         // 只在真跑过反驳轮时才说"未产出反驳"；派生摘要档本来就没人反驳过，
         // 逐条写"未产出"只会让人以为这是一次失败。
         live && arg.argument_id && (
-          <p className="mt-2 text-[11px] text-text-muted">这一方没有产出反驳。</p>
+          <p className="mt-2 text-[11px] text-text-muted">{t('page.report.argument.empty')}</p>
         )
       )}
     </div>
@@ -957,7 +1073,7 @@ function CrossExamChangeCard({
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
         {/* vote_changes 的 persona_id 是**真 id**，展示要用 persona_name */}
         <span className="text-sm font-medium text-text-primary">
-          {change.persona_name || change.persona_id || '未知人格'}
+          {change.persona_name || change.persona_id || t('page.report.change.empty')}
         </span>
         {change.argument_id && (
           <span className="rounded bg-bg-card px-1.5 font-mono text-xs text-text-muted">{change.argument_id}</span>
@@ -965,7 +1081,8 @@ function CrossExamChangeCard({
         {change.topic && <span className="text-xs text-text-muted">{change.topic}</span>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary">{change.from_stance || '—'}</span>
+        {/* from_stance / to_stance 是引擎的立场枚举原词（wire key），永不翻译 */}
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary">{change.from_stance || DASH}</span>
         {accepted ? (
           <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-brand-primary" strokeWidth={1.5} />
         ) : (
@@ -977,20 +1094,35 @@ function CrossExamChangeCard({
             accepted ? 'bg-brand-primary/10 text-brand-primary' : 'text-text-muted line-through'
           )}
         >
-          {accepted ? '' : '模型声称改为 '}
-          {change.to_stance || '—'}
+          {accepted
+            ? change.to_stance || DASH
+            : t('page.report.change.badge', { stance: change.to_stance || DASH })}
         </span>
       </div>
       <p className="mt-1.5 text-xs text-text-muted">
-        置信度 {confidencePct(change.confidence_before)} → {confidencePct(change.confidence_after)}
-        （变化 {signedNumber(change.delta, 2)}
-        {threshold !== null && `，采纳阈值 θ=${threshold}`}）
+        {threshold !== null
+          ? t('page.report.change_threshold.label', {
+              before: confidencePct(change.confidence_before),
+              after: confidencePct(change.confidence_after),
+              delta: signedNumber(change.delta, 2),
+              threshold,
+            })
+          : t('page.report.change.label', {
+              before: confidencePct(change.confidence_before),
+              after: confidencePct(change.confidence_after),
+              delta: signedNumber(change.delta, 2),
+            })}
       </p>
+      {/* suppressed_reason / reason 都是引擎回传的自由文本，只翻前缀不翻内容 */}
       {!accepted && change.suppressed_reason && (
-        <p className="mt-1.5 text-xs text-severity-medium">未采纳原因：{change.suppressed_reason}</p>
+        <p className="mt-1.5 text-xs text-severity-medium">
+          {t('page.report.change.error', { reason: change.suppressed_reason })}
+        </p>
       )}
       {change.reason && (
-        <p className="mt-1.5 whitespace-pre-line text-xs text-text-secondary">依据（反驳原文）：{change.reason}</p>
+        <p className="mt-1.5 whitespace-pre-line text-xs text-text-secondary">
+          {t('page.report.change.desc', { reason: change.reason })}
+        </p>
       )}
     </div>
   )
@@ -1016,22 +1148,25 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
       <div className="mb-6">
         <div className="mb-4 flex items-center gap-2">
           <Swords className="h-5 w-5 text-text-muted" strokeWidth={1.25} />
-          <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+          <h3 className="text-lg font-semibold text-text-primary">{t('page.report.cross_exam.title')}</h3>
         </div>
         <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
-          这份报告由旧版本生成，交叉质询记录以旧格式保存（{view.legacy_entry_count} 条原始条目），
-          无法解析出争议点、反驳内容与改票明细。重新发起一次评审即可得到完整记录。
+          {t('page.report.cross_exam_legacy.desc', { count: view.legacy_entry_count })}
         </div>
       </div>
     )
   }
 
   const live = view.is_live_debate
-  const modeLabel = view.mode ? CROSS_EXAM_MODE_LABELS[view.mode] : `未知模式${view.mode_raw ? `（${view.mode_raw}）` : ''}`
+  const modeLabel = view.mode
+    ? t(CROSS_EXAM_MODE_LABEL_KEYS[view.mode])
+    : view.mode_raw
+      ? t('page.report.cross_exam_mode_unknown.value', { raw: view.mode_raw })
+      : t('page.report.cross_exam_mode_unknown.label')
   const modeBadgeClass = view.mode ? CROSS_EXAM_MODE_BADGE[view.mode] : 'bg-severity-medium/10 text-severity-medium border-severity-medium/30'
   const modeDescription = view.mode
-    ? CROSS_EXAM_MODE_DESCRIPTIONS[view.mode]
-    : '这份报告没有标明交叉质询的执行方式，无法判断是否真的发生过反驳——请按"未发生反驳"理解。'
+    ? t(CROSS_EXAM_MODE_DESC_KEYS[view.mode])
+    : t('page.report.cross_exam_mode_unknown.desc')
   // 请求的档位跑不成会回落，落差本身是用户该知道的信息
   const fellBack = view.requested_mode !== null && view.mode !== null && view.requested_mode !== view.mode
   const hasFailures = view.failures.length > 0
@@ -1047,10 +1182,10 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
     <div className="mb-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Swords className={cn('h-5 w-5', live ? 'text-brand-primary' : 'text-text-muted')} strokeWidth={1.25} />
-        <h3 className="text-lg font-semibold text-text-primary">交叉质询</h3>
+        <h3 className="text-lg font-semibold text-text-primary">{t('page.report.cross_exam.title')}</h3>
         <span className={cn('rounded border px-2 py-0.5 text-xs font-medium', modeBadgeClass)}>{modeLabel}</span>
         {live && view.rounds_run > 0 && (
-          <span className="text-xs text-text-muted">实际执行 {view.rounds_run} 轮</span>
+          <span className="text-xs text-text-muted">{t('page.report.cross_exam.badge', { count: view.rounds_run })}</span>
         )}
       </div>
 
@@ -1064,12 +1199,20 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
         <p>{modeDescription}</p>
         {fellBack && (
           <p className="mt-2 text-xs text-severity-medium">
-            本次请求的是「{view.requested_mode ? CROSS_EXAM_MODE_LABELS[view.requested_mode] : view.requested_mode_raw}」，
-            实际回落为「{modeLabel}」。
+            {t('page.report.cross_exam_fallback.desc', {
+              requested: view.requested_mode
+                ? t(CROSS_EXAM_MODE_LABEL_KEYS[view.requested_mode])
+                : view.requested_mode_raw ?? t('page.report.cross_exam_mode_unknown.label'),
+              actual: modeLabel,
+            })}
           </p>
         )}
         {view.limitation && limitationTone === 'muted' && (
-          <p className="mt-2 text-xs text-text-muted">引擎原始说明：{renderEmphasis(view.limitation)}</p>
+          // limitation 是引擎原文（带 markdown 粗体标记），逐字展示、只翻前缀
+          <p className="mt-2 text-xs text-text-muted">
+            {t('page.report.cross_exam_limitation.label')}
+            {renderEmphasis(view.limitation)}
+          </p>
         )}
       </div>
 
@@ -1100,16 +1243,17 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
           <div className="mb-2 flex items-center gap-2">
             <XCircle className="h-4 w-4 text-severity-critical" strokeWidth={1.5} />
             <h4 className="text-sm font-medium text-severity-critical">
-              交叉质询过程中的失败（{view.failures.length} 条）
+              {t('page.report.cross_exam_failures.title', { count: view.failures.length })}
             </h4>
           </div>
           <ul className="space-y-1">
             {view.failures.map((f, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-1.5 text-xs text-text-secondary">
                 <span className="rounded bg-bg-secondary px-1.5 font-mono text-text-muted">
-                  {[f.stage, f.point_id, f.argument_id].filter(Boolean).join(' · ') || '未标注阶段'}
+                  {[f.stage, f.point_id, f.argument_id].filter(Boolean).join(' · ') ||
+                    t('page.report.cross_exam_failures.label')}
                 </span>
-                <span>{f.error || '未给出原因'}</span>
+                <span>{f.error || t('page.report.cross_exam_failures.empty')}</span>
               </li>
             ))}
           </ul>
@@ -1125,13 +1269,17 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
                 {d.point_id && (
                   <span className="rounded bg-bg-secondary px-1.5 font-mono text-xs text-text-muted">{d.point_id}</span>
                 )}
-                <p className="flex-1 text-sm font-medium text-text-primary">{d.topic || '未命名争议点'}</p>
+                <p className="flex-1 text-sm font-medium text-text-primary">
+                  {d.topic || t('page.report.dispute.empty')}
+                </p>
                 <span className={cn('rounded px-2 py-0.5 text-xs font-medium', REBUTTAL_STATUS_CLASSES[d.rebuttal_status])}>
-                  {REBUTTAL_STATUS_LABELS[d.rebuttal_status]}
+                  {t(REBUTTAL_STATUS_KEYS[d.rebuttal_status])}
                 </span>
               </div>
               {d.rebuttal_status !== 'ok' && d.rebuttal_error && (
-                <p className="mb-3 text-xs text-severity-medium">本争议点交叉质询未完成：{d.rebuttal_error}</p>
+                <p className="mb-3 text-xs text-severity-medium">
+                  {t('page.report.dispute.error', { reason: d.rebuttal_error })}
+                </p>
               )}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {d.pro_args.map((arg, j) => (
@@ -1150,8 +1298,8 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
         // "没有可反驳的论据正文"和"大家意见一致"是两回事。
         <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
           {limitationTone === 'muted'
-            ? '本次没有找到需要质询的争议点——各人格在关键判断上没有出现足够大的分歧。'
-            : '本次没有产出可展示的争议点，原因见上方说明。'}
+            ? t('page.report.dispute_empty.desc')
+            : t('page.report.dispute_empty.hint')}
         </div>
       )}
 
@@ -1159,21 +1307,25 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
       <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-          <h4 className="text-sm font-semibold text-text-primary">改票记录</h4>
+          <h4 className="text-sm font-semibold text-text-primary">{t('page.report.vote.title')}</h4>
           {live && (
             <span className="text-xs text-text-muted">
-              {view.vote_changes.length} 条
-              {view.threshold !== null && ` · 采纳阈值 θ=${view.threshold}`}
+              {view.threshold !== null
+                ? t('page.report.vote_threshold.badge', {
+                    count: view.vote_changes.length,
+                    threshold: view.threshold,
+                  })
+                : t('page.report.vote.badge', { count: view.vote_changes.length })}
             </span>
           )}
         </div>
         {!live ? (
           <p className="text-sm text-text-secondary">
-            本次未进行反驳轮，因此不存在改票记录。改票只能来自真实发生过的反驳。
+            {t('page.report.vote.empty')}
           </p>
         ) : view.vote_changes.length === 0 ? (
           <p className="text-sm text-text-secondary">
-            本轮双方立场未变。这是交叉质询中完全正常、而且常见的结果，不代表反驳没有发生。
+            {t('page.report.vote_unchanged.desc')}
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -1192,9 +1344,9 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
         {view.suppressed_changes.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
             <p className="mb-2 text-xs text-text-muted">
-              另有 {view.suppressed_changes.length} 条立场变化由模型提出、但未被采纳
-              （改票由代码判定，不采信模型自报）
-              {!view.allow_stance_update && '；本次配置为不接受立场更新'}
+              {view.allow_stance_update
+                ? t('page.report.suppressed.desc', { count: view.suppressed_changes.length })
+                : t('page.report.suppressed_no_update.desc', { count: view.suppressed_changes.length })}
             </p>
             <div className="flex flex-col gap-2">
               {view.suppressed_changes.map((sc, i) => (
@@ -1214,7 +1366,7 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
           画出来只会让人以为发生过一场辩论） */}
       {live && view.confidence_changes.length > 0 && (
         <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h4 className="mb-3 text-sm font-semibold text-text-primary">反驳前后的置信度</h4>
+          <h4 className="mb-3 text-sm font-semibold text-text-primary">{t('page.report.confidence.title')}</h4>
           <ul className="flex flex-col gap-2">
             {view.confidence_changes.map((cc, i) => {
               const delta = cc.delta
@@ -1228,13 +1380,15 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
               return (
                 <li key={cc.persona_key || `${cc.persona_id}-${i}`} className="flex flex-wrap items-center gap-2 text-xs">
                   {/* confidence_changes 的 persona_id 是展示名（引擎历史口径） */}
-                  <span className="min-w-24 text-text-primary">{cc.persona_id || cc.persona_key || '未知人格'}</span>
+                  <span className="min-w-24 text-text-primary">
+                    {cc.persona_id || cc.persona_key || t('page.report.change.empty')}
+                  </span>
                   <span className="text-text-secondary">
                     {pointPct(cc.before)} → {pointPct(cc.after)}
                   </span>
                   <span className={cn('flex items-center gap-1', deltaClass)}>
                     <Icon className="h-3 w-3" strokeWidth={1.5} />
-                    {delta === null ? '—' : `${signedNumber(delta, 0)} 个百分点`}
+                    {delta === null ? DASH : t('page.report.confidence.unit', { delta: signedNumber(delta, 0) })}
                   </span>
                 </li>
               )
@@ -1248,16 +1402,19 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
           否则"1 次调用 / 0 tokens"看起来像个 bug。 */}
       {view.usage && view.usage.calls > 0 && (
         <p className="text-xs text-text-muted">
-          本节发起 {view.usage.calls} 次模型调用（含失败的尝试）· 输入 {view.usage.input_tokens.toLocaleString()} tokens ·
-          输出 {view.usage.output_tokens.toLocaleString()} tokens
-          {!view.usage.token_counts_available && '（token 用量未被完整回报，实际成本可能高于账面）'}
+          {t('page.report.usage.desc', {
+            calls: view.usage.calls,
+            input: formatNumber(view.usage.input_tokens),
+            output: formatNumber(view.usage.output_tokens),
+          })}
+          {!view.usage.token_counts_available && t('page.report.usage.hint')}
         </p>
       )}
 
       {/* θ 没读到配置、走了内置默认值时才提——正常读到 yaml 时展示文件路径只是噪音 */}
       {view.threshold_source.startsWith('fallback-default') && (
         <p className="mt-1 text-xs text-severity-medium">
-          改票阈值未能从配置读取，本次使用内置默认值（{view.threshold_source}）。
+          {t('page.report.threshold.error', { source: view.threshold_source })}
         </p>
       )}
     </div>
@@ -1265,6 +1422,9 @@ function CrossExamSection({ view }: { view: CrossExamView }) {
 }
 
 export default function ReportPage() {
+  // 顶层调用一次：它内部 useLocale()，所以本页也顺带订阅了 ui_lang，
+  // 切语言时整页重渲染、t() 的结果跟着变（契约 6.3）。
+  useDocumentTitle('page.report.meta.title')
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
   const [report, setReport] = useState<RealReport | null>(null)
@@ -1320,7 +1480,7 @@ export default function ReportPage() {
       const r = await api.shareReview(id)
       setShareToken(r.share_token)
     } catch (e) {
-      setShareError(e instanceof Error ? e.message : '生成分享链接失败')
+      setShareError(tApiError(e, 'page.report.share.error'))
     } finally {
       setShareBusy(false)
     }
@@ -1335,7 +1495,7 @@ export default function ReportPage() {
       setShareToken(null)
       setShareCopied(false)
     } catch (e) {
-      setShareError(e instanceof Error ? e.message : '撤销失败')
+      setShareError(tApiError(e, 'page.report.share_revoke.error'))
     } finally {
       setShareBusy(false)
     }
@@ -1350,7 +1510,7 @@ export default function ReportPage() {
     } catch {
       // 剪贴板 API 在非 HTTPS/无权限时会拒绝。不弹"复制成功"的假消息——
       // 链接本身就在输入框里显示着，用户可以自己选中复制。
-      setShareError('浏览器拒绝了剪贴板访问，请手动选中上面的链接复制')
+      setShareError(t('page.report.share_copy.error'))
     }
   }
 
@@ -1437,14 +1597,14 @@ export default function ReportPage() {
           setHtmlUnavailable(null)
         } else {
           setHtmlUnavailable(
-            withError.html_error?.trim() || '后端没有回传这份报告的 HTML 版本（也没有说明原因）。'
+            withError.html_error?.trim() || t('page.report.html.empty')
           )
         }
         if (result.report_md && !reportMarkdown) setReportMarkdown(result.report_md)
       })
       .catch((error: unknown) => {
         setHtmlUnavailable(
-          `取 HTML 版本失败：${error instanceof Error ? error.message : String(error)}`
+          t('page.report.html.error', { reason: tApiError(error, 'common.ui.unknown_error') })
         )
       })
   }, [id])
@@ -1470,7 +1630,7 @@ export default function ReportPage() {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
         <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-4" strokeWidth={1.25} />
-        <p className="text-text-secondary">加载报告中...</p>
+        <p className="text-text-secondary">{t('page.report.body.loading')}</p>
       </div>
     )
   }
@@ -1493,9 +1653,11 @@ export default function ReportPage() {
   if (!review || !report) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-        <p className="text-text-secondary">报告尚未生成</p>
-        <p className="mt-2 text-sm text-text-muted">评审可能还在跑，也可能还没开始——去详情页看实时进度。</p>
-        <Link to={`/review/${id}`} className="text-cyan hover:text-cyan-dim mt-4 inline-block">查看进度</Link>
+        <p className="text-text-secondary">{t('page.report.pending.title')}</p>
+        <p className="mt-2 text-sm text-text-muted">{t('page.report.pending.desc')}</p>
+        <Link to={`/review/${id}`} className="text-cyan hover:text-cyan-dim mt-4 inline-block">
+          {t('page.report.pending.cta')}
+        </Link>
       </div>
     )
   }
@@ -1584,13 +1746,13 @@ export default function ReportPage() {
         </Link>
         <div className="flex-1 min-w-[12rem]">
           <h1 className="text-xl font-semibold text-text-primary truncate">
-            {review.target_title || report.meta?.target || '评审报告'}
+            {review.target_title || report.meta?.target || t('page.report.header.title')}
           </h1>
           <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-sm text-text-secondary">评审报告</p>
+            <p className="text-sm text-text-secondary">{t('page.report.header.subtitle')}</p>
             <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', modeBadge.bg, modeBadge.color)}>
               <modeBadge.Icon className="w-3 h-3" strokeWidth={1.5} />
-              {modeBadge.label}模式
+              {t('page.report.header.badge', { mode: t(modeBadge.labelKey) })}
             </span>
           </div>
         </div>
@@ -1605,7 +1767,9 @@ export default function ReportPage() {
             )}
           >
             <Share2 className="w-3.5 h-3.5" strokeWidth={1.25} />
-            <span className="hidden sm:inline">{shareToken ? '已公开' : '分享'}</span>
+            <span className="hidden sm:inline">
+              {shareToken ? t('page.report.share.badge') : t('page.report.share.cta')}
+            </span>
           </button>
           <button
             onClick={() => handleExport('json')}
@@ -1624,7 +1788,7 @@ export default function ReportPage() {
           <button
             onClick={() => handleExport('html')}
             disabled={!reportHtml}
-            title={reportHtml ? undefined : htmlUnavailable ?? 'HTML 版本还在生成中'}
+            title={reportHtml ? undefined : htmlUnavailable ?? t('page.report.html.tooltip')}
             className={cn(
               'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all',
               reportHtml
@@ -1652,27 +1816,33 @@ export default function ReportPage() {
           <div className="flex items-start gap-2.5">
             <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold text-text-primary">只读分享链接</h3>
+              <h3 className="text-sm font-semibold text-text-primary">{t('page.report.share.title')}</h3>
               <p className="mt-1 text-xs text-text-secondary">
-                生成一条链接发给合伙人或团队，<strong className="text-text-primary">对方无需注册即可打开</strong>。
-                任何拿到链接的人都能看，所以别发到公开场合。
+                <Trans
+                  k="page.report.share.desc"
+                  slots={{ emph: (s) => <strong className="text-text-primary">{s}</strong> }}
+                />
               </p>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border bg-bg-secondary/50 p-3">
-                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">对方能看到</div>
+                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">
+                    {t('page.report.share_visible.label')}
+                  </div>
                   <ul className="space-y-1 text-[11px] text-text-muted">
-                    <li>· 报告全文（摘要、优先修复、各角色视角、共识与分歧）</li>
-                    <li>· 这次评审的标题与任务类型</li>
-                    <li>· 评审时间与校准指标</li>
+                    <li>{t('page.report.share_item_report.label')}</li>
+                    <li>{t('page.report.share_item_meta.label')}</li>
+                    <li>{t('page.report.share_item_calibration.label')}</li>
                   </ul>
                 </div>
                 <div className="rounded-lg border border-border bg-bg-secondary/50 p-3">
-                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">对方看不到</div>
+                  <div className="text-[11px] font-semibold text-text-secondary mb-1.5">
+                    {t('page.report.share_hidden.label')}
+                  </div>
                   <ul className="space-y-1 text-[11px] text-text-muted">
-                    <li>· 你的账号与邮箱</li>
-                    <li>· 这次评审的花费与 token 消耗</li>
-                    <li>· 你上传的原始材料</li>
+                    <li>{t('page.report.share_item_account.label')}</li>
+                    <li>{t('page.report.share_item_cost.label')}</li>
+                    <li>{t('page.report.share_item_material.label')}</li>
                   </ul>
                 </div>
               </div>
@@ -1691,7 +1861,7 @@ export default function ReportPage() {
                       readOnly
                       value={shareUrl}
                       onFocus={(e) => e.currentTarget.select()}
-                      aria-label="分享链接"
+                      aria-label={t('page.report.share.aria')}
                       className="min-w-0 flex-1 rounded-md border border-border bg-bg-secondary px-3 py-2 font-mono text-xs text-text-primary outline-none"
                     />
                     <button
@@ -1703,7 +1873,7 @@ export default function ReportPage() {
                       ) : (
                         <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
                       )}
-                      {shareCopied ? '已复制' : '复制'}
+                      {shareCopied ? t('common.ui.copied') : t('common.action.copy')}
                     </button>
                     <button
                       onClick={() => void handleUnshare()}
@@ -1711,11 +1881,11 @@ export default function ReportPage() {
                       className="flex items-center gap-1.5 rounded-md border border-severity-critical/30 bg-severity-critical/5 px-3 py-2 text-xs text-severity-critical transition-colors hover:bg-severity-critical/10 disabled:opacity-50"
                     >
                       {shareBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Lock className="h-3.5 w-3.5" strokeWidth={1.5} />}
-                      撤销
+                      {t('page.report.share_revoke.cta')}
                     </button>
                   </div>
                   <p className="mt-2 text-[11px] text-text-muted">
-                    撤销后这条链接立刻失效，已经打开过的人也无法再次访问。再次分享会生成一条新链接。
+                    {t('page.report.share.hint')}
                   </p>
                 </div>
               ) : (
@@ -1725,7 +1895,7 @@ export default function ReportPage() {
                   className="mt-4 flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-primary-dim disabled:opacity-50"
                 >
                   {shareBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />}
-                  生成分享链接
+                  {t('page.report.share_create.cta')}
                 </button>
               )}
             </div>
@@ -1739,8 +1909,7 @@ export default function ReportPage() {
         <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-border bg-bg-secondary/40 p-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" strokeWidth={1.5} />
           <p className="text-xs text-text-secondary break-all">
-            这份报告没有 HTML 可视化版本：{htmlUnavailable}
-            上面的网页内容和 JSON / Markdown 导出不受影响。
+            {t('page.report.html.desc', { reason: htmlUnavailable })}
           </p>
         </div>
       )}
@@ -1758,7 +1927,7 @@ export default function ReportPage() {
           >
             <span className="flex items-center gap-2 text-sm font-medium text-text-secondary">
               <Globe className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
-              HTML 可视化报告
+              {t('page.report.html.cta')}
             </span>
             {showHtmlReport
               ? <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
@@ -1769,7 +1938,7 @@ export default function ReportPage() {
             <div className="mt-3 rounded-xl border border-border overflow-x-auto bg-bg-card">
               <iframe
                 ref={iframeRef}
-                title="HTML Report"
+                title={t('page.report.html.aria')}
                 className="w-full border-0"
                 style={{ height: '600px' }}
                 sandbox="allow-same-origin"
@@ -1784,26 +1953,27 @@ export default function ReportPage() {
         <div className="flex items-center gap-3 mb-3">
           <AlertTriangle className={cn('w-5 h-5 md:w-6 md:h-6', riskView.color)} strokeWidth={1.25} />
           <h2 className={cn('text-base md:text-lg font-bold font-display', riskView.color)}>
-            发布风险评估：{riskView.label}
+            {t('page.report.summary.title', { risk: risk ? t(risk.labelKey) : DASH })}
           </h2>
         </div>
         {/* 缺等级要说是"报告没给"，不是"评估结果是中风险" */}
         {!risk && (
           <p className="mb-3 text-xs text-text-muted">
-            这份报告没有给出发布风险等级
-            {summary?.release_risk ? `（收到的取值「${summary.release_risk}」不在已知档位里）` : '（执行摘要里没有 release_risk）'}
-            ，这里不替它推断。
+            {summary?.release_risk
+              ? t('page.report.summary_risk_missing.desc', { raw: summary.release_risk })
+              : t('page.report.summary_risk_absent.desc')}
           </p>
         )}
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div>
-            <dt className="text-xs text-text-muted">评审团主流立场</dt>
-            <dd className="mt-1 font-medium text-text-primary">{summary?.primary_recommendation || '—'}</dd>
+            <dt className="text-xs text-text-muted">{t('page.report.summary_stance.label')}</dt>
+            {/* primary_recommendation 是引擎的自由文本（产出物），原样透出 */}
+            <dd className="mt-1 font-medium text-text-primary">{summary?.primary_recommendation || DASH}</dd>
           </div>
           <div>
-            <dt className="text-xs text-text-muted">证据充分度</dt>
+            <dt className="text-xs text-text-muted">{t('page.report.summary_evidence.label')}</dt>
             <dd className="mt-1 font-medium text-text-primary">
-              {EVIDENCE_QUALITY_LABELS[summary?.evidence_quality ?? ''] ?? summary?.evidence_quality ?? '—'}
+              {evidenceQualityLabel(summary?.evidence_quality)}
             </dd>
           </div>
           <div>
@@ -1811,21 +1981,23 @@ export default function ReportPage() {
                 agreed_points = 至少两位人格各自提到的同一议题；
                 questioned_points = 只有个别人格提出的关切，不是"大家共同质疑"。
                 写成"存疑点"会被读反。 */}
-            <dt className="text-xs text-text-muted">共识议题 / 个别人格单独提出</dt>
+            <dt className="text-xs text-text-muted">{t('page.report.summary_consensus.label')}</dt>
             {/* 报告压根没有 consensus 区块时显示「—」：0/0 会被读成"跑过了、没找到共识问题"，
                 和"这一节根本没产出"是两回事 */}
             <dd className="mt-1 font-medium text-text-primary">
               {report.consensus
                 ? `${report.consensus.agreed_points?.length ?? 0} / ${report.consensus.questioned_points?.length ?? 0}`
-                : '—'}
+                : DASH}
             </dd>
             {/* 判定口径来自引擎的 min_personas_for_agreement，不在前端重算——
                 引擎改阈值时这里自动跟着变，两套口径并存正是要避免的坑 */}
             {typeof report.consensus?.min_personas_for_agreement === 'number' &&
               report.consensus.min_personas_for_agreement > 0 && (
                 <p className="mt-0.5 text-xs text-text-muted">
-                  判定口径：同一议题被 ≥{report.consensus.min_personas_for_agreement}/
-                  {report.consensus.persona_count ?? '?'} 位人格各自独立提出
+                  {t('page.report.summary_consensus.hint', {
+                    min: report.consensus.min_personas_for_agreement,
+                    total: report.consensus.persona_count ?? '?',
+                  })}
                 </p>
               )}
           </div>
@@ -1835,7 +2007,9 @@ export default function ReportPage() {
       {/* ---------- 立场分布 + 校准指标 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-          <h3 className="text-sm font-medium text-text-muted mb-4">立场分布（{personaNotes.length} 个人格）</h3>
+          <h3 className="text-sm font-medium text-text-muted mb-4">
+            {t('page.report.stance.title', { count: personaNotes.length })}
+          </h3>
           {stanceData.length > 0 ? (
             <>
               <div className="min-h-[180px] md:min-h-[220px]">
@@ -1872,12 +2046,12 @@ export default function ReportPage() {
               </div>
             </>
           ) : (
-            <p className="py-8 text-center text-xs text-text-muted">暂无人格立场数据</p>
+            <p className="py-8 text-center text-xs text-text-muted">{t('page.report.stance.empty')}</p>
           )}
         </div>
 
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 overflow-x-auto">
-          <h3 className="mb-4 text-base font-semibold text-text-primary">校准指标</h3>
+          <h3 className="mb-4 text-base font-semibold text-text-primary">{t('page.report.calibration.title')}</h3>
           {calibration ? (
             <>
               {/* 合格线全部来自 src/runner/calibration.py::run_calibration_check：
@@ -1887,18 +2061,18 @@ export default function ReportPage() {
                   给一条编出来的线，就等于凭空判一个指标合格或不合格。 */}
               <div className="flex flex-wrap justify-around gap-2">
                 <CalibrationGauge
-                  label="角色一致性"
+                  label={t('enum.calibration.role_consistency')}
                   value={calibration.role_consistency?.average}
                   passLine={0.8}
                 />
                 <CalibrationGauge
-                  label="视角覆盖度"
+                  label={t('enum.calibration.coverage')}
                   value={calibration.coverage?.average_distance}
                   passLine={0.3}
                 />
                 {calibration.hallucination != null && (
                   <CalibrationGauge
-                    label="无幻觉率"
+                    label={t('enum.calibration.hallucination')}
                     value={
                       calibration.hallucination.average == null ? null : 1 - calibration.hallucination.average
                     }
@@ -1910,12 +2084,14 @@ export default function ReportPage() {
                   'mt-3 text-center text-xs font-medium',
                   calibration.overall_pass ? 'text-brand-primary' : 'text-warm-orange'
                 )}>
-                  {calibration.overall_pass ? '校准通过' : '校准未达标——结论请谨慎采信'}
+                  {calibration.overall_pass
+                    ? t('page.report.calibration.success')
+                    : t('page.report.calibration.error')}
                 </p>
               )}
             </>
           ) : (
-            <p className="py-8 text-center text-xs text-text-muted">本次评审未运行校准检查</p>
+            <p className="py-8 text-center text-xs text-text-muted">{t('page.report.calibration.empty')}</p>
           )}
         </div>
       </div>
@@ -1923,7 +2099,7 @@ export default function ReportPage() {
       {/* ---------- 优先修复项 ---------- */}
       {priorityFixes.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-4">优先修复项</h3>
+          <h3 className="text-lg font-semibold text-text-primary mb-4">{t('page.report.fixes.title')}</h3>
           <div className="flex flex-col gap-3">
             {priorityFixes.map((fix, index) => {
               const expanded = expandedIssues.has(index)
@@ -1949,19 +2125,19 @@ export default function ReportPage() {
                     <div className="px-4 md:px-5 pb-4 border-t border-border pt-3">
                       {fix.why_it_matters && (
                         <div className="mb-3">
-                          <h4 className="text-xs font-medium text-text-muted mb-1">为什么重要</h4>
+                          <h4 className="text-xs font-medium text-text-muted mb-1">{t('page.report.fix_why.label')}</h4>
                           <p className="text-sm text-text-secondary">{fix.why_it_matters}</p>
                         </div>
                       )}
                       {fix.suggested_fix && (
                         <div className="mb-3">
-                          <h4 className="text-xs font-medium text-text-muted mb-1">修复建议</h4>
+                          <h4 className="text-xs font-medium text-text-muted mb-1">{t('page.report.fix_suggestion.label')}</h4>
                           <p className="text-sm text-text-secondary">{fix.suggested_fix}</p>
                         </div>
                       )}
                       {(fix.affected_personas?.length ?? 0) > 0 && (
                         <div>
-                          <h4 className="text-xs font-medium text-text-muted mb-1.5">提出的人格</h4>
+                          <h4 className="text-xs font-medium text-text-muted mb-1.5">{t('page.report.fix_personas.label')}</h4>
                           <div className="flex flex-wrap gap-1.5">
                             {fix.affected_personas!.map((p) => (
                               <span key={p} className="px-2 py-0.5 rounded bg-bg-secondary text-xs text-text-secondary">
@@ -1985,7 +2161,7 @@ export default function ReportPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-cyan" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">人格视角</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.report.personas.title')}</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {personaNotes.map((note) => {
@@ -2017,7 +2193,7 @@ export default function ReportPage() {
 
                   {(note.top_issues?.length ?? 0) > 0 && (
                     <div className="mb-2">
-                      <h4 className="text-xs text-text-muted mb-1">关键议题</h4>
+                      <h4 className="text-xs text-text-muted mb-1">{t('page.report.persona_issues.label')}</h4>
                       <ul className="space-y-0.5">
                         {note.top_issues!.map((issue, i) => (
                           <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
@@ -2031,7 +2207,7 @@ export default function ReportPage() {
 
                   {(note.evidence_top3?.length ?? 0) > 0 && (
                     <div>
-                      <h4 className="text-xs text-text-muted mb-1">关键证据</h4>
+                      <h4 className="text-xs text-text-muted mb-1">{t('page.report.persona_evidence.label')}</h4>
                       <ul className="space-y-0.5">
                         {note.evidence_top3!.map((e, i) => (
                           <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
@@ -2056,12 +2232,14 @@ export default function ReportPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">议题共识明细</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.report.consensus.title')}</h3>
             {typeof report.consensus?.min_personas_for_agreement === 'number' &&
               report.consensus.min_personas_for_agreement > 0 && (
                 <span className="text-xs text-text-muted">
-                  共识 = 同一议题被 ≥{report.consensus.min_personas_for_agreement}/
-                  {report.consensus.persona_count ?? '?'} 位人格各自独立提出
+                  {t('page.report.consensus.hint', {
+                    min: report.consensus.min_personas_for_agreement,
+                    total: report.consensus.persona_count ?? '?',
+                  })}
                 </span>
               )}
           </div>
@@ -2077,22 +2255,29 @@ export default function ReportPage() {
                         : 'bg-bg-secondary text-text-muted'
                     )}
                   >
-                    {c.is_consensus ? '共识' : '个别提出'}
+                    {c.is_consensus ? t('page.report.consensus.badge') : t('page.report.consensus_single.badge')}
                   </span>
                   <p className="text-sm text-text-primary min-w-0">{c.issue}</p>
                   <span className="ml-auto shrink-0 text-xs text-text-muted">
-                    {c.persona_count ?? c.personas?.length ?? '?'} 人提出
+                    {/* 两个计数都没给就如实说没记录：写 0 会被读成"没人提过这条"，
+                        而真相是这份报告没记录提出人数 */}
+                    {(() => {
+                      const raisers = c.persona_count ?? c.personas?.length
+                      return typeof raisers === 'number'
+                        ? t('page.report.consensus.meta', { count: raisers })
+                        : t('page.report.consensus_unknown.meta')
+                    })()}
                   </span>
                 </div>
                 {(c.personas?.length ?? 0) > 0 && (
                   <p className="mt-1.5 text-xs font-mono text-text-muted">
-                    {c.personas!.join('、')}
+                    {c.personas!.join(t('page.report.sep_enum'))}
                   </p>
                 )}
                 {/* 合并了不同措辞时把原话列出来，读者才能核对聚类是否靠谱 */}
                 {(c.title_variants?.length ?? 0) > 1 && (
                   <p className="mt-1 text-xs text-text-muted">
-                    合并的措辞：{c.title_variants!.join(' / ')}
+                    {t('page.report.consensus.desc', { variants: c.title_variants!.join(' / ') })}
                   </p>
                 )}
               </div>
@@ -2106,7 +2291,7 @@ export default function ReportPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Scale className="w-5 h-5 text-warm-orange" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">主要分歧</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.report.disagreements.title')}</h3>
           </div>
           <div className="flex flex-col gap-3">
             {disagreements.map((d, i) => (
@@ -2124,7 +2309,9 @@ export default function ReportPage() {
                   </ul>
                 )}
                 {d.resolution_suggestion && (
-                  <p className="text-xs text-text-muted">建议：{d.resolution_suggestion}</p>
+                  <p className="text-xs text-text-muted">
+                    {t('page.report.disagreement.hint', { text: d.resolution_suggestion })}
+                  </p>
                 )}
               </div>
             ))}
@@ -2141,7 +2328,7 @@ export default function ReportPage() {
           <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
             <div className="mb-4 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
-              <h3 className="text-sm font-semibold text-text-primary">信息缺口</h3>
+              <h3 className="text-sm font-semibold text-text-primary">{t('page.report.gaps.title')}</h3>
             </div>
             <ul className="space-y-2">
               {informationGaps.map((gap, i) => (
@@ -2156,21 +2343,21 @@ export default function ReportPage() {
 
         {report.next_human_test && (
           <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">建议的下一步真人验证</h3>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">{t('page.report.next_test.title')}</h3>
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-xs text-text-muted mb-1">验证任务</dt>
+                <dt className="text-xs text-text-muted mb-1">{t('page.report.next_test_tasks.label')}</dt>
                 <dd className="text-text-secondary">
-                  {(report.next_human_test.suggested_tasks ?? []).join('；') || '—'}
+                  {(report.next_human_test.suggested_tasks ?? []).join(t('page.report.sep_semicolon')) || DASH}
                 </dd>
               </div>
               <div>
                 {/* 标题不能写"建议招募的人群"：recruit_types 是本次 AI 面板覆盖的
                     受众特征串（取自人格档案的真实属性），引擎并没有算"你该找谁"。
                     写成招募建议就是把没算过的东西说成算过了。 */}
-                <dt className="text-xs text-text-muted mb-1">本次面板覆盖的受众特征</dt>
+                <dt className="text-xs text-text-muted mb-1">{t('page.report.next_test_audience.label')}</dt>
                 <dd className="text-text-secondary">
-                  {(report.next_human_test.recruit_types ?? []).join('、') || '—'}
+                  {(report.next_human_test.recruit_types ?? []).join(t('page.report.sep_enum')) || DASH}
                 </dd>
                 {report.next_human_test.recruit_types_basis?.trim() && (
                   <p className="mt-1 text-xs text-text-muted">
@@ -2179,9 +2366,9 @@ export default function ReportPage() {
                 )}
               </div>
               <div>
-                <dt className="text-xs text-text-muted mb-1">需要补充的材料</dt>
+                <dt className="text-xs text-text-muted mb-1">{t('page.report.next_test_materials.label')}</dt>
                 <dd className="text-text-secondary">
-                  {(report.next_human_test.next_materials ?? []).join('；') || '—'}
+                  {(report.next_human_test.next_materials ?? []).join(t('page.report.sep_semicolon')) || DASH}
                 </dd>
               </div>
             </dl>
@@ -2202,7 +2389,7 @@ export default function ReportPage() {
         <div className="mb-6 overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" strokeWidth={1.25} />
-            <h3 className="text-sm font-semibold text-text-primary">人格伦理合规</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t('page.report.compliance.title')}</h3>
             <span className={cn(
               'ml-auto text-xs px-2 py-0.5 rounded font-medium',
               (report.compliance.ethics_score ?? 0) >= 80
@@ -2211,7 +2398,11 @@ export default function ReportPage() {
                   ? 'bg-severity-medium/10 text-severity-medium'
                   : 'bg-severity-critical/10 text-severity-critical'
             )}>
-              {report.compliance.status ?? '—'} · {report.compliance.ethics_score ?? '—'} 分
+              {/* status 是引擎写的自由文本（"通过" / "需复核"…），原样透出不翻译 */}
+              {t('page.report.compliance.badge', {
+                status: report.compliance.status ?? DASH,
+                score: report.compliance.ethics_score ?? DASH,
+              })}
             </span>
           </div>
           {(report.compliance.recommended_steps?.length ?? 0) > 0 && (
@@ -2232,14 +2423,14 @@ export default function ReportPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-cyan" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">评估评分卡</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.report.evaluation.title')}</h3>
           </div>
 
           {evaluationScorecard.critical_failures.length > 0 && (
             <div className="rounded-xl border-2 border-severity-critical/30 bg-severity-critical/5 p-4 md:p-5 mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <AlertOctagon className="w-4 h-4 text-severity-critical" strokeWidth={1.25} />
-                <h4 className="text-sm font-medium text-severity-critical">关键失败项</h4>
+                <h4 className="text-sm font-medium text-severity-critical">{t('page.report.evaluation_critical.title')}</h4>
               </div>
               <ul className="space-y-1">
                 {evaluationScorecard.critical_failures.map((cf, i) => (
@@ -2255,7 +2446,7 @@ export default function ReportPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
             <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
               {/* 标出满分：右边那块维度分是 0–3，不写清楚两个数看起来是同一把尺子 */}
-              <h4 className="text-sm font-medium text-text-muted mb-4">总体评分（满分 100）</h4>
+              <h4 className="text-sm font-medium text-text-muted mb-4">{t('page.report.evaluation_overall.label')}</h4>
               <div className="flex items-center gap-4">
                 <div className={cn(
                   'w-20 h-20 rounded-full flex items-center justify-center border-4',
@@ -2284,18 +2475,21 @@ export default function ReportPage() {
                       : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {evaluationScorecard.passed
-                      ? <><CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />通过</>
-                      : <><XCircle className="w-3.5 h-3.5" strokeWidth={1.5} />未通过</>}
+                      ? <><CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />{t('enum.verdict.pass')}</>
+                      : <><XCircle className="w-3.5 h-3.5" strokeWidth={1.5} />{t('enum.verdict.fail')}</>}
                   </span>
                   <p className="text-xs text-text-muted mt-1">
-                    {evaluationScorecard.results.filter((r) => r.passed).length}/{evaluationScorecard.results.length} 维度通过
+                    {t('page.report.evaluation.meta', {
+                      passed: evaluationScorecard.results.filter((r) => r.passed).length,
+                      total: evaluationScorecard.results.length,
+                    })}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
-              <h4 className="text-sm font-medium text-text-muted mb-4">维度评分（每项满分 3，合格线 2）</h4>
+              <h4 className="text-sm font-medium text-text-muted mb-4">{t('page.report.evaluation_dimension.label')}</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={evaluationScorecard.results.map((r) => {
                   const dim = EVALUATION_DIMENSIONS.find((d) => d.id === r.dimension)
@@ -2347,7 +2541,7 @@ export default function ReportPage() {
                         'ml-2 text-xs px-1.5 py-0.5 rounded',
                         result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                       )}>
-                        {result.passed ? '通过' : '未通过'}
+                        {result.passed ? t('enum.verdict.pass') : t('enum.verdict.fail')}
                       </span>
                     </div>
                     {expanded ? (
@@ -2358,7 +2552,11 @@ export default function ReportPage() {
                   </button>
                   {expanded && (
                     <div className="px-4 pb-3 border-t border-border pt-2">
-                      <p className="text-xs text-text-muted mb-1">{dim?.description ?? '本地词表里没有这个维度的说明'}</p>
+                      {/* dim.description 来自 EVALUATION_DIMENSIONS（前端目录，
+                          batch-0 的 catalog.eval_dimension 尚未交付），暂时仍是中文 */}
+                      <p className="text-xs text-text-muted mb-1">
+                        {dim?.description ?? t('page.report.evaluation_dimension.empty')}
+                      </p>
                       <p className="text-sm text-text-secondary">{result.details}</p>
                     </div>
                   )}
@@ -2374,7 +2572,7 @@ export default function ReportPage() {
         <div className="mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">伦理报告</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.report.ethics.title')}</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {ethicsReports.map((er) => (
@@ -2386,14 +2584,14 @@ export default function ReportPage() {
                     er.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
                     {er.passed
-                      ? <><CheckCircle2 className="w-3 h-3" strokeWidth={1.5} />通过</>
-                      : <><XCircle className="w-3 h-3" strokeWidth={1.5} />未通过</>}
+                      ? <><CheckCircle2 className="w-3 h-3" strokeWidth={1.5} />{t('enum.verdict.pass')}</>
+                      : <><XCircle className="w-3 h-3" strokeWidth={1.5} />{t('enum.verdict.fail')}</>}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                      <span>伦理评分</span>
+                      <span>{t('page.report.ethics_score.label')}</span>
                       <span className={cn(
                         'font-mono font-bold',
                         er.score > 70 ? 'text-brand-primary' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
@@ -2415,18 +2613,20 @@ export default function ReportPage() {
                       原来按 0–1 小数乘 100 显示，实际收到字符串，于是永远是
                       NaN% + 恒红「高风险」，进度条 width: NaN% 还是非法 CSS。 */}
                   <div className="flex-1">
-                    <div className="text-xs text-text-muted mb-1">刻板印象风险</div>
+                    <div className="text-xs text-text-muted mb-1">{t('page.report.ethics_stereotype.label')}</div>
                     <span className={cn(
                       'inline-block px-2 py-0.5 rounded text-xs font-medium',
                       stereotypeRiskBadgeClass(er.stereotype_risk)
                     )}>
-                      {stereotypeRiskLabel(er.stereotype_risk)}
+                      {stereotypeRiskText(er.stereotype_risk)}
                     </span>
                   </div>
                 </div>
                 {er.violations.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-text-muted mb-1.5">违规项 {er.violations.length}</h4>
+                    <h4 className="text-xs font-medium text-text-muted mb-1.5">
+                      {t('page.report.ethics_violations.label', { count: er.violations.length })}
+                    </h4>
                     <ul className="space-y-2">
                       {/* 后端给的是 {severity, rule, detail} 对象，老数据里还可能是
                           字符串——两种都在 toEthicsReportView 里收敛过了，这里
@@ -2441,7 +2641,7 @@ export default function ReportPage() {
                               'px-1.5 py-0.5 rounded text-[10px] font-medium',
                               ETHICS_SEVERITY_BADGE_CLASSES[v.severity]
                             )}>
-                              {ETHICS_SEVERITY_LABELS[v.severity]}
+                              {t(ETHICS_SEVERITY_KEYS[v.severity])}
                             </span>
                             {v.rule && (
                               <code className="text-[10px] font-mono text-text-primary break-all">{v.rule}</code>
@@ -2474,7 +2674,7 @@ export default function ReportPage() {
             } catch (error) {
               // 以前这里是个空 catch：点完只看到转圈结束，既没有结果也没有原因，
               // 用户只能反复点。失败必须说出口。
-              setEvaluationError(error instanceof Error ? error.message : '运行质量评估失败')
+              setEvaluationError(tApiError(error, 'page.report.evaluation.error'))
             } finally {
               setEvaluating(false)
             }
@@ -2488,7 +2688,7 @@ export default function ReportPage() {
           )}
         >
           {evaluating ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : <FlaskConical className="w-4 h-4" strokeWidth={1.25} />}
-          运行评估
+          {t('page.report.evaluation.cta')}
         </button>
         {evaluationScorecard && (
           <Link
@@ -2496,14 +2696,16 @@ export default function ReportPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm bg-purple-400/10 text-purple-400 border border-purple-400/30 hover:bg-purple-400/20 transition-all"
           >
             <FlaskConical className="w-4 h-4" strokeWidth={1.25} />
-            查看完整评估
+            {t('page.report.evaluation_full.cta')}
           </Link>
         )}
         </div>
         {evaluationError && (
           <p className="mt-3 flex items-start gap-1.5 text-sm text-severity-critical">
             <XCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-            <span className="whitespace-pre-wrap break-words">运行评估失败：{evaluationError}</span>
+            <span className="whitespace-pre-wrap break-words">
+              {t('page.report.evaluation_run.error', { reason: evaluationError })}
+            </span>
           </p>
         )}
       </div>
@@ -2514,20 +2716,23 @@ export default function ReportPage() {
       {/* ---------- 价值回填 ---------- */}
       {id && !feedbackSent && (
         <section className="mb-6 rounded-xl border border-brand-primary/30 bg-bg-card p-5">
-          <h2 className="font-display text-sm font-semibold text-text-primary">这份报告真的有用吗？</h2>
-          <p className="mt-1 text-xs text-text-muted">反馈将用于衡量建议采纳与决策影响，不用调用次数冒充价值。</p>
+          <h2 className="font-display text-sm font-semibold text-text-primary">{t('page.report.feedback.title')}</h2>
+          <p className="mt-1 text-xs text-text-muted">{t('page.report.feedback.desc')}</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === true ? 'border-brand-primary bg-brand-primary/10 text-brand-primary' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(true)}>有用</button>
-            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === false ? 'border-severity-critical bg-severity-critical/10 text-severity-critical' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(false)}>没帮助</button>
+            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === true ? 'border-brand-primary bg-brand-primary/10 text-brand-primary' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(true)}>{t('page.report.feedback_useful.cta')}</button>
+            <button className={cn('rounded-md border px-3 py-2 text-sm', feedbackUseful === false ? 'border-severity-critical bg-severity-critical/10 text-severity-critical' : 'border-border text-text-secondary')} onClick={() => setFeedbackUseful(false)}>{t('page.report.feedback_useless.cta')}</button>
           </div>
           {feedbackUseful !== null && (
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               {priorityFixes.length > 0 && (
                 <fieldset className="text-xs text-text-secondary sm:col-span-3">
-                  <legend className="mb-2">实际准备采纳哪些建议？</legend>
+                  <legend className="mb-2">{t('page.report.feedback_adopted.label')}</legend>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {priorityFixes.map((fix, i) => {
-                      const title = fix.issue ?? `建议 ${i + 1}`
+                      // title 同时是提交给后端的 adopted_fixes 元素。fix.issue 是
+                      // 引擎原文，缺失时才用这条前端占位——它会跟着界面语言变，
+                      // 而这只发生在"引擎没给标题"的情况下，不影响真实建议的可比性。
+                      const title = fix.issue ?? t('page.report.feedback_fix.value', { index: i + 1 })
                       return (
                         <label key={i} className="flex items-start gap-2 rounded-md border border-border px-3 py-2">
                           <input type="checkbox" checked={adoptedFixes.includes(title)} onChange={(e) => setAdoptedFixes((current) => e.target.checked ? [...current, title] : current.filter((t) => t !== title))} className="mt-0.5 accent-brand-primary" />
@@ -2538,15 +2743,15 @@ export default function ReportPage() {
                   </div>
                 </fieldset>
               )}
-              <label className="text-xs text-text-secondary">预计节省工时
+              <label className="text-xs text-text-secondary">{t('page.report.feedback_hours.label')}
                 <input type="number" min={0} step="0.5" value={hoursSaved} onChange={(e) => setHoursSaved(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
               </label>
-              <label className="text-xs text-text-secondary">愿意为本次支付（USD）
+              <label className="text-xs text-text-secondary">{t('page.report.feedback_pay.label')}
                 <input type="number" min={0} step="1" value={willingnessToPay} onChange={(e) => setWillingnessToPay(Number(e.target.value))} className="mt-1 w-full rounded-md border border-border bg-bg-secondary px-3 py-2 text-text-primary" />
               </label>
               <label className="flex items-center gap-2 text-xs text-text-secondary sm:col-span-2">
                 <input type="checkbox" checked={decisionChanged} onChange={(e) => setDecisionChanged(e.target.checked)} className="accent-brand-primary" />
-                报告改变了我的产品或发布决策
+                {t('page.report.feedback_decision.label')}
               </label>
               <button className="rounded-md bg-brand-primary px-4 py-2 text-sm font-semibold text-white" onClick={async () => {
                 setFeedbackError(null)
@@ -2562,15 +2767,21 @@ export default function ReportPage() {
                   })
                   setFeedbackSent(true)
                 } catch (error) {
-                  setFeedbackError(error instanceof Error ? error.message : '反馈提交失败')
+                  setFeedbackError(tApiError(error, 'page.report.feedback.error'))
                 }
-              }}>提交反馈</button>
+              }}>{t('page.report.feedback.cta')}</button>
             </div>
           )}
           {feedbackError && <p className="mt-3 text-xs text-severity-critical">{feedbackError}</p>}
         </section>
       )}
-      {feedbackSent && <p className="mb-6 text-sm text-brand-primary">已记录。后续可在"判断复利"查看价值指标。</p>}
+      {/* 引用的是导航项本身的译名（nav.item.ledger），不另写一份：
+          导航改名时这句自动跟着改，不会出现"页面让我去某某页、导航里没这一项" */}
+      {feedbackSent && (
+        <p className="mb-6 text-sm text-brand-primary">
+          {t('page.report.feedback.success', { section: t('nav.item.ledger') })}
+        </p>
+      )}
       </div>
     </div>
   )
@@ -2583,6 +2794,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
   const fix = gated.priority_fixes?.[0]
   const fixesHidden = gated.gated_counts?.priority_fixes_hidden ?? 0
   const notesHidden = gated.gated_counts?.persona_notes_hidden ?? 0
+  const gatedRiskKey = RISK_CONFIG[summary?.release_risk ?? '']?.labelKey
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 animate-fade-in">
@@ -2601,30 +2813,36 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
           <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">{review?.target_title ?? '评审报告'}</h1>
-          <p className="text-sm text-text-secondary">体验版报告</p>
+          <h1 className="text-xl font-semibold text-text-primary">
+            {review?.target_title ?? t('page.report.header.title')}
+          </h1>
+          <p className="text-sm text-text-secondary">{t('page.report.gated.subtitle')}</p>
         </div>
       </div>
 
       {summary && (
         <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
-          <h2 className="text-sm font-medium text-text-muted mb-3">执行摘要</h2>
+          <h2 className="text-sm font-medium text-text-muted mb-3">{t('page.report.gated_summary.title')}</h2>
           <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-text-muted text-xs">发布风险</dt>
+              <dt className="text-text-muted text-xs">{t('page.report.gated_risk.label')}</dt>
               <dd className="mt-1 font-medium text-text-primary">
-                {RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '—'}
+                {gatedRiskKey
+                  ? t(gatedRiskKey)
+                  : summary.release_risk
+                    ? t('page.report.unknown_level.value', { raw: summary.release_risk })
+                    : DASH}
               </dd>
             </div>
             <div>
-              <dt className="text-text-muted text-xs">证据充分度</dt>
+              <dt className="text-text-muted text-xs">{t('page.report.summary_evidence.label')}</dt>
               <dd className="mt-1 font-medium text-text-primary">
-                {EVIDENCE_QUALITY_LABELS[summary.evidence_quality ?? ''] ?? summary.evidence_quality ?? '—'}
+                {evidenceQualityLabel(summary.evidence_quality)}
               </dd>
             </div>
             {summary.primary_recommendation && (
               <div className="col-span-2 sm:col-span-3">
-                <dt className="text-text-muted text-xs">主要建议</dt>
+                <dt className="text-text-muted text-xs">{t('page.report.gated_recommendation.label')}</dt>
                 <dd className="mt-1 font-medium text-text-primary">{summary.primary_recommendation}</dd>
               </div>
             )}
@@ -2634,7 +2852,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
 
       {fix && (
         <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
-          <h2 className="text-sm font-medium text-text-muted mb-3">优先修复项（预览）</h2>
+          <h2 className="text-sm font-medium text-text-muted mb-3">{t('page.report.gated_fix.title')}</h2>
           <p className="font-medium text-text-primary">{fix.issue}</p>
           {fix.why_it_matters && <p className="mt-1 text-sm text-text-secondary">{fix.why_it_matters}</p>}
         </div>
@@ -2643,7 +2861,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
       <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 p-6 text-center">
         <Lock className="w-6 h-6 text-brand-primary mx-auto mb-3" strokeWidth={1.5} />
         <p className="text-text-primary font-medium">
-          还有 {fixesHidden} 条优先修复项、{notesHidden} 条角色视角未展示
+          {t('page.report.gated.hint', { count: fixesHidden, notes: notesHidden })}
         </p>
         {/* 这句话必须和代码对得上。匿名评审落库时 user_id="anonymous"，登录后
             身份变了就再也打不开——所以"报告会保存在你的历史记录里"只有在认领
@@ -2651,13 +2869,13 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
             /api/auth/me/claim-reviews）。认领靠的是这台浏览器本地记下的 id，
             所以"在这台设备上"不是废话，是这句承诺真实的边界。 */}
         <p className="mt-1 text-sm text-text-secondary">
-          在这台设备上登录或注册后，这份报告会自动归到你的账号名下，完整内容和历史记录都能在「评审历史」里打开。
+          {t('page.report.gated.desc')}
         </p>
         <Link
           to="/login"
           className="mt-4 inline-block rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors"
         >
-          登录 / 注册看完整报告
+          {t('page.report.gated.cta')}
         </Link>
       </div>
 
@@ -2670,15 +2888,39 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
 
 // ---------- 导出兜底（无服务端 markdown 时按真实字段现拼） ----------
 
+/** 已知产出语言的显示名。认不出的 BCP-47 标签原样带出去——标签本身就是答案，
+ *  比翻成一个我们猜的语种名诚实。 */
+const REPORT_LANG_KEYS: Record<string, PlainMessageKey> = {
+  'zh-CN': 'page.report.md_lang_zh.value',
+  'en-US': 'page.report.md_lang_en.value',
+}
+
+/**
+ * 导出件顶部那行"本报告正文语言"。契约 8.4 的强制项。
+ *
+ * 三个分支：认得的语种出译名；认不出的原样带标签；根本没有这个键就明说未记录。
+ * **绝不把缺失当成中文**——那是在替一个从未被声明过的值作证（契约 D7）。
+ */
+function reportLanguageLine(language?: string): string {
+  if (!language) return t('page.report.md_lang.empty')
+  const key = REPORT_LANG_KEYS[language]
+  return t('page.report.md_lang.value', { lang: key ? t(key) : language })
+}
+
 function generateMarkdown(report: RealReport): string {
   const lines: string[] = []
   const summary = report.executive_summary
-  lines.push('# 评审报告')
+  lines.push(`# ${t('page.report.header.title')}`)
   lines.push('')
   // 服务端的 markdown 走 src/templates/report-template.md，顶部自带 Synthetic Banner。
   // 这条兜底路径此前直接从"# 评审报告"开始，导出的文件里一句合成声明都没有。
-  lines.push('> **合成评审面板：以下全部意见由 AI 人格生成，不是真实玩家/用户的反馈。**')
-  lines.push('> 本报告不得作为「玩家调研结果」「用户调查数据」「真实玩家意见分布」对外展示或引用。')
+  lines.push(`> **${t('page.report.synthetic_banner.title')}**`)
+  lines.push(`> ${t('page.report.md_banner.desc')}`)
+  lines.push('')
+  // 契约 8.4：导出的是文件，脱离界面之后没人知道它是什么语言。
+  // meta.language 只在引擎拿到真值时才写（aggregator 的"取得到真值才写这个键"），
+  // 所以这里 null / undefined = **未记录**，不许当成中文（契约 D7）。
+  lines.push(`> ${reportLanguageLine(report.meta?.language)}`)
   lines.push('')
   if (report.degradation?.degraded && report.degradation.notice) {
     lines.push(`> **⚠️ ${report.degradation.notice}**`)
@@ -2688,20 +2930,17 @@ function generateMarkdown(report: RealReport): string {
   // 有没有因为预算跳过环节）不能只存在于网页里
   const gatedOut = (report.validation?.gated_out ?? []).filter((g) => g.persona_id)
   if (gatedOut.length) {
-    lines.push(`> **⚠️ 有 ${gatedOut.length} 位人格的输出没通过质量校验，未计入以下结论：**`)
+    lines.push(`> **⚠️ ${t('page.report.md_gate.title', { count: gatedOut.length })}**`)
     for (const g of gatedOut) {
-      const reason = g.failure_reason
-        ? GATE_REASON_LABELS[g.failure_reason] ?? `未知失败类型（${g.failure_reason}）`
-        : '引擎没有回传失败类型'
-      lines.push(`> - ${g.persona_id}：${reason}`)
+      lines.push(`> - ${g.persona_id}${t('page.report.sep_colon')}${gateReasonLabel(g.failure_reason)}`)
     }
     lines.push('')
   }
   if (report.budget?.exceeded) {
-    const notice = report.budget.notice?.trim() || '本次评审达到了单次成本上限。'
+    const notice = report.budget.notice?.trim() || t('page.report.budget_generic.desc')
     lines.push(`> **⚠️ ${notice}**`)
     if ((report.budget.skipped_stages ?? []).includes('cross_examination')) {
-      lines.push('> 交叉质询未执行——本报告没有这一节，不代表人格之间没有分歧。')
+      lines.push(`> ${t('page.report.md_budget.hint')}`)
     }
     lines.push('')
   }
@@ -2712,21 +2951,31 @@ function generateMarkdown(report: RealReport): string {
     lines.push('')
   }
   if (summary) {
-    lines.push(`## 发布风险：${RISK_CONFIG[summary.release_risk ?? '']?.label ?? summary.release_risk ?? '未知'}`)
+    const riskKey = RISK_CONFIG[summary.release_risk ?? '']?.labelKey
+    const riskText = riskKey
+      ? t(riskKey)
+      : summary.release_risk
+        ? t('page.report.unknown_level.value', { raw: summary.release_risk })
+        : t('page.report.md_risk.empty')
+    lines.push(`## ${t('page.report.md_risk.title', { risk: riskText })}`)
     lines.push('')
-    lines.push(`- 主流立场：${summary.primary_recommendation ?? '—'}`)
-    lines.push(`- 证据充分度：${EVIDENCE_QUALITY_LABELS[summary.evidence_quality ?? ''] ?? summary.evidence_quality ?? '—'}`)
+    lines.push(`- ${t('page.report.md_stance.label', { value: summary.primary_recommendation ?? DASH })}`)
+    lines.push(`- ${t('page.report.md_evidence.label', { value: evidenceQualityLabel(summary.evidence_quality) })}`)
     lines.push('')
   }
   const fixes = report.priority_fixes ?? []
   if (fixes.length) {
-    lines.push('## 优先修复项')
+    lines.push(`## ${t('page.report.fixes.title')}`)
     lines.push('')
     for (const fix of fixes) {
+      // severity 在导出件里保持英文枚举大写：它是给人做 grep / 排序的标记，
+      // 不是展示标签，翻了两份导出件就没法互相比对。
       lines.push(`### [${(fix.severity ?? 'medium').toUpperCase()}] ${fix.issue ?? ''}`)
       lines.push('')
       if (fix.why_it_matters) lines.push(fix.why_it_matters)
-      if (fix.suggested_fix) lines.push(`**建议**：${fix.suggested_fix}`)
+      if (fix.suggested_fix) {
+        lines.push(`**${t('page.report.md_fix.label')}**${t('page.report.sep_colon')}${fix.suggested_fix}`)
+      }
       lines.push('')
     }
   }
@@ -2734,48 +2983,66 @@ function generateMarkdown(report: RealReport): string {
   // 少了这句话，读者只会按最强的那一档（多智能体反驳）理解。
   const crossExam = toCrossExamView(report.cross_examination)
   if (crossExam) {
-    lines.push('## 交叉质询')
+    lines.push(`## ${t('page.report.cross_exam.title')}`)
     lines.push('')
     if (crossExam.is_legacy_array) {
-      lines.push('这份报告由旧版本生成，交叉质询记录格式过旧，无法解析出反驳与改票明细。')
+      lines.push(t('page.report.md_cross_exam_legacy.desc'))
     } else {
-      const label = crossExam.mode ? CROSS_EXAM_MODE_LABELS[crossExam.mode] : `未知模式（${crossExam.mode_raw}）`
-      lines.push(`- 执行方式：${label}`)
-      const desc = crossExam.mode ? CROSS_EXAM_MODE_DESCRIPTIONS[crossExam.mode] : '无法判断是否真的发生过反驳。'
+      const label = crossExam.mode
+        ? t(CROSS_EXAM_MODE_LABEL_KEYS[crossExam.mode])
+        : crossExam.mode_raw
+          ? t('page.report.cross_exam_mode_unknown.value', { raw: crossExam.mode_raw })
+          : t('page.report.cross_exam_mode_unknown.label')
+      lines.push(`- ${t('page.report.md_cross_exam.label', { mode: label })}`)
+      const desc = crossExam.mode
+        ? t(CROSS_EXAM_MODE_DESC_KEYS[crossExam.mode])
+        : t('page.report.md_cross_exam.empty')
       lines.push(`- ${desc}`)
-      if (crossExam.limitation) lines.push(`- 引擎说明：${crossExam.limitation}`)
+      // limitation 是引擎原文（产出物），只翻前缀不翻内容
+      if (crossExam.limitation) {
+        lines.push(`- ${t('page.report.md_cross_exam.hint', { text: crossExam.limitation })}`)
+      }
       lines.push(
         crossExam.is_live_debate
-          ? `- 改票记录：${crossExam.vote_changes.length} 条${crossExam.vote_changes.length === 0 ? '（本轮双方立场未变，属正常结果）' : ''}`
-          : '- 改票记录：不适用（未进行反驳轮）'
+          ? `- ${
+              crossExam.vote_changes.length === 0
+                ? t('page.report.md_vote_none.label', { count: 0 })
+                : t('page.report.md_vote.label', { count: crossExam.vote_changes.length })
+            }`
+          : `- ${t('page.report.md_vote.empty')}`
       )
       if (crossExam.failures.length) {
-        lines.push(`- 过程中有 ${crossExam.failures.length} 条失败：${crossExam.failures.map((f) => f.error).join('；')}`)
+        lines.push(
+          `- ${t('page.report.md_failures.label', {
+            count: crossExam.failures.length,
+            list: crossExam.failures.map((f) => f.error).join(t('page.report.sep_semicolon')),
+          })}`,
+        )
       }
     }
     lines.push('')
   } else {
     // 整节缺席也要写出来：导出件里少一节，读者只会当"这次没什么争议"
-    lines.push('## 交叉质询')
+    lines.push(`## ${t('page.report.cross_exam.title')}`)
     lines.push('')
     lines.push(
       report.budget?.exceeded && (report.budget.skipped_stages ?? []).includes('cross_examination')
-        ? '本次没有执行交叉质询：成本已达单次上限，为免继续加钱而跳过。这不代表人格之间没有分歧。'
-        : '这份报告里没有交叉质询记录，报告也没有写明原因（可能是这一档评审模式不包含反驳环节，也可能是没有出现值得反驳的对立观点）。请不要读成"大家意见一致"。'
+        ? t('page.report.md_cross_exam_skipped.desc')
+        : t('page.report.md_cross_exam_absent.desc')
     )
     lines.push('')
   }
   const gaps = report.information_gaps ?? []
   if (gaps.length) {
-    lines.push('## 信息缺口')
+    lines.push(`## ${t('page.report.gaps.title')}`)
     lines.push('')
     gaps.forEach((g, i) => lines.push(`${i + 1}. ${g}`))
     lines.push('')
   }
   // ETHICS.md 要求每份报告都带 Limitations & Caveats——导出件同样算"一份报告"
-  lines.push('## 局限与注意事项（Limitations & Caveats）')
+  lines.push(`## ${t('page.report.limitations.title')}`)
   lines.push('')
-  for (const item of [...(report.meta?.caveats ?? []), ...LIMITATIONS]) {
+  for (const item of [...(report.meta?.caveats ?? []), ...LIMITATION_KEYS.map((k) => t(k))]) {
     lines.push(`- ${item}`)
   }
   lines.push('')

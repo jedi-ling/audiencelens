@@ -164,6 +164,13 @@ EXEMPT_FILES = {
     # 注意这跟 FROZEN_BODY_FILES 不是一回事：那些是"已发出的稿子正文冻结"，
     # 这份是"内容本身即错误值的引用"。
     "REMOVED/business-plan/pdf-audit-report.md",
+    # i18n 实施契约是**内部工程文档**，不是对外材料，里面一个人格数字都没有。
+    # 它被扫到是因为正文反复写「12 个 agent」——指的是并行改代码的 12 个编码 agent，
+    # 而 persona 的正则里有一条专门捞「N 个 agent」（那条是为 REMOVED-bp.html
+    # 用「72 个 agent」指代人格而加的，见 PATTERNS 里的注释）。
+    # 两种「agent」同形不同义，正则分不开。豁免整份文件而不是放宽那条正则：
+    # 放宽会让对外材料里真正写错的「N 个 agent」重新隐身，那条正则当初就是为此加的。
+    "docs/I18N_CONTRACT.md",
 }
 
 
@@ -511,11 +518,24 @@ def test_privacy_deletion_list_covers_conversations():
     svc_path = os.path.join(
         REPO_ROOT, "web", "backend", "app", "services", "user_data_service.py"
     )
-    page_path = os.path.join(REPO_ROOT, "web", "frontend", "src", "pages", "PrivacyPage.tsx")
     with open(svc_path, "r", encoding="utf-8") as f:
         svc = f.read()
-    with open(page_path, "r", encoding="utf-8") as f:
-        page = f.read()
+
+    # i18n 之后 PrivacyPage.tsx 里只剩 t('page.privacy.…')，政策正文搬进了资源文件，
+    # 所以下面改成扫资源文件，而且**中英两侧都扫**：英文用户读到的是 en 那份，
+    # 只钉中文的话「英文政策漏掉一类数据」照样全绿，那正是这条测试要防的事。
+    # （实测有效：第一次加上 en 侧就抓出英文版把"对话记录"写成了含混的 "chat records"。）
+    i18n_dir = os.path.join(REPO_ROOT, "web", "frontend", "src", "i18n", "locales")
+    policy = {}
+    for locale in ("zh", "en"):
+        with open(
+            os.path.join(i18n_dir, locale, "page.privacy.ts"), "r", encoding="utf-8"
+        ) as f:
+            policy[locale] = f.read().lower()
+
+    def _both_locales_say(zh_word, en_word, complaint):
+        for locale, word in (("zh", zh_word), ("en", en_word)):
+            assert word.lower() in policy[locale], f"[{locale}] {complaint}"
 
     assert "conversations_deleted" in svc, (
         "delete_user_data 不再统计删除的对话数——要么级联被摘掉了（删号会留下"
@@ -524,13 +544,17 @@ def test_privacy_deletion_list_covers_conversations():
     assert "Conversation" in svc, "delete_user_data 已经不再引用 Conversation 模型"
 
     # 政策里的删除清单必须提到对话
-    assert "对话记录" in page, (
+    _both_locales_say(
+        "对话记录",
+        "conversation",
         "隐私政策的「删除我的账号与数据」清单里没有对话记录，"
-        "但服务器确实存着它、删号时也确实删了——清单漏项等于对用户少说了一类数据。"
+        "但服务器确实存着它、删号时也确实删了——清单漏项等于对用户少说了一类数据。",
     )
-    assert "上传的图片" in page, (
+    _both_locales_say(
+        "上传的图片",
+        "uploaded image",
         "删除清单里没提上传的图片，但 delete_user_data 确实会连磁盘上的字节一起删。"
-        "清单漏项等于对用户少说了一类数据。"
+        "清单漏项等于对用户少说了一类数据。",
     )
     assert "uploaded_files_deleted" in svc, (
         "delete_user_data 不再统计删除的图片数——要么删盘逻辑被摘掉了"
@@ -538,7 +562,9 @@ def test_privacy_deletion_list_covers_conversations():
     )
 
     # 收集说明里也得写明它存在服务器上，而不是只写"追问与回复"
-    assert "发起评审之前的澄清" in page, (
+    _both_locales_say(
+        "发起评审之前的澄清",
+        "before a review starts",
         "隐私政策的「我们收集的数据」没写明评审之前那段对话也会存到服务器。"
-        "用户看到的是「追问与回复」，会以为只有评审之后的内容被保存。"
+        "用户看到的是「追问与回复」，会以为只有评审之后的内容被保存。",
     )

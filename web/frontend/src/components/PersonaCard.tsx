@@ -1,4 +1,8 @@
 import { cn } from '@/lib/utils'
+import { t, missingMarker } from '@/i18n/runtime'
+import { getLocale } from '@/i18n/locale'
+import { formatPercent } from '@/i18n/format'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 import type { Persona } from '@/lib/mock-data'
 import PersonaRadarChart from './PersonaRadarChart'
 
@@ -23,11 +27,13 @@ const statusColors: Record<PersonaStatus, string> = {
   failed: 'bg-status-failed',
 }
 
-const statusLabels: Record<PersonaStatus, string> = {
-  pending: '等待中',
-  running: '运行中',
-  completed: '已完成',
-  failed: '失败',
+/** 下面两张表存的是 **key 不是文案**：模块级常量存翻译结果的话，切换语言不会
+ *  重新求值，卡片会一直停在打开页面时的那种语言（同 Layout.tsx 的 navItems）。 */
+const statusLabelKeys: Record<PersonaStatus, PlainMessageKey> = {
+  pending: 'enum.persona_status.pending',
+  running: 'enum.persona_status.running',
+  completed: 'enum.persona_status.completed',
+  failed: 'enum.persona_status.failed',
 }
 
 const stanceColors: Record<string, string> = {
@@ -37,11 +43,26 @@ const stanceColors: Record<string, string> = {
   blocker: 'text-severity-critical',
 }
 
-const stanceLabels: Record<string, string> = {
-  advocate: '支持',
-  neutral: '中立',
-  skeptic: '质疑',
-  blocker: '反对',
+const stanceLabelKeys: Record<string, PlainMessageKey> = {
+  advocate: 'enum.primary_stance.advocate',
+  neutral: 'enum.primary_stance.neutral',
+  skeptic: 'enum.primary_stance.skeptic',
+  blocker: 'enum.primary_stance.blocker',
+}
+
+/**
+ * 立场标签。认不出来的取值**显式标记缺失**，不回落成后端原值。
+ *
+ * 原来写的是 `stanceLabels[primaryStance] ?? primaryStance`：后端加了第五档立场
+ * （或改了拼写）时，卡片上会直接显示 "advocate" 这样的英文标识符，看起来像
+ * 一个正常的标签，缺译因此隐身。契约 D8：缺译只能表现为 ⟦missing:…⟧。
+ * 颜色仍然回落到中性色——**样式**没有"如实表达不知道"的表达方式，
+ * 而且回落配色不会让用户误读成一个确定的立场。
+ */
+function stanceLabel(primaryStance: string): string {
+  const key = stanceLabelKeys[primaryStance]
+  if (key === undefined) return missingMarker(`enum.primary_stance.${primaryStance}`, getLocale())
+  return t(key)
 }
 
 export default function PersonaCard({ persona, status, progress, primaryStance, confidence, topIssue, selected, compact, onClick }: PersonaCardProps) {
@@ -50,9 +71,9 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
       onClick={onClick}
       className={cn(
         // h-full：在卡片网格里与同行卡片等高
-        'h-full rounded-xl border-2 p-4 transition-all duration-200',
+        'h-full rounded-xl border p-4 hover-lift',
         'bg-bg-card hover:bg-bg-card-hover',
-        selected ? 'border-brand-primary border-glow-green' : 'border-border',
+        selected ? 'border-brand-primary border-glow-green shadow-[0_0_20px_rgba(10,132,255,0.15)]' : 'border-border',
         onClick && 'cursor-pointer'
       )}
     >
@@ -68,7 +89,7 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
 
           {status !== undefined && (
             <div className="flex items-center gap-2 text-xs text-text-muted mb-2">
-              <span>{statusLabels[status]}</span>
+              <span>{t(statusLabelKeys[status])}</span>
               {progress !== undefined && (
                 <>
                   <span>·</span>
@@ -78,7 +99,10 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <span className="font-mono">{progress}%</span>
+                  {/* 进度条读数走 @/i18n/format：百分号的位置与小数点写法各语种不同。
+                      style 里的 width 仍然是裸的 `${progress}%`——那是 CSS 长度，
+                      不是给人读的文案，翻译它会直接把进度条画坏。 */}
+                  <span className="font-mono">{formatPercent(progress / 100)}</span>
                 </>
               )}
             </div>
@@ -87,11 +111,11 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
           {primaryStance && (
             <div className="flex items-center gap-2 text-xs mt-1">
               <span className={cn('font-medium', stanceColors[primaryStance] ?? 'text-text-secondary')}>
-                {stanceLabels[primaryStance] ?? primaryStance}
+                {stanceLabel(primaryStance)}
               </span>
               {confidence !== undefined && (
                 <span className="font-mono text-text-muted">
-                  置信度 {(confidence * 100).toFixed(0)}%
+                  {t('common.persona_card.confidence.value', { value: formatPercent(confidence) })}
                 </span>
               )}
             </div>

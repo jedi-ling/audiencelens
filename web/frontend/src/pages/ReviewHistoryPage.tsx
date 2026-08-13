@@ -17,6 +17,12 @@ import { cn } from '@/lib/utils'
 import { fetchReviewsPage, deleteReview, REVIEWS_PAGE_SIZE } from '@/lib/api'
 import { TASK_TYPES } from '@/lib/mock-data'
 import type { ReviewListItem, ReviewMode } from '@/lib/mock-data'
+import { t, Trans, missingMarker } from '@/i18n/runtime'
+import { getLocale } from '@/i18n/locale'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatDateTime, formatNumber } from '@/i18n/format'
+import { tApiError } from '@/i18n/api-error'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 import {
   Loader2,
   FileText,
@@ -34,18 +40,20 @@ import {
 } from 'lucide-react'
 import { PageShell, PageHeader, EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 
-const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: '等待中', color: 'text-text-muted', bg: 'bg-bg-secondary' },
-  running: { label: '运行中', color: 'text-cyan', bg: 'bg-cyan/10' },
-  completed: { label: '已完成', color: 'text-brand-primary', bg: 'bg-brand-primary/10' },
-  failed: { label: '失败', color: 'text-severity-critical', bg: 'bg-severity-critical/10' },
-  cancelled: { label: '已取消', color: 'text-text-muted', bg: 'bg-bg-secondary' },
+/** 这两张表存的是 **key 不是文案**：模块级常量存翻译结果的话，切换语言不会
+ *  重新求值，徽章会一直停在打开页面时的那种语言（同 Layout.tsx 的 navItems）。 */
+const statusConfig: Record<string, { labelKey: PlainMessageKey; color: string; bg: string }> = {
+  pending: { labelKey: 'enum.review_status.pending', color: 'text-text-muted', bg: 'bg-bg-secondary' },
+  running: { labelKey: 'enum.review_status.running', color: 'text-cyan', bg: 'bg-cyan/10' },
+  completed: { labelKey: 'enum.review_status.completed', color: 'text-brand-primary', bg: 'bg-brand-primary/10' },
+  failed: { labelKey: 'enum.review_status.failed', color: 'text-severity-critical', bg: 'bg-severity-critical/10' },
+  cancelled: { labelKey: 'enum.review_status.cancelled', color: 'text-text-muted', bg: 'bg-bg-secondary' },
 }
 
-const modeBadgeConfig: Record<ReviewMode, { label: string; color: string; bg: string; Icon: typeof Zap }> = {
-  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
-  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
-  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
+const modeBadgeConfig: Record<ReviewMode, { labelKey: PlainMessageKey; color: string; bg: string; Icon: typeof Zap }> = {
+  quick: { labelKey: 'enum.mode_badge.quick', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
+  standard: { labelKey: 'enum.mode_badge.standard', color: 'text-brand-primary', bg: 'bg-brand-primary/10', Icon: ListChecks },
+  full: { labelKey: 'enum.mode_badge.full', color: 'text-warm-orange', bg: 'bg-warm-orange/10', Icon: Microscope },
 }
 
 function taskTypeName(taskType: string): string {
@@ -73,16 +81,11 @@ function groupByProject(reviews: ReviewListItem[]): { projects: { key: string; i
   return { projects: order.map((key) => ({ key, items: map.get(key)! })), ungrouped }
 }
 
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return iso
-  }
-}
-
 export default function ReviewHistoryPage() {
   const navigate = useNavigate()
+  // 订阅 ui_lang（useDocumentTitle 内部就是 useLocale）：t() 是普通函数、不带
+  // 响应性，切语言时必须有人触发重渲染。页面订阅一次，子组件跟着重渲染。
+  useDocumentTitle('page.history.meta.title')
   const [reviews, setReviews] = useState<ReviewListItem[] | null>(null)
   /** 后端 X-Total-Count；读不到（跨域没 expose 等）就是 null，此时不显示"共 N 条" */
   const [total, setTotal] = useState<number | null>(null)
@@ -108,7 +111,10 @@ export default function ReviewHistoryPage() {
       setNextOffset(page.items.length)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      // tApiError：原来是 `e instanceof Error ? e.message : '加载失败'`，
+      // 会把 `TypeError: x is not a function` 原样甩给用户；而后端 message
+      // 是中文，在英文界面上并排一句中文用户会以为界面坏了（契约 D2）。
+      setError(tApiError(e, 'page.history.load.error'))
       setReviews((prev) => prev ?? [])
     }
   }, [])
@@ -134,7 +140,7 @@ export default function ReviewHistoryPage() {
       setNextOffset((prev) => prev + page.items.length)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载更多失败')
+      setError(tApiError(e, 'page.history.load_more.error'))
     } finally {
       setLoadingMore(false)
     }
@@ -166,7 +172,7 @@ export default function ReviewHistoryPage() {
       setNextOffset((prev) => Math.max(0, prev - 1)) // 见 nextOffset 的说明
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '删除失败')
+      setError(tApiError(e, 'page.history.delete.error'))
     } finally {
       setDeletingId(null)
     }
@@ -174,20 +180,23 @@ export default function ReviewHistoryPage() {
 
   const loaded = reviews?.length ?? 0
   /** 顶部计数：总数拿得到就说"共 N 条"，拿不到就只说已显示多少——不猜 */
+  /* 抽 key 时补充：第四个分支（total === null && loaded === 0）是**空串**，
+     那不是一句"什么都不说"的文案，是这一整块不渲染，所以它不进 key 表
+     （契约 3.4 例 5）。条件渲染保留在这里。 */
   const countLabel =
     total === null
       ? loaded > 0
-        ? `已显示 ${loaded} 条`
+        ? t('page.history.count.loaded_only', { count: loaded })
         : ''
       : hasMore || loaded < total
-        ? `共 ${total} 条 · 已显示 ${loaded} 条`
-        : `共 ${total} 条`
+        ? t('page.history.count.total_and_loaded', { count: total, loaded })
+        : t('page.history.count.total', { count: total })
 
   return (
     <PageShell size="reading">
       <PageHeader
-        title="评审历史"
-        subtitle="你发起过的所有评审，点进去看报告或继续跟进"
+        title={t('page.history.header.title')}
+        subtitle={t('page.history.header.desc')}
         actions={
           countLabel
             ? <span className="text-xs text-text-muted tabular-nums">{countLabel}</span>
@@ -205,7 +214,7 @@ export default function ReviewHistoryPage() {
       {reviews === null ? (
         <div className="py-16 text-center">
           <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-3" strokeWidth={1.25} />
-          <p className="text-text-secondary text-sm">加载中...</p>
+          <p className="text-text-secondary text-sm">{t('common.ui.loading')}</p>
         </div>
       ) : reviews.length === 0 ? (
         /* 空列表要分清两种情况：真的没有记录，和"没加载出来"。
@@ -214,21 +223,21 @@ export default function ReviewHistoryPage() {
           <EmptyState
             icon={AlertCircle}
             tone="error"
-            title="没能加载评审历史"
-            description="这不代表记录被删除了，请重试或稍后再来"
+            title={t('page.history.load_error.title')}
+            description={t('page.history.load_error.desc')}
             action={
               <button onClick={() => void loadFirstPage()} className={SECONDARY_BUTTON_CLASS}>
-                重试
+                {t('common.action.retry')}
               </button>
             }
           />
         ) : (
           <EmptyState
             icon={Inbox}
-            title="还没有评审记录"
+            title={t('page.history.list_empty.title')}
             action={
               <Link to="/ask" className={PRIMARY_BUTTON_CLASS}>
-                发起第一次评审 →
+                {t('page.history.list_empty.cta')}
               </Link>
             }
           />
@@ -237,8 +246,22 @@ export default function ReviewHistoryPage() {
         (() => {
           const { projects, ungrouped } = groupByProject(reviews)
           const renderRow = (r: ReviewListItem) => {
-            const sc = statusConfig[r.status] ?? statusConfig.pending
-            const mb = modeBadgeConfig[r.mode] ?? modeBadgeConfig.standard
+            // 认不出来的状态/模式：**样式**回落到 pending / standard 那一档（总得画点
+            // 什么，而且中性配色不会让用户误读成某个确定的档位），但**文案不回落**。
+            // 回落会让后端新增的枚举值在界面上伪装成"等待中"，缺译因此隐身（契约 D8）。
+            const scHit: (typeof statusConfig)[string] | undefined = statusConfig[r.status]
+            const sc = scHit ?? statusConfig.pending
+            const statusLabel = scHit
+              ? t(scHit.labelKey)
+              : missingMarker(`enum.review_status.${r.status}`, getLocale())
+
+            const modeTable = modeBadgeConfig as Record<string, (typeof modeBadgeConfig)[ReviewMode] | undefined>
+            const mbHit = modeTable[r.mode]
+            const mb = mbHit ?? modeBadgeConfig.standard
+            const modeLabel = mbHit
+              ? t(mbHit.labelKey)
+              : missingMarker(`enum.mode_badge.${r.mode}`, getLocale())
+
             const target = r.status === 'completed' ? `/review/${r.id}/report` : `/review/${r.id}`
             const label = r.target_title || taskTypeName(r.task_type)
 
@@ -248,15 +271,20 @@ export default function ReviewHistoryPage() {
                 <div
                   key={r.id}
                   role="alertdialog"
-                  aria-label={`确认删除「${label}」`}
+                  aria-label={t('page.history.confirm_dialog.aria', { title: label })}
                   className="rounded-xl border-2 border-severity-critical/40 bg-severity-critical/5 p-4"
                 >
                   <p className="mb-2 text-sm leading-relaxed text-text-secondary">
-                    删除「<span className="text-text-primary">{label}</span>」？
-                    <br />
-                    <span className="text-xs text-text-muted">
-                      报告、各角色意见、全部追问记录一起没，无法撤销。
-                    </span>
+                    {/* 标题和后果说明排版不同（主色 / 小字弱色），但必须是**一条** key：
+                        拆成两条之后英文语序就改不动了（契约 D13 / 3.4 例 6）。 */}
+                    <Trans
+                      k="page.history.confirm_dialog.desc"
+                      vars={{ title: label }}
+                      slots={{
+                        name: (s) => <span className="text-text-primary">{s}</span>,
+                        note: (s) => <span className="text-xs text-text-muted">{s}</span>,
+                      }}
+                    />
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -266,7 +294,7 @@ export default function ReviewHistoryPage() {
                       className="flex items-center gap-1.5 rounded-lg bg-severity-critical/85 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-severity-critical disabled:opacity-60"
                     >
                       {deletingId === r.id && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2} />}
-                      删除
+                      {t('common.action.delete')}
                     </button>
                     <button
                       onClick={(e) => {
@@ -275,7 +303,7 @@ export default function ReviewHistoryPage() {
                       }}
                       className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
                     >
-                      取消
+                      {t('common.action.cancel')}
                     </button>
                   </div>
                 </div>
@@ -289,7 +317,7 @@ export default function ReviewHistoryPage() {
                 className="group flex items-center gap-4 p-4 rounded-xl border border-border bg-bg-card hover:border-brand-primary/30 hover:bg-bg-card-hover transition-all cursor-pointer"
               >
                 <span className={cn('shrink-0 px-2 py-1 rounded text-xs font-medium', sc.bg, sc.color)}>
-                  {sc.label}
+                  {statusLabel}
                 </span>
 
                 <div className="min-w-0 flex-1">
@@ -299,19 +327,23 @@ export default function ReviewHistoryPage() {
                       className={cn('shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium', mb.bg, mb.color)}
                     >
                       <mb.Icon className="w-2.5 h-2.5" strokeWidth={1.5} />
-                      {mb.label}
+                      {modeLabel}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-text-muted">
                     <span>{taskTypeName(r.task_type)}</span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" strokeWidth={1.25} />
-                      {formatTime(r.created_at)}
+                      {/* 原来是 toLocaleString('zh-CN', …)：硬编码的 locale 会让英文
+                          界面显示中文日期。全站格式化统一走 @/i18n/format（契约 6.5）。 */}
+                      {formatDateTime(r.created_at)}
                     </span>
                     {r.total_cost_usd > 0 && (
                       <span className="flex items-center gap-1">
                         <DollarSign className="w-3 h-3" strokeWidth={1.25} />
-                        {r.total_cost_usd.toFixed(3)}
+                        {/* 货币符号已经是左边那个图标了，所以这里只格式化数字、
+                            不用 formatUsd——用了会变成两个 $。金额恒为美元，不换算。 */}
+                        {formatNumber(r.total_cost_usd, 3)}
                       </span>
                     )}
                   </div>
@@ -325,8 +357,8 @@ export default function ReviewHistoryPage() {
                   onClick={(e) => askDelete(e, r.id)}
                   disabled={deletingId === r.id}
                   className="shrink-0 p-1.5 rounded-md text-text-muted hover:text-severity-critical hover:bg-severity-critical/10 transition-colors disabled:opacity-50"
-                  aria-label={`删除「${label}」`}
-                  title="删除这条评审（会二次确认）"
+                  aria-label={t('page.history.item.aria', { title: label })}
+                  title={t('page.history.item.tooltip')}
                 >
                   {deletingId === r.id ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.25} />
@@ -344,7 +376,9 @@ export default function ReviewHistoryPage() {
                   <div className="mb-2 flex items-center gap-2 text-sm font-medium text-warm-orange">
                     <FolderOpen className="w-4 h-4 shrink-0" strokeWidth={1.5} />
                     <span className="min-w-0 truncate">{group.key}</span>
-                    <span className="text-xs text-text-muted">长期评审项目 · {group.items.length} 次评审</span>
+                    <span className="text-xs text-text-muted">
+                      {t('page.history.group.meta', { count: group.items.length })}
+                    </span>
                   </div>
                   <div className="space-y-2.5 border-l-2 border-warm-orange/20 pl-3">
                     {group.items.map(renderRow)}
@@ -367,13 +401,14 @@ export default function ReviewHistoryPage() {
                     {loadingMore ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} />
-                        加载中...
+                        {t('common.ui.loading')}
                       </>
                     ) : (
                       <>
                         <ChevronDown className="w-4 h-4" strokeWidth={1.25} />
-                        加载更多
-                        {total !== null && ` · 还有 ${Math.max(0, total - loaded)} 条`}
+                        {total === null
+                          ? t('page.history.load_more.cta')
+                          : `${t('page.history.load_more.cta')} ${t('page.history.load_more.remaining', { count: Math.max(0, total - loaded) })}`}
                       </>
                     )}
                   </button>
@@ -381,7 +416,7 @@ export default function ReviewHistoryPage() {
                   loaded > REVIEWS_PAGE_SIZE && (
                     <p className="inline-flex items-center gap-1.5 text-xs text-text-muted">
                       <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.25} />
-                      已加载全部 {loaded} 条评审
+                      {t('page.history.load_more.success', { count: loaded })}
                     </p>
                   )
                 )}

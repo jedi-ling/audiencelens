@@ -11,6 +11,10 @@ import type { SkillTruth } from '@/lib/skills'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
 import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw } from 'lucide-react'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { tApiErrorParts, type ApiErrorText } from '@/i18n/api-error'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5
 /**
@@ -29,10 +33,35 @@ type Step = 0 | 1 | 2 | 3 | 4 | 5
  */
 type MaterialInputMode = 'text' | 'file'
 
-const modeConfig: Record<ReviewMode, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  quick: { label: '快速', color: 'text-cyan', bg: 'bg-cyan/10', border: 'border-cyan/30', icon: '⚡' },
-  standard: { label: '标准', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30', icon: '✅' },
-  full: { label: '完整', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30', icon: '🔬' },
+/**
+ * 三种评审模式的显示配置。
+ *
+ * 存的是 **labelKey 不是文案**：这个对象在模块求值时就固定了，存翻译结果的话
+ * 切换语言不会重新求值，模式名会一直停在打开页面时的那种语言。
+ * color / bg / border / icon 留在这里不进 key 表——样式与图标不是文案（契约 3.4 例 7）。
+ *
+ * 档位名读 enum.mode_badge.*（ReviewMode 是后端枚举，按契约 §11 第 3 条走 enum.*），
+ * 不在本页另抽一份——各页各抽会让同一个模式在报告页、历史页、这一页出现三种叫法。
+ * 「…模式」那半句是本页自己的（page.create.mode_name.value）：中文是后缀，
+ * 英文语序不同，拼进枚举值会把英文语序锁死。
+ */
+const modeConfig: Record<ReviewMode, { labelKey: PlainMessageKey; color: string; bg: string; border: string; icon: string }> = {
+  quick: { labelKey: 'enum.mode_badge.quick', color: 'text-cyan', bg: 'bg-cyan/10', border: 'border-cyan/30', icon: '⚡' },
+  standard: { labelKey: 'enum.mode_badge.standard', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/30', icon: '✅' },
+  full: { labelKey: 'enum.mode_badge.full', color: 'text-warm-orange', bg: 'bg-warm-orange/10', border: 'border-warm-orange/30', icon: '🔬' },
+}
+
+/** 红队对抗的四个典型场景。同样存 key 不存文案，理由见 modeConfig。 */
+const RED_TEAM_CASE_KEYS: PlainMessageKey[] = [
+  'page.create.red_team_case_pricing.badge',
+  'page.create.red_team_case_community.badge',
+  'page.create.red_team_case_localization.badge',
+  'page.create.red_team_case_pr.badge',
+]
+
+/** "3" 或 "4-6"。两端相同时不写成 "3-3"。 */
+function formatCountRange(range: readonly [number, number]): string {
+  return range[0] === range[1] ? `${range[0]}` : `${range[0]}-${range[1]}`
 }
 
 /**
@@ -63,15 +92,31 @@ function SkillIcon({ skill, className }: { skill: SkillTruth; className?: string
  * 任务类型补齐，但那是「这次补上了」，不是「以后不会再漏」：新增任务类型时同样会漏。
  * 所以这里留一道结构性兜底，宁可问一个笼统的问题，也不能让人交白卷。
  */
-const GENERIC_MATERIAL_FIELD: TaskMaterialField = {
-  key: '材料正文',
-  label: '材料正文',
-  placeholder: '粘贴要评审的材料全文（这个任务类型还没有配置分项字段，先整段贴进来）...',
-  required: true,
+/**
+ * 兜底字段的 key。它会被当成 `materials[].type` 发给后端，和 TASK_MATERIALS[].key
+ * 是同一个位置、同一条规矩：**wire 值不是文案，永不翻译**（契约 12.2）。
+ */
+const GENERIC_MATERIAL_KEY = '材料正文'
+
+/**
+ * label / placeholder 必须在渲染时才求值。写成模块级常量会把翻译结果固定在模块
+ * 求值那一刻，切换语言时这个兜底字段不会跟着变——而它出现的场合恰恰是
+ * "这个任务类型还没配字段"，界面上只有它一个输入框，语言不对格外显眼。
+ */
+function genericMaterialField(): TaskMaterialField {
+  return {
+    key: GENERIC_MATERIAL_KEY,
+    label: t('page.create.generic_field.label'),
+    placeholder: t('page.create.generic_field.placeholder'),
+    required: true,
+  }
 }
 
 export default function CreateReviewPage() {
   const navigate = useNavigate()
+  // 标签页标题。它内部 useLocale()，顺带让整页在切语言时重渲染——
+  // t() 是普通函数、不带响应性，没有这一步文案会停在打开页面时的语言。
+  useDocumentTitle('page.create.meta.title')
   const [searchParams] = useSearchParams()
   // 技能 id 是后端的字符串，不做 `as SkillType` 断言：断言只是让类型检查闭嘴，
   // 并不能让一个后端新增的技能真的属于这个前端联合类型（同 SkillSelectPage 的口径）。
@@ -97,18 +142,20 @@ export default function CreateReviewPage() {
   const [selectedPack, setSelectedPack] = useState<string | null>(null)
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(new Set())
   const [launching, setLaunching] = useState(false)
-  const [launchError, setLaunchError] = useState<string | null>(null)
+  // 错误态存 { text, detail } 而不是一句拼好的字符串：非中文界面下后端中文原文
+  // 要降级进 title 属性，而不是与英文界面混排、也不是被丢掉（契约 D2）。
+  const [launchError, setLaunchError] = useState<ApiErrorText | null>(null)
   const [materialsExpanded, setMaterialsExpanded] = useState(false)
   const [examplesExpanded, setExamplesExpanded] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [extracting, setExtracting] = useState(false)
-  const [extractError, setExtractError] = useState<string | null>(null)
+  const [extractError, setExtractError] = useState<ApiErrorText | null>(null)
   const [enableEvaluation, setEnableEvaluation] = useState(false)
   const [enableRedTeam, setEnableRedTeam] = useState(false)
   // 技能清单以 /api/skills 为唯一事实源。以前第 0 步的名称/描述读的是本地 SKILLS，
   // 后端改了文案这一页不会跟，同一个技能在技能中心和创建页会显示两种说法。
   const [skills, setSkills] = useState<SkillTruth[] | null>(null)
-  const [skillsError, setSkillsError] = useState<string | null>(null)
+  const [skillsError, setSkillsError] = useState<ApiErrorText | null>(null)
   const [skillsLoading, setSkillsLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -137,7 +184,7 @@ export default function CreateReviewPage() {
         // 不回落本地 SKILLS：那份清单可能已经和后端不一致，拿它假装加载成功，
         // 用户会挑一个后端根本没有的技能。取不到就说取不到。
         setSkills(null)
-        setSkillsError(e instanceof Error ? e.message : '加载技能列表失败')
+        setSkillsError(tApiErrorParts(e, 'page.create.skill_list.error'))
         setSkillsLoading(false)
       })
   }, [])
@@ -168,7 +215,7 @@ export default function CreateReviewPage() {
     : []
   /** 真正渲染与校验用的字段。没有定义时退回一个必填的通用正文框，见 GENERIC_MATERIAL_FIELD。 */
   const currentFields: TaskMaterialField[] =
-    selectedTaskType && definedFields.length === 0 ? [GENERIC_MATERIAL_FIELD] : definedFields
+    selectedTaskType && definedFields.length === 0 ? [genericMaterialField()] : definedFields
 
   /**
    * AI 从上传文件里提取出来、但不在 currentFields 里的键。
@@ -226,13 +273,14 @@ export default function CreateReviewPage() {
   const overModeMax = selectedPersonaIds.size > modeMax
   const packName = (id: string) => packs.find((p) => p.panel_id === id)?.name ?? id
 
+  // 在渲染里求值（而不是模块级常量）：切语言时要跟着变。
   const stepLabels: Record<Step, string> = {
-    0: '选择技能',
-    1: '选择任务类型',
-    2: '上传材料',
-    3: '选择角色',
-    4: '评审选项',
-    5: '确认并启动',
+    0: t('page.create.stage.skill'),
+    1: t('page.create.stage.task_type'),
+    2: t('page.create.stage.material'),
+    3: t('page.create.stage.persona'),
+    4: t('page.create.stage.option'),
+    5: t('page.create.stage.confirm'),
   }
 
   const canNext = () => {
@@ -265,7 +313,7 @@ export default function CreateReviewPage() {
     // 第 3 步已经拦过一道，这里是最后一道闸：宁可不发请求，也不能发一个
     // "跑出来跟确认页不一样"的评审出去
     if (!effectivePack || packConflict || overModeMax) {
-      setLaunchError('所选角色与角色包/评审模式不一致，请返回第 3 步调整后再启动')
+      setLaunchError({ text: t('page.create.launch_pack_mismatch.error') })
       setStep(3)
       return
     }
@@ -275,7 +323,7 @@ export default function CreateReviewPage() {
     // 空材料的评审不发出去：引擎只能拿标题当全部输入，跑出来是一份看着正常
     // 却什么都没读过的报告，用户没法从结果里看出自己漏交了东西。
     if (materials.length === 0) {
-      setLaunchError('还没有填写任何评审材料，请返回第 2 步补充后再启动')
+      setLaunchError({ text: t('page.create.launch_no_material.error') })
       setStep(2)
       return
     }
@@ -311,7 +359,7 @@ export default function CreateReviewPage() {
       })
       navigate(`/review/${reviewId}`)
     } catch (e) {
-      setLaunchError(e instanceof Error ? e.message : '发起评审失败')
+      setLaunchError(tApiErrorParts(e, 'page.create.launch.error'))
     } finally {
       setLaunching(false)
     }
@@ -343,8 +391,13 @@ export default function CreateReviewPage() {
       // 原因必须如实透出：后端会告诉你是文件太大、格式不支持、没配 API key、限流还是
       // 鉴权失败，这些用户改一下就能过。一律替换成「AI 提取失败」，用户会以为是模型不行，
       // 于是放弃这个功能。后半句保留手填这条退路。
-      const reason = e instanceof Error && e.message ? e.message : '未知原因'
-      setExtractError(`AI 提取失败：${reason}。你也可以直接手动填写下面的材料字段。`)
+      // 中文界面 reason.text 就是后端原文；非中文界面是按 code 出的前端译文，
+      // 后端中文原文进 reason.detail，由渲染处放进 title 属性，不与英文并排显示。
+      const reason = tApiErrorParts(e, 'page.create.extract_reason_unknown.error')
+      setExtractError({
+        text: t('page.create.extract.error', { reason: reason.text }),
+        detail: reason.detail,
+      })
     } finally {
       setExtracting(false)
     }
@@ -445,17 +498,17 @@ export default function CreateReviewPage() {
       <div className="min-h-[500px]">
         {step === 0 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">选择评审技能</h2>
-            <p className="text-sm text-text-secondary mb-6">不同技能对应不同的评审视角和侧重点</p>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.skill.title')}</h2>
+            <p className="text-sm text-text-secondary mb-6">{t('page.create.skill.desc')}</p>
 
             {droppedSkill && (
               <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/5 p-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
                 <div className="text-xs text-text-secondary leading-relaxed">
                   <p className="text-warm-orange font-medium mb-1">
-                    「{droppedSkill}」还不能用来创建评审
+                    {t('page.create.dropped_skill.title', { skill: droppedSkill })}
                   </p>
-                  <p>它目前不会改变评审的跑法，选了也等于没选，所以这里没有替你选上。请另选一个技能。</p>
+                  <p>{t('page.create.dropped_skill.desc')}</p>
                 </div>
               </div>
             )}
@@ -472,21 +525,22 @@ export default function CreateReviewPage() {
             {!skillsLoading && skillsError && (
               <div className="rounded-xl border-2 border-severity-critical/30 bg-severity-critical/5 p-6 text-center">
                 <AlertTriangle className="w-7 h-7 mx-auto mb-2 text-severity-critical" strokeWidth={1.25} />
-                <p className="text-sm text-text-primary font-medium mb-1">技能列表没能加载出来</p>
-                <p className="text-xs text-text-secondary mb-4">{skillsError}</p>
+                <p className="text-sm text-text-primary font-medium mb-1">{t('page.create.skill_error.title')}</p>
+                {/* detail 是后端原文，语种可能与界面不一致——放 title 属性，不与主文案并排 */}
+                <p className="text-xs text-text-secondary mb-4" title={skillsError.detail}>{skillsError.text}</p>
                 <button
                   onClick={loadSkills}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-dim transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
-                  重新加载
+                  {t('page.create.skill_error.cta')}
                 </button>
               </div>
             )}
 
             {!skillsLoading && !skillsError && skills?.length === 0 && (
               <div className="rounded-xl border border-border bg-bg-card p-6 text-center text-sm text-text-secondary">
-                当前账号下没有可用于创建评审的技能。
+                {t('page.create.skill_list.empty')}
               </div>
             )}
 
@@ -525,7 +579,7 @@ export default function CreateReviewPage() {
                       约束。现在只在后端真的声明了 task_types 时才报数，没声明就不显示。 */}
                   {skill.taskTypes && (
                     <div className="flex items-center gap-3 text-xs text-text-muted">
-                      <span>{skill.taskTypes.length} 种任务</span>
+                      <span>{t('page.create.skill_card.meta', { count: skill.taskTypes.length })}</span>
                     </div>
                   )}
                   {skill.deco && (
@@ -549,7 +603,8 @@ export default function CreateReviewPage() {
                 {selectedSkill.taskTypes && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {selectedSkill.taskTypes.map((tt) => {
-                      const taskType = TASK_TYPES.find((t) => t.id === tt)
+                      // 形参改名 x：t 已经是 i18n 的取文案函数，别在这里遮蔽它
+                      const taskType = TASK_TYPES.find((x) => x.id === tt)
                       return taskType ? (
                         <span key={tt} className="px-2 py-0.5 rounded text-xs bg-bg-secondary text-text-secondary">
                           {taskType.icon} {taskType.name}
@@ -565,15 +620,15 @@ export default function CreateReviewPage() {
 
         {step === 1 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">选择任务类型</h2>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.task_type.title')}</h2>
             <p className="text-sm text-text-secondary mb-6">
               {/* 只有后端真的声明了 task_types 时才说「该技能支持的任务类型」，
                   否则这句话是在替后端发明一条它没有的限制 */}
               {selectedSkill
                 ? selectedSkill.taskTypes
-                  ? `当前技能：${selectedSkill.name} · 以下为该技能声明支持的任务类型`
-                  : `当前技能：${selectedSkill.name} · 它没有限定任务类型，下面全部可选`
-                : '选择你要评审的内容类型'}
+                  ? t('page.create.task_type_scoped.desc', { skill: selectedSkill.name })
+                  : t('page.create.task_type_open.desc', { skill: selectedSkill.name })
+                : t('page.create.task_type.desc')}
             </p>
 
             <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
@@ -586,7 +641,7 @@ export default function CreateReviewPage() {
                     : 'bg-bg-card border border-border text-text-secondary hover:border-cyan/30'
                 )}
               >
-                <span>全部</span>
+                <span>{t('page.create.category_all.tab')}</span>
                 <span className={cn(
                   'px-1.5 py-0.5 rounded text-xs font-mono',
                   selectedCategory === 'all' ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-secondary/50 text-text-muted'
@@ -637,11 +692,11 @@ export default function CreateReviewPage() {
             </div>
 
             {selectedTaskType && (() => {
-              const tt = TASK_TYPES.find((t) => t.id === selectedTaskType)
+              const tt = TASK_TYPES.find((x) => x.id === selectedTaskType)
               if (!tt) return null
               return (
                 <div className="mt-6 rounded-xl border border-border bg-bg-card p-4">
-                  <h3 className="text-sm font-medium text-text-muted mb-3">评审模式</h3>
+                  <h3 className="text-sm font-medium text-text-muted mb-3">{t('page.create.mode.title')}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {REVIEW_MODES.map((rm) => {
                       const mc = modeConfig[rm.mode]
@@ -663,17 +718,17 @@ export default function CreateReviewPage() {
                               'font-medium text-sm',
                               selectedMode === rm.mode ? mc.color : 'text-text-primary'
                             )}>
-                              {mc.label}
+                              {t(mc.labelKey)}
                             </span>
                             <span className="ml-auto text-xs text-text-muted font-mono">
-                              {rm.persona_count_range[0]}{rm.persona_count_range[0] !== rm.persona_count_range[1] ? `-${rm.persona_count_range[1]}` : ''} 人
+                              {t('page.create.mode_card.unit', { range: formatCountRange(rm.persona_count_range) })}
                             </span>
                           </div>
                           <p className="text-xs text-text-secondary w-full">{rm.description}</p>
                           <div className="flex items-center gap-2 w-full text-xs text-text-muted">
-                            {rm.cross_examination && <span className="px-1.5 py-0.5 rounded bg-cyan/10 text-cyan">交叉质询</span>}
-                            {rm.calibration && <span className="px-1.5 py-0.5 rounded bg-warm-orange/10 text-warm-orange">校准检查</span>}
-                            {!rm.cross_examination && !rm.calibration && <span className="text-text-muted/50">无额外步骤</span>}
+                            {rm.cross_examination && <span className="px-1.5 py-0.5 rounded bg-cyan/10 text-cyan">{t('page.create.feature_cross_exam.badge')}</span>}
+                            {rm.calibration && <span className="px-1.5 py-0.5 rounded bg-warm-orange/10 text-warm-orange">{t('page.create.feature_calibration.badge')}</span>}
+                            {!rm.cross_examination && !rm.calibration && <span className="text-text-muted/50">{t('page.create.feature_none.badge')}</span>}
                           </div>
                         </button>
                       )
@@ -687,8 +742,8 @@ export default function CreateReviewPage() {
 
         {step === 2 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">上传评审材料</h2>
-            <p className="text-sm text-text-secondary mb-6">手动填写文本，或上传文件让 AI 自动提取材料</p>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.material.title')}</h2>
+            <p className="text-sm text-text-secondary mb-6">{t('page.create.material.desc')}</p>
 
             <div className="space-y-6">
             <div className="flex items-center gap-2">
@@ -702,7 +757,7 @@ export default function CreateReviewPage() {
                 )}
               >
                 <AlignLeft className="w-4 h-4" strokeWidth={1.25} />
-                文本输入
+                {t('page.create.input_mode_text.tab')}
               </button>
               <button
                 onClick={() => setMaterialInputMode('file')}
@@ -714,7 +769,7 @@ export default function CreateReviewPage() {
                 )}
               >
                 <FileText className="w-4 h-4" strokeWidth={1.25} />
-                文件上传
+                {t('page.create.input_mode_file.tab')}
               </button>
               {/* 这里曾经有第三个「目录路径」按钮，已下线——原因见文件顶部
                   MaterialInputMode 的注释（服务器扫不到客户端路径，且收上来的
@@ -746,26 +801,29 @@ export default function CreateReviewPage() {
                 {extracting ? (
                   <div className="py-4">
                     <Loader2 className="w-8 h-8 mx-auto mb-3 text-brand-primary animate-spin" strokeWidth={1.25} />
-                    <p className="text-sm text-brand-primary font-medium">AI 正在阅读文件并提取材料...</p>
-                    <p className="text-xs text-text-muted mt-1">请稍候，通常需要 5-10 秒</p>
+                    <p className="text-sm text-brand-primary font-medium">{t('page.create.extract.pending')}</p>
+                    <p className="text-xs text-text-muted mt-1">{t('page.create.extract.hint')}</p>
                   </div>
                 ) : (
                   <>
                     <Upload className="w-8 h-8 mx-auto mb-3 text-text-muted" strokeWidth={1.25} />
                     <p className="text-sm text-text-secondary">
-                      拖拽文件到此处，或<span className="text-brand-primary">点击上传</span>
+                      <Trans
+                        k="page.create.dropzone.cta"
+                        slots={{ click: (s) => <span className="text-brand-primary">{s}</span> }}
+                      />
                     </p>
                     <p className="text-xs text-text-muted mt-1">
-                      支持 .txt .md .json .pdf .docx（不支持旧版 .doc）· AI 自动提取结构化材料
+                      {t('page.create.dropzone.hint')}
                     </p>
                   </>
                 )}
                 {extractError && (
-                  <p className="text-xs text-severity-critical mt-2">{extractError}</p>
+                  <p className="text-xs text-severity-critical mt-2" title={extractError.detail}>{extractError.text}</p>
                 )}
                 {filledMaterialsCount > 0 && !extracting && (
                   <p className="text-xs text-brand-primary mt-2">
-                    已提取 {filledMaterialsCount} 个字段 · 可在下方编辑修改
+                    {t('page.create.extract.success', { count: filledMaterialsCount })}
                   </p>
                 )}
               </div>
@@ -779,7 +837,7 @@ export default function CreateReviewPage() {
                 >
                   <span className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                     <Star className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
-                    快速开始：导入示例数据
+                    {t('page.create.examples.cta')}
                   </span>
                   {examplesExpanded
                     ? <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
@@ -803,21 +861,21 @@ export default function CreateReviewPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">评审目标</label>
+              <label className="block text-sm font-medium text-text-secondary mb-2">{t('page.create.target.label')}</label>
               <input
                 type="text"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                placeholder="例如：《星际漂流》概念设计文档"
+                placeholder={t('page.create.target.placeholder')}
                 className="w-full px-4 py-3 rounded-lg bg-bg-card border border-border text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-primary transition-colors"
               />
             </div>
 
             <div className="space-y-4 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-3">
-                <h3 className="text-sm font-medium text-text-secondary">编辑材料详情</h3>
+                <h3 className="text-sm font-medium text-text-secondary">{t('page.create.fields.title')}</h3>
                 {filledMaterialsCount > 0 && (
-                  <span className="text-xs text-brand-primary">AI 已提取 {filledMaterialsCount} 个字段，请检查并修改</span>
+                  <span className="text-xs text-brand-primary">{t('page.create.fields.hint', { count: filledMaterialsCount })}</span>
                 )}
               </div>
               {currentFields.map((field, idx) => {
@@ -863,8 +921,11 @@ export default function CreateReviewPage() {
               {extraFieldKeys.length > 0 && (
                 <div className="pt-2">
                   <p className="text-xs text-text-muted mb-2">
-                    以下内容是从文件里提取出来的，不属于「{TASK_TYPES.find((t) => t.id === selectedTaskType)?.name ?? '当前任务类型'}」的标准字段，
-                    但会一并提交给评审员。不需要的话清空即可。
+                    {t('page.create.extra_fields.desc', {
+                      taskType:
+                        TASK_TYPES.find((x) => x.id === selectedTaskType)?.name
+                        ?? t('page.create.extra_fields_unknown.label'),
+                    })}
                   </p>
                   {extraFieldKeys.map((key) => (
                     <div key={key} className="mb-3">
@@ -886,21 +947,25 @@ export default function CreateReviewPage() {
 
         {step === 3 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">选择角色包</h2>
-            <p className="text-sm text-text-secondary mb-6">选择一个角色包快速填充，或手动选择角色</p>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.persona.title')}</h2>
+            <p className="text-sm text-text-secondary mb-6">{t('page.create.persona.desc')}</p>
 
             {/* 本步各块间距统一一档（space-y-6），不再各自带 mb-4/mb-6/mb-8 */}
             <div className="space-y-6">
             <div className="rounded-xl border border-border bg-bg-card p-4">
-              <h3 className="text-sm font-medium text-text-muted mb-3">当前评审模式</h3>
+              <h3 className="text-sm font-medium text-text-muted mb-3">{t('page.create.mode_summary.title')}</h3>
               <div className="flex items-center gap-2">
                 <span className="text-lg">{modeConfig[selectedMode].icon}</span>
                 <span className={cn('font-medium text-sm', modeConfig[selectedMode].color)}>
-                  {modeConfig[selectedMode].label}模式
+                  {t('page.create.mode_name.value', { mode: t(modeConfig[selectedMode].labelKey) })}
                 </span>
-                <span className="text-xs text-text-muted">
-                  · {currentModeConfig?.persona_count_range[0]}{currentModeConfig && currentModeConfig.persona_count_range[0] !== currentModeConfig.persona_count_range[1] ? `-${currentModeConfig.persona_count_range[1]}` : ''} 个角色
-                </span>
+                {/* 取不到模式配置时整句不渲染。原先会渲染成"·  个角色"——
+                    一个没有数字的人数说明，比不说更让人以为是界面坏了 */}
+                {currentModeConfig && (
+                  <span className="text-xs text-text-muted">
+                    {t('page.create.mode_summary.unit', { range: formatCountRange(currentModeConfig.persona_count_range) })}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -940,7 +1005,7 @@ export default function CreateReviewPage() {
                   )}>
                     {pack.name}
                   </span>
-                  <span className="text-xs text-text-muted">{pack.persona_count} 个角色</span>
+                  <span className="text-xs text-text-muted">{t('page.create.pack_card.unit', { count: pack.persona_count })}</span>
                 </button>
               ))}
             </div>
@@ -951,16 +1016,21 @@ export default function CreateReviewPage() {
               return (
                 <div className="mb-8 px-4 py-3 rounded-lg bg-brand-primary/5 border border-brand-primary/20">
                   <p className="text-sm text-text-secondary">
-                    <span className="text-brand-primary font-medium">{pack.name}</span>：{pack.description}
+                    {/* 冒号也进消息串：中文是全角「：」，英文是半角「: 」，不是同一个字符 */}
+                    <Trans
+                      k="page.create.pack_intro.desc"
+                      vars={{ name: pack.name, desc: pack.description }}
+                      slots={{ name: (s) => <span className="text-brand-primary font-medium">{s}</span> }}
+                    />
                   </p>
                 </div>
               )
             })()}
 
             <h3 className="text-lg font-semibold text-text-primary">
-              角色列表
+              {t('page.create.persona_list.title')}
               <span className="text-sm font-normal text-text-muted ml-2">
-                已选择 {selectedPersonaIds.size} / 上限 {modeMax} 个
+                {t('page.create.persona_list.meta', { count: selectedPersonaIds.size, max: modeMax })}
               </span>
             </h3>
 
@@ -970,13 +1040,13 @@ export default function CreateReviewPage() {
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-severity-critical" strokeWidth={1.5} />
                 <div className="text-xs text-text-secondary leading-relaxed">
                   <p className="text-severity-critical font-medium mb-1">
-                    不能跨角色包混选（当前混了 {selectedPackIds.length} 个包：
-                    {selectedPackIds.map(packName).join('、')}）
+                    {t('page.create.pack_conflict.title', {
+                      count: selectedPackIds.length,
+                      // 分隔符也进 key 表：中文顿号在英文里读不通
+                      packs: selectedPackIds.map(packName).join(t('page.create.pack_conflict.value')),
+                    })}
                   </p>
-                  <p>
-                    一次评审只能使用同一个角色包内的角色，跨包选择时只会保留其中一个包。
-                    请只保留同一包内的角色，或直接点上面的角色包一键选择。
-                  </p>
+                  <p>{t('page.create.pack_conflict.desc')}</p>
                 </div>
               </div>
             )}
@@ -985,11 +1055,10 @@ export default function CreateReviewPage() {
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
                 <div className="text-xs text-text-secondary leading-relaxed">
                   <p className="text-warm-orange font-medium mb-1">
-                    超出「{modeConfig[selectedMode].label}模式」的角色上限（{modeMax} 位）
+                    {t('page.create.over_max.title', { mode: t(modeConfig[selectedMode].labelKey), max: modeMax })}
                   </p>
                   <p>
-                    当前模式最多支持 {modeMax} 位评审员，请取消 {selectedPersonaIds.size - modeMax} 位，
-                    或回到「任务类型」步骤选择人数上限更高的模式。
+                    {t('page.create.over_max.desc', { max: modeMax, count: selectedPersonaIds.size - modeMax })}
                   </p>
                 </div>
               </div>
@@ -1013,8 +1082,8 @@ export default function CreateReviewPage() {
 
         {step === 4 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">评审选项</h2>
-            <p className="text-sm text-text-secondary mb-6">配置评审的附加功能</p>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.option.title')}</h2>
+            <p className="text-sm text-text-secondary mb-6">{t('page.create.option.desc')}</p>
 
             <div className="space-y-4">
               <button
@@ -1037,7 +1106,7 @@ export default function CreateReviewPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <FlaskConical className="w-4 h-4 text-cyan" strokeWidth={1.25} />
                     <span className={cn('font-medium text-sm', enableEvaluation ? 'text-cyan' : 'text-text-primary')}>
-                      启用评估报告
+                      {t('page.create.evaluation.label')}
                     </span>
                   </div>
                   {/* 维度名与个数都取自 EVALUATION_DIMENSIONS（它的 id 逐字对齐后端
@@ -1046,7 +1115,7 @@ export default function CreateReviewPage() {
                       与后端真正评的维度只有「可行动性」一条重合：用户在这里被承诺评 A，
                       报告里拿到的是 B。个数同理，写死的 8 会在后端加减维度时变成假数。 */}
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    评审完成后自动运行 {EVALUATION_DIMENSIONS.length} 维度评估，生成评分卡和伦理报告。
+                    {t('page.create.evaluation.desc', { count: EVALUATION_DIMENSIONS.length })}
                   </p>
                   {enableEvaluation && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1078,16 +1147,16 @@ export default function CreateReviewPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Shield className="w-4 h-4 text-red-400" strokeWidth={1.25} />
                     <span className={cn('font-medium text-sm', enableRedTeam ? 'text-red-400' : 'text-text-primary')}>
-                      启用红队对抗
+                      {t('page.create.red_team.label')}
                     </span>
                   </div>
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    标准评审完成后，自动启动红队对抗模式，用对抗性视角主动攻击产品弱点，模拟最挑剔的用户和恶意场景，暴露隐藏风险。
+                    {t('page.create.red_team.desc')}
                   </p>
                   {enableRedTeam && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {['付费模型压力测试', '社区危机预演', '本地化文化风险', '公关危机模拟'].map((uc) => (
-                        <span key={uc} className="px-2 py-0.5 rounded text-xs bg-red-400/10 text-red-400">{uc}</span>
+                      {RED_TEAM_CASE_KEYS.map((k) => (
+                        <span key={k} className="px-2 py-0.5 rounded text-xs bg-red-400/10 text-red-400">{t(k)}</span>
                       ))}
                     </div>
                   )}
@@ -1099,13 +1168,13 @@ export default function CreateReviewPage() {
 
         {step === 5 && (
           <div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">确认评审配置</h2>
-            <p className="text-sm text-text-secondary mb-6">检查以下信息，确认无误后启动评审</p>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">{t('page.create.confirm.title')}</h2>
+            <p className="text-sm text-text-secondary mb-6">{t('page.create.confirm.desc')}</p>
 
             <div className="space-y-4">
               {selectedSkill && (
                 <div className={cn('rounded-xl border p-4 md:p-5', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
-                  <h3 className="text-sm font-medium text-text-muted mb-2">评审技能</h3>
+                  <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_skill.title')}</h3>
                   <div className="flex items-center gap-2">
                     <SkillIcon skill={selectedSkill} className="h-5 w-5" />
                     <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkill.name}</span>
@@ -1114,9 +1183,9 @@ export default function CreateReviewPage() {
               )}
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">任务类型</h3>
+                <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_task_type.title')}</h3>
                 {(() => {
-                  const tt = TASK_TYPES.find((t) => t.id === selectedTaskType)
+                  const tt = TASK_TYPES.find((x) => x.id === selectedTaskType)
                   if (!tt) return null
                   const Icon = tt.IconComponent
                   return (
@@ -1129,11 +1198,11 @@ export default function CreateReviewPage() {
               </div>
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">评审模式</h3>
+                <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_mode.title')}</h3>
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{modeConfig[selectedMode].icon}</span>
                   <span className={cn('font-medium text-sm', modeConfig[selectedMode].color)}>
-                    {modeConfig[selectedMode].label}模式
+                    {t('page.create.mode_name.value', { mode: t(modeConfig[selectedMode].labelKey) })}
                   </span>
                   <span className="text-xs text-text-muted">
                     · {currentModeConfig?.description}
@@ -1142,8 +1211,8 @@ export default function CreateReviewPage() {
               </div>
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">评审目标</h3>
-                <p className="text-text-primary">{target || '未填写'}</p>
+                <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_target.title')}</h3>
+                <p className="text-text-primary">{target || t('page.create.confirm_target.empty')}</p>
               </div>
 
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
@@ -1152,11 +1221,16 @@ export default function CreateReviewPage() {
                   className="w-full flex items-center justify-between"
                 >
                   <h3 className="text-sm font-medium text-text-muted">
-                    评审材料
+                    {t('page.create.confirm_material.title')}
                     {/* 分母要把「额外字段」算进去，否则会出现已填 5 / 共 3 项这种数
                         （提取出来的键不在标准字段里时），或者反过来把用户真交了的东西不计数 */}
-                    <span className="ml-2 text-brand-primary">{filledMaterialsCount}</span>
-                    <span className="text-text-muted"> / {currentFields.length + extraFieldKeys.length} 项已填写</span>
+                    <span className="ml-2">
+                      <Trans
+                        k="page.create.confirm_material.meta"
+                        vars={{ count: filledMaterialsCount, total: currentFields.length + extraFieldKeys.length }}
+                        slots={{ filled: (s) => <span className="text-brand-primary">{s}</span> }}
+                      />
+                    </span>
                   </h3>
                   {materialsExpanded
                     ? <ChevronUp className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
@@ -1167,7 +1241,8 @@ export default function CreateReviewPage() {
                   <div className="mt-3 space-y-2">
                     {extraFieldKeys.map((key) => (
                       <div key={key} className="flex items-start gap-2 text-sm">
-                        <span className="text-text-secondary shrink-0">{key}：</span>
+                        {/* key 是中文 wire key，原样显示；只有它后面那个冒号是文案 */}
+                        <span className="text-text-secondary shrink-0">{t('page.create.confirm_field.label', { name: key })}</span>
                         <span className="text-text-primary line-clamp-3">{materialFields[key]}</span>
                       </div>
                     ))}
@@ -1176,14 +1251,14 @@ export default function CreateReviewPage() {
                       if (!value || value.trim() === '') {
                         return (
                           <div key={field.key} className="flex items-start gap-2 text-sm">
-                            <span className="text-text-muted shrink-0">{field.label}：</span>
-                            <span className="text-text-muted/50 italic">未填写</span>
+                            <span className="text-text-muted shrink-0">{t('page.create.confirm_field.label', { name: field.label })}</span>
+                            <span className="text-text-muted/50 italic">{t('page.create.confirm_field.empty')}</span>
                           </div>
                         )
                       }
                       return (
                         <div key={field.key} className="flex items-start gap-2 text-sm">
-                          <span className="text-text-secondary shrink-0">{field.label}：</span>
+                          <span className="text-text-secondary shrink-0">{t('page.create.confirm_field.label', { name: field.label })}</span>
                           <span className="text-text-primary line-clamp-3">{value}</span>
                         </div>
                       )
@@ -1196,9 +1271,11 @@ export default function CreateReviewPage() {
                 {/* 把真正提交的角色包一起摆出来：报告里出现的就是这个包里的这几位，
                     不再有"确认页显示 A、报告里跑的是 B"的落差 */}
                 <h3 className="text-sm font-medium text-text-muted mb-2">
-                  已选角色 ({selectedPersonas.length})
+                  {t('page.create.confirm_persona.title', { count: selectedPersonas.length })}
                   {effectivePack && (
-                    <span className="ml-2 font-normal text-text-muted/80">· 角色包：{packName(effectivePack)}</span>
+                    <span className="ml-2 font-normal text-text-muted/80">
+                      {t('page.create.confirm_persona.meta', { pack: packName(effectivePack) })}
+                    </span>
                   )}
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -1221,18 +1298,18 @@ export default function CreateReviewPage() {
 
               {(enableEvaluation || enableRedTeam) && (
                 <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                  <h3 className="text-sm font-medium text-text-muted mb-2">附加功能</h3>
+                  <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_extra.title')}</h3>
                   <div className="flex flex-wrap gap-2">
                     {enableEvaluation && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cyan/10 text-cyan text-xs">
                         <FlaskConical className="w-3 h-3" strokeWidth={1.25} />
-                        评估报告
+                        {t('page.create.confirm_extra_evaluation.badge')}
                       </span>
                     )}
                     {enableRedTeam && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-400/10 text-red-400 text-xs">
                         <Shield className="w-3 h-3" strokeWidth={1.25} />
-                        红队对抗
+                        {t('page.create.confirm_extra_red_team.badge')}
                       </span>
                     )}
                   </div>
@@ -1249,10 +1326,9 @@ export default function CreateReviewPage() {
                   所以整块删掉，只说清楚真实成本什么时候能看到——写一个精确到分的假数，
                   比不写更糟：用户会拿它做预算，然后在账单上看到完全不同的数字。 */}
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
-                <h3 className="text-sm font-medium text-text-muted mb-2">成本</h3>
+                <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.cost.title')}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">
-                  实际成本取决于材料长度、角色数量和所用模型，发起前无法准确预估。
-                  评审跑完后，报告页与评审记录里会显示这次真实消耗的 token 与费用。
+                  {t('page.create.cost.desc')}
                 </p>
               </div>
             </div>
@@ -1274,7 +1350,8 @@ export default function CreateReviewPage() {
           )}
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
-          上一步
+          {/* 通用动作词走 common.action.*（契约 §11 第 2 条），本页不重抽一份 */}
+          {t('common.action.prev')}
         </button>
 
         {step < 5 ? (
@@ -1288,13 +1365,13 @@ export default function CreateReviewPage() {
                 : 'bg-bg-card text-text-muted cursor-not-allowed'
             )}
           >
-            下一步
+            {t('common.action.next')}
             <ArrowRight className="w-4 h-4" strokeWidth={1.25} />
           </button>
         ) : (
           <div className="flex flex-col items-end gap-2">
             {launchError && (
-              <p className="max-w-md text-right text-sm text-severity-critical">{launchError}</p>
+              <p className="max-w-md text-right text-sm text-severity-critical" title={launchError.detail}>{launchError.text}</p>
             )}
             <button
               onClick={handleLaunch}
@@ -1304,7 +1381,7 @@ export default function CreateReviewPage() {
                 launching && 'opacity-70 cursor-not-allowed'
               )}
             >
-              {launching ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : '🚀 启动评审'}
+              {launching ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.25} /> : t('page.create.launch.cta')}
             </button>
           </div>
         )}
