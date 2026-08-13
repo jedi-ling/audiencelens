@@ -231,23 +231,6 @@ export default function AskPage() {
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  // 把全页背景图（Layout 的 .page-bg，position:fixed 铺满视口）从侧栏底下让开。
-  //
-  // 为什么要这么绕：侧栏本身不设底色，是想要"没有一块板压在背景上"的观感。
-  // 但背景素材的高光弧线恰好横穿侧栏区域，实测主文字对比度低到 1.4:1，对话
-  // 标题会直接消失在弧线里（详见 <HistorySidebar> 上的注释）。与其给侧栏盖
-  // 遮罩把观感又赔回去，不如让图从侧栏边缘才开始铺——侧栏落在页面的纯黑底
-  // 上，观感是干净的，可读性是确定的，两边都不牺牲。
-  //
-  // 用 CSS 变量而不是给 .page-bg 加一条 /ask 专用规则：宽度得跟着侧栏的展开/
-  // 收起走（w-64 ↔ w-0），这个状态只有这里知道。清理必须做——变量挂在 :root
-  // 上，离开本页不还原的话，别的页面背景图会平白少一块。
-  useEffect(() => {
-    const root = document.documentElement
-    root.style.setProperty('--page-bg-left', sidebarOpen ? '16rem' : '0px')
-    return () => root.style.removeProperty('--page-bg-left')
-  }, [sidebarOpen])
-
   const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
   // 全部对话（不管有没有产出评审），CC Desktop 风格侧栏树的数据源。
   // 此前这里只存"还没产出评审"的那些（draftConvs），一旦某段对话关联了评审
@@ -1163,10 +1146,12 @@ export default function AskPage() {
           // 空会话时改成 flex 容器把引导内容垂直居中
           'chat-backdrop relative isolate flex-1 space-y-4 overflow-y-auto rounded-xl border p-4 transition-colors',
           isEmptyChat && 'flex flex-col justify-center',
-          // /90 而不是 /60：背景素材最亮处接近纯白（bg-4 实测 rgb(240,255,255)），
-          // 透到 0.6 的面板底下会把气泡里的正文压出一层蓝雾。留 10% 透明是刻意的——
-          // 完全做实会让整块面板像一张贴上去的卡片，失去与背景的层次关系。
-          dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border bg-bg-card/90'
+          // 面板不设底色：背景素材直接透到底，只留一圈 border 划出对话区的范围。
+          // 面板里真正承载文字的是气泡，气泡自己有不透明底色（bg-bg-secondary），
+          // 所以正文的可读性不依赖这块面板——面板只是个容器。
+          // 需要注意的是面板里**不在气泡内**的那些文字（"从一句话开始"、时间戳、
+          // 底部提示行），它们是直接压在背景素材上的。
+          dragging ? 'border-brand-primary/60 bg-brand-primary/5' : 'border-border'
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1736,17 +1721,16 @@ function HistorySidebar({
   return (
     <aside
       className={cn(
-        // 侧栏不设底色——但这**不等于**让背景图从它底下透上来。
+        // 侧栏不设底色，背景素材直接透上来——这是产品所有者明确要的观感。
         //
-        // 真让图透上来的话，四张背景素材的高光弧线全都横穿侧栏区域：实测 bg-1 在
-        // 侧栏那条竖带里有连续 480px 高的范围，主文字对比度只有 1.4–1.5:1（等于
-        // 白字写在白线上），而对话标题正好落在那一段。加遮罩也救不回来——要压到
-        // AA 得上 80% 黑，那时候已经和不透明没区别了。换背景图同样无解：唯一左侧
-        // 够暗的 bg-2，它那点亮度又恰好卡在 muted 色附近。
+        // 已知代价，改这里之前先看数据：四张背景素材的高光弧线都横穿侧栏区域。
+        // 实测 /ask 用的 bg-1，在侧栏这条 256px 竖带里有连续 480px 高的范围，
+        // 主文字 #f5f5f7 对比度只有 1.4–1.5:1（32 行采样 13 行低于 AA 的 4.5），
+        // 对话标题正好落在那一段。空列表时看不出来，列表长了才会显形。
         //
-        // 所以做法是让**背景图本身避开侧栏**（见下面的 --page-bg-left effect）：
-        // 侧栏落在页面的纯黑底上，没有底色也没有遮罩，弧线整条留在内容区——
-        // 那边只有聊天面板，面板自己有底色，不吃这个亏。
+        // 所以不要用"加个半透明底色"去补——试过，muted 文字要达标得上 80% 黑，
+        // 那时和不透明没区别，等于把这里想要的效果整个赔掉。真要救可读性，
+        // 该走 text-shadow 之类不产生可见色块的手段。
         'shrink-0 overflow-hidden border-r border-border transition-all duration-200',
         open ? 'w-64' : 'w-0 border-r-0'
       )}

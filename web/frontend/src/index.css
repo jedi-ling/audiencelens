@@ -86,19 +86,13 @@ html, body {
    opacity 0.85 让弧光更明显但不抢内容风头。 */
 .page-bg {
   position: fixed;
-  /* left 可被页面覆写：对话页把图从侧栏底下让开，让侧栏不设底色也能保证
-     文字可读（见 AskPage.tsx 里设置 --page-bg-left 的 effect）。
-     默认 0px = 铺满视口，其余页面行为不变。 */
-  left: var(--page-bg-left, 0px);
-  top: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  width: calc(100vw - var(--page-bg-left, 0px));
+  width: 100vw;
   height: 100vh;
   object-fit: cover;
   opacity: 0.85;
-  transition: left 200ms, width 200ms; /* 跟侧栏 w-64↔w-0 的 duration-200 对齐 */
 }
 
 ::selection {
