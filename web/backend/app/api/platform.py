@@ -38,6 +38,7 @@ from app.deps import (
 )
 from app.models import Job, Review, User
 from app.services import (
+    admin_settings_service,
     intent_service,
     job_service,
     key_service,
@@ -56,13 +57,39 @@ router = APIRouter()
 # ============================== 健康检查 ==============================
 
 @router.get("/health")
-async def health():
+async def health(db: Session = Depends(get_db)):
     """探活 + 当前生效的链路开关（绝不泄露密钥）。
 
-    注意这条**不碰数据库**，是纯进程存活探测，用于容器 healthcheck 之类
-    "进程还在不在"的场景。要判断"服务是不是真的能用"，用 /health/ready。
+    这条**不做依赖探测**（不判断数据库健不健康），是纯进程存活语义，
+    用于容器 healthcheck 之类"进程还在不在"的场景。要判断"服务是不是
+    真的能用"，用 /health/ready。
+
+    但它确实要读一次库，因为下面两项能在后台面板运行时覆盖：
+
+      · key_mode           —— admin_settings 表里的覆盖值（key_service.resolve_key
+                              读的就是它，不是 env）
+      · server_key_present —— 后台面板设的平台 key 存在**数据库**里
+                              （PLATFORM_KEY_OWNER 那行），而 settings.server_llm_key
+                              只是 env 里的 ANTHROPIC_API_KEY
+
+    不合成的话会出现这个具体故障：运营在后台配好平台 key、把 key_mode 切成
+    managed，前端拿到的仍是启动时的快照（byok / server_key_present=false），
+    于是 session-store 的 canReview() 判定为 false，"发起评审"按钮是灰的——
+    而后端 resolve_key 明明已经能解析出 key，跑得起来。
+    后台点了没反应、又没有任何报错，是最难排查的一类。
+
+    读库失败不该让存活探测跟着失败（那是 /health/ready 的职责），
+    所以这里回落到 env 快照并打日志。
     """
-    return {"status": "ok", "config": settings.sanitized()}
+    config = settings.sanitized()
+    try:
+        config["key_mode"] = admin_settings_service.get(db, "key_mode", settings.key_mode)
+        config["server_key_present"] = bool(
+            settings.server_llm_key or key_service.get_platform_key_status(db)
+        )
+    except Exception as exc:  # noqa: BLE001  存活探测不因读库失败而失败
+        logger.warning("health: 读运行时覆盖值失败，回落 env 快照：%s", exc)
+    return {"status": "ok", "config": config}
 
 
 @router.get("/health/ready")

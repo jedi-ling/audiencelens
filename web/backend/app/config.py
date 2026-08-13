@@ -490,11 +490,17 @@ class Settings:
 
         改这里要同步 web/frontend/src/lib/types.ts 的 HealthConfig，
         有 test_health_config_parity 守着两边不漂移。
+
+        ⚠️ 这里给的是**进程启动时的 env 快照**。key_mode 和平台 key 都能在
+        后台面板运行时覆盖（写库，不改 env），所以 /api/health 不能直接用这份
+        快照——见 api/platform.py::health，它会用 db 里的实际值覆盖这两项。
+        单独调 sanitized() 时请自己意识到这一点。
         """
         return {
             # 前端隐藏/显示登录入口
             "auth_enabled": self.auth_enabled,
-            # 下面两项一起决定「这次评审能不能跑起来」（见 session-store 的 canRun）
+            # 下面两项一起决定「这次评审能不能跑起来」（见 session-store 的 canReview）。
+            # 两者都会被 /api/health 用运行时实际值覆盖。
             "key_mode": self.key_mode,
             "server_key_present": bool(self.server_llm_key),
             # 前端隐藏/显示配额进度条

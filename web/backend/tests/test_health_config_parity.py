@@ -137,3 +137,96 @@ def test_no_secret_shaped_values_leak():
     raw = json.dumps(settings.sanitized(), default=str).lower()
     for pattern in ("sk-", "secret", "password", "ciphertext", "-----begin"):
         assert pattern not in raw, f"/api/health 的响应里出现了疑似密钥内容：{pattern!r}"
+
+
+# ============ /api/health 必须反映运行时覆盖，而不是启动快照 ============
+#
+# key_mode 与平台 key 都能在后台面板运行时改（写库，不动 env）。
+# 如果 /api/health 直接回 settings.sanitized()，前端拿到的就是**进程启动那一刻**
+# 的 env 快照，于是出现这个具体故障：
+#
+#   运营在后台配好平台 key、把 key_mode 切成 managed
+#     → 前端仍读到 byok / server_key_present=false
+#     → session-store 的 canReview() 判定 false，"发起评审"按钮是灰的
+#     → 而后端 key_service.resolve_key 明明已经能解析出 key，跑得起来
+#
+# 后台点了没反应、页面又没有任何报错，是最难排查的一类问题。
+# 下面两条分别钉住两个字段。
+
+
+class TestHealthReflectsRuntimeOverrides:
+    """后台改了运行时配置，/api/health 必须当场反映。"""
+
+    def test_key_mode_override_is_reflected(self, client, db):
+        from app.services import admin_settings_service
+
+        before = client.get("/api/health").json()["config"]["key_mode"]
+        admin_settings_service.set_override(db, "key_mode", "managed")
+        try:
+            after = client.get("/api/health").json()["config"]["key_mode"]
+            assert after == "managed", (
+                f"后台把 key_mode 改成了 managed，/api/health 却仍回 {after!r}。"
+                "前端会按旧模式判断能不能发起评审——后台点了没反应，且没有任何报错。"
+            )
+            assert before != after, "前置条件失效：改之前就已经是 managed 了"
+        finally:
+            admin_settings_service.clear_override(db, "key_mode")
+
+    def test_platform_key_set_via_admin_is_reflected(self, client, db):
+        """平台 key 存在**数据库**里，而 settings.server_llm_key 只是 env。
+
+        这条是本文件里唯一一个"后端能跑但前端说不能跑"的形态：
+        canReview() 在 managed 模式下只看 server_key_present。
+        """
+        from app.services import key_service
+
+        assert client.get("/api/health").json()["config"]["server_key_present"] is False, (
+            "前置条件失效：测试环境本来就有平台 key（env 里设了 ANTHROPIC_API_KEY？）"
+        )
+
+        key_service.save_platform_key(db, "sk-ant-test-platform-key-0123456789")
+        try:
+            cfg = client.get("/api/health").json()["config"]
+            assert cfg["server_key_present"] is True, (
+                "后台已经配好平台 key（key_service.resolve_key 能解析出来），"
+                "/api/health 却仍回 server_key_present=false。"
+                "managed 模式下前端 canReview() 只看这个字段——"
+                "结果是后端跑得起来，而用户那边「发起评审」按钮是灰的。"
+            )
+        finally:
+            key_service.delete_platform_key(db)
+
+    def test_health_never_returns_the_platform_key_itself(self, client, db):
+        """合成运行时状态时只能给布尔，绝不能把 key 带出来。
+
+        /api/health 不鉴权。这条防的是"顺手把 key 的信息也回一下方便调试"。
+        """
+        from app.services import key_service
+
+        secret = "sk-ant-must-never-appear-in-health-9876543210"
+        key_service.save_platform_key(db, secret)
+        try:
+            raw = client.get("/api/health").text
+            assert secret not in raw
+            assert "sk-ant" not in raw, "平台 key（哪怕是脱敏形式）出现在公开的 /api/health 里"
+        finally:
+            key_service.delete_platform_key(db)
+
+    def test_db_failure_falls_back_instead_of_500(self, client, monkeypatch):
+        """读运行时覆盖值失败时，存活探测要回落而不是 500。
+
+        /api/health 是**进程存活**语义（容器 healthcheck 用它）。
+        数据库抖一下就让它 500，会导致容器被 orchestrator 杀掉重启——
+        而重启解决不了数据库的问题，只会让服务在重启循环里彻底不可用。
+        判断依赖健不健康是 /health/ready 的职责。
+        """
+        from app.services import admin_settings_service
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("db is down")
+
+        monkeypatch.setattr(admin_settings_service, "get", _boom)
+
+        r = client.get("/api/health")
+        assert r.status_code == 200, "读库失败把存活探测打成了非 200，容器会被反复重启"
+        assert r.json()["config"]["key_mode"], "回落时也要给出 env 快照，不能是空的"
