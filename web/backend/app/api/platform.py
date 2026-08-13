@@ -428,6 +428,43 @@ async def change_password(
     return {"changed": True, "token": token}
 
 
+@router.post("/auth/sessions/revoke-all", dependencies=[Depends(rate_limit("auth", 20, 3600))])
+async def revoke_all_sessions(
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """登出所有设备：作废该账号当前已签发的全部 JWT。
+
+    为什么单独给一个入口，而不是让用户去改密码：
+    用户怀疑账号被盗时，第一反应是"把别人踢下线"，而改密码要求他先想出并
+    记住一个新密码——多一道摩擦，且在慌乱时最容易被拖延。撤销会话是止血，
+    改密码是治本，两件事不该被绑成一件。
+
+    这个能力对 BYOK 用户尤其重要：账号里存着他自己的模型 API Key，
+    会话被盗意味着别人能拿他的 key 跑评审花钱（虽然看不到明文）。
+
+    **本设备也会被登出**，前端拿到响应后要清掉本地令牌跳回登录页。
+    刻意不像 change_password 那样顺手换一把新令牌给本设备：
+    用户点这个按钮的语境是"我不确定哪台设备是我的"，此时"除了你都踢掉"
+    是个需要他信任当前设备的假设——而他正因为不确定才点的。
+    全部登出、重新登一次，语义上没有歧义。
+
+    要做到"看得见有哪些设备、逐个踢"需要为每次登录存一条会话记录
+    （设备/IP/最后活跃）。那是另一件事：新表、新数据，而且存 IP 要同步
+    改隐私政策。这里先给出安全价值最大的那一半。
+    """
+    _require_auth_enabled()
+    _require_own_identity(identity)
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+
+    revoke_user_sessions(db, user.id)
+    audit_target = user.email
+    logger.info("user %s revoked all sessions", audit_target)
+    return {"revoked": True}
+
+
 class UpdateProfileRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=50)
 

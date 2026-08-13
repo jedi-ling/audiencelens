@@ -361,6 +361,15 @@ export const api = {
       body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
     }),
 
+  /** 登出所有设备：作废该账号已签发的全部令牌。
+   *
+   *  与 changePassword 不同，这里**不会**换一把新令牌给本设备——本设备也会
+   *  被登出。用户点这个按钮的语境是"我不确定哪台设备是我的"，"除了你都踢掉"
+   *  需要他信任当前设备，而他正因为不确定才点的。
+   *  调用方拿到响应后必须 setToken(null) 并跳回登录页。 */
+  revokeAllSessions: () =>
+    request<{ revoked: boolean }>('/api/auth/sessions/revoke-all', { method: 'POST' }),
+
   /** 改昵称。邮箱不在这里改——那要走"向新地址发验证信"的两步流程。 */
   updateProfile: (displayName: string) =>
     request<{ id: string; email: string; display_name: string }>('/api/auth/me', {

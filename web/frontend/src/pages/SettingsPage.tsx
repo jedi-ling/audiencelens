@@ -25,6 +25,7 @@ import {
   Ticket,
   Download,
   AlertTriangle,
+  LogOut,
   User,
 } from 'lucide-react'
 
@@ -147,6 +148,12 @@ export default function SettingsPage() {
   const [pwBusy, setPwBusy] = useState(false)
   const [pwMsg, setPwMsg] = useState<string | null>(null)
   const [pwError, setPwError] = useState<string | null>(null)
+  // 登出所有设备：两段式确认（第一次点变成"确认？"，再点才真执行）。
+  // 不用 window.confirm——它在移动端体验差，且被浏览器"阻止此页面弹窗"拦掉时
+  // 会静默什么都不发生，用户以为点了没反应。
+  const [revokeBusy, setRevokeBusy] = useState(false)
+  const [revokeConfirm, setRevokeConfirm] = useState(false)
+  const [revokeError, setRevokeError] = useState<string | null>(null)
 
   useEffect(() => {
     // 进页面时把当前昵称填进输入框当初值；identity 是异步拿的，所以放 effect 里。
@@ -187,6 +194,30 @@ export default function SettingsPage() {
       setPwError(e instanceof Error ? e.message : '修改失败')
     } finally {
       setPwBusy(false)
+    }
+  }
+
+  /** 登出所有设备。
+   *
+   *  与 handleChangePassword 的关键差别：那边后端会回一把新令牌让本设备续上，
+   *  这边**不会**——本设备也被登出。所以成功后必须 setToken(null) 并跳登录页，
+   *  否则页面会带着一把已作废的令牌继续跑，下一个请求 401，用户看到的是
+   *  一堆莫名其妙的报错而不是"已登出"。
+   */
+  const handleRevokeAllSessions = async () => {
+    if (!revokeConfirm) { setRevokeConfirm(true); setRevokeError(null); return }
+    setRevokeBusy(true); setRevokeError(null)
+    try {
+      await api.revokeAllSessions()
+      setToken(null)
+      // 用整页跳转而不是 router navigate：本地还残留着 session-store 里的
+      // identity/keys 等状态，软跳转会让登录页上半截还显示着上一个账号的信息。
+      window.location.href = '/login'
+    } catch (e) {
+      setRevokeError(e instanceof Error ? e.message : '操作失败')
+      setRevokeConfirm(false)
+    } finally {
+      setRevokeBusy(false)
     }
   }
 
@@ -527,6 +558,35 @@ export default function SettingsPage() {
                   修改后其他设备会自动退出登录，本设备保持登录。如忘记当前密码，请退出后通过「忘记密码」重置。
                 </p>
               </div>
+
+              {/* 登出所有设备。
+                  与改密码分开是有意的：怀疑账号被盗时第一反应是"把别人踢下线"，
+                  而改密码要求先想出并记住一个新密码——多一道摩擦，慌乱时最容易被拖延。
+                  撤销会话是止血，改密码是治本，不该绑成一件事。 */}
+              <div className="mt-3 rounded-lg border border-border bg-black/30 p-4">
+                <label className="block text-xs font-medium text-text-secondary">登出所有设备</label>
+                <p className="mt-1.5 text-xs leading-relaxed text-text-muted">
+                  怀疑账号在别处被登录时用这个：立即作废本账号已签发的全部登录凭证。
+                  <strong className="text-text-secondary">本设备也会退出</strong>，需要重新登录。
+                  你的 API Key 和评审记录不受影响。
+                </p>
+                <button
+                  onClick={() => void handleRevokeAllSessions()}
+                  disabled={revokeBusy}
+                  className="mt-3 flex items-center gap-1.5 rounded-md border border-severity-critical/40 bg-black/30 px-3 py-2 text-sm text-severity-critical transition-colors hover:bg-severity-critical/10 disabled:opacity-50"
+                >
+                  {revokeBusy
+                    ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} />
+                    : <LogOut className="h-4 w-4" strokeWidth={1.5} />}
+                  {revokeConfirm ? '确认登出所有设备？' : '登出所有设备'}
+                </button>
+                {revokeConfirm && !revokeBusy && (
+                  <p className="mt-2 text-xs text-warm-orange">
+                    再点一次确认。确认后所有设备（含本机）都需要重新登录。
+                  </p>
+                )}
+                {revokeError && <p className="mt-2 text-xs text-severity-critical">{revokeError}</p>}
+              </div>
             </section>
           )
         )}
@@ -543,8 +603,8 @@ export default function SettingsPage() {
                 API Key（BYOK）
               </h2>
               <p className="text-xs text-text-muted">
-                自带 Key 评审：Key 加密存储在服务端，评审费用从你的模型账户扣除。
-                {keyStatus?.server_key_available && '（平台也提供共享 Key 作为兜底）'}
+                自带 Key 评审：评审费用从你自己的模型账户扣除。
+                {keyStatus?.server_key_available && '（不填也能用——平台提供共享 Key）'}
               </p>
             </div>
           </div>
@@ -780,10 +840,43 @@ export default function SettingsPage() {
               Key 已保存
             </p>
           )}
-          <p className="mt-2 text-xs text-text-muted flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3 shrink-0" strokeWidth={1.25} />
-            API Key 加密存储，本页面不会明文回显
-          </p>
+          {/* 把 Key 交给别人的服务器，用户会有疑虑——这是合理的。
+              与其含糊地写一句"加密存储"，不如逐条回答他心里真正在问的：
+              谁能看到、你们拿去干嘛、我不想给行不行。
+              最后那条（不填也能用 / 可自建）比任何安全承诺都更能消除怀疑，
+              因为它把选择权交回给用户，而不是要求他信任我们。 */}
+          <div className="mt-3 rounded-lg border border-border bg-black/30 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-brand-primary" strokeWidth={1.5} />
+              你的 Key 会被怎么对待
+            </p>
+            <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-text-muted">
+              <li>
+                <span className="text-text-secondary">谁能看到：</span>
+                没有人。加密后落库（Fernet / AES-128 + HMAC），本页面、数据导出、
+                管理后台一律只显示脱敏形式（如 <code className="font-mono">sk-ant-…4f2a</code>）。
+              </li>
+              <li>
+                <span className="text-text-secondary">用来干嘛：</span>
+                只用于你自己发起的评审。不训练模型、不做案例展示、不转给任何第三方。
+              </li>
+              <li>
+                <span className="text-text-secondary">换设备：</span>
+                Key 绑在账号上而不是浏览器上，换设备登录后自动可用，无需重填。
+              </li>
+              <li>
+                <span className="text-text-secondary">不想给：</span>
+                {keyStatus?.server_key_available
+                  ? '可以不填，直接用平台提供的共享 Key。'
+                  : '本项目代码开源，可自行部署——自建时 Key 从头到尾在你自己的机器上。'}
+                {' '}也可以随时在本页删除它。
+              </li>
+            </ul>
+            <p className="mt-2 border-t border-border pt-2 text-[11px] text-text-muted">
+              以上每一条都能在源码里查证（本项目开源）。详见{' '}
+              <Link to="/privacy" className="text-cyan hover:underline">隐私政策</Link>。
+            </p>
+          </div>
 
           <div className="mt-4 flex items-start gap-2 text-xs text-text-muted rounded-lg border border-border bg-black/30 p-3">
             <ImagePlus className="w-3.5 h-3.5 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.25} />
