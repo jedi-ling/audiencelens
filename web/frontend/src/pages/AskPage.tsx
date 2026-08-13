@@ -230,6 +230,24 @@ export default function AskPage() {
 
   // 左侧历史侧栏——桌面端默认展开，让用户不用跳出对话页就能回看/切换之前的评审
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // 把全页背景图（Layout 的 .page-bg，position:fixed 铺满视口）从侧栏底下让开。
+  //
+  // 为什么要这么绕：侧栏本身不设底色，是想要"没有一块板压在背景上"的观感。
+  // 但背景素材的高光弧线恰好横穿侧栏区域，实测主文字对比度低到 1.4:1，对话
+  // 标题会直接消失在弧线里（详见 <HistorySidebar> 上的注释）。与其给侧栏盖
+  // 遮罩把观感又赔回去，不如让图从侧栏边缘才开始铺——侧栏落在页面的纯黑底
+  // 上，观感是干净的，可读性是确定的，两边都不牺牲。
+  //
+  // 用 CSS 变量而不是给 .page-bg 加一条 /ask 专用规则：宽度得跟着侧栏的展开/
+  // 收起走（w-64 ↔ w-0），这个状态只有这里知道。清理必须做——变量挂在 :root
+  // 上，离开本页不还原的话，别的页面背景图会平白少一块。
+  useEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--page-bg-left', sidebarOpen ? '16rem' : '0px')
+    return () => root.style.removeProperty('--page-bg-left')
+  }, [sidebarOpen])
+
   const [reviewHistory, setReviewHistory] = useState<ReviewListItem[] | null>(null)
   // 全部对话（不管有没有产出评审），CC Desktop 风格侧栏树的数据源。
   // 此前这里只存"还没产出评审"的那些（draftConvs），一旦某段对话关联了评审
@@ -1718,11 +1736,18 @@ function HistorySidebar({
   return (
     <aside
       className={cn(
-        // 不透明而不是 /60：侧栏是导航底板，没有理由让全页背景图从它底下透上来。
-        // 背景素材的高光弧线正好横穿侧栏区域，对话标题这类小字压在弧线上会糊成一片，
-        // 而且滚动列表时字随背景明暗忽明忽暗，比单纯的对比度问题更难受。
-        // 页面的通透感由侧栏**之外**的大片区域承担，那里背景是完整的。
-        'shrink-0 overflow-hidden border-r border-border bg-bg-secondary transition-all duration-200',
+        // 侧栏不设底色——但这**不等于**让背景图从它底下透上来。
+        //
+        // 真让图透上来的话，四张背景素材的高光弧线全都横穿侧栏区域：实测 bg-1 在
+        // 侧栏那条竖带里有连续 480px 高的范围，主文字对比度只有 1.4–1.5:1（等于
+        // 白字写在白线上），而对话标题正好落在那一段。加遮罩也救不回来——要压到
+        // AA 得上 80% 黑，那时候已经和不透明没区别了。换背景图同样无解：唯一左侧
+        // 够暗的 bg-2，它那点亮度又恰好卡在 muted 色附近。
+        //
+        // 所以做法是让**背景图本身避开侧栏**（见下面的 --page-bg-left effect）：
+        // 侧栏落在页面的纯黑底上，没有底色也没有遮罩，弧线整条留在内容区——
+        // 那边只有聊天面板，面板自己有底色，不吃这个亏。
+        'shrink-0 overflow-hidden border-r border-border transition-all duration-200',
         open ? 'w-64' : 'w-0 border-r-0'
       )}
     >
