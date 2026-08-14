@@ -474,6 +474,11 @@ def list_personas():
             gaming_profile=p.get("gaming_profile", {}),
             pack=p.get("_pack", ""),
             source=p.get("source", "yaml"),
+            # 表述层英文（10.3）。缺 overlay 时是 None，前端按 D8 显式标缺译，
+            # 不许回落中文——身份字段（name / region 等）本来就不翻。
+            archetype_en=p.get("archetype_en"),
+            identity_summary_en=p.get("identity_summary_en"),
+            display_name_en=p.get("display_name_en"),
         ))
     return result
 
@@ -499,6 +504,9 @@ def list_personas_by_pack(pack: str):
             gaming_profile=p.get("gaming_profile", {}),
             pack=p.get("_pack", pack),
             source=p.get("source", "yaml"),
+            archetype_en=p.get("archetype_en"),
+            identity_summary_en=p.get("identity_summary_en"),
+            display_name_en=p.get("display_name_en"),
         ))
     return result
 
@@ -517,6 +525,9 @@ def get_persona_in_pack(pack: str, persona_id: str):
                 gaming_profile=p.get("gaming_profile", {}),
                 pack=p.get("_pack", pack),
                 source=p.get("source", "yaml"),
+                archetype_en=p.get("archetype_en"),
+                identity_summary_en=p.get("identity_summary_en"),
+                display_name_en=p.get("display_name_en"),
             )
     raise HTTPException(status_code=404, detail=f"Persona '{persona_id}' not found in pack '{pack}'")
 
@@ -535,6 +546,9 @@ def get_persona(persona_id: str):
         gaming_profile=p.get("gaming_profile", {}),
         pack=p.get("_pack", ""),
         source=p.get("source", "yaml"),
+        archetype_en=p.get("archetype_en"),
+        identity_summary_en=p.get("identity_summary_en"),
+            display_name_en=p.get("display_name_en"),
     )
 
 

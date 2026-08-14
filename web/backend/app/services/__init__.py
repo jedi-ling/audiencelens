@@ -12,6 +12,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.i18n import (
+    assert_pack_categories_en,
+    assert_persona_packs_en,
+    assert_skills_en,
+    merge_persona_overlay,
+    merge_review_modes_en,
+    merge_task_types_en,
+    pack_category_name_en,
+    pack_en,
+    skill_en,
+)
+from app.i18n import persona_overlay as _persona_overlay
 from app.models import Base, Review, SkillType
 from app.services.json_safe import json_safe, json_safe_key
 
@@ -140,6 +152,12 @@ assert set(TASK_TYPES) == set(_ENGINE_TASK_TYPES), (
     f"仅注册表有 {set(_ENGINE_TASK_TYPES) - set(TASK_TYPES)}"
 )
 
+# 英文文案在 import 期并成同级键 name_en / description_en / stance_labels_en（D4）。
+# 上面那条 assert 管的是「界面能选的类型引擎认不认」，这条管的是「英文用户看到的是不是英文」——
+# 两条是同一个形态：漂了不会报错，只会让用户看到假的/半截的东西，所以都放在 import 期炸。
+# 英文缺一条 = 后端起不来，不是「那一条静默显示中文」。
+merge_task_types_en(TASK_TYPES)
+
 REVIEW_MODES: Dict[str, Dict[str, Any]] = {
     "quick": {
         "persona_count_range": [3, 3],
@@ -160,6 +178,36 @@ REVIEW_MODES: Dict[str, Dict[str, Any]] = {
         "description": "正式评审，完整流程",
     },
 }
+
+merge_review_modes_en(REVIEW_MODES)
+
+# 技能的英文条目也在 import 期核对。id 集就是 SkillType 枚举本身——
+# 加了新枚举而没补英文时，后端起不来，而不是那条技能在英文界面上显示中文名。
+assert_skills_en([st.value for st in SkillType])
+
+
+def _pack_ids_on_disk() -> set:
+    """磁盘上的人格包 id = `src/personas/*.yaml` 的文件名主干。
+
+    与 `PersonaService.load_all_personas()` 的键完全同源（那边也是按文件名主干建键），
+    所以拿它去核对英文条目是准的；这里刻意**不解析 yaml**——import 期只是核 id 集，
+    没必要为此把 11 个包全读一遍，读盘目录一次就够。
+    （`en-US/` 是子目录、不以 .yaml 结尾，天然不会被当成包。）
+    """
+    if not os.path.isdir(PERSONAS_DIR):
+        raise RuntimeError(
+            f"人格库目录不存在：{PERSONAS_DIR}。"
+            "这不是 i18n 的问题——没有人格库后端本来就跑不了评审，"
+            "在这里显式报出来是为了不让它伪装成「英文目录对不上」"
+        )
+    return {
+        os.path.splitext(f)[0]
+        for f in os.listdir(PERSONAS_DIR)
+        if f.endswith((".yaml", ".yml"))
+    }
+
+
+assert_persona_packs_en(_pack_ids_on_disk())
 
 # 注：交叉质询的档位映射、多智能体反驳的身份前言、失败兜底区块，以前在这里
 # 各有一份，供 ReviewService.run_review 这套「与引擎平行的第二实现」使用。
@@ -194,14 +242,25 @@ class PersonaService:
         'startup-panel': 'general',
     }
 
+    # 分类标题的英文条目在 import 期核对。分类的取值集合是这张表的值域再加上
+    # `.get(pack_id, 'special')` 的兜底档——照着代码真正能吐出来的值核，
+    # 而不是照 json 里写了几条核（后者会在「多写了一条没人用的分类」时假绿）。
+    assert_pack_categories_en(set(PACK_CATEGORY_MAP.values()) | {'special'})
+
     @classmethod
-    def _load_pack(cls, yaml_path: str) -> List[dict]:
+    def _load_pack_doc(cls, yaml_path: str) -> dict:
+        """读整份人格包 yaml。`_load_pack` 只要 personas 列表，而 overlay 合并还要
+        panel_id 做防抄串校验——两处各 open 一次会让同一个文件在启动时被解析两遍。"""
         try:
             with open(yaml_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            return data.get("personas", [])
+            return data if isinstance(data, dict) else {}
         except Exception:
-            return []
+            return {}
+
+    @classmethod
+    def _load_pack(cls, yaml_path: str) -> List[dict]:
+        return cls._load_pack_doc(yaml_path).get("personas", [])
 
     @classmethod
     def _parse_agent_md(cls, md_path: str) -> Optional[dict]:
@@ -347,6 +406,13 @@ class PersonaService:
 
     @classmethod
     def load_all_personas(cls) -> Dict[str, List[dict]]:
+        """人格库（正主 yaml）。加载时并入 en-US 表述层 overlay。
+
+        overlay 合并在这里而不是在端点里，是为了让「英文缺了」在**加载**时就炸：
+        放到端点里意味着每个端点都要记得合一次，忘掉的那个端点会静默发中文。
+        合进来的是 `archetype_en` 等同级键，身份字段一个都不动（10.3），
+        引擎也读不到这份缓存（它直接吃 yaml 文件路径），所以不会影响任何评审结论。
+        """
         if cls._personas_cache:
             return cls._personas_cache
         if not os.path.isdir(PERSONAS_DIR):
@@ -355,7 +421,13 @@ class PersonaService:
             if fname.endswith((".yaml", ".yml")):
                 pack_id = os.path.splitext(fname)[0]
                 path = os.path.join(PERSONAS_DIR, fname)
-                cls._personas_cache[pack_id] = cls._load_pack(path)
+                doc = cls._load_pack_doc(path)
+                personas = doc.get("personas", [])
+                # panel_id 不给兜底值：兜底成 pack_id 会让「源包忘写 panel_id」
+                # 变成一次必然通过的防抄串校验，也就是把卡口关掉还留着它的样子。
+                cls._personas_cache[pack_id] = merge_persona_overlay(
+                    pack_id, personas, doc.get("panel_id")
+                )
         return cls._personas_cache
 
     @classmethod
@@ -411,6 +483,10 @@ class PersonaService:
         all_packs = cls.load_all_personas()
         for pack_id, personas in all_packs.items():
             path = os.path.join(PERSONAS_DIR, f"{pack_id}.yaml")
+            # 这两行放在 try 外面：英文条目缺失必须炸，不能被下面那个 except 吞成
+            # 「降级条目」——降级条目长得和正常条目一模一样，只是英文名变成了 id。
+            en = pack_en(pack_id)
+            category = cls.PACK_CATEGORY_MAP.get(pack_id, 'special')
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
@@ -419,7 +495,12 @@ class PersonaService:
                     "name": data.get("name", pack_id),
                     "description": data.get("description", ""),
                     "persona_count": len(personas),
-                    "category": cls.PACK_CATEGORY_MAP.get(pack_id, 'special'),
+                    "category": category,
+                    # 英文查表用 pack_id（文件名主干）而不是 panel_id：
+                    # import 期核对的就是文件名主干那份 id 集，两边用同一把钥匙。
+                    "name_en": en["name"],
+                    "description_en": en["description"],
+                    "category_name_en": pack_category_name_en(category),
                 })
             except Exception:
                 cls._packs_cache.append({
@@ -427,7 +508,13 @@ class PersonaService:
                     "name": pack_id,
                     "description": "",
                     "persona_count": len(personas),
-                    "category": cls.PACK_CATEGORY_MAP.get(pack_id, 'special'),
+                    "category": category,
+                    # 中文侧降级成 pack_id 是因为 yaml 读不到了；英文侧不跟着降级——
+                    # 它的事实源是 catalog.en-US.json，那份文件好好的，
+                    # 这里再把它降级成 id 就是替一个没坏的东西认错。
+                    "name_en": en["name"],
+                    "description_en": en["description"],
+                    "category_name_en": pack_category_name_en(category),
                 })
 
         # 注：不把 .claude/agents / .trae 的镜像副本列进包清单——
@@ -449,24 +536,14 @@ class PersonaService:
         return presets.get(task_type)
 
     @classmethod
-    def get_task_types(cls) -> List[dict]:
-        result = []
-        for task_type, info in TASK_TYPES.items():
-            result.append({
-                "task_type": task_type,
-                "name_zh": info["name_zh"],
-                "description": info["description"],
-                "stance_enum": info["stance_enum"],
-                "score_dimensions": info["score_dimensions"],
-                "base_dimensions": ["clarity", "trust"],
-            })
-        return result
+    def _task_type_entry(cls, task_type: str, info: Dict[str, Any]) -> dict:
+        """一条任务类型的对外形状。中英同时发（D4）。
 
-    @classmethod
-    def get_task_type(cls, task_type: str) -> Optional[dict]:
-        info = TASK_TYPES.get(task_type)
-        if not info:
-            return None
+        `stance_enum` 是**聚类键**，永不翻译——聚合器拿它当立场分桶的 dict 键。
+        英文只存在于 `stance_labels_en` 这个显示层副本里，与 `stance_enum` 逐位对应，
+        位置即契约：顺序错一位就等于把「会买」显示成「不买」，而且不会报任何错。
+        （等长与不重复由 catalog_en.merge_task_types_en 在 import 期核过。）
+        """
         return {
             "task_type": task_type,
             "name_zh": info["name_zh"],
@@ -474,7 +551,21 @@ class PersonaService:
             "stance_enum": info["stance_enum"],
             "score_dimensions": info["score_dimensions"],
             "base_dimensions": ["clarity", "trust"],
+            "name_en": info["name_en"],
+            "description_en": info["description_en"],
+            "stance_labels_en": info["stance_labels_en"],
         }
+
+    @classmethod
+    def get_task_types(cls) -> List[dict]:
+        return [cls._task_type_entry(tt, info) for tt, info in TASK_TYPES.items()]
+
+    @classmethod
+    def get_task_type(cls, task_type: str) -> Optional[dict]:
+        info = TASK_TYPES.get(task_type)
+        if not info:
+            return None
+        return cls._task_type_entry(task_type, info)
 
     @classmethod
     def get_review_modes(cls) -> List[dict]:
@@ -486,6 +577,10 @@ class PersonaService:
                 "cross_examination": config["cross_examination"],
                 "calibration": config["calibration"],
                 "description": config["description"],
+                # 只发 description_en：模式名（Quick / Standard / Full）的 owner 是前端
+                # enum.mode_badge，后端 REVIEW_MODES 本来就没有 name 字段，
+                # 在这里再造一份英文名就是给同一个词立第二个 owner。
+                "description_en": config["description_en"],
             })
         return result
 
@@ -537,6 +632,9 @@ class PersonaService:
         cls._packs_cache = []
         cls._agents_cache = {}
         cls._trae_cache = {}
+        # overlay 有自己的缓存。不一起清的话，重载人格库之后发的还是旧英文，
+        # 而「中文改了英文没改」这种不一致会一路被当成前端 bug 查过去。
+        _persona_overlay.invalidate_cache()
 
     @classmethod
     def get_skill_types(cls) -> List[dict]:
@@ -562,10 +660,16 @@ class PersonaService:
         result = []
         for skill_type in SkillType:
             info = skill_info.get(skill_type, {"name": skill_type.value, "description": ""})
+            # 英文侧不跟着上面那句「查不到就用枚举值当名字」的兜底走：
+            # 英文的事实源是 catalog.en-US.json，id 集在 import 期核过，
+            # 查不到就该炸（skill_en 会抛），而不是把 enum 值当英文名发出去。
+            en = skill_en(skill_type.value)
             result.append({
                 "skill_type": skill_type.value,
                 "name": info["name"],
                 "description": info["description"],
+                "name_en": en["name"],
+                "description_en": en["description"],
             })
         return result
 

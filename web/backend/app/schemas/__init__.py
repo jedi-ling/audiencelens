@@ -111,6 +111,28 @@ class ReviewListItemResponse(BaseModel):
 
 
 class PersonaSummary(BaseModel):
+    """人格摘要。**身份数据不本地化，展示名有罗马音译**（I18N_CONTRACT 10.3，
+    2026-08 推翻早期"人格名恒中文"的裁决）：`name` 恒是中文，继续是 recruit_types /
+    引擎 / persona_outputs 落库的唯一事实源——`region` / `age_range` 会被拼进报告的
+    recruit_types，用户照着去招真人受访者，改动这些字段就是在向英文用户断言一个
+    从未建模过的受众。这条红线没有变。
+
+    变的是：`display_name_en` 给同一个身份配一个罗马音译的展示名（如 陆澄 → Lu Cheng，
+    pypinyin 批量生成，非逐条人工编），**只活在展示链路上**，绝不流入
+    recruit_types / 引擎提示词 / persona_outputs.persona_name 落库——那三处
+    继续读 `name`。隔离由 test_persona_overlay.py 的
+    test_display_name_never_reaches_recruit_types_or_prompt 机械卡死。
+
+    表述层双发：`archetype_en` / `identity_summary_en` / `display_name_en` 来自
+    `src/personas/en-US/<pack>.yaml`（10.3.1 的 overlay）。
+
+    三个字段都可以是 null，且 null 只有一种含义：**这条人格没有 overlay**。
+    它只会出现在 `.claude/agents` / `.trae` 那两份开发工具链镜像上（那两处不进
+    人格库列表，只有按包名直连时才拿得到）。正主 `src/personas/*.yaml` 的 72 条
+    在加载时逐条核过覆盖率，缺一条就抛。前端拿到 null 时按 D8 渲染
+    ⟦missing:en-US:…⟧，**不许回落显示中文**——回落的表现就是英文界面里混中文且没人发现。
+    """
+
     id: str
     name: str
     archetype: str
@@ -119,6 +141,9 @@ class PersonaSummary(BaseModel):
     gaming_profile: Dict[str, Any] = {}
     pack: str
     source: str = "yaml"
+    archetype_en: Optional[str] = None
+    identity_summary_en: Optional[str] = None
+    display_name_en: Optional[str] = None
 
 
 class PackSummary(BaseModel):
@@ -127,6 +152,13 @@ class PackSummary(BaseModel):
     description: str
     persona_count: int
     category: str = 'special'
+    # 中英同时发（D4）。无默认值同 TaskTypeResponse：英文条目的 id 集在 import 期
+    # 核过，服务层永远填得出，配个 None 只会把「没并进来」伪装成「这条没有英文」。
+    name_en: str
+    description_en: str
+    # 分类标题（"玩家类型" / "平台" …）的中文 owner 在前端 mock-data.ts 的
+    # PACK_CATEGORIES，后端只发英文那一半——中文也发一份就是给同一句话立第二个 owner。
+    category_name_en: str
 
 
 class PresetResponse(BaseModel):
@@ -192,12 +224,25 @@ class TaskTypeStanceDimension(BaseModel):
 
 
 class TaskTypeResponse(BaseModel):
+    """任务类型条目。中英同时发（I18N_CONTRACT D4），不按 Accept-Language 协商。
+
+    三个 `_en` 字段**没有默认值**，因为服务层永远填得出来（英文条目的 id 集在
+    import 期核对过，缺一条后端根本起不来）。给它们配 `= None` 反而会让
+    「英文没并进来」这件事退化成一个 null，而 null 在前端就是又一个静默的中文回落点。
+
+    `stance_enum` 不翻：它是聚合器的立场分桶键。英文只存在于 `stance_labels_en`，
+    与 `stance_enum` **逐位对应**——顺序错一位就是把「会买」显示成「不买」，且不报错。
+    """
+
     task_type: str
     name_zh: str
     description: str
     stance_enum: List[str]
     score_dimensions: List[str]
     base_dimensions: List[str] = ["clarity", "trust"]
+    name_en: str
+    description_en: str
+    stance_labels_en: List[str]
 
 
 class ReviewModeConfig(BaseModel):
@@ -206,6 +251,9 @@ class ReviewModeConfig(BaseModel):
     cross_examination: bool
     calibration: bool
     description: str
+    # 模式名（Quick / Standard / Full）的 owner 是前端 enum.mode_badge，
+    # 后端没有 name 字段也不新造一个，所以英文这里只有说明文字。
+    description_en: str
 
 
 class EvaluationResultResponse(BaseModel):
@@ -262,6 +310,10 @@ class SkillTypeResponse(BaseModel):
     skill_type: str
     name: str
     description: str
+    # 中英同时发（D4）。无默认值：英文条目缺一条后端在 import 期就起不来，
+    # 所以「服务层填不出」这件事不可能发生，不必给它留一个会静默变 null 的位置。
+    name_en: str
+    description_en: str
     # 该技能可用的人格包 id（当前只有 synthetic_playtest 给）
     available_packs: Optional[List[str]] = None
     # 该技能支持的任务类型（真实值来自 TASK_TYPES 注册表，不是手写清单）
