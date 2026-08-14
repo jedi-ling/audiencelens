@@ -24,6 +24,8 @@ SKILL_SELECT = os.path.join(PAGES, "SkillSelectPage.tsx")
 CREATE_REVIEW = os.path.join(PAGES, "CreateReviewPage.tsx")
 # 两页共用的技能加载逻辑（以 /api/skills 为事实源）住在这里
 SKILLS_LIB = os.path.join(REPO_ROOT, "web", "frontend", "src", "lib", "skills.ts")
+# i18n 之后，目录条目（任务类型 / 材料字段 / 自评维度）的取数都收在这里
+CATALOG_TS = os.path.join(REPO_ROOT, "web", "frontend", "src", "i18n", "catalog.ts")
 
 
 def _strip_comments(source: str) -> str:
@@ -219,11 +221,40 @@ def test_extract_failure_shows_the_real_reason(create_review):
 
 def test_evaluation_dimension_labels_are_not_hardcoded(create_review):
     """第 4 步「启用评估报告」列出的维度必须来自 EVALUATION_DIMENSIONS
-    （其 id 逐字对齐后端 RUBRIC_DIMENSIONS），不能是另写一套词表。"""
+    （其 id 逐字对齐后端 RUBRIC_DIMENSIONS），不能是另写一套词表。
+
+    i18n 之后页面不再直接 `EVALUATION_DIMENSIONS.map`，而是走
+    `i18n/catalog.ts` 的 `getEvaluationDimensions()`（按 ui_lang 取 name/desc）。
+    断言因此**跟着这层间接跳一步**，而不是就地放宽成「有这个函数名就算过」：
+    放宽等于把「维度必须来自那张表」降级成「维度来自某个叫这名字的函数」，
+    而那个函数完全可以在 catalog.ts 里另写一套词表——正是本条要防的事。
+    所以这里额外读 catalog.ts，钉住它确实是在 EVALUATION_DIMENSIONS 上 map、
+    且把 id 原样带出来（id 才是与后端 RUBRIC_DIMENSIONS 对齐的那一位）。
+    """
     from app.services.evaluation_service import RUBRIC_DIMENSIONS
 
-    assert "EVALUATION_DIMENSIONS.map" in create_review
-    assert "EVALUATION_DIMENSIONS.length" in create_review
+    assert "getEvaluationDimensions()" in create_review, (
+        "第 4 步不再从 EVALUATION_DIMENSIONS 取维度了。要么改回去，"
+        "要么把这条断言跟着新的取数路径改——但不许删。"
+    )
+    assert "getEvaluationDimensions().map" in create_review
+    assert "getEvaluationDimensions().length" in create_review
+
+    catalog = _strip_comments(_read(CATALOG_TS))
+    body = re.search(
+        r"export function getEvaluationDimensions\(\)[^{]*\{(.*?)\n\}", catalog, flags=re.S
+    )
+    assert body, "catalog.ts 里找不到 getEvaluationDimensions 的函数体，取数路径又变了"
+    assert "EVALUATION_DIMENSIONS.map" in body.group(1), (
+        "getEvaluationDimensions 不是在 EVALUATION_DIMENSIONS 上 map —— "
+        "维度词表和后端 RUBRIC_DIMENSIONS 脱钩了"
+    )
+    assert "id: d.id" in body.group(1), (
+        "getEvaluationDimensions 没把 id 原样带出来。id 是与后端 RUBRIC_DIMENSIONS "
+        "对齐的那一位，重编 id 会让自评结果对不上维度"
+    )
+
     for stale in ("'覆盖度'", "'新颖性'", "'偏见检测'"):
         assert stale not in create_review, "又写死了一套和后端对不上的维度词表"
+        assert stale not in catalog, "又写死了一套和后端对不上的维度词表（挪到 catalog.ts 了）"
     assert len(RUBRIC_DIMENSIONS) > 0

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import { usePersonaStore } from '@/store/persona-store'
+import { usePersonaStore, packName } from '@/store/persona-store'
 import { cn } from '@/lib/utils'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
 import { Search, X, GitCompare, ChevronDown, ChevronUp, Loader2, SlidersHorizontal, Bot } from 'lucide-react'
 import { PACK_CATEGORIES } from '@/lib/mock-data'
 import { PageShell, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 import { t } from '@/i18n/runtime'
+import { getPackCategoryName, localizePersona } from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import { formatNumber } from '@/i18n/format'
 
@@ -53,10 +54,16 @@ export default function PersonasPage() {
 
   const filteredPersonas = personas.filter((p) => {
     const matchPack = !selectedPack || p.pack === selectedPack
+    // 搜的是**屏幕上那行字**：英文界面下卡片显示的是 en overlay，
+    // 只搜中文源字段会让英文用户搜 "Color vision" 一条也搜不到，
+    // 而页面上明明白白写着这几个词——那种"搜不到但看得见"最像是搜索坏了。
+    // name 恒中文（10.3），所以它不进 localize，照旧直接比。
+    const shown = localizePersona(p)
+    const q = searchQuery.toLowerCase()
     const matchSearch = !searchQuery ||
-      p.name.includes(searchQuery) ||
-      p.archetype.includes(searchQuery) ||
-      p.identity_summary.includes(searchQuery)
+      p.name.toLowerCase().includes(q) ||
+      shown.archetype.toLowerCase().includes(q) ||
+      shown.identity_summary.toLowerCase().includes(q)
     return matchPack && matchSearch
   })
 
@@ -112,9 +119,12 @@ export default function PersonasPage() {
                 onClick={() => toggleCategory(category.id)}
                 className="flex items-center justify-between w-full px-1 py-1.5 text-xs font-medium text-text-muted uppercase tracking-wider hover:text-text-secondary transition-colors"
               >
-                {/* 分类名与角色包名是**目录数据**，事实源与 owner 都是 batch-0
-                    （契约 D5 / 4.3）。页面只渲染，不在这里再写一份译名。 */}
-                <span>{category.name}</span>
+                {/* 分类名与角色包名是**目录数据**，D5 表里它们的 zh / en 事实源都在前端，
+                    译文住在 locales/{zh,en}/catalog.persona_pack.ts。页面只查读取器，
+                    不在这里再写一份译名——写了就是给同一批名字立第二个 owner。
+                    此前这里渲染的是 PACK_CATEGORIES[].name 的中文字面量，
+                    英文界面上这一栏是中文；那四条译文一直躺在资源里没有消费方。 */}
+                <span>{getPackCategoryName(category.id)}</span>
                 <span className="flex items-center gap-1.5">
                   <span className="text-[10px] normal-case tracking-normal opacity-60">{formatNumber(categoryPacks.length)}</span>
                   {isExpanded ? (
@@ -142,7 +152,10 @@ export default function PersonasPage() {
                           : 'text-text-secondary hover:bg-bg-card hover:text-text-primary'
                       )}
                     >
-                      <span>{pack.name}</span>
+                      {/* pack.name 是后端回的中文。包名的 owner 是 persona-store 的
+                          PACK_NAME_KEY（D5：zh / en 事实源都在前端），走 packName() 才能
+                          在英文界面拿到英文、缺一条时显式 ⟦missing:…⟧ 而不是漏出中文。 */}
+                      <span>{packName(pack.panel_id)}</span>
                       <span className="text-text-muted">{formatNumber(packCount)}</span>
                     </button>
                   )
@@ -232,7 +245,7 @@ export default function PersonasPage() {
             {comparePersonas.map((p) => (
               <div key={p.id} className="text-center">
                 <p className="font-medium text-text-primary">{p.name}</p>
-                <p className="text-xs text-text-muted">{p.archetype}</p>
+                <p className="text-xs text-text-muted">{localizePersona(p).archetype}</p>
               </div>
             ))}
           </div>
@@ -291,9 +304,9 @@ export default function PersonasPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-text-primary">{persona.name}</span>
-                          <span className="text-xs text-text-muted">{persona.archetype}</span>
+                          <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>
                         </div>
-                        <p className="text-xs text-text-secondary line-clamp-2">{persona.identity_summary}</p>
+                        <p className="text-xs text-text-secondary line-clamp-2">{localizePersona(persona).identity_summary}</p>
                       </div>
                       <div className="shrink-0">
                         <PersonaRadarChart data={persona.behavior_profile} size={80} mobileSize={60} />
@@ -304,8 +317,12 @@ export default function PersonasPage() {
                       <span className="text-xs text-text-muted">
                         {/* 找不到包时说"未知"，不是缺译（缺译走 ⟦missing:…⟧），
                             是后端没回这个包的**数据缺口**。不拿 persona.pack 这个
-                            内部 id 顶上去——那会让用户以为 "game-core" 是包名。 */}
-                        {packs.find((p) => p.panel_id === persona.pack)?.name ?? t('page.personas.pack_unknown')}
+                            内部 id 顶上去——那会让用户以为 "game-core" 是包名。
+                            后端确实回了这个包时，名字走 packName() 而不是后端的中文
+                            pack.name，与上面侧栏同一个 owner。 */}
+                        {packs.some((p) => p.panel_id === persona.pack) && persona.pack
+                          ? packName(persona.pack)
+                          : t('page.personas.pack_unknown')}
                       </span>
                       <div className="flex items-center gap-2">
                         {compareMode && (

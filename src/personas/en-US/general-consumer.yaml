@@ -155,11 +155,12 @@ persona_overlays:
     archetype: First-time user
     identity_summary: He doesn't stand for "slow" — he stands for where a real person actually gets stuck
       the first time they open the thing, and that's true of any onboarding, not just a game's.
+    # 源是"顿号分隔的单个元素"（`[看懂、做到、不要丢脸、别让我查帮助文档]`），
+    # 所以这里同样保持 1 个元素，不拆成 4 个——与 game-core 的 P05/P08 同一处理法
+    # （P08 的源行几乎逐字相同，只是"攻略"换成"帮助文档"）。
+    # 拆开会让英文侧比中文侧多出三条动机，引擎按条数取用时两边行为就不一样了。
     motivations:
-    - Understanding what he's looking at
-    - Getting the thing done
-    - Not feeling stupid
-    - Not having to go read the help docs
+    - Understand it, get it done, don't look foolish, and don't make me go read the help docs
     likes:
     - An obvious first step
     - Feedback that comes back immediately

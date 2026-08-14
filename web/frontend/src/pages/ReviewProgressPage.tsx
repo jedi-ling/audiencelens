@@ -19,7 +19,9 @@ import { cn } from '@/lib/utils'
 import type { Review, WSMessage, ReviewMode } from '@/lib/mock-data'
 import type { ReviewDetail } from '@/lib/types'
 import { usePersonaStore } from '@/store/persona-store'
+import { SKILLS } from '@/lib/mock-data'
 import { t } from '@/i18n/runtime'
+import { localizeBackendSkill, localizePersona } from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
@@ -93,6 +95,18 @@ function stageLabel(phase: PhaseStatus): string {
   if (phase === 'completed') return t('page.progress.stage.completed')
   if (phase === 'running') return t('page.progress.stage.running')
   return t('page.progress.stage.waiting')
+}
+
+
+/**
+ * 技能展示名。取自本地 SKILLS 常量 + catalog.skill.* overlay（zh 用常量里的中文，
+ * en 查 overlay），与 AskPage / 创建评审页同一条路径——三处各写一份就是
+ * 同一个技能在三个页面三个名字，正是契约 D5 要防的事。
+ */
+function skillLabel(type: string): string {
+  const row = SKILLS.find((sk) => sk.type === type)
+  if (!row) return type
+  return localizeBackendSkill({ type: row.type, name: row.name, description: row.description_zh }).name
 }
 
 export default function ReviewProgressPage() {
@@ -600,13 +614,15 @@ export default function ReviewProgressPage() {
               )
             })()}
             {detail?.skill_type && (
-              // ⚠ 技能名（红队受众 / 受众面板）**本次没有外化**：它是后端目录条目，
-              // 事实源在后端 catalog.en-US.json，前端 overlay 由 `npm run i18n:sync-catalog`
-              // 生成、i18n:check 断言它与后端一致——契约 D5 明写这份 overlay **不许手写**。
-              // 手写一份英文名会让同一个技能在不同页面出现两个译名，正是 D5 要防的事。
-              // catalog.skill.* 到位后，把这里的三元换成 tCatalog 查表。
+              // 技能名是后端目录条目，事实源在后端 catalog.en-US.json，前端 overlay 由
+              // `npm run i18n:sync-catalog` 生成、i18n:check 断言它与后端一致——
+              // 契约 D5 明写这份 overlay **不许手写**：手写一份英文名会让同一个技能
+              // 在不同页面出现两个译名，正是 D5 要防的事。
+              // catalog.skill.* 现已到位，所以原来那个写死中文的三元换成了查表；
+              // 本地 SKILLS 里没有的 skill_type 仍原样显示 id（后端新增、前端没跟上，
+              // 那是目录漂移不是缺译，藏起来反而更糟）。
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-cyan/10 text-cyan">
-                {t('page.progress.skill.label')} · {detail.skill_type === 'red_team_audience' ? '红队受众' : detail.skill_type === 'audience_panel' ? '受众面板' : detail.skill_type}
+                {t('page.progress.skill.label')} · {skillLabel(detail.skill_type)}
               </span>
             )}
             {detail?.selected_personas && detail.selected_personas.length > 0 && (
@@ -832,7 +848,7 @@ export default function ReviewProgressPage() {
                       />
                     </div>
                     <span className="font-medium text-text-primary text-sm">{po.persona_name}</span>
-                    {persona && <span className="text-xs text-text-muted">{persona.archetype}</span>}
+                    {persona && <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>}
                   </div>
 
                   <div className="flex items-center gap-2 mb-2">
@@ -903,7 +919,7 @@ export default function ReviewProgressPage() {
                   <span className="font-medium text-text-primary text-sm truncate">
                     {persona?.name ?? pid}
                   </span>
-                  {persona && <span className="text-xs text-text-muted shrink-0">{persona.archetype}</span>}
+                  {persona && <span className="text-xs text-text-muted shrink-0">{localizePersona(persona).archetype}</span>}
                   <span className="ml-auto text-xs text-brand-primary shrink-0">{t('page.progress.persona_done.badge')}</span>
                 </div>
               )

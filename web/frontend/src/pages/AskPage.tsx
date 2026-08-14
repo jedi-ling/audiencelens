@@ -12,7 +12,7 @@
  * 拼接用户历史发言等价于给它更多上下文，不需要后端改造就能获得"越聊越准"的效果。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins, LogIn } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -28,9 +28,11 @@ import { t, Trans } from '@/i18n/runtime'
 import { useDocumentTitle } from '@/i18n/head'
 import { formatNumber, formatPercent, formatTime, formatUsd } from '@/i18n/format'
 import { tApiError } from '@/i18n/api-error'
+import { findTaskType, localizeBackendSkill, localizePersona } from '@/i18n/catalog'
+import { useLocale } from '@/i18n/locale'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import type { ConversationSummary, IntentResult, Material, Project, ReviewDetail, WsEvent } from '@/lib/types'
-import type { Review, ReviewListItem } from '@/lib/mock-data'
+import type { Persona, Review, ReviewListItem } from '@/lib/mock-data'
 
 const UPLOAD_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.json,.yaml,.yml'
 
@@ -59,15 +61,19 @@ const EXAMPLE_KEYS: PlainMessageKey[] = [
 ]
 
 /**
- * 任务类型 / 技能的展示名。
+ * 任务类型的**中文名，只给 engine-prompt 用**。
  *
- * ⚠ **不外化，也不要在 page.ask.* 里抄一份英文。** 这两张表是目录文案，
- * 英文事实源在后端 catalog.en-US.json，前端那份 overlay 由
- * `npm run i18n:sync-catalog` 生成、不许手写（契约 D5）。在这里手写一份
- * 就是给同一批文案造了第二个 owner，表现是"同一个任务类型在两个页面
- * 显示两个英文名"。overlay 到位后这两张表整个换成 catalog 读取器。
+ * ⚠ 恒中文、永不外化。它唯一的消费点是 pickCandidate 里的 `就是${...}`：
+ * 那句会当成用户消息进 api.parseIntent，而后端意图解析的启发式档是中文关键词
+ * 打分，发英文 → 命中数归零 → 用户点的是"Steam 商店页"却跑出概念评审，
+ * 且全程不报错（契约 12.2 逐条点名了这一处）。
+ *
+ * **展示名不再走这张表**：屏幕上的任务类型名走 taskLabel()（catalog 读取器，
+ * 事实源是 catalog.task_type.*，见下）。原先两个用途共用一张中文表，
+ * 结果是英文界面的确认卡片上一排中文。两个用途拆开之后，
+ * 这张表改了只影响意图解析、那张表改了只影响显示，互不牵连。
  */
-const TASK_LABELS: Record<string, string> = {
+const TASK_LABELS_ZH_FOR_ENGINE: Record<string, string> = {
   steam_page_review: 'Steam 商店页评审',
   demo_first_play: 'Demo 首玩评审',
   concept_review: '概念评审',
@@ -84,9 +90,24 @@ const TASK_LABELS: Record<string, string> = {
   pitch_review: '创业项目评审',
 }
 
-const SKILL_LABELS: Record<string, string> = {
-  red_team_audience: '红队受众',
-  audience_panel: '受众面板',
+/**
+ * 技能展示名。取自本地 SKILLS 常量 + catalog.skill.* overlay（同 §B2 的取法）：
+ * zh 用常量里的中文，en 查 overlay。这里不再手写一张 Record——
+ * 手写就是给同一批技能名立第二个 owner（契约 D5），表现是同一个技能
+ * 在对话页和技能中心显示两个英文名。
+ */
+function skillLabel(type: string): string {
+  const row = SKILLS.find((sk) => sk.type === type)
+  if (!row) return type
+  return localizeBackendSkill({ type: row.type, name: row.name, description: row.description_zh }).name
+}
+
+/**
+ * 任务类型展示名。事实源是 catalog.task_type.*（zh/en 同一条路径）。
+ * 找不到就退回 id——那是目录漂移，不是缺译，与各调用点原先的 `?? c` 同义。
+ */
+function taskLabel(id: string): string {
+  return findTaskType(id)?.name ?? id
 }
 
 type ChatMessageBase =
@@ -287,22 +308,34 @@ export default function AskPage() {
   const [historyRequiresLogin, setHistoryRequiresLogin] = useState(false)
 
   // 角色 id → 展示名（"呼叫角色"确认卡片用）；加载失败就退回显示 id，不阻断
-  const [personaNames, setPersonaNames] = useState<Record<string, string>>({})
+  //
+  // 存的是**人格原始行**而不是拼好的展示名：拼好的字符串会把语言固定在
+  // fetch 那一刻，切换语言时这张表不会重算，名字一直停在打开页面时的那种语言
+  // （store/persona-store.ts 的 PACK_NAME_KEY 文件头记的是同一个坑）。
+  // 所以展示名放到 useMemo 里按 locale 现算。
+  const [personaRows, setPersonaRows] = useState<Persona[]>([])
+  const locale = useLocale()
 
   useEffect(() => {
     let cancelled = false
     fetchPersonas()
       .then((list) => {
         if (cancelled) return
-        const map: Record<string, string> = {}
-        for (const p of list) map[p.id] = p.archetype || p.name
-        setPersonaNames(map)
+        setPersonaRows(list)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [])
+
+  const personaNames = useMemo(() => {
+    const map: Record<string, string> = {}
+    // archetype 是表述层，按 ui_lang 取；取不到才退回 name（恒中文，10.3）。
+    for (const p of personaRows) map[p.id] = localizePersona(p).archetype || p.name
+    return map
+    // locale 进依赖数组：切语言要重算这张表
+  }, [personaRows, locale])
 
   const loadHistory = useCallback(async () => {
     try {
@@ -995,7 +1028,7 @@ export default function AskPage() {
     // ⚠ 这句**不外化、恒中文**：它是 engine-prompt——会当成用户消息进
     // api.parseIntent，后端靠中文关键词打分命中任务类型。翻成英文 → 命中数归零
     // → 用户点的是"Steam 商店页"，跑出来的却是概念评审，且全程不报错（契约 12.2）。
-    void send(`就是${TASK_LABELS[candidate] ?? candidate}`)
+    void send(`就是${TASK_LABELS_ZH_FOR_ENGINE[candidate] ?? candidate}`)
   }
 
   const confirmAndCreate = async (msgId: string, intent: IntentResult, personasOverride?: string[]) => {
@@ -2408,9 +2441,12 @@ function ReviewStatusBody({
         <div className="animate-pop-in rounded-lg border border-border/60 bg-bg-card/40 p-3.5">
           <div className="flex items-center justify-between gap-2">
             <h3 className="min-w-0 truncate text-[15px] font-semibold text-text-primary font-display">
-              {TASK_LABELS[reviewState.detail?.task_type ?? ''] ??
-                reviewState.detail?.task_type ??
-                t('page.ask.report_card.title')}
+              {/* taskLabel 查不到会退回 id（恒返回 string），所以"根本没有 task_type"
+                  这一档要显式判空——写成 `taskLabel(x ?? '') ?? t(...)` 的话
+                  ?? 永远不触发，标题会渲染成空白。 */}
+              {reviewState.detail?.task_type
+                ? taskLabel(reviewState.detail.task_type)
+                : t('page.ask.report_card.title')}
             </h3>
             {risk && (
               <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium', risk.color, risk.bg, risk.border)}>
@@ -2552,7 +2588,7 @@ function ReportModal({
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-text-primary font-display">
-              {TASK_LABELS[detail.task_type ?? ''] ?? detail.task_type}
+              {taskLabel(detail.task_type ?? '')}
             </h2>
             <p className="text-xs text-text-muted">{t('page.ask.report_modal.subtitle')}</p>
           </div>
@@ -2876,7 +2912,7 @@ function ChatBubble({
                     className="rounded-md border border-border bg-bg-card px-3.5 py-2 text-sm text-text-primary transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-primary/50 hover:bg-bg-card-hover hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)]"
                     onClick={() => onPickCandidate(c)}
                   >
-                    {TASK_LABELS[c] ?? c}
+                    {taskLabel(c)}
                   </button>
                 ))}
               </div>
@@ -2899,7 +2935,7 @@ function ChatBubble({
         <div className="rounded-xl rounded-tl-sm border border-brand-primary/30 bg-bg-secondary px-5 py-4 text-sm shadow-[0_2px_12px_rgba(0,0,0,0.06)] break-words">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{t('page.ask.confirm.label')}</p>
           <h3 className="mt-1.5 text-base font-semibold text-text-primary font-display">
-            {TASK_LABELS[intent.task_type ?? ''] ?? intent.task_type}
+            {taskLabel(intent.task_type ?? '')}
           </h3>
 
           <div className="mt-2.5 flex flex-wrap gap-2">
@@ -2913,7 +2949,7 @@ function ChatBubble({
             </span>
             {intent.skill_type && (
               <span className="rounded-md border border-cyan/30 bg-cyan/10 px-2.5 py-1 text-xs text-cyan">
-                {t('page.ask.skill.badge', { name: SKILL_LABELS[intent.skill_type] ?? intent.skill_type })}
+                {t('page.ask.skill.badge', { name: skillLabel(intent.skill_type) })}
               </span>
             )}
             {intent.project_key && (

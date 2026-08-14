@@ -6,6 +6,7 @@ import { fetchTaskTypes, fetchTaskType } from '@/lib/api'
 import { X, Loader2, AlertTriangle, Shapes } from 'lucide-react'
 import { PageShell, PageHeader, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 import { t, missingMarker } from '@/i18n/runtime'
+import { localizeBackendTaskType, localizeStanceLabels } from '@/i18n/catalog'
 import { getLocale } from '@/i18n/locale'
 import { useDocumentTitle } from '@/i18n/head'
 import { tApiError, tApiErrorParts } from '@/i18n/api-error'
@@ -223,6 +224,10 @@ export default function TaskTypesPage() {
               // 后端新类型本地没有图标，用通用图标兜底，不能因为缺图标就不渲染。
               const Icon = local?.IconComponent ?? Shapes
               const CategoryIcon = categoryIcons.get(categoryId) ?? Shapes
+              // 名称/描述按 ui_lang 取：后端今天只回中文（catalog_en.py 已就位但端点
+              // 还没引用它），英文界面直接渲染 name_zh 就是"看不出是缺译的中文"。
+              // zh 仍用后端原文——后端才是中文事实源，新类型也照常显示。见 i18n/catalog.ts §B2。
+              const text = localizeBackendTaskType(tt)
 
               return (
                 <button
@@ -236,7 +241,7 @@ export default function TaskTypesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm text-text-primary group-hover:text-brand-primary transition-colors truncate">
-                        {tt.name_zh || tt.task_type}
+                        {text.name}
                       </h3>
                       <div className="flex items-center gap-1 text-xs text-text-muted">
                         <CategoryIcon className="w-3 h-3" strokeWidth={1.25} />
@@ -246,15 +251,21 @@ export default function TaskTypesPage() {
                   </div>
 
                   {/* 描述行数差很多：clamp 到 3 行才能让同一行网格的卡片底边对齐 */}
-                  <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">{tt.description}</p>
+                  <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">{text.description}</p>
 
+                  {/* stance_enum 的值是 wire contract（引擎的聚类键，后端 parity 测试逐字
+                      保护），永不翻译。英文显示标签的下发通道是后端的 stance_labels_en
+                      （契约 D4，见 locales/zh/enum.primary_stance.ts 的文件头）。
+                      端点现在已经在发它了（catalog_en.py 已接线），所以这里改走
+                      localizeStanceLabels()：value 恒是 wire 值、label 才是画上去的字。
+                      前端仍然不许在这里另造一份标签——理由同上，那会立第二个 owner。 */}
                   {tt.stance_enum.length > 0 && (
                     <div>
                       <span className="text-xs text-text-muted">{t('page.task_types.card_stance.label')}</span>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {tt.stance_enum.map((s) => (
-                          <span key={s} className="px-1.5 py-0.5 rounded text-[10px] bg-cyan/10 text-cyan">
-                            {s}
+                        {localizeStanceLabels(tt).map((s) => (
+                          <span key={s.value} className="px-1.5 py-0.5 rounded text-[10px] bg-cyan/10 text-cyan">
+                            {s.label}
                           </span>
                         ))}
                       </div>
@@ -304,6 +315,10 @@ export default function TaskTypesPage() {
                   <p className="text-sm text-text-secondary">{t('common.ui.loading')}</p>
                 </div>
               ) : selectedDetail ? (
+                (() => {
+                // 与卡片同一个读取器，免得同一个任务类型在卡片上是英文、点开是中文。
+                const detailText = localizeBackendTaskType(selectedDetail)
+                return (
                 <div className="space-y-4">
                   <div>
                     <span className="text-xs text-text-muted">{t('page.task_types.modal_id.label')}</span>
@@ -311,18 +326,18 @@ export default function TaskTypesPage() {
                   </div>
                   <div>
                     <span className="text-xs text-text-muted">{t('page.task_types.modal_name.label')}</span>
-                    <p className="text-sm text-text-primary mt-0.5">{selectedDetail.name_zh}</p>
+                    <p className="text-sm text-text-primary mt-0.5">{detailText.name}</p>
                   </div>
                   <div>
                     <span className="text-xs text-text-muted">{t('page.task_types.modal_desc.label')}</span>
-                    <p className="text-sm text-text-secondary mt-0.5">{selectedDetail.description}</p>
+                    <p className="text-sm text-text-secondary mt-0.5">{detailText.description}</p>
                   </div>
                   <div>
                     <span className="text-xs text-text-muted">{t('page.task_types.modal_stance.label')}</span>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {selectedDetail.stance_enum.map((s) => (
-                        <span key={s} className="px-2 py-1 rounded-md text-xs bg-cyan/10 text-cyan border border-cyan/20">
-                          {s}
+                      {localizeStanceLabels(selectedDetail).map((s) => (
+                        <span key={s.value} className="px-2 py-1 rounded-md text-xs bg-cyan/10 text-cyan border border-cyan/20">
+                          {s.label}
                         </span>
                       ))}
                     </div>
@@ -348,6 +363,8 @@ export default function TaskTypesPage() {
                     </div>
                   </div>
                 </div>
+                )
+                })()
               ) : (
                 <div className="py-6 text-center">
                   <AlertTriangle className="w-6 h-6 text-severity-critical mx-auto mb-3" strokeWidth={1.25} />

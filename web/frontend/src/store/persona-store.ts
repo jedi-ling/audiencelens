@@ -28,6 +28,11 @@ const PACK_NAME_KEY: Record<string, PlainMessageKey> = {
   'indie-creative': 'catalog.persona_pack.indie_creative',
   'general-consumer': 'catalog.persona_pack.general_consumer',
   'startup-panel': 'catalog.persona_pack.startup_panel',
+  // 集成阶段（跑完 `npm run i18n:gen`，keys.gen.ts 里已有这条 key）补上。
+  // 并发期它被注释掉的原因见 git 历史：那时 keys.gen.ts 还是旧的，写进来 tsc 会当场红。
+  // 补之前角色库那一栏漏出的是 ⟦missing:catalog.persona_pack.launch_compliance⟧
+  // ——被看见、没有静默回落成中文，卡口的行为是对的。
+  'launch-compliance': 'catalog.persona_pack.launch_compliance',
 }
 
 /**
@@ -38,8 +43,13 @@ const PACK_NAME_KEY: Record<string, PlainMessageKey> = {
  * （同一条规则修的还有 PersonaRadarChart 的 `?? d.axis`）。
  * 显式标出缺译的代价是中文界面上也会看到 ⟦missing:…⟧——那正是目的：
  * 后端新增了一个包而前端没跟上，这件事必须有人看得见。
+ *
+ * export 是 batch-2 接线时加的：PersonasPage 三处（侧栏包名、抽屉包名、卡片上的
+ * 所属包）此前直接渲染后端回的 pack.name（中文），要接上这份 overlay 就得用这个函数。
+ * 在页面里另写一份 panel_id → key 的映射等于给同一批包名立第二个 owner，
+ * 正是契约 D5 要防的"同一个包在两个页面显示两个名字"。
  */
-function packName(panelId: string): string {
+export function packName(panelId: string): string {
   const key = PACK_NAME_KEY[panelId]
   if (!key) {
     // 包 id 走第二个实参而不是拼进模板串：i18n-scan 只豁免 console 调用的

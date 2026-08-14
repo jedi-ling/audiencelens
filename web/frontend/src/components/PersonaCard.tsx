@@ -4,6 +4,7 @@ import { getLocale } from '@/i18n/locale'
 import { formatPercent } from '@/i18n/format'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import type { Persona } from '@/lib/mock-data'
+import { localizePersona } from '@/i18n/catalog'
 import PersonaRadarChart from './PersonaRadarChart'
 
 type PersonaStatus = 'pending' | 'running' | 'completed' | 'failed'
@@ -85,7 +86,8 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
             )}
             <h3 className="font-semibold text-text-primary truncate">{persona.name}</h3>
           </div>
-          <p className="text-xs text-text-secondary mb-2">{persona.archetype}</p>
+          {/* archetype 是表述层、按 ui_lang 取；上面那行 persona.name 恒中文（10.3）。 */}
+          <p className="text-xs text-text-secondary mb-2">{localizePersona(persona).archetype}</p>
 
           {status !== undefined && (
             <div className="flex items-center gap-2 text-xs text-text-muted mb-2">

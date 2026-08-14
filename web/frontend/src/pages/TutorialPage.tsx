@@ -1,6 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { TASK_MATERIALS, TASK_TYPES } from '@/lib/mock-data'
 import { fetchExamples } from '@/lib/api'
 import { api } from '@/lib/apiClient'
 import type { UploadConfig } from '@/lib/types'
@@ -20,6 +19,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { PageShell, PageHeader, SectionCard, PRIMARY_BUTTON_CLASS } from '@/components/ui'
 import { t } from '@/i18n/runtime'
+import { getTaskTypes, getMaterialFields } from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import { formatBytes } from '@/i18n/format'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
@@ -87,16 +87,24 @@ function buildUploadMethods(exampleCount: number | null) {
   ]
 }
 
-// 表里的任务类型名与字段名是**目录数据**，不是本页文案：中文读 mock-data 的
-// TASK_TYPES / TASK_MATERIALS，英文的事实源是后端目录 + catalog.* overlay
-// （契约 D5/D6）。在这里 t() 一份等于给同一批字段名造第二套译名，
-// 教程写的字段名和创建评审页表单里的字段名会对不上。
-const taskTypeTable = TASK_TYPES.map((tt) => {
-  const fields = TASK_MATERIALS[tt.id] ?? []
-  const required = fields.filter((f) => f.required).map((f) => f.label)
-  const optional = fields.filter((f) => !f.required).map((f) => f.label)
-  return { name: tt.name, required, optional }
-})
+/**
+ * 表里的任务类型名与字段名是**目录数据**，不是本页文案：在这里 t() 一份等于给同一批
+ * 字段名造第二套译名，教程写的字段名和创建评审页表单里的字段名会对不上（契约 D5/D6）。
+ * 所以两列都走 i18n/catalog.ts 的读取器——CreateReviewPage 第 2 步渲染表单用的是
+ * 同一个 getMaterialFields()，这一页与那一页必然逐字一致。
+ *
+ * 必须是**函数**、必须在渲染里调用：写成模块级常量会把文案固定在模块求值那一刻，
+ * 切换语言时整张表不会跟着变（同一条坑见本文件 steps 与 resultItems 的注释）。
+ * 这也是它从 const 改成 function 的唯一原因，取值逻辑一行没动。
+ */
+function buildTaskTypeTable() {
+  return getTaskTypes().map((tt) => {
+    const fields = getMaterialFields(tt.id)
+    const required = fields.filter((f) => f.required).map((f) => f.label)
+    const optional = fields.filter((f) => !f.required).map((f) => f.label)
+    return { name: tt.name, required, optional }
+  })
+}
 
 // 同样存 key 不存文案（理由见 steps）。color 是样式不是文案，留在这里。
 const resultItems: { icon: LucideIcon; labelKey: PlainMessageKey; descKey: PlainMessageKey; color: string }[] = [
@@ -144,6 +152,8 @@ export default function TutorialPage() {
   }, [])
 
   const uploadMethods = buildUploadMethods(exampleCount)
+  // 在渲染里求值（而不是模块级常量）：切语言时整张表要跟着变。
+  const taskTypeTable = buildTaskTypeTable()
 
   return (
     <PageShell size="reading">

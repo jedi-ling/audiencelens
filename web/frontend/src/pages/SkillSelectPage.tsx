@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
-import { TASK_TYPES } from '@/lib/mock-data'
 import { NON_REVIEW_SKILL_TYPES, loadSkillTruth } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import { AlertTriangle, ArrowRight, Layers, RefreshCw } from 'lucide-react'
 import { PageShell, PageHeader, EmptyState, CARD_GRID_CLASS, PRIMARY_BUTTON_CLASS } from '@/components/ui'
 import { t } from '@/i18n/runtime'
+import { findTaskType, localizeBackendSkill } from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import { tApiErrorParts } from '@/i18n/api-error'
 import type { ApiErrorText } from '@/i18n/api-error'
@@ -116,13 +116,20 @@ export default function SkillSelectPage() {
         <div className={CARD_GRID_CLASS}>
           {skills.map((skill) => {
             const deco = skill.deco
+            // 技能名与描述按 ui_lang 取。后端今天只回中文（catalog_en.py 已就位但
+            // /api/skills 还没引用它），直接渲染 skill.name 在英文界面上就是
+            // 「看不出是缺译的中文」。zh 仍用后端原文——后端是中文事实源，
+            // 后端新增技能也照常显示。取法见 i18n/catalog.ts §B2。
+            const skillText = localizeBackendSkill(skill)
             // 任务类型只认后端详情里的 task_types。这里以前用的是本地 SKILLS[].task_types，
             // 一份手写枚举：后端 apply_skill_hint / POST /api/v2/reviews 对
             // skill_type × task_type 的组合根本不做校验，这条「约束」在服务端不存在。
-            // 名字仍从本地 TASK_TYPES 查（后端给的是 id），查不到的 id 不渲染，
-            // 计数直接用渲染结果的长度，保证「写的数」和「看得见的标签」永远一致。
+            // 名字仍从本地目录查（后端给的是 id），但改走 findTaskType：它按 ui_lang
+            // 查 overlay，直读 TASK_TYPES[].name 的话英文界面上这一排标签全是中文。
+            // 查不到的 id 仍然不渲染，计数直接用渲染结果的长度，
+            // 保证「写的数」和「看得见的标签」永远一致。
             const taskNames = (skill.taskTypes ?? [])
-              .map((tt) => TASK_TYPES.find((t) => t.id === tt)?.name)
+              .map((tt) => findTaskType(tt)?.name)
               .filter((n): n is string => Boolean(n))
 
             const color = deco?.color ?? 'text-brand-primary'
@@ -165,13 +172,13 @@ export default function SkillSelectPage() {
                       )}
                     </span>
                     <div>
-                      <h2 className={cn('text-xl font-bold font-display', color)}>{skill.name}</h2>
+                      <h2 className={cn('text-xl font-bold font-display', color)}>{skillText.name}</h2>
                       <span className="text-xs text-text-muted font-mono">{skill.type}</span>
                     </div>
                   </div>
 
                   <p className="text-sm text-text-secondary leading-relaxed mb-5">
-                    {skill.description}
+                    {skillText.description}
                   </p>
 
                   {/* 这里以前还有一个"N 个角色"。它来自前端写死的 persona_count，
@@ -193,6 +200,12 @@ export default function SkillSelectPage() {
                     </div>
                   )}
 
+                  {/* ⚠ use_cases 是 mock-data 的 SKILLS[].use_cases，纯前端展示装饰、
+                      后端没有对应字段，也不在后端目录 catalog.en-US.json 里，
+                      所以 i18n:sync-catalog 生成不出它——英文界面上这四个标签今天仍是中文。
+                      它要么进一份手写的前端 overlay（与 EVALUATION_DIMENSIONS 同级），
+                      要么后端在 /api/skills/{skill_type} 里透出来。两条都不是本次接线的
+                      文件范围，已写进交付报告，不在这里就地 t() 一份（那会立第二个 owner）。 */}
                   {deco && deco.use_cases.length > 0 && (
                     <div className="mb-5">
                       <h3 className="text-xs font-medium text-text-muted mb-2">

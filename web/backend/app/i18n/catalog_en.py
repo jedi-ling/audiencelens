@@ -49,13 +49,20 @@ def _fail(msg: str) -> None:
     raise CatalogEnError(f"{msg}\n（英文目录事实源：{CATALOG_EN_PATH}）")
 
 
+def contains_cjk(text: str) -> bool:
+    """英文栏里有没有中日韩文字。人格 overlay（`persona_overlay.py`）用的是同一份判定——
+    两处各写一份正则必然漂移，而漂移的表现是「一边拦得住、一边拦不住」，
+    比两边都没有更难查。"""
+    return bool(_CJK_RE.search(text))
+
+
 def _assert_no_cjk(section: str, entry_id: str, field: str, value: str) -> None:
     """英文栏里出现中日韩文字，几乎只有一种成因：条目是复制中文源占位的。
 
     不拦的话它长得和「翻好了」一模一样——字段在、非空、断言全绿，
     只有英文用户看得见那行中文。所以这条按硬失败处理。
     """
-    if _CJK_RE.search(value):
+    if contains_cjk(value):
         _fail(f"{section}.{entry_id}.{field} 里有中文字符，这是没翻的占位而不是英文文案：{value!r}")
 
 

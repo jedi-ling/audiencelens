@@ -12,16 +12,228 @@ export type MessageKey =
   | 'catalog.brand.ollama'
   | 'catalog.brand.openai'
   | 'catalog.brand.qwen'
+  | 'catalog.eval_dimension.actionability.desc'
+  | 'catalog.eval_dimension.actionability.label'
+  | 'catalog.eval_dimension.calibration_honesty.desc'
+  | 'catalog.eval_dimension.calibration_honesty.label'
+  | 'catalog.eval_dimension.ethical_persona_use.desc'
+  | 'catalog.eval_dimension.ethical_persona_use.label'
+  | 'catalog.eval_dimension.input_grounding.desc'
+  | 'catalog.eval_dimension.input_grounding.label'
+  | 'catalog.eval_dimension.persona_differentiation.desc'
+  | 'catalog.eval_dimension.persona_differentiation.label'
+  | 'catalog.eval_dimension.report_structure.desc'
+  | 'catalog.eval_dimension.report_structure.label'
+  | 'catalog.eval_dimension.risk_detection.desc'
+  | 'catalog.eval_dimension.risk_detection.label'
+  | 'catalog.eval_dimension.segment_conflict.desc'
+  | 'catalog.eval_dimension.segment_conflict.label'
+  | 'catalog.material.concept_review__一句话pitch.label'
+  | 'catalog.material.concept_review__一句话pitch.placeholder'
+  | 'catalog.material.concept_review__定价与平台.label'
+  | 'catalog.material.concept_review__定价与平台.placeholder'
+  | 'catalog.material.concept_review__截图.label'
+  | 'catalog.material.concept_review__截图.placeholder'
+  | 'catalog.material.concept_review__核心循环说明.label'
+  | 'catalog.material.concept_review__核心循环说明.placeholder'
+  | 'catalog.material.concept_review__目标受众.label'
+  | 'catalog.material.concept_review__目标受众.placeholder'
+  | 'catalog.material.concept_review__竞品对比.label'
+  | 'catalog.material.concept_review__竞品对比.placeholder'
+  | 'catalog.material.concept_review__系统说明.label'
+  | 'catalog.material.concept_review__系统说明.placeholder'
+  | 'catalog.material.demo_first_play__实机视频.label'
+  | 'catalog.material.demo_first_play__实机视频.placeholder'
+  | 'catalog.material.demo_first_play__截图.label'
+  | 'catalog.material.demo_first_play__截图.placeholder'
+  | 'catalog.material.demo_first_play__核心循环说明.label'
+  | 'catalog.material.demo_first_play__核心循环说明.placeholder'
+  | 'catalog.material.demo_first_play__游戏名称.label'
+  | 'catalog.material.demo_first_play__游戏名称.placeholder'
+  | 'catalog.material.demo_first_play__竞品对比.label'
+  | 'catalog.material.demo_first_play__竞品对比.placeholder'
+  | 'catalog.material.demo_first_play__评价摘要.label'
+  | 'catalog.material.demo_first_play__评价摘要.placeholder'
+  | 'catalog.material.devlog_review__截图.label'
+  | 'catalog.material.devlog_review__截图.placeholder'
+  | 'catalog.material.devlog_review__核心循环说明.label'
+  | 'catalog.material.devlog_review__核心循环说明.placeholder'
+  | 'catalog.material.devlog_review__游戏名称.label'
+  | 'catalog.material.devlog_review__游戏名称.placeholder'
+  | 'catalog.material.devlog_review__评价摘要.label'
+  | 'catalog.material.devlog_review__评价摘要.placeholder'
+  | 'catalog.material.discord_community_review__核心循环说明.label'
+  | 'catalog.material.discord_community_review__核心循环说明.placeholder'
+  | 'catalog.material.discord_community_review__社区名称.label'
+  | 'catalog.material.discord_community_review__社区名称.placeholder'
+  | 'catalog.material.discord_community_review__竞品对比.label'
+  | 'catalog.material.discord_community_review__竞品对比.placeholder'
+  | 'catalog.material.discord_community_review__系统说明.label'
+  | 'catalog.material.discord_community_review__系统说明.placeholder'
+  | 'catalog.material.discord_community_review__评价摘要.label'
+  | 'catalog.material.discord_community_review__评价摘要.placeholder'
+  | 'catalog.material.kickstarter_review__一句话pitch.label'
+  | 'catalog.material.kickstarter_review__一句话pitch.placeholder'
+  | 'catalog.material.kickstarter_review__定价与平台.label'
+  | 'catalog.material.kickstarter_review__定价与平台.placeholder'
+  | 'catalog.material.kickstarter_review__截图.label'
+  | 'catalog.material.kickstarter_review__截图.placeholder'
+  | 'catalog.material.kickstarter_review__核心循环说明.label'
+  | 'catalog.material.kickstarter_review__核心循环说明.placeholder'
+  | 'catalog.material.kickstarter_review__目标受众.label'
+  | 'catalog.material.kickstarter_review__目标受众.placeholder'
+  | 'catalog.material.kickstarter_review__项目名称.label'
+  | 'catalog.material.kickstarter_review__项目名称.placeholder'
+  | 'catalog.material.localization_review__核心循环说明.label'
+  | 'catalog.material.localization_review__核心循环说明.placeholder'
+  | 'catalog.material.localization_review__游戏名称.label'
+  | 'catalog.material.localization_review__游戏名称.placeholder'
+  | 'catalog.material.localization_review__竞品对比.label'
+  | 'catalog.material.localization_review__竞品对比.placeholder'
+  | 'catalog.material.localization_review__系统说明.label'
+  | 'catalog.material.localization_review__系统说明.placeholder'
+  | 'catalog.material.looking_for_party_post__核心循环说明.label'
+  | 'catalog.material.looking_for_party_post__核心循环说明.placeholder'
+  | 'catalog.material.looking_for_party_post__游戏名称.label'
+  | 'catalog.material.looking_for_party_post__游戏名称.placeholder'
+  | 'catalog.material.looking_for_party_post__目标受众.label'
+  | 'catalog.material.looking_for_party_post__目标受众.placeholder'
+  | 'catalog.material.monetization_review__定价与平台.label'
+  | 'catalog.material.monetization_review__定价与平台.placeholder'
+  | 'catalog.material.monetization_review__核心循环说明.label'
+  | 'catalog.material.monetization_review__核心循环说明.placeholder'
+  | 'catalog.material.monetization_review__游戏名称.label'
+  | 'catalog.material.monetization_review__游戏名称.placeholder'
+  | 'catalog.material.monetization_review__竞品对比.label'
+  | 'catalog.material.monetization_review__竞品对比.placeholder'
+  | 'catalog.material.monetization_review__评价摘要.label'
+  | 'catalog.material.monetization_review__评价摘要.placeholder'
+  | 'catalog.material.onboarding_review__产品名称.label'
+  | 'catalog.material.onboarding_review__产品名称.placeholder'
+  | 'catalog.material.onboarding_review__截图.label'
+  | 'catalog.material.onboarding_review__截图.placeholder'
+  | 'catalog.material.onboarding_review__核心循环说明.label'
+  | 'catalog.material.onboarding_review__核心循环说明.placeholder'
+  | 'catalog.material.onboarding_review__目标受众.label'
+  | 'catalog.material.onboarding_review__目标受众.placeholder'
+  | 'catalog.material.onboarding_review__系统说明.label'
+  | 'catalog.material.onboarding_review__系统说明.placeholder'
+  | 'catalog.material.onboarding_review__评价摘要.label'
+  | 'catalog.material.onboarding_review__评价摘要.placeholder'
+  | 'catalog.material.pitch_review__一句话pitch.label'
+  | 'catalog.material.pitch_review__一句话pitch.placeholder'
+  | 'catalog.material.pitch_review__定价与平台.label'
+  | 'catalog.material.pitch_review__定价与平台.placeholder'
+  | 'catalog.material.pitch_review__核心循环说明.label'
+  | 'catalog.material.pitch_review__核心循环说明.placeholder'
+  | 'catalog.material.pitch_review__目标受众.label'
+  | 'catalog.material.pitch_review__目标受众.placeholder'
+  | 'catalog.material.pitch_review__竞品对比.label'
+  | 'catalog.material.pitch_review__竞品对比.placeholder'
+  | 'catalog.material.pitch_review__系统说明.label'
+  | 'catalog.material.pitch_review__系统说明.placeholder'
+  | 'catalog.material.pitch_review__项目名称.label'
+  | 'catalog.material.pitch_review__项目名称.placeholder'
+  | 'catalog.material.pricing_page_review__产品名称.label'
+  | 'catalog.material.pricing_page_review__产品名称.placeholder'
+  | 'catalog.material.pricing_page_review__定价与平台.label'
+  | 'catalog.material.pricing_page_review__定价与平台.placeholder'
+  | 'catalog.material.pricing_page_review__截图.label'
+  | 'catalog.material.pricing_page_review__截图.placeholder'
+  | 'catalog.material.pricing_page_review__核心循环说明.label'
+  | 'catalog.material.pricing_page_review__核心循环说明.placeholder'
+  | 'catalog.material.pricing_page_review__目标受众.label'
+  | 'catalog.material.pricing_page_review__目标受众.placeholder'
+  | 'catalog.material.pricing_page_review__竞品对比.label'
+  | 'catalog.material.pricing_page_review__竞品对比.placeholder'
+  | 'catalog.material.product_feedback_review__产品名称.label'
+  | 'catalog.material.product_feedback_review__产品名称.placeholder'
+  | 'catalog.material.product_feedback_review__截图.label'
+  | 'catalog.material.product_feedback_review__截图.placeholder'
+  | 'catalog.material.product_feedback_review__核心循环说明.label'
+  | 'catalog.material.product_feedback_review__核心循环说明.placeholder'
+  | 'catalog.material.product_feedback_review__目标受众.label'
+  | 'catalog.material.product_feedback_review__目标受众.placeholder'
+  | 'catalog.material.product_feedback_review__竞品对比.label'
+  | 'catalog.material.product_feedback_review__竞品对比.placeholder'
+  | 'catalog.material.product_feedback_review__评价摘要.label'
+  | 'catalog.material.product_feedback_review__评价摘要.placeholder'
+  | 'catalog.material.steam_page_review__demo.label'
+  | 'catalog.material.steam_page_review__demo.placeholder'
+  | 'catalog.material.steam_page_review__tags.label'
+  | 'catalog.material.steam_page_review__tags.placeholder'
+  | 'catalog.material.steam_page_review__价格.label'
+  | 'catalog.material.steam_page_review__价格.placeholder'
+  | 'catalog.material.steam_page_review__截图.label'
+  | 'catalog.material.steam_page_review__截图.placeholder'
+  | 'catalog.material.steam_page_review__核心循环说明.label'
+  | 'catalog.material.steam_page_review__核心循环说明.placeholder'
+  | 'catalog.material.steam_page_review__游戏名称.label'
+  | 'catalog.material.steam_page_review__游戏名称.placeholder'
+  | 'catalog.material.steam_page_review__评价摘要.label'
+  | 'catalog.material.steam_page_review__评价摘要.placeholder'
+  | 'catalog.material.update_announcement_review__截图.label'
+  | 'catalog.material.update_announcement_review__截图.placeholder'
+  | 'catalog.material.update_announcement_review__核心循环说明.label'
+  | 'catalog.material.update_announcement_review__核心循环说明.placeholder'
+  | 'catalog.material.update_announcement_review__游戏名称.label'
+  | 'catalog.material.update_announcement_review__游戏名称.placeholder'
+  | 'catalog.material.update_announcement_review__评价摘要.label'
+  | 'catalog.material.update_announcement_review__评价摘要.placeholder'
+  | 'catalog.mode.full.desc'
+  | 'catalog.mode.quick.desc'
+  | 'catalog.mode.standard.desc'
   | 'catalog.persona_pack.accessibility'
+  | 'catalog.persona_pack.category_general'
+  | 'catalog.persona_pack.category_platform'
+  | 'catalog.persona_pack.category_player_type'
+  | 'catalog.persona_pack.category_special'
   | 'catalog.persona_pack.competitive_esport'
   | 'catalog.persona_pack.educational_serious'
   | 'catalog.persona_pack.family_casual'
   | 'catalog.persona_pack.game_core'
   | 'catalog.persona_pack.general_consumer'
   | 'catalog.persona_pack.indie_creative'
+  | 'catalog.persona_pack.launch_compliance'
   | 'catalog.persona_pack.mobile_f2p'
   | 'catalog.persona_pack.startup_panel'
   | 'catalog.persona_pack.vr_immersive'
+  | 'catalog.skill.audience_panel.desc'
+  | 'catalog.skill.audience_panel.label'
+  | 'catalog.skill.persona_generate.desc'
+  | 'catalog.skill.persona_generate.label'
+  | 'catalog.skill.red_team_audience.desc'
+  | 'catalog.skill.red_team_audience.label'
+  | 'catalog.skill.synthetic_playtest.desc'
+  | 'catalog.skill.synthetic_playtest.label'
+  | 'catalog.task_type.concept_review.desc'
+  | 'catalog.task_type.concept_review.label'
+  | 'catalog.task_type.demo_first_play.desc'
+  | 'catalog.task_type.demo_first_play.label'
+  | 'catalog.task_type.devlog_review.desc'
+  | 'catalog.task_type.devlog_review.label'
+  | 'catalog.task_type.discord_community_review.desc'
+  | 'catalog.task_type.discord_community_review.label'
+  | 'catalog.task_type.kickstarter_review.desc'
+  | 'catalog.task_type.kickstarter_review.label'
+  | 'catalog.task_type.localization_review.desc'
+  | 'catalog.task_type.localization_review.label'
+  | 'catalog.task_type.looking_for_party_post.desc'
+  | 'catalog.task_type.looking_for_party_post.label'
+  | 'catalog.task_type.monetization_review.desc'
+  | 'catalog.task_type.monetization_review.label'
+  | 'catalog.task_type.onboarding_review.desc'
+  | 'catalog.task_type.onboarding_review.label'
+  | 'catalog.task_type.pitch_review.desc'
+  | 'catalog.task_type.pitch_review.label'
+  | 'catalog.task_type.pricing_page_review.desc'
+  | 'catalog.task_type.pricing_page_review.label'
+  | 'catalog.task_type.product_feedback_review.desc'
+  | 'catalog.task_type.product_feedback_review.label'
+  | 'catalog.task_type.steam_page_review.desc'
+  | 'catalog.task_type.steam_page_review.label'
+  | 'catalog.task_type.update_announcement_review.desc'
+  | 'catalog.task_type.update_announcement_review.label'
   | 'common.action.back'
   | 'common.action.cancel'
   | 'common.action.clear'
@@ -1355,16 +1567,228 @@ export type PlainMessageKey =
   | 'catalog.brand.ollama'
   | 'catalog.brand.openai'
   | 'catalog.brand.qwen'
+  | 'catalog.eval_dimension.actionability.desc'
+  | 'catalog.eval_dimension.actionability.label'
+  | 'catalog.eval_dimension.calibration_honesty.desc'
+  | 'catalog.eval_dimension.calibration_honesty.label'
+  | 'catalog.eval_dimension.ethical_persona_use.desc'
+  | 'catalog.eval_dimension.ethical_persona_use.label'
+  | 'catalog.eval_dimension.input_grounding.desc'
+  | 'catalog.eval_dimension.input_grounding.label'
+  | 'catalog.eval_dimension.persona_differentiation.desc'
+  | 'catalog.eval_dimension.persona_differentiation.label'
+  | 'catalog.eval_dimension.report_structure.desc'
+  | 'catalog.eval_dimension.report_structure.label'
+  | 'catalog.eval_dimension.risk_detection.desc'
+  | 'catalog.eval_dimension.risk_detection.label'
+  | 'catalog.eval_dimension.segment_conflict.desc'
+  | 'catalog.eval_dimension.segment_conflict.label'
+  | 'catalog.material.concept_review__一句话pitch.label'
+  | 'catalog.material.concept_review__一句话pitch.placeholder'
+  | 'catalog.material.concept_review__定价与平台.label'
+  | 'catalog.material.concept_review__定价与平台.placeholder'
+  | 'catalog.material.concept_review__截图.label'
+  | 'catalog.material.concept_review__截图.placeholder'
+  | 'catalog.material.concept_review__核心循环说明.label'
+  | 'catalog.material.concept_review__核心循环说明.placeholder'
+  | 'catalog.material.concept_review__目标受众.label'
+  | 'catalog.material.concept_review__目标受众.placeholder'
+  | 'catalog.material.concept_review__竞品对比.label'
+  | 'catalog.material.concept_review__竞品对比.placeholder'
+  | 'catalog.material.concept_review__系统说明.label'
+  | 'catalog.material.concept_review__系统说明.placeholder'
+  | 'catalog.material.demo_first_play__实机视频.label'
+  | 'catalog.material.demo_first_play__实机视频.placeholder'
+  | 'catalog.material.demo_first_play__截图.label'
+  | 'catalog.material.demo_first_play__截图.placeholder'
+  | 'catalog.material.demo_first_play__核心循环说明.label'
+  | 'catalog.material.demo_first_play__核心循环说明.placeholder'
+  | 'catalog.material.demo_first_play__游戏名称.label'
+  | 'catalog.material.demo_first_play__游戏名称.placeholder'
+  | 'catalog.material.demo_first_play__竞品对比.label'
+  | 'catalog.material.demo_first_play__竞品对比.placeholder'
+  | 'catalog.material.demo_first_play__评价摘要.label'
+  | 'catalog.material.demo_first_play__评价摘要.placeholder'
+  | 'catalog.material.devlog_review__截图.label'
+  | 'catalog.material.devlog_review__截图.placeholder'
+  | 'catalog.material.devlog_review__核心循环说明.label'
+  | 'catalog.material.devlog_review__核心循环说明.placeholder'
+  | 'catalog.material.devlog_review__游戏名称.label'
+  | 'catalog.material.devlog_review__游戏名称.placeholder'
+  | 'catalog.material.devlog_review__评价摘要.label'
+  | 'catalog.material.devlog_review__评价摘要.placeholder'
+  | 'catalog.material.discord_community_review__核心循环说明.label'
+  | 'catalog.material.discord_community_review__核心循环说明.placeholder'
+  | 'catalog.material.discord_community_review__社区名称.label'
+  | 'catalog.material.discord_community_review__社区名称.placeholder'
+  | 'catalog.material.discord_community_review__竞品对比.label'
+  | 'catalog.material.discord_community_review__竞品对比.placeholder'
+  | 'catalog.material.discord_community_review__系统说明.label'
+  | 'catalog.material.discord_community_review__系统说明.placeholder'
+  | 'catalog.material.discord_community_review__评价摘要.label'
+  | 'catalog.material.discord_community_review__评价摘要.placeholder'
+  | 'catalog.material.kickstarter_review__一句话pitch.label'
+  | 'catalog.material.kickstarter_review__一句话pitch.placeholder'
+  | 'catalog.material.kickstarter_review__定价与平台.label'
+  | 'catalog.material.kickstarter_review__定价与平台.placeholder'
+  | 'catalog.material.kickstarter_review__截图.label'
+  | 'catalog.material.kickstarter_review__截图.placeholder'
+  | 'catalog.material.kickstarter_review__核心循环说明.label'
+  | 'catalog.material.kickstarter_review__核心循环说明.placeholder'
+  | 'catalog.material.kickstarter_review__目标受众.label'
+  | 'catalog.material.kickstarter_review__目标受众.placeholder'
+  | 'catalog.material.kickstarter_review__项目名称.label'
+  | 'catalog.material.kickstarter_review__项目名称.placeholder'
+  | 'catalog.material.localization_review__核心循环说明.label'
+  | 'catalog.material.localization_review__核心循环说明.placeholder'
+  | 'catalog.material.localization_review__游戏名称.label'
+  | 'catalog.material.localization_review__游戏名称.placeholder'
+  | 'catalog.material.localization_review__竞品对比.label'
+  | 'catalog.material.localization_review__竞品对比.placeholder'
+  | 'catalog.material.localization_review__系统说明.label'
+  | 'catalog.material.localization_review__系统说明.placeholder'
+  | 'catalog.material.looking_for_party_post__核心循环说明.label'
+  | 'catalog.material.looking_for_party_post__核心循环说明.placeholder'
+  | 'catalog.material.looking_for_party_post__游戏名称.label'
+  | 'catalog.material.looking_for_party_post__游戏名称.placeholder'
+  | 'catalog.material.looking_for_party_post__目标受众.label'
+  | 'catalog.material.looking_for_party_post__目标受众.placeholder'
+  | 'catalog.material.monetization_review__定价与平台.label'
+  | 'catalog.material.monetization_review__定价与平台.placeholder'
+  | 'catalog.material.monetization_review__核心循环说明.label'
+  | 'catalog.material.monetization_review__核心循环说明.placeholder'
+  | 'catalog.material.monetization_review__游戏名称.label'
+  | 'catalog.material.monetization_review__游戏名称.placeholder'
+  | 'catalog.material.monetization_review__竞品对比.label'
+  | 'catalog.material.monetization_review__竞品对比.placeholder'
+  | 'catalog.material.monetization_review__评价摘要.label'
+  | 'catalog.material.monetization_review__评价摘要.placeholder'
+  | 'catalog.material.onboarding_review__产品名称.label'
+  | 'catalog.material.onboarding_review__产品名称.placeholder'
+  | 'catalog.material.onboarding_review__截图.label'
+  | 'catalog.material.onboarding_review__截图.placeholder'
+  | 'catalog.material.onboarding_review__核心循环说明.label'
+  | 'catalog.material.onboarding_review__核心循环说明.placeholder'
+  | 'catalog.material.onboarding_review__目标受众.label'
+  | 'catalog.material.onboarding_review__目标受众.placeholder'
+  | 'catalog.material.onboarding_review__系统说明.label'
+  | 'catalog.material.onboarding_review__系统说明.placeholder'
+  | 'catalog.material.onboarding_review__评价摘要.label'
+  | 'catalog.material.onboarding_review__评价摘要.placeholder'
+  | 'catalog.material.pitch_review__一句话pitch.label'
+  | 'catalog.material.pitch_review__一句话pitch.placeholder'
+  | 'catalog.material.pitch_review__定价与平台.label'
+  | 'catalog.material.pitch_review__定价与平台.placeholder'
+  | 'catalog.material.pitch_review__核心循环说明.label'
+  | 'catalog.material.pitch_review__核心循环说明.placeholder'
+  | 'catalog.material.pitch_review__目标受众.label'
+  | 'catalog.material.pitch_review__目标受众.placeholder'
+  | 'catalog.material.pitch_review__竞品对比.label'
+  | 'catalog.material.pitch_review__竞品对比.placeholder'
+  | 'catalog.material.pitch_review__系统说明.label'
+  | 'catalog.material.pitch_review__系统说明.placeholder'
+  | 'catalog.material.pitch_review__项目名称.label'
+  | 'catalog.material.pitch_review__项目名称.placeholder'
+  | 'catalog.material.pricing_page_review__产品名称.label'
+  | 'catalog.material.pricing_page_review__产品名称.placeholder'
+  | 'catalog.material.pricing_page_review__定价与平台.label'
+  | 'catalog.material.pricing_page_review__定价与平台.placeholder'
+  | 'catalog.material.pricing_page_review__截图.label'
+  | 'catalog.material.pricing_page_review__截图.placeholder'
+  | 'catalog.material.pricing_page_review__核心循环说明.label'
+  | 'catalog.material.pricing_page_review__核心循环说明.placeholder'
+  | 'catalog.material.pricing_page_review__目标受众.label'
+  | 'catalog.material.pricing_page_review__目标受众.placeholder'
+  | 'catalog.material.pricing_page_review__竞品对比.label'
+  | 'catalog.material.pricing_page_review__竞品对比.placeholder'
+  | 'catalog.material.product_feedback_review__产品名称.label'
+  | 'catalog.material.product_feedback_review__产品名称.placeholder'
+  | 'catalog.material.product_feedback_review__截图.label'
+  | 'catalog.material.product_feedback_review__截图.placeholder'
+  | 'catalog.material.product_feedback_review__核心循环说明.label'
+  | 'catalog.material.product_feedback_review__核心循环说明.placeholder'
+  | 'catalog.material.product_feedback_review__目标受众.label'
+  | 'catalog.material.product_feedback_review__目标受众.placeholder'
+  | 'catalog.material.product_feedback_review__竞品对比.label'
+  | 'catalog.material.product_feedback_review__竞品对比.placeholder'
+  | 'catalog.material.product_feedback_review__评价摘要.label'
+  | 'catalog.material.product_feedback_review__评价摘要.placeholder'
+  | 'catalog.material.steam_page_review__demo.label'
+  | 'catalog.material.steam_page_review__demo.placeholder'
+  | 'catalog.material.steam_page_review__tags.label'
+  | 'catalog.material.steam_page_review__tags.placeholder'
+  | 'catalog.material.steam_page_review__价格.label'
+  | 'catalog.material.steam_page_review__价格.placeholder'
+  | 'catalog.material.steam_page_review__截图.label'
+  | 'catalog.material.steam_page_review__截图.placeholder'
+  | 'catalog.material.steam_page_review__核心循环说明.label'
+  | 'catalog.material.steam_page_review__核心循环说明.placeholder'
+  | 'catalog.material.steam_page_review__游戏名称.label'
+  | 'catalog.material.steam_page_review__游戏名称.placeholder'
+  | 'catalog.material.steam_page_review__评价摘要.label'
+  | 'catalog.material.steam_page_review__评价摘要.placeholder'
+  | 'catalog.material.update_announcement_review__截图.label'
+  | 'catalog.material.update_announcement_review__截图.placeholder'
+  | 'catalog.material.update_announcement_review__核心循环说明.label'
+  | 'catalog.material.update_announcement_review__核心循环说明.placeholder'
+  | 'catalog.material.update_announcement_review__游戏名称.label'
+  | 'catalog.material.update_announcement_review__游戏名称.placeholder'
+  | 'catalog.material.update_announcement_review__评价摘要.label'
+  | 'catalog.material.update_announcement_review__评价摘要.placeholder'
+  | 'catalog.mode.full.desc'
+  | 'catalog.mode.quick.desc'
+  | 'catalog.mode.standard.desc'
   | 'catalog.persona_pack.accessibility'
+  | 'catalog.persona_pack.category_general'
+  | 'catalog.persona_pack.category_platform'
+  | 'catalog.persona_pack.category_player_type'
+  | 'catalog.persona_pack.category_special'
   | 'catalog.persona_pack.competitive_esport'
   | 'catalog.persona_pack.educational_serious'
   | 'catalog.persona_pack.family_casual'
   | 'catalog.persona_pack.game_core'
   | 'catalog.persona_pack.general_consumer'
   | 'catalog.persona_pack.indie_creative'
+  | 'catalog.persona_pack.launch_compliance'
   | 'catalog.persona_pack.mobile_f2p'
   | 'catalog.persona_pack.startup_panel'
   | 'catalog.persona_pack.vr_immersive'
+  | 'catalog.skill.audience_panel.desc'
+  | 'catalog.skill.audience_panel.label'
+  | 'catalog.skill.persona_generate.desc'
+  | 'catalog.skill.persona_generate.label'
+  | 'catalog.skill.red_team_audience.desc'
+  | 'catalog.skill.red_team_audience.label'
+  | 'catalog.skill.synthetic_playtest.desc'
+  | 'catalog.skill.synthetic_playtest.label'
+  | 'catalog.task_type.concept_review.desc'
+  | 'catalog.task_type.concept_review.label'
+  | 'catalog.task_type.demo_first_play.desc'
+  | 'catalog.task_type.demo_first_play.label'
+  | 'catalog.task_type.devlog_review.desc'
+  | 'catalog.task_type.devlog_review.label'
+  | 'catalog.task_type.discord_community_review.desc'
+  | 'catalog.task_type.discord_community_review.label'
+  | 'catalog.task_type.kickstarter_review.desc'
+  | 'catalog.task_type.kickstarter_review.label'
+  | 'catalog.task_type.localization_review.desc'
+  | 'catalog.task_type.localization_review.label'
+  | 'catalog.task_type.looking_for_party_post.desc'
+  | 'catalog.task_type.looking_for_party_post.label'
+  | 'catalog.task_type.monetization_review.desc'
+  | 'catalog.task_type.monetization_review.label'
+  | 'catalog.task_type.onboarding_review.desc'
+  | 'catalog.task_type.onboarding_review.label'
+  | 'catalog.task_type.pitch_review.desc'
+  | 'catalog.task_type.pitch_review.label'
+  | 'catalog.task_type.pricing_page_review.desc'
+  | 'catalog.task_type.pricing_page_review.label'
+  | 'catalog.task_type.product_feedback_review.desc'
+  | 'catalog.task_type.product_feedback_review.label'
+  | 'catalog.task_type.steam_page_review.desc'
+  | 'catalog.task_type.steam_page_review.label'
+  | 'catalog.task_type.update_announcement_review.desc'
+  | 'catalog.task_type.update_announcement_review.label'
   | 'common.action.back'
   | 'common.action.cancel'
   | 'common.action.clear'
@@ -2525,16 +2949,228 @@ export interface MessageVars {
   'catalog.brand.ollama': Record<string, never>
   'catalog.brand.openai': Record<string, never>
   'catalog.brand.qwen': Record<string, never>
+  'catalog.eval_dimension.actionability.desc': Record<string, never>
+  'catalog.eval_dimension.actionability.label': Record<string, never>
+  'catalog.eval_dimension.calibration_honesty.desc': Record<string, never>
+  'catalog.eval_dimension.calibration_honesty.label': Record<string, never>
+  'catalog.eval_dimension.ethical_persona_use.desc': Record<string, never>
+  'catalog.eval_dimension.ethical_persona_use.label': Record<string, never>
+  'catalog.eval_dimension.input_grounding.desc': Record<string, never>
+  'catalog.eval_dimension.input_grounding.label': Record<string, never>
+  'catalog.eval_dimension.persona_differentiation.desc': Record<string, never>
+  'catalog.eval_dimension.persona_differentiation.label': Record<string, never>
+  'catalog.eval_dimension.report_structure.desc': Record<string, never>
+  'catalog.eval_dimension.report_structure.label': Record<string, never>
+  'catalog.eval_dimension.risk_detection.desc': Record<string, never>
+  'catalog.eval_dimension.risk_detection.label': Record<string, never>
+  'catalog.eval_dimension.segment_conflict.desc': Record<string, never>
+  'catalog.eval_dimension.segment_conflict.label': Record<string, never>
+  'catalog.material.concept_review__一句话pitch.label': Record<string, never>
+  'catalog.material.concept_review__一句话pitch.placeholder': Record<string, never>
+  'catalog.material.concept_review__定价与平台.label': Record<string, never>
+  'catalog.material.concept_review__定价与平台.placeholder': Record<string, never>
+  'catalog.material.concept_review__截图.label': Record<string, never>
+  'catalog.material.concept_review__截图.placeholder': Record<string, never>
+  'catalog.material.concept_review__核心循环说明.label': Record<string, never>
+  'catalog.material.concept_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.concept_review__目标受众.label': Record<string, never>
+  'catalog.material.concept_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.concept_review__竞品对比.label': Record<string, never>
+  'catalog.material.concept_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.concept_review__系统说明.label': Record<string, never>
+  'catalog.material.concept_review__系统说明.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__实机视频.label': Record<string, never>
+  'catalog.material.demo_first_play__实机视频.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__截图.label': Record<string, never>
+  'catalog.material.demo_first_play__截图.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__核心循环说明.label': Record<string, never>
+  'catalog.material.demo_first_play__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__游戏名称.label': Record<string, never>
+  'catalog.material.demo_first_play__游戏名称.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__竞品对比.label': Record<string, never>
+  'catalog.material.demo_first_play__竞品对比.placeholder': Record<string, never>
+  'catalog.material.demo_first_play__评价摘要.label': Record<string, never>
+  'catalog.material.demo_first_play__评价摘要.placeholder': Record<string, never>
+  'catalog.material.devlog_review__截图.label': Record<string, never>
+  'catalog.material.devlog_review__截图.placeholder': Record<string, never>
+  'catalog.material.devlog_review__核心循环说明.label': Record<string, never>
+  'catalog.material.devlog_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.devlog_review__游戏名称.label': Record<string, never>
+  'catalog.material.devlog_review__游戏名称.placeholder': Record<string, never>
+  'catalog.material.devlog_review__评价摘要.label': Record<string, never>
+  'catalog.material.devlog_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.discord_community_review__核心循环说明.label': Record<string, never>
+  'catalog.material.discord_community_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.discord_community_review__社区名称.label': Record<string, never>
+  'catalog.material.discord_community_review__社区名称.placeholder': Record<string, never>
+  'catalog.material.discord_community_review__竞品对比.label': Record<string, never>
+  'catalog.material.discord_community_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.discord_community_review__系统说明.label': Record<string, never>
+  'catalog.material.discord_community_review__系统说明.placeholder': Record<string, never>
+  'catalog.material.discord_community_review__评价摘要.label': Record<string, never>
+  'catalog.material.discord_community_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__一句话pitch.label': Record<string, never>
+  'catalog.material.kickstarter_review__一句话pitch.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__定价与平台.label': Record<string, never>
+  'catalog.material.kickstarter_review__定价与平台.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__截图.label': Record<string, never>
+  'catalog.material.kickstarter_review__截图.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__核心循环说明.label': Record<string, never>
+  'catalog.material.kickstarter_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__目标受众.label': Record<string, never>
+  'catalog.material.kickstarter_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.kickstarter_review__项目名称.label': Record<string, never>
+  'catalog.material.kickstarter_review__项目名称.placeholder': Record<string, never>
+  'catalog.material.localization_review__核心循环说明.label': Record<string, never>
+  'catalog.material.localization_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.localization_review__游戏名称.label': Record<string, never>
+  'catalog.material.localization_review__游戏名称.placeholder': Record<string, never>
+  'catalog.material.localization_review__竞品对比.label': Record<string, never>
+  'catalog.material.localization_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.localization_review__系统说明.label': Record<string, never>
+  'catalog.material.localization_review__系统说明.placeholder': Record<string, never>
+  'catalog.material.looking_for_party_post__核心循环说明.label': Record<string, never>
+  'catalog.material.looking_for_party_post__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.looking_for_party_post__游戏名称.label': Record<string, never>
+  'catalog.material.looking_for_party_post__游戏名称.placeholder': Record<string, never>
+  'catalog.material.looking_for_party_post__目标受众.label': Record<string, never>
+  'catalog.material.looking_for_party_post__目标受众.placeholder': Record<string, never>
+  'catalog.material.monetization_review__定价与平台.label': Record<string, never>
+  'catalog.material.monetization_review__定价与平台.placeholder': Record<string, never>
+  'catalog.material.monetization_review__核心循环说明.label': Record<string, never>
+  'catalog.material.monetization_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.monetization_review__游戏名称.label': Record<string, never>
+  'catalog.material.monetization_review__游戏名称.placeholder': Record<string, never>
+  'catalog.material.monetization_review__竞品对比.label': Record<string, never>
+  'catalog.material.monetization_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.monetization_review__评价摘要.label': Record<string, never>
+  'catalog.material.monetization_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__产品名称.label': Record<string, never>
+  'catalog.material.onboarding_review__产品名称.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__截图.label': Record<string, never>
+  'catalog.material.onboarding_review__截图.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__核心循环说明.label': Record<string, never>
+  'catalog.material.onboarding_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__目标受众.label': Record<string, never>
+  'catalog.material.onboarding_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__系统说明.label': Record<string, never>
+  'catalog.material.onboarding_review__系统说明.placeholder': Record<string, never>
+  'catalog.material.onboarding_review__评价摘要.label': Record<string, never>
+  'catalog.material.onboarding_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.pitch_review__一句话pitch.label': Record<string, never>
+  'catalog.material.pitch_review__一句话pitch.placeholder': Record<string, never>
+  'catalog.material.pitch_review__定价与平台.label': Record<string, never>
+  'catalog.material.pitch_review__定价与平台.placeholder': Record<string, never>
+  'catalog.material.pitch_review__核心循环说明.label': Record<string, never>
+  'catalog.material.pitch_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.pitch_review__目标受众.label': Record<string, never>
+  'catalog.material.pitch_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.pitch_review__竞品对比.label': Record<string, never>
+  'catalog.material.pitch_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.pitch_review__系统说明.label': Record<string, never>
+  'catalog.material.pitch_review__系统说明.placeholder': Record<string, never>
+  'catalog.material.pitch_review__项目名称.label': Record<string, never>
+  'catalog.material.pitch_review__项目名称.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__产品名称.label': Record<string, never>
+  'catalog.material.pricing_page_review__产品名称.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__定价与平台.label': Record<string, never>
+  'catalog.material.pricing_page_review__定价与平台.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__截图.label': Record<string, never>
+  'catalog.material.pricing_page_review__截图.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__核心循环说明.label': Record<string, never>
+  'catalog.material.pricing_page_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__目标受众.label': Record<string, never>
+  'catalog.material.pricing_page_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.pricing_page_review__竞品对比.label': Record<string, never>
+  'catalog.material.pricing_page_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__产品名称.label': Record<string, never>
+  'catalog.material.product_feedback_review__产品名称.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__截图.label': Record<string, never>
+  'catalog.material.product_feedback_review__截图.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__核心循环说明.label': Record<string, never>
+  'catalog.material.product_feedback_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__目标受众.label': Record<string, never>
+  'catalog.material.product_feedback_review__目标受众.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__竞品对比.label': Record<string, never>
+  'catalog.material.product_feedback_review__竞品对比.placeholder': Record<string, never>
+  'catalog.material.product_feedback_review__评价摘要.label': Record<string, never>
+  'catalog.material.product_feedback_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__demo.label': Record<string, never>
+  'catalog.material.steam_page_review__demo.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__tags.label': Record<string, never>
+  'catalog.material.steam_page_review__tags.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__价格.label': Record<string, never>
+  'catalog.material.steam_page_review__价格.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__截图.label': Record<string, never>
+  'catalog.material.steam_page_review__截图.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__核心循环说明.label': Record<string, never>
+  'catalog.material.steam_page_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__游戏名称.label': Record<string, never>
+  'catalog.material.steam_page_review__游戏名称.placeholder': Record<string, never>
+  'catalog.material.steam_page_review__评价摘要.label': Record<string, never>
+  'catalog.material.steam_page_review__评价摘要.placeholder': Record<string, never>
+  'catalog.material.update_announcement_review__截图.label': Record<string, never>
+  'catalog.material.update_announcement_review__截图.placeholder': Record<string, never>
+  'catalog.material.update_announcement_review__核心循环说明.label': Record<string, never>
+  'catalog.material.update_announcement_review__核心循环说明.placeholder': Record<string, never>
+  'catalog.material.update_announcement_review__游戏名称.label': Record<string, never>
+  'catalog.material.update_announcement_review__游戏名称.placeholder': Record<string, never>
+  'catalog.material.update_announcement_review__评价摘要.label': Record<string, never>
+  'catalog.material.update_announcement_review__评价摘要.placeholder': Record<string, never>
+  'catalog.mode.full.desc': Record<string, never>
+  'catalog.mode.quick.desc': Record<string, never>
+  'catalog.mode.standard.desc': Record<string, never>
   'catalog.persona_pack.accessibility': Record<string, never>
+  'catalog.persona_pack.category_general': Record<string, never>
+  'catalog.persona_pack.category_platform': Record<string, never>
+  'catalog.persona_pack.category_player_type': Record<string, never>
+  'catalog.persona_pack.category_special': Record<string, never>
   'catalog.persona_pack.competitive_esport': Record<string, never>
   'catalog.persona_pack.educational_serious': Record<string, never>
   'catalog.persona_pack.family_casual': Record<string, never>
   'catalog.persona_pack.game_core': Record<string, never>
   'catalog.persona_pack.general_consumer': Record<string, never>
   'catalog.persona_pack.indie_creative': Record<string, never>
+  'catalog.persona_pack.launch_compliance': Record<string, never>
   'catalog.persona_pack.mobile_f2p': Record<string, never>
   'catalog.persona_pack.startup_panel': Record<string, never>
   'catalog.persona_pack.vr_immersive': Record<string, never>
+  'catalog.skill.audience_panel.desc': Record<string, never>
+  'catalog.skill.audience_panel.label': Record<string, never>
+  'catalog.skill.persona_generate.desc': Record<string, never>
+  'catalog.skill.persona_generate.label': Record<string, never>
+  'catalog.skill.red_team_audience.desc': Record<string, never>
+  'catalog.skill.red_team_audience.label': Record<string, never>
+  'catalog.skill.synthetic_playtest.desc': Record<string, never>
+  'catalog.skill.synthetic_playtest.label': Record<string, never>
+  'catalog.task_type.concept_review.desc': Record<string, never>
+  'catalog.task_type.concept_review.label': Record<string, never>
+  'catalog.task_type.demo_first_play.desc': Record<string, never>
+  'catalog.task_type.demo_first_play.label': Record<string, never>
+  'catalog.task_type.devlog_review.desc': Record<string, never>
+  'catalog.task_type.devlog_review.label': Record<string, never>
+  'catalog.task_type.discord_community_review.desc': Record<string, never>
+  'catalog.task_type.discord_community_review.label': Record<string, never>
+  'catalog.task_type.kickstarter_review.desc': Record<string, never>
+  'catalog.task_type.kickstarter_review.label': Record<string, never>
+  'catalog.task_type.localization_review.desc': Record<string, never>
+  'catalog.task_type.localization_review.label': Record<string, never>
+  'catalog.task_type.looking_for_party_post.desc': Record<string, never>
+  'catalog.task_type.looking_for_party_post.label': Record<string, never>
+  'catalog.task_type.monetization_review.desc': Record<string, never>
+  'catalog.task_type.monetization_review.label': Record<string, never>
+  'catalog.task_type.onboarding_review.desc': Record<string, never>
+  'catalog.task_type.onboarding_review.label': Record<string, never>
+  'catalog.task_type.pitch_review.desc': Record<string, never>
+  'catalog.task_type.pitch_review.label': Record<string, never>
+  'catalog.task_type.pricing_page_review.desc': Record<string, never>
+  'catalog.task_type.pricing_page_review.label': Record<string, never>
+  'catalog.task_type.product_feedback_review.desc': Record<string, never>
+  'catalog.task_type.product_feedback_review.label': Record<string, never>
+  'catalog.task_type.steam_page_review.desc': Record<string, never>
+  'catalog.task_type.steam_page_review.label': Record<string, never>
+  'catalog.task_type.update_announcement_review.desc': Record<string, never>
+  'catalog.task_type.update_announcement_review.label': Record<string, never>
   'common.action.back': Record<string, never>
   'common.action.cancel': Record<string, never>
   'common.action.clear': Record<string, never>
@@ -3894,7 +4530,12 @@ export interface MessageSlots {
 /** 参与本次生成的资源文件（调试用，改动这行说明有人加/删了资源文件）。 */
 export const RESOURCE_FILES = [
   'catalog.brand.ts',
+  'catalog.eval_dimension.ts',
+  'catalog.material.ts',
+  'catalog.mode.ts',
   'catalog.persona_pack.ts',
+  'catalog.skill.ts',
+  'catalog.task_type.ts',
   'common.action.ts',
   'common.calibration_gauge.ts',
   'common.meta.ts',

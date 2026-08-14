@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
-import { TASK_TYPES, PACK_ICONS, TASK_MATERIALS, TASK_TYPE_CATEGORIES, REVIEW_MODES, EVALUATION_DIMENSIONS } from '@/lib/mock-data'
+import { TASK_TYPES, PACK_ICONS, TASK_TYPE_CATEGORIES } from '@/lib/mock-data'
 import type { Persona, TaskMaterialField, Example, ReviewMode, SkillType } from '@/lib/mock-data'
 import { extractMaterials } from '@/lib/api'
-import { usePersonaStore } from '@/store/persona-store'
+import { usePersonaStore, packName } from '@/store/persona-store'
 import { useReviewStore } from '@/store/review-store'
 import { loadSkillTruth, NON_REVIEW_SKILL_TYPES } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
@@ -12,6 +12,16 @@ import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
 import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw } from 'lucide-react'
 import { t, Trans } from '@/i18n/runtime'
+import {
+  getTaskTypes,
+  findTaskType,
+  getReviewModes,
+  findReviewMode,
+  getMaterialFields,
+  getEvaluationDimensions,
+  localizeBackendSkill,
+  localizePersona,
+} from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import { tApiErrorParts, type ApiErrorText } from '@/i18n/api-error'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
@@ -209,12 +219,22 @@ export default function CreateReviewPage() {
   }
 
   const selectedSkill = skills?.find((s) => s.type === selectedSkillType) ?? null
+  // 技能名与描述按 ui_lang 取（后端只回中文，理由见 i18n/catalog.ts §B2）。
+  // 三处显示（第 0 步选中卡、第 1 步说明句、第 5 步确认页）共用这一份，
+  // 免得同一个技能在同一条流程里出现两种叫法。
+  const selectedSkillText = selectedSkill ? localizeBackendSkill(selectedSkill) : null
 
-  const definedFields: TaskMaterialField[] = selectedTaskType
-    ? TASK_MATERIALS[selectedTaskType] ?? []
+  /**
+   * 材料字段走 getMaterialFields 而不是直读 TASK_MATERIALS：
+   * 源常量里的 label / placeholder 是中文字面量，直读的话英文界面上整张表单是中文，
+   * 而且是看不出缺译的那种中文。`?? []` 那条数据缺口语义由读取器保留（见其注释），
+   * 所以下面 GENERIC_MATERIAL_FIELD 的兜底分支一行没变。
+   */
+  const definedFields: readonly TaskMaterialField[] = selectedTaskType
+    ? getMaterialFields(selectedTaskType)
     : []
   /** 真正渲染与校验用的字段。没有定义时退回一个必填的通用正文框，见 GENERIC_MATERIAL_FIELD。 */
-  const currentFields: TaskMaterialField[] =
+  const currentFields: readonly TaskMaterialField[] =
     selectedTaskType && definedFields.length === 0 ? [genericMaterialField()] : definedFields
 
   /**
@@ -239,13 +259,17 @@ export default function CreateReviewPage() {
    * 这种情况下不裁：宁可多给选项，也不能替后端发明限制。
    */
   const skillTaskTypes = selectedSkill?.taskTypes ?? null
+  // 名称/描述按 ui_lang 取好再过滤：TaskTypeCard 直接渲染传进去的 name / description，
+  // 直读 TASK_TYPES 的话英文界面上这一屏卡片全是中文。过滤逻辑一行没改。
+  const localizedTaskTypes = getTaskTypes()
   const filteredTaskTypes = skillTaskTypes
-    ? TASK_TYPES.filter((tt) => skillTaskTypes.includes(tt.id))
-    : TASK_TYPES
+    ? localizedTaskTypes.filter((tt) => skillTaskTypes.includes(tt.id))
+    : localizedTaskTypes
 
   const requiredFields = currentFields.filter((f) => f.required)
 
-  const currentModeConfig = REVIEW_MODES.find((m) => m.mode === selectedMode)
+  // 模式描述同样走 overlay（档位名仍是 enum.mode_badge.*，见 i18n/catalog.ts §B1 末段）。
+  const currentModeConfig = findReviewMode(selectedMode)
   const selectedPersonas = personas.filter((p) => selectedPersonaIds.has(p.id))
 
   /* ---------------- 「选了谁」必须等于「跑了谁」 ----------------
@@ -271,7 +295,10 @@ export default function CreateReviewPage() {
     (selectedPackIds.length > 1 || (selectedPack !== null && selectedPackIds[0] !== selectedPack))
   const modeMax = currentModeConfig?.persona_count_range[1] ?? 8
   const overModeMax = selectedPersonaIds.size > modeMax
-  const packName = (id: string) => packs.find((p) => p.panel_id === id)?.name ?? id
+  // 包名不再在本页自己查（原来是 `packs.find(...)?.name ?? id`）：后端回的 name 是中文，
+  // 英文界面上就是"混中文且没人发现"（契约 D8），`?? id` 更会让用户以为 "game-core"
+  // 是包名。统一走 store 的 packName()——包名的 owner 是它的 PACK_NAME_KEY +
+  // catalog.persona_pack（D5 表里包名的 zh / en 事实源都是前端），查不到显式 ⟦missing:…⟧。
 
   // 在渲染里求值（而不是模块级常量）：切语言时要跟着变。
   const stepLabels: Record<Step, string> = {
@@ -545,7 +572,12 @@ export default function CreateReviewPage() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {(skills ?? []).map((skill) => (
+              {(skills ?? []).map((skill) => {
+                // 卡片上的名称/描述与下面选中详情走**同一个** localizeBackendSkill：
+                // 只给详情接本地化、卡片直接渲染后端原文，表现是同一个技能在同一屏上
+                // 卡片是中文、详情是英文。
+                const skillText = localizeBackendSkill(skill)
+                return (
                 <button
                   key={skill.type}
                   onClick={() => setSelectedSkillType(skill.type)}
@@ -564,11 +596,11 @@ export default function CreateReviewPage() {
                     <div>
                       {/* 名称与描述都用后端返回的那份：本地再存一份必然和引擎实际读的漂移，
                           表现是同一个技能在技能中心和这一页显示两种说法 */}
-                      <h3 className={cn('font-bold font-display', skill.deco?.color ?? 'text-brand-primary')}>{skill.name}</h3>
+                      <h3 className={cn('font-bold font-display', skill.deco?.color ?? 'text-brand-primary')}>{skillText.name}</h3>
                       <span className="text-xs text-text-muted font-mono">{skill.type}</span>
                     </div>
                   </div>
-                  <p className="text-sm text-text-secondary leading-relaxed mb-3">{skill.description}</p>
+                  <p className="text-sm text-text-secondary leading-relaxed mb-3">{skillText.description}</p>
                   {/* 这里原本还显示"{skill.persona_count} 个角色"。那个数是本地常量里
                       写死的（6/8/5/10），没有任何事实源，而且 persona_generate 标的 10
                       超过了所有评审模式的人数上限 8——是个可以被当场证伪的数。
@@ -590,21 +622,23 @@ export default function CreateReviewPage() {
                     </div>
                   )}
                 </button>
-              ))}
+                )
+              })}
             </div>
 
-            {selectedSkill && (
+            {selectedSkill && selectedSkillText && (
               <div className={cn('mt-6 rounded-xl border p-4', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
                 <div className="flex items-center gap-2 mb-2">
                   <SkillIcon skill={selectedSkill} className="h-5 w-5" />
-                  <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkill.name}</span>
+                  <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkillText.name}</span>
                 </div>
-                <p className="text-sm text-text-secondary">{selectedSkill.description}</p>
+                <p className="text-sm text-text-secondary">{selectedSkillText.description}</p>
                 {selectedSkill.taskTypes && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {selectedSkill.taskTypes.map((tt) => {
-                      // 形参改名 x：t 已经是 i18n 的取文案函数，别在这里遮蔽它
-                      const taskType = TASK_TYPES.find((x) => x.id === tt)
+                      // findTaskType 已按 ui_lang 取好 name（直读 TASK_TYPES 会漏中文出来）。
+                      // 后端声明了一个本地没有的 id 就不渲染这一条，与原来的行为一致。
+                      const taskType = findTaskType(tt)
                       return taskType ? (
                         <span key={tt} className="px-2 py-0.5 rounded text-xs bg-bg-secondary text-text-secondary">
                           {taskType.icon} {taskType.name}
@@ -624,10 +658,10 @@ export default function CreateReviewPage() {
             <p className="text-sm text-text-secondary mb-6">
               {/* 只有后端真的声明了 task_types 时才说「该技能支持的任务类型」，
                   否则这句话是在替后端发明一条它没有的限制 */}
-              {selectedSkill
+              {selectedSkill && selectedSkillText
                 ? selectedSkill.taskTypes
-                  ? t('page.create.task_type_scoped.desc', { skill: selectedSkill.name })
-                  : t('page.create.task_type_open.desc', { skill: selectedSkill.name })
+                  ? t('page.create.task_type_scoped.desc', { skill: selectedSkillText.name })
+                  : t('page.create.task_type_open.desc', { skill: selectedSkillText.name })
                 : t('page.create.task_type.desc')}
             </p>
 
@@ -666,6 +700,13 @@ export default function CreateReviewPage() {
                     )}
                   >
                     <Icon className="w-4 h-4" strokeWidth={1.25} />
+                    {/* ⚠ TASK_TYPE_CATEGORIES[].name 是中文字面量，英文界面上这一排分类
+                        按钮今天仍是中文。它与 TaskTypesPage 的分类名是**同一批目录数据**、
+                        中文逐字相同，而现有 owner 是 page.task_types.category_*.label。
+                        按契约 §11 第 4 条，"两处逐字相同"要各抽各的、并把合并与否交给
+                        batch-0 决定——所以这里不复用那份 key，也不就地再抽一份。
+                        建议整批迁到 catalog.task_type_category.*（与 PACK_CATEGORIES 同级）。
+                        已写进交付报告。 */}
                     <span>{category.name}</span>
                     <span className={cn(
                       'px-1.5 py-0.5 rounded text-xs font-mono',
@@ -692,13 +733,16 @@ export default function CreateReviewPage() {
             </div>
 
             {selectedTaskType && (() => {
-              const tt = TASK_TYPES.find((x) => x.id === selectedTaskType)
+              const tt = findTaskType(selectedTaskType)
               if (!tt) return null
               return (
                 <div className="mt-6 rounded-xl border border-border bg-bg-card p-4">
                   <h3 className="text-sm font-medium text-text-muted mb-3">{t('page.create.mode.title')}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {REVIEW_MODES.map((rm) => {
+                    {/* getReviewModes() 而不是 REVIEW_MODES：description 要按 ui_lang 取，
+                        直读源常量的话英文界面上三张模式卡的说明全是中文。
+                        档位名仍走 mc.labelKey（enum.mode_badge.*），owner 没变。 */}
+                    {getReviewModes().map((rm) => {
                       const mc = modeConfig[rm.mode]
                       return (
                         <button
@@ -923,7 +967,7 @@ export default function CreateReviewPage() {
                   <p className="text-xs text-text-muted mb-2">
                     {t('page.create.extra_fields.desc', {
                       taskType:
-                        TASK_TYPES.find((x) => x.id === selectedTaskType)?.name
+                        findTaskType(selectedTaskType)?.name
                         ?? t('page.create.extra_fields_unknown.label'),
                     })}
                   </p>
@@ -1003,7 +1047,7 @@ export default function CreateReviewPage() {
                     'text-xs md:text-sm font-medium',
                     selectedPack === pack.panel_id ? 'text-brand-primary' : 'text-text-primary'
                   )}>
-                    {pack.name}
+                    {packName(pack.panel_id)}
                   </span>
                   <span className="text-xs text-text-muted">{t('page.create.pack_card.unit', { count: pack.persona_count })}</span>
                 </button>
@@ -1017,9 +1061,15 @@ export default function CreateReviewPage() {
                 <div className="mb-8 px-4 py-3 rounded-lg bg-brand-primary/5 border border-brand-primary/20">
                   <p className="text-sm text-text-secondary">
                     {/* 冒号也进消息串：中文是全角「：」，英文是半角「: 」，不是同一个字符 */}
+                    {/* ⚠ desc 仍是后端回的中文：包**名**的 owner 在前端（走 packName），
+                        包**描述**在前端没有任何 owner——mock-data 的 PERSONA_PACKS 早已删除，
+                        所以 i18n:sync-catalog 生成不出它的 zh 侧，只有 en 侧一半的话
+                        i18n:check 的 zh/en key 集相等断言会红。后端 catalog.en-US.json 的
+                        persona_packs[].description 已经有英文，缺的是下发通道
+                        （packs 端点还不发 description_en）。已写进交付报告。 */}
                     <Trans
                       k="page.create.pack_intro.desc"
-                      vars={{ name: pack.name, desc: pack.description }}
+                      vars={{ name: packName(pack.panel_id), desc: pack.description }}
                       slots={{ name: (s) => <span className="text-brand-primary font-medium">{s}</span> }}
                     />
                   </p>
@@ -1113,13 +1163,16 @@ export default function CreateReviewPage() {
                       evaluation_service.RUBRIC_DIMENSIONS，有 parity 测试钉着）。
                       这里以前写死了另一套词表——覆盖度/深度/一致性/证据质量/偏见检测/新颖性/伦理安全，
                       与后端真正评的维度只有「可行动性」一条重合：用户在这里被承诺评 A，
-                      报告里拿到的是 B。个数同理，写死的 8 会在后端加减维度时变成假数。 */}
+                      报告里拿到的是 B。个数同理，写死的 8 会在后端加减维度时变成假数。
+                      读的是 i18n/catalog.ts 的 getEvaluationDimensions()：它按 ui_lang 取
+                      name（id 与个数都还是源常量那份），直读源常量的话英文界面上这一排
+                      维度标签全是中文，且看不出是缺译。 */}
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    {t('page.create.evaluation.desc', { count: EVALUATION_DIMENSIONS.length })}
+                    {t('page.create.evaluation.desc', { count: getEvaluationDimensions().length })}
                   </p>
                   {enableEvaluation && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {EVALUATION_DIMENSIONS.map((d) => (
+                      {getEvaluationDimensions().map((d) => (
                         <span key={d.id} className="px-2 py-0.5 rounded text-xs bg-cyan/10 text-cyan">{d.name}</span>
                       ))}
                     </div>
@@ -1172,12 +1225,12 @@ export default function CreateReviewPage() {
             <p className="text-sm text-text-secondary mb-6">{t('page.create.confirm.desc')}</p>
 
             <div className="space-y-4">
-              {selectedSkill && (
+              {selectedSkill && selectedSkillText && (
                 <div className={cn('rounded-xl border p-4 md:p-5', selectedSkill.deco?.border ?? 'border-brand-primary/30', selectedSkill.deco?.bg ?? 'bg-brand-primary/10')}>
                   <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_skill.title')}</h3>
                   <div className="flex items-center gap-2">
                     <SkillIcon skill={selectedSkill} className="h-5 w-5" />
-                    <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkill.name}</span>
+                    <span className={cn('font-medium text-sm', selectedSkill.deco?.color ?? 'text-brand-primary')}>{selectedSkillText.name}</span>
                   </div>
                 </div>
               )}
@@ -1185,7 +1238,7 @@ export default function CreateReviewPage() {
               <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
                 <h3 className="text-sm font-medium text-text-muted mb-2">{t('page.create.confirm_task_type.title')}</h3>
                 {(() => {
-                  const tt = TASK_TYPES.find((x) => x.id === selectedTaskType)
+                  const tt = findTaskType(selectedTaskType)
                   if (!tt) return null
                   const Icon = tt.IconComponent
                   return (
@@ -1420,14 +1473,15 @@ function PersonaSelectCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text-primary">{persona.name}</span>
-          <span className="text-xs text-text-muted">{persona.archetype}</span>
+          <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>
           {packLabel && (
             <span className="shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] text-text-muted">
               {packLabel}
             </span>
           )}
         </div>
-        <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{persona.identity_summary}</p>
+        {/* 表述层按 ui_lang 取；上面的 persona.name 恒中文（10.3）。 */}
+        <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{localizePersona(persona).identity_summary}</p>
       </div>
       <div className="shrink-0 hidden sm:block">
         <PersonaRadarChart data={persona.behavior_profile} size={60} mobileSize={48} />

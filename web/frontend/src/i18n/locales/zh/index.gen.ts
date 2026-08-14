@@ -6,7 +6,12 @@
 
 import type { Catalog } from '../../types'
 import catalog_brand from './catalog.brand'
+import catalog_eval_dimension from './catalog.eval_dimension'
+import catalog_material from './catalog.material'
+import catalog_mode from './catalog.mode'
 import catalog_persona_pack from './catalog.persona_pack'
+import catalog_skill from './catalog.skill'
+import catalog_task_type from './catalog.task_type'
 import common_action from './common.action'
 import common_calibration_gauge from './common.calibration_gauge'
 import common_meta from './common.meta'
@@ -67,7 +72,12 @@ import page_verify from './page.verify'
 
 const TABLES: Record<string, Record<string, string>> = {
   'catalog.brand': catalog_brand,
+  'catalog.eval_dimension': catalog_eval_dimension,
+  'catalog.material': catalog_material,
+  'catalog.mode': catalog_mode,
   'catalog.persona_pack': catalog_persona_pack,
+  'catalog.skill': catalog_skill,
+  'catalog.task_type': catalog_task_type,
   'common.action': common_action,
   'common.calibration_gauge': common_calibration_gauge,
   'common.meta': common_meta,

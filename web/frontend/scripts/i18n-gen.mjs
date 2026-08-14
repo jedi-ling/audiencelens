@@ -23,6 +23,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { buildCatalogOutputs } from './i18n-sync-catalog.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -191,10 +192,78 @@ function wireStrings() {
 }
 
 /* ------------------------------------------------------------------ *
+ * 2b. wire 黑名单对 zh 材料 overlay 的**定点豁免**
+ *
+ * 为什么需要它：TASK_MATERIALS 里有 16 个字段的 label 与它自己的 key 逐字相同
+ * （`{ key: '目标受众', label: '目标受众', … }`）。这两个字符串长得一样，
+ * 但身份完全不同：key 是发给后端的 wire，label 是画在输入框上的字。
+ * 上面那条黑名单只认字符串、不认身份，于是把中文界面**本来就该显示的那行字**
+ * 判成了"翻译 wire key"。
+ *
+ * 为什么豁免不会开洞：豁免的不是"这 16 个字符串随便用"，而是
+ * "zh 侧这一条 key 的值必须**逐字等于 mock-data 里同一个字段的 label/placeholder**"。
+ * 值对不上就照样红。所以想借这个口子把 wire key 塞进别的 key、或者把 zh 的显示文案
+ * 改成另一个 wire 字符串，都过不去。
+ * en 侧不豁免——英文界面显示中文 wire key 一定是错的。
+ *
+ * 为什么现取而不写死 16 条清单：写死的清单在 mock-data 改了之后会静默失效，
+ * 且失效方向是"豁免仍然生效、但已经不对应任何真实字段"。现取则是源改了、
+ * 豁免跟着改，对不上就红。
+ *
+ * 注意 wire 本身并没有因此变得可翻译：getMaterialFields 返回的 `key` 取自
+ * TASK_MATERIALS 源常量（catalog.ts:89 `key: f.key`），从来不经过 key 表。
+ * ------------------------------------------------------------------ */
+
+function materialDisplayStrings() {
+  const out = new Map()
+  if (!existsSync(MOCK_DATA)) return out // 上面 wireStrings 已经报过找不到文件了
+  const src = readFileSync(MOCK_DATA, 'utf8')
+  const blk = src.match(/export const TASK_MATERIALS[\s\S]*?\n\}/)
+  if (!blk) {
+    fail('[黑名单豁免] 没抓到 TASK_MATERIALS 块——豁免无法建立，别当成"没有问题"')
+    return out
+  }
+
+  const TASK_TYPE_RE = /^ {2}([a-z0-9_]+):\s*\[/
+  const FIELD_RE =
+    /^\s*\{\s*key:\s*'((?:[^'\\]|\\.)*)',\s*label:\s*'((?:[^'\\]|\\.)*)',\s*placeholder:\s*'((?:[^'\\]|\\.)*)'/
+
+  let cur = null
+  let parsed = 0
+  for (const line of blk[0].split(/\r?\n/)) {
+    const t = line.match(TASK_TYPE_RE)
+    if (t) {
+      cur = t[1]
+      continue
+    }
+    const m = line.match(FIELD_RE)
+    if (!m) continue
+    if (!cur) {
+      fail(`[黑名单豁免] 在任何任务类型之前就读到了材料字段，TASK_MATERIALS 结构变了：${line.trim()}`)
+      return new Map()
+    }
+    out.set(`catalog.material.${cur}__${m[1]}.label`, m[2])
+    out.set(`catalog.material.${cur}__${m[1]}.placeholder`, m[3])
+    parsed++
+  }
+
+  // 逐字段数对拍：漏解析会让豁免范围变窄（表现为误报、很吵），但也说明
+  // 源行的书写形态变了（D6 说这些行一个字不改），该停下来看，不该带病往下跑。
+  const total = (blk[0].match(/\{\s*key:/g) || []).length
+  if (parsed !== total) {
+    fail(
+      `[黑名单豁免] TASK_MATERIALS 有 ${total} 个字段，只解析出 ${parsed} 个——` +
+        `源行的书写形态变了（D6 说这些行一个字不改），先确认源，别改这里的正则`,
+    )
+  }
+  return out
+}
+
+/* ------------------------------------------------------------------ *
  * 3. 校验
  * ------------------------------------------------------------------ */
 
-function validate(byLocale, wire) {
+function validate(byLocale, wire, matDisplay) {
   // --- 情形 1：zh / en 文件名集合必须相等 ---
   const nameSets = Object.fromEntries(
     LOCALES.map((l) => [l, new Set(byLocale[l].map((f) => f.file))]),
@@ -312,7 +381,10 @@ function validate(byLocale, wire) {
       if (v.includes('⟦')) {
         fail(`[缺译标记] ${l}: ${full} 的值里出现了 ⟦ —— 缺译标记是运行时产物，不该写进语料`)
       }
-      if (wire.has(v.trim())) {
+      // 定点豁免见上面 2b：zh 侧材料 overlay 的值只要逐字等于 mock-data 里
+      // 同一字段的 label/placeholder，它就是"显示文案"而不是"被翻译的 wire key"。
+      const isSourceMaterialDisplay = l === SOURCE && matDisplay.get(full) === v
+      if (wire.has(v.trim()) && !isSourceMaterialDisplay) {
         fail(
           `[wire key] ${l}: ${full} 的值 "${v}" 是 wire contract（TASK_MATERIALS.key 或 stance_enum），` +
             `永不进 key 表。见契约 12.2。`,
@@ -444,7 +516,8 @@ const byLocale = {}
 for (const l of LOCALES) byLocale[l] = await loadLocale(l)
 
 const wire = wireStrings()
-const { logical } = validate(byLocale, wire)
+const matDisplay = materialDisplayStrings()
+const { logical } = validate(byLocale, wire, matDisplay)
 
 const outputs = [
   [join(I18N_DIR, 'keys.gen.ts'), genKeys(logical[SOURCE] ?? new Map(), byLocale)],
@@ -453,6 +526,35 @@ const outputs = [
 ]
 
 const norm = (s) => s.replace(/\r\n/g, '\n')
+
+/* ------------------------------------------------------------------ *
+ * 5.1 目录 overlay 与后端事实源的一致性断言（契约 D5）
+ *
+ * locales/{zh,en}/catalog.{task_type,skill,mode}.ts 是 i18n-sync-catalog 的产物，
+ * D5 明写它们**不许手写**：「手写必然漂移，而漂移的表现是"同一个任务类型在两个页面
+ * 显示两个英文名"」。这里就是防它的那条断言——把应有内容重新算一遍，逐字节比。
+ *
+ * 两种模式下都比、也都不写：
+ *   · 不写，是因为写盘是 i18n:sync-catalog 的职责，一个产物只能有一个生成者；
+ *     i18n:gen 顺手写它会让"跑哪条命令"变得看运气。
+ *   · 两种模式都比，是因为 overlay 和后端漂了的时候，keys.gen.ts 生成得再对也没意义：
+ *     此时 errors 非空，下面的写盘分支自然不会执行，先修漂移再生成。
+ * ------------------------------------------------------------------ */
+const catalog = await buildCatalogOutputs()
+for (const e of catalog.errors) fail(e)
+for (const [path, content] of catalog.outputs) {
+  const rel = path.slice(ROOT.length + 1).replace(/\\/g, '/')
+  if (!existsSync(path)) {
+    fail(`[目录 overlay] 缺 ${rel} —— 跑 \`npm run i18n:sync-catalog\``)
+    continue
+  }
+  if (norm(readFileSync(path, 'utf8')) !== norm(content)) {
+    fail(
+      `[目录 overlay 漂移] ${rel} 与事实源（后端 catalog.en-US.json / mock-data 源常量）不一致。\n` +
+        `        它是生成物，不许手写（契约 D5）。改文案要改事实源，然后跑 \`npm run i18n:sync-catalog\`。`,
+    )
+  }
+}
 
 if (CHECK) {
   // --- 情形 6：生成物与目录现状不一致（有人改了资源没跑 gen） ---

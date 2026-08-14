@@ -37,7 +37,35 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const SRC = join(ROOT, 'src')
 
-const CJK = /[㐀-䶿一-鿿豈-﫿。，、；：？！“”‘’（）《》—…·]/
+/**
+ * ⚠ `u` 标志是必须的，不是可选的风格。
+ *
+ * 去掉 `u` 时字符类按 **UTF-16 码元**匹配，而这里的 `豈-﫿`（U+8C48–U+FAFF）
+ * 整段盖住了代理区 U+D800–U+DFFF —— 于是星平面 emoji 的**高代理**会单独命中：
+ * 🔬(U+1F52C→D83D DD2C)、📦(U+1F4E6)、🚀(U+1F680) 全部被判成"中文"，
+ * 而 BMP 里的 ⚡(U+26A1)、✅(U+2705) 不命中。同一个表情符号集合分裂成两半，
+ * 排查的人只会以为是自己看花了眼。
+ * 加 `u` 后按**码点**匹配，U+1F52C 不在任何区间内，emoji 一律不命中。
+ *
+ * 实测（node，同一字符类）：
+ *   无 u：🔬 true  📦 true  🚀 true  ⚡ false  ✅ false
+ *   有 u：🔬 false 📦 false 🚀 false ⚡ false ✅ false   中/—/· 仍为 true
+ */
+const CJK = /[㐀-䶿一-鿿豈-﫿。，、；：？！“”‘’（）《》—…·]/u
+
+/**
+ * 只因为排版符号才命中 CJK 的字符串，不是"待外化文案"。
+ *
+ * `—`（U+2014 em dash）与 `·`（U+00B7 中点）在上面的字符类里，但它们是**排版
+ * 符号**不是中文：ReportPage 用 DASH 拼"未提供"占位、用 ' · ' 拼阶段标识，
+ * 中英两侧逐字相同。给它们建 key 只会得到一条 zh 与 en 一模一样的条目，
+ * 外加一堆运行时查表——ReportPage:272 的注释已经把这个判断写下来了。
+ *
+ * 判定方式是**减法**而不是白名单匹配：把这两个符号从字符串里去掉后再测一次，
+ * 还有中文就照报不误。所以 '第—章' 之类仍然会被报出来，只有 '—' / ' · ' /
+ * 'A — B' 这种"去掉符号就没中文了"的才豁免。
+ */
+const TYPOGRAPHY_ONLY = /[—·]/gu
 
 /**
  * console.log / warn / error 的第一个实参不算 UI 文案。
@@ -64,6 +92,13 @@ const SKIP_DIRS = new Set([
  *
  * 形态：{ file: 路径前缀（相对 web/frontend）, text?: 完整字符串, why: 理由 }
  * 只写 file 表示整文件豁免；带 text 表示只豁免那一条。
+ *
+ * 补充：text 也可以写成字符串**数组**，表示"这一组串共用同一条理由"。
+ * 加这个是为了模板串——`AudienceLens 升级到 ${plan.name} 档` 在扫描器眼里是
+ * 两段（'AudienceLens 升级到' 和 '档'），拆成两条 ALLOW 就要把同一条理由抄两遍，
+ * 抄第二遍的时候人就开始不看理由了。**仍然是逐字面量精确匹配**，
+ * 不是前缀、不是正则：这些串一旦被改写就会重新报出来，那正是要的效果
+ * （改文案 = 要重新判断这封信到底该用哪种语言）。
  */
 const ALLOW = [
   {
@@ -92,6 +127,30 @@ const ALLOW = [
     why: '法定 ICP 备案号，逐字符固定。工信部要求原样公示，翻译或改写都是违规',
   },
   {
+    file: 'src/pages/TermsPage.tsx',
+    text: '苏ICP备2025198057号',
+    why: '法定 ICP 备案号，逐字符固定。工信部要求原样公示，翻译或改写都是违规（同 Layout.tsx 页脚那条，两处渲染的是同一个备案号）',
+  },
+  {
+    file: 'src/pages/PlansPage.tsx',
+    text: [
+      // upgradeMailto()：subject 模板串被 ${plan.name} 切成两段
+      'AudienceLens 升级到',
+      '档',
+      // 同一函数的 body 模板串，被三个 ${} 切成四段
+      '我想升级到',
+      '（',
+      '/月，每天',
+      '次评审）。\\n\\n请告诉我怎么付款。',
+    ],
+    why: '升级询价邮件的 subject / body，收件人是站方（solo dev）本人，不是界面文案。跟着 ui_lang 翻的话，一个把界面切成英文的中文用户会给同一个中国人发出一封英文询价邮件——语言选错的是**信**，而他完全不知道自己发出去的是什么。界面语言表达的是"我想用什么语言读界面"，不是"我想用什么语言写信给作者"（契约 12.2，函数头注释里写了完整推导）',
+  },
+  {
+    file: 'src/pages/PlansPage.tsx',
+    text: ['AudienceLens 兑换码申请', 'AudienceLens 升级咨询'],
+    why: '同上，另外两处 mailto 的 subject：兑换码申请信与升级咨询信，收件人同样是站方本人（契约 12.2）',
+  },
+  {
     file: 'src/lib/apiClient.ts',
     why: '两条兜底 message 是前端自己写的中文，已用 ApiError.messageLang 如实标注语种，由 tApiError 决定显不显示（契约 D2）',
   },
@@ -102,9 +161,16 @@ const ALLOW = [
 ]
 
 function allowedReason(rel, text) {
+  // 排版符号豁免不挂在任何文件上：它是"这条命中根本不是中文"的判断，
+  // 与出现在哪个文件无关。放在最前面是因为它最便宜也最不可能误放行。
+  if (!CJK.test(text.replace(TYPOGRAPHY_ONLY, ''))) {
+    return '只含排版符号（— / ·），中英逐字相同，不建 key'
+  }
   for (const a of ALLOW) {
     if (!rel.startsWith(a.file)) continue
-    if (a.text === undefined || a.text === text) return a.why
+    if (a.text === undefined) return a.why
+    const texts = Array.isArray(a.text) ? a.text : [a.text]
+    if (texts.includes(text)) return a.why
   }
   return null
 }
@@ -249,7 +315,9 @@ function jsxTextRuns(chunk, baseLine) {
   const runs = []
   let line = baseLine
   for (const raw of chunk.split('\n')) {
-    const hits = raw.match(/[^<>{}()[\];,=&|!?:+\-*/\n\t]*[㐀-䶿一-鿿豈-﫿][^<>{}()[\];,=]*/g)
+    // 同上：`u` 不能省。这里是同一段 `豈-﫿` 区间，无 u 时同样会被 emoji 的
+    // 高代理命中，切出一条以表情符号开头的"中文文本节点"。
+    const hits = raw.match(/[^<>{}()[\];,=&|!?:+\-*/\n\t]*[㐀-䶿一-鿿豈-﫿][^<>{}()[\];,=]*/gu)
     if (hits) {
       for (const h of hits) {
         const text = h.trim()
