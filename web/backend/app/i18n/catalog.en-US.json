@@ -1,0 +1,171 @@
+{
+  "_meta": {
+    "_owner": "batch-2 / 后端目录英文事实源",
+    "_what": "目录数据的英文事实源（I18N_CONTRACT D4）：任务类型 / 评审模式 / 技能 / 人格包 / 包分类。",
+    "_how": "app/i18n/catalog_en.py 在 import 期把这里的值查表合并成同级键 name_en / description_en / stance_labels_en / category_name_en。端点签名一个字不改：没有 lang 参数，没有 Accept-Language 分支。",
+    "_assert": "下面每一节的 id 集必须与中文源逐一对应，缺一个后端启动即失败（catalog_en.assert_catalog_en_complete）。这是让「缺译」变成可发现失败、而不是静默显示中文的唯一机械保证。",
+    "_never_translate": "stance_enum / score_dimensions / 一切 id 都是聚类键与 wire contract，永不翻译。stance_labels 只是显示层，逐位对应 stance_enum，位置即契约——顺序错了等于把「会买」显示成「不买」。",
+    "_persona_identity": "人格身份不本地化（I18N_CONTRACT 10.3）：张伟在英文模式下仍叫张伟。本文件只覆盖目录，不覆盖 src/personas/*.yaml 里的人格档案。",
+    "_review_mode_names": "模式名（Quick / Standard / Full）的 owner 是前端 enum.mode_badge——后端 REVIEW_MODES 压根没有 name 字段，这里再给一份就是给同一个词立第二个 owner。所以本节只发 description。",
+    "_pack_names": "人格包的 name 用受众群体的叫法（『Core Gamers』而不是『Game Core Persona Pack』），与前端 catalog.persona_pack.ts 逐字一致，免得同一个包在两个页面显示两个英文名。",
+    "_pack_category_desc": "包分类的描述文案（『按玩家特征分类』等）住在前端 mock-data.ts 的 PACK_CATEGORIES，后端从来不发它，所以这里只给分类标题、不给分类描述——给了就是给同一句话立第二个 owner。"
+  },
+
+  "task_types": {
+    "steam_page_review": {
+      "name": "Steam page review",
+      "description": "Store page structure, visual pitch, and trust signals",
+      "stance_labels": ["Wishlist it", "Skip it", "On the fence"]
+    },
+    "demo_first_play": {
+      "name": "Demo first play",
+      "description": "Onboarding friction, game feel, and the first 15 minutes",
+      "stance_labels": ["Keep playing", "Quit", "On the fence"]
+    },
+    "concept_review": {
+      "name": "Concept review",
+      "description": "Core loop, differentiation, and feasibility",
+      "stance_labels": ["Worth pursuing", "Not worth it", "On the fence"]
+    },
+    "monetization_review": {
+      "name": "Monetization review",
+      "description": "Pricing, where the paywall sits, and perceived value",
+      "stance_labels": ["Would buy", "Would not buy", "On the fence"]
+    },
+    "looking_for_party_post": {
+      "name": "Looking-for-group post",
+      "description": "Community copy, reach, and social pull",
+      "stance_labels": ["Would share it", "Would not share it", "On the fence"]
+    },
+    "update_announcement_review": {
+      "name": "Update announcement",
+      "description": "Patch notes, trust reinforcement, and retention signals",
+      "stance_labels": ["Builds confidence", "Erodes confidence", "No effect"]
+    },
+    "kickstarter_review": {
+      "name": "Crowdfunding page review",
+      "description": "Campaign narrative, reward tiers, and building trust",
+      "stance_labels": ["Would back it", "Would not back it", "On the fence"]
+    },
+    "discord_community_review": {
+      "name": "Community ops review",
+      "description": "Community vibe, engagement design, and member retention",
+      "stance_labels": ["Would join", "Would not join", "On the fence"]
+    },
+    "devlog_review": {
+      "name": "Devlog review",
+      "description": "Narrative pacing, transparency, and community response",
+      "stance_labels": ["Raises anticipation", "Lowers anticipation", "No effect"]
+    },
+    "localization_review": {
+      "name": "Localization review",
+      "description": "Cultural fit, language quality, and UI adaptation",
+      "stance_labels": ["Fits the culture", "Has problems", "On the fence"]
+    },
+    "product_feedback_review": {
+      "name": "Product feedback review",
+      "description": "Collecting and reading general product feedback, games or not",
+      "stance_labels": ["Would keep using it", "Would churn", "On the fence"]
+    },
+    "pricing_page_review": {
+      "name": "Pricing page review",
+      "description": "Plan tiers, value communication, and trust signals, games or not",
+      "stance_labels": ["Would pay", "Would not pay", "On the fence"]
+    },
+    "onboarding_review": {
+      "name": "Onboarding review",
+      "description": "First-run experience and getting-started friction, games or not",
+      "stance_labels": ["Would stay", "Would give up", "On the fence"]
+    },
+    "pitch_review": {
+      "name": "Startup pitch review",
+      "description": "Decks, pitch sessions, and application forms, read by investors and diligence",
+      "stance_labels": ["Worth following up", "Pass", "On the fence"]
+    }
+  },
+
+  "review_modes": {
+    "quick": {
+      "description": "Quick screen, results in under five minutes"
+    },
+    "standard": {
+      "description": "Everyday review, balanced for speed and depth"
+    },
+    "full": {
+      "description": "Formal review, the complete pipeline"
+    }
+  },
+
+  "skills": {
+    "synthetic_playtest": {
+      "name": "Synthetic playtest",
+      "description": "Put your work in front of a persona panel that stands in for your target audience"
+    },
+    "audience_panel": {
+      "name": "Audience panel",
+      "description": "An audience panel for work outside games, for general product reviews"
+    },
+    "red_team_audience": {
+      "name": "Red team audience",
+      "description": "Adversarial personas that go looking for weak points and risks"
+    },
+    "persona_generate": {
+      "name": "Persona generator",
+      "description": "Generate persona definitions from a domain, an audience, and your goals"
+    }
+  },
+
+  "persona_packs": {
+    "game-core": {
+      "name": "Core Gamers",
+      "description": "The launch pack of 16 personas, for reviewing an indie game's Steam page, demo, concept, monetization, community copy, and update announcements."
+    },
+    "competitive-esport": {
+      "name": "Competitive Esports Players",
+      "description": "Competitive and esports pack covering five players: the ranked climber, the speedrunner, the team coordinator, the spectator, and the mod-scene competitor. Use it to judge competitive depth, matchmaking, spectator systems, and community tooling."
+    },
+    "family-casual": {
+      "name": "Family & Casual Players",
+      "description": "Family and casual pack covering five players: parent-and-child co-play, party socializing, unwinding, retro nostalgia, and the cross-generation bridge. Use it to judge family fit, local multiplayer, stress relief, and universal design."
+    },
+    "indie-creative": {
+      "name": "Indie Creatives",
+      "description": "Indie and experimental-play pack covering five players: the indie connoisseur, the novelty seeker, the cultural consumer, the narrative designer, and the rhythm-game player. Use it to review creative depth, artistic voice, narrative structure, and mechanical invention."
+    },
+    "mobile-f2p": {
+      "name": "Mobile F2P Players",
+      "description": "Mobile and free-to-play pack covering five players: the whale, the never-pays, the socially driven, the anime fan, and the hyper-casual player. Use it to review monetization, social features, retention, and short-session design in mobile and F2P products."
+    },
+    "vr-immersive": {
+      "name": "VR Immersion Seekers",
+      "description": "VR and immersive pack covering four players: the motion-sickness prone, the immersion seeker, the fitness player, and the social VR user. Use it to review comfort, presence, physical movement, and social space in VR and XR products."
+    },
+    "accessibility": {
+      "name": "Accessibility Advocates",
+      "description": "Accessibility pack covering four players: color vision deficiency, cognitive load, motor impairment, and hearing impairment. Use it to review how complete and how usable a game's accessibility design really is."
+    },
+    "educational-serious": {
+      "name": "Educational & Serious Games",
+      "description": "Educational and serious-games pack covering four players: the teacher evaluating, the parent gatekeeping, the lifelong learner, and the learner with special educational needs. Use it to review learning-goal alignment, content safety, progress tracking, and accessibility."
+    },
+    "launch-compliance": {
+      "name": "Launch Blockers",
+      "description": "The launch-blocker pack. This product sells finding risk before you ship, yet every earlier persona was a player or an investor, and none of them stood for the roles that can actually keep a product off the shelf: platform submission, ratings and licensing, privacy compliance, device coverage, and the refunding or churned users who already voted with their feet. This pack adds those five. They do not answer whether it is fun. They answer whether it can ship, whether it gets sent back, and whether a refund wave follows."
+    },
+    "general-consumer": {
+      "name": "General Consumers",
+      "description": "A general product and user pack, not games only: multi-angle user views for product feedback, pricing pages, onboarding, and similar everyday scenarios."
+    },
+    "startup-panel": {
+      "name": "Startup Review Panel",
+      "description": "A startup review panel of investors, diligence analysts, and incubator screeners, for reviewing decks, pitch material, and application forms in any industry."
+    }
+  },
+
+  "pack_categories": {
+    "player-type": { "name": "Player types" },
+    "platform": { "name": "Platform focus" },
+    "special": { "name": "Special purpose" },
+    "general": { "name": "General users" }
+  }
+}

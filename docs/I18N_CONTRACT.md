@@ -1221,6 +1221,36 @@ def expected_catalog_keys() -> set[str]:
 schema 都不一样（`behavioral_profile` vs `behavior_profile`）且**运行时从不读取**
 （`review_service.py:110-114` 只认 `src/personas/`）。别把它当成"英文人设已现成"的依据。
 
+### 10.3.1 overlay 的文件形状（补规定）
+
+10.3 只规定了**哪些键**能进 overlay，没规定**文件长什么样**。结果是 batch-2 的三个
+并行 agent 各写了一种外壳：裸的顶层 id mapping、`personas:` 包裹、`persona_overlays:`
+包裹。三份内容都对，但加载器得同时认三种形状——这正是并行分片最典型的失败模式，
+根因是契约留了空白而不是 agent 不守规矩。
+
+**规范形状**（`src/personas/en-US/<与源同名>.yaml`）：
+
+```yaml
+version: '1.0'
+locale: en-US
+panel_id: game-core            # 必须与源文件的 panel_id 逐字相等
+persona_overlays:              # mapping，键是人格 id
+  P01-indie-core-operator:
+    archetype: ...
+    identity_summary: ...
+```
+
+两个决定的理由：
+
+- **容器叫 `persona_overlays` 而不是 `personas`。** 源文件的 `personas:` 是**完整人格
+  记录的列表**；overlay 里是以 id 为键的 mapping。同名不同形状是最容易看错的组合，
+  改个名字就不会有人把两者当同一种东西读。
+- **必须有 `panel_id` 且与源逐字相等。** 这是唯一能机械发现"overlay 抄串了包"的手段——
+  内容全是英文散文，人眼看不出 family-casual 的 overlay 里混进了 mobile-f2p 的条目。
+
+用 id 做 mapping 键是被 10.3 逼出来的：`id` 在禁翻键清单里，不能作为条目内的字段出现，
+而合并又必须能定位到具体人格。
+
 ### 10.4 英文报告的前置硬门（一条没做完就不许开 `SUPPORTED_REPORT_LANGS`）
 
 | # | 门 | 不做的后果 |

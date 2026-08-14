@@ -98,8 +98,21 @@ def test_skill_select_does_not_offer_review_entry_for_inert_skills(skill_select)
     而不是无条件渲染给每一张卡。"""
     assert "startsReview" in skill_select
     assert "disabled={!startsReview}" in skill_select
-    idx = skill_select.index("使用此技能创建评审")
+    # i18n 之后页面里已经没有「使用此技能创建评审」这个字面量了（它搬进了
+    # page.skills.card.cta），所以改用 key 定位 CTA，并另外校验那条 key 的中文没变——
+    # 只找 key 的话，有人把 card.cta 的文案改成别的意思也照样绿。
+    idx = skill_select.index("t('page.skills.card.cta')")
     assert "startsReview ? (" in skill_select[max(0, idx - 400) : idx]
+
+    zh = _read(
+        os.path.join(
+            REPO_ROOT, "web", "frontend", "src", "i18n", "locales", "zh", "page.skills.ts"
+        )
+    )
+    assert "'card.cta': '使用此技能创建评审'" in zh, (
+        "page.skills.card.cta 的中文变了。改文案本身没问题，但要同步改这条测试——"
+        "否则这个断言就不再是在守「创建评审的入口」了。"
+    )
 
 
 def test_task_type_lists_come_from_the_backend_not_local_skills(skill_select, create_review, skills_lib):
@@ -146,9 +159,21 @@ def test_materials_cannot_be_empty(create_review):
     """两道闸：任务类型没有字段定义时退到一个必填的通用正文框；
     发起前再确认材料非空。缺任何一道，用户都能只填一个标题就跑完整条流程，
     拿回一份基于一句话生成的报告而不自知。"""
-    assert "GENERIC_MATERIAL_FIELD" in create_review
-    assert "definedFields.length === 0 ? [GENERIC_MATERIAL_FIELD]" in create_review
-    assert "if (materials.length === 0)" in create_review
+    # i18n 之后兜底字段从模块级常量 GENERIC_MATERIAL_FIELD 变成了函数
+    # genericMaterialField()：它的 label/placeholder 必须在渲染时才求值，写成模块级
+    # 常量会把译文固定在模块求值那一刻，切语言时这个框不跟着变。
+    # 断言跟着改成函数形态，同时**加严**两条：
+    #   · 只看去掉注释后的代码（原来第一条断言靠注释里的 GENERIC_MATERIAL_FIELD 就能过）
+    #   · wire key 必须仍是未翻译的中文「材料正文」——它会被当成 materials[].type
+    #     发给后端，翻了就是编译通过、界面正常、引擎提取不到材料（契约 12.2）
+    code = _strip_comments(create_review)
+    assert "genericMaterialField" in code
+    assert "definedFields.length === 0 ? [genericMaterialField()]" in code
+    assert "const GENERIC_MATERIAL_KEY = '材料正文'" in code, (
+        "兜底字段的 wire key 不再是「材料正文」。它是发给后端的 materials[].type，"
+        "不是文案，永不翻译。"
+    )
+    assert "if (materials.length === 0)" in code
 
 
 def test_extracted_extra_fields_are_visible(create_review):
@@ -159,8 +184,37 @@ def test_extracted_extra_fields_are_visible(create_review):
 
 def test_extract_failure_shows_the_real_reason(create_review):
     """提取失败要透出后端给的原因（文件过大/格式不支持/没配 key/限流…），
-    不能一律替换成一句「AI 提取失败」——那会让用户以为是模型能力不行而放弃。"""
-    assert "AI 提取失败：${reason}" in create_review
+    不能一律替换成一句「AI 提取失败」——那会让用户以为是模型能力不行而放弃。
+
+    i18n 之后这句话搬进了资源文件，所以断言拆成两边，缺一边都会红：
+      · 页面确实把后端给的原因当插值传进去了（不是丢弃后自己编一句）
+      · 资源文件里那条文案确实带 {{reason}} 占位（不是翻成一句没有原因的话）
+    只钉其中一边都能被绕过：只钉页面，译文可以把 {{reason}} 删掉；
+    只钉译文，页面可以传个空字符串进去。
+    """
+    code = _strip_comments(create_review)
+    assert "t('page.create.extract.error', { reason: reason.text })" in code, (
+        "提取失败的提示不再把后端给的原因传进去了——用户会看到一句没有信息量的"
+        "「AI 提取失败」，以为是模型能力不行而放弃。"
+    )
+
+    zh = _read(
+        os.path.join(
+            REPO_ROOT, "web", "frontend", "src", "i18n", "locales", "zh", "page.create.ts"
+        )
+    )
+    en = _read(
+        os.path.join(
+            REPO_ROOT, "web", "frontend", "src", "i18n", "locales", "en", "page.create.ts"
+        )
+    )
+    for locale, source in (("zh", zh), ("en", en)):
+        body = re.search(r"'extract\.error':\s*\n?\s*'([^']*)'", source)
+        assert body, f"{locale}/page.create.ts 里找不到 extract.error"
+        assert "{{reason}}" in body.group(1), (
+            f"{locale} 的 extract.error 把 {{{{reason}}}} 占位删掉了，"
+            "等于把后端给的真实原因翻译没了。"
+        )
 
 
 def test_evaluation_dimension_labels_are_not_hardcoded(create_review):
