@@ -92,6 +92,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # VITE_AL_LOCALES 是构建期变量（build.args），不是 environment——写在
+      # environment 里对已经打包好的静态文件毫无作用，改了 .env 也要
+      # `--build` 重新构建才会生效，这跟 backend 那些运行时读的 AL_* 开关
+      # 完全是两回事。默认给 zh,en：中英双语已经过全站验证（i18n:check /
+      # 落地页能力声明测试 / 浏览器实测），可以直接对外。
+      args:
+        VITE_AL_LOCALES: ${VITE_AL_LOCALES:-zh,en}
     ports:
       # 默认直接占 80（无 TLS 的裸跑）。上 Caddy 时在 .env 设
       # FRONTEND_BIND=127.0.0.1:8080 让出公网 80/443，由 Caddy 终结 TLS。
