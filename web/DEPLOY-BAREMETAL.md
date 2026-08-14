@@ -335,6 +335,43 @@ cd /opt/audiencelens && BACKUP_DIR=/var/backups/audiencelens bash web/deploy/bac
 ls -lh /var/backups/audiencelens
 ```
 
+### 恢复演练（同样必做）
+
+**没有恢复过的备份不算备份。** backup.sh 能防住"备份产物是空的"，
+防不住"恢复流程从来没人走通过"——真出事那天才发现命令记不清、格式对不上。
+
+`restore.sh --drill` 把最新备份恢复到一个**临时库**，校验核心表存在且有数据，
+然后删掉临时库。全程不碰生产库，所以安全到可以挂定时任务。
+
+```bash
+# 手动演练一次
+cd /opt/audiencelens && BACKUP_DIR=/var/backups/audiencelens bash web/deploy/restore.sh --drill
+
+# 挂成每周一次（crontab -e）
+30 4 * * 1 cd /opt/audiencelens && BACKUP_DIR=/var/backups/audiencelens bash web/deploy/restore.sh --drill >> /var/log/audiencelens-restore-drill.log 2>&1
+```
+
+真要恢复时用 `--to-production`。它会先备份当前库（回滚用）、先演练一遍、
+再要求你手输 `RESTORE` 确认——刻意不提供 `-y` / `--force`：
+
+```bash
+bash web/deploy/restore.sh --to-production /var/backups/audiencelens/reviews-YYYYmmdd-HHMMSS.db.gz
+sudo systemctl restart audiencelens-backend   # 恢复后必须重启，让连接池重连
+```
+
+> ⚠️ 演练失败时 cron 只会写进日志，不会主动通知你。接了监控之后，
+> 建议把 `/var/log/audiencelens-restore-drill.log` 的非零退出也纳入告警。
+
+### 健康检查（接外部监控用哪个）
+
+| 端点 | 查什么 | 用在哪 |
+|---|---|---|
+| `GET /api/health` | 只回写死的 `ok`，**不碰数据库** | systemd / 本地存活探测 |
+| `GET /api/health/ready` | 真打一次 `SELECT 1`，库不可用时返 **503** | 外部监控（UptimeRobot 等） |
+
+拿 `/api/health` 接外部监控是个常见错误：数据库挂了它照样 200，
+监控一片绿而用户那边每个页面都在报错。**外部监控一律指向 `/api/health/ready`。**
+
 > ⚠️ 用 SQLite 时，`data/reviews.db` 里存的用户 API Key 是**用 `AL_ENCRYPTION_KEY` 加密的**。
 > 只备份 db、不备份 `.env`，恢复出来的库里所有 key 都解不开。两个要一起备，
 > 而且 `.env` 里有明文密钥，备份目标的权限要收紧。

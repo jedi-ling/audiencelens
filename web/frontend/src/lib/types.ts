@@ -3,6 +3,9 @@
  * 改动后端 schema 时，请同步这里 —— 这是前后端唯一的约定处。
  */
 
+// 只用于 OPENAI_COMPATIBLE_PRESETS 的展示名 key（type-only import，运行时不产生依赖）。
+import type { PlainMessageKey } from '@/i18n/keys.gen'
+
 export type TaskType =
   | 'steam_page_review'
   | 'demo_first_play'
@@ -52,13 +55,31 @@ export class ApiError extends Error {
   code: ApiErrorCode
   status: number
   detail?: unknown
+  /**
+   * 后端 message 的语种（BCP-47），来自信封里的 `error.message_lang`。
+   *
+   * 它**不是协商结果**，就是一句诚实的事实标注：「这条 message 是中文」。
+   * 本期后端恒给 "zh-CN"。undefined = 这个响应还没带这个字段（老后端 / 第二套
+   * `{"detail": ...}` 信封），前端按"语种未知"处理，不许猜。
+   *
+   * 为什么必须有：没有它，前端无法判断拿到的 message 是不是英文，只能猜；
+   * 猜错的表现是"英文界面混中文且没人发现"。见 docs/I18N_CONTRACT.md D2。
+   */
+  messageLang?: string
 
-  constructor(status: number, code: ApiErrorCode, message: string, detail?: unknown) {
+  constructor(
+    status: number,
+    code: ApiErrorCode,
+    message: string,
+    detail?: unknown,
+    messageLang?: string,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.detail = detail
+    this.messageLang = messageLang
   }
 
   /** 缺 key —— 前端应把用户引导到设置页填写，而不是弹一个干瘪的报错 */
@@ -67,16 +88,20 @@ export class ApiError extends Error {
   }
 }
 
+/** GET /api/health 的 config。
+ *
+ * 这个端点不鉴权，所以后端只回**前端真的要用的**四项，而不是所有非密钥配置。
+ * 曾经还回过 env / ratelimit_enabled / queue_backend / ledger_enabled /
+ * review_concurrency，前端一个都没消费——但它们组合起来是一张给攻击者的
+ * 侦察表（限流关没关、配额关没关、有没有平台密钥）。详见 config.sanitized()。
+ *
+ * 想加字段前先问：前端真的会读它吗？读不到的字段不该出现在公开响应里。
+ * 后端有 test_health_config_parity 守着这两边一致。 */
 export interface HealthConfig {
-  env: string
   auth_enabled: boolean
   key_mode: 'byok' | 'managed' | 'hybrid'
   server_key_present: boolean
   quota_enabled: boolean
-  ratelimit_enabled: boolean
-  queue_backend: string
-  ledger_enabled: boolean
-  review_concurrency: number
 }
 
 /** GET /api/v2/shared/{token} 的响应——公开只读视图。
@@ -131,7 +156,15 @@ export interface KeyStatus {
 /** 非 Anthropic 服务商预设——都遵循 OpenAI 兼容协议，见 src/runner/llm_client.py 同名表。 */
 export interface OpenAICompatiblePreset {
   id: string
-  name: string
+  /**
+   * 展示名的 **key，不是文案**：这张表在模块求值时就固定了，存翻译结果的话
+   * 切换语言不会重新求值，预设名会一直停在打开页面时的那种语言。
+   * 渲染处写 t(preset.nameKey)。
+   *
+   * 译文在 i18n/locales/{zh,en}/catalog.brand.ts —— 那里放的是**厂商官方英文名**
+   * 而不是直译（通义千问 → Qwen、智谱 GLM → Zhipu GLM），见契约 6.11 / 12.2。
+   */
+  nameKey: PlainMessageKey
   api_base: string
   model: string
 }
@@ -139,12 +172,12 @@ export interface OpenAICompatiblePreset {
 // 模型名核实于 2026-07-21（各厂商 API 文档/更新日志），见 docs/MAINTENANCE.md「4.3.5 服务商预设保鲜」
 // 「服务商预设」一节。这类默认值有时效性——厂商换代快，过一阵子要再核一遍。
 export const OPENAI_COMPATIBLE_PRESETS: OpenAICompatiblePreset[] = [
-  { id: 'openai', name: 'OpenAI', api_base: 'https://api.openai.com/v1', model: 'gpt-5.2' },
-  { id: 'deepseek', name: 'DeepSeek', api_base: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
-  { id: 'kimi', name: 'Kimi (月之暗面)', api_base: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
-  { id: 'qwen', name: '通义千问', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-  { id: 'glm', name: '智谱 GLM', api_base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5' },
-  { id: 'ollama', name: 'Ollama 本地模型', api_base: 'http://localhost:11434/v1', model: 'llama3' },
+  { id: 'openai', nameKey: 'catalog.brand.openai', api_base: 'https://api.openai.com/v1', model: 'gpt-5.2' },
+  { id: 'deepseek', nameKey: 'catalog.brand.deepseek', api_base: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
+  { id: 'kimi', nameKey: 'catalog.brand.kimi', api_base: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+  { id: 'qwen', nameKey: 'catalog.brand.qwen', api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  { id: 'glm', nameKey: 'catalog.brand.glm', api_base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5' },
+  { id: 'ollama', nameKey: 'catalog.brand.ollama', api_base: 'http://localhost:11434/v1', model: 'llama3' },
 ]
 
 export interface TestConnectionResult {
@@ -220,6 +253,7 @@ export interface ReviewDetail {
   mode: ReviewMode
   persona_pack: string | null
   selected_personas: string[] | null
+  adaptive_panel: boolean
   skill_type: string | null
   project_key: string | null
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -365,6 +399,43 @@ export interface HitRate {
   hit_rate: number | null
   sample_size: number
   /** 样本不足时为 true —— UI 必须如实展示，不能拿 3 个样本吹准确率 */
+  low_confidence: boolean
+  note: string | null
+}
+
+/** 置信度校准：预测时说的把握 vs 回填后的真实结果。
+ *
+ * 与 HitRate 的分工：HitRate 回答"说中了几次"，这个回答"说自己有多大把握时
+ * 准不准"——一个恒说 90% 却只对一半的面板，hit_rate 看不出问题，校准能。
+ *
+ * 所有指标在样本为空时是 null 而不是 0：0 分是"预测完美"的意思（Brier 越低越好），
+ * 拿它表示"没数据"会把空账本显示成满分。
+ */
+export interface ConfidenceCalibration {
+  persona_id: string | null
+  sample_size: number
+  /** 已回填真实结果的判断条数（含被排除的） */
+  verified_rows: number
+  /** 因为没有 confidence 或 verdict 无法映射而被排除的条数 */
+  excluded_rows: number
+  mean_predicted_confidence: number | null
+  /** 真实命中得分均值。hit=1 / partial=0.5 / miss=0 */
+  observed_hit_score: number | null
+  /** Brier 分数，越低越好（0 = 完美）。null = 无样本 */
+  brier_score: number | null
+  /** 期望校准误差：各置信度区间内「说的把握」与「真实结果」的加权平均差 */
+  expected_calibration_error: number | null
+  bins: Array<{
+    lower: number
+    upper: number
+    sample_size: number
+    mean_confidence: number | null
+    observed_hit_score: number | null
+    gap: number | null
+  }>
+  outcome_mapping: Record<string, number>
+  confidence_source: string
+  /** 样本不足时为 true —— 同 HitRate，UI 必须如实展示，不能拿几个样本谈校准 */
   low_confidence: boolean
   note: string | null
 }

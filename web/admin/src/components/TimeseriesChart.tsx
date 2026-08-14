@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { TrendingUp } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminTimeseries } from '@/lib/types'
+import { PanelShell, PanelError, PanelLoading } from './panel'
 
 const WIDTH = 640
 const HEIGHT = 180
@@ -47,12 +48,11 @@ export function TimeseriesChart() {
   const barW = series.length > 0 ? Math.max(2, (INNER_W / series.length) * 0.5) : 0
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <TrendingUp className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-          评审量 / 成本趋势
-        </h2>
+    <PanelShell
+      icon={TrendingUp}
+      iconTone="text-cyan"
+      title="评审量 / 成本趋势"
+      actions={
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
@@ -63,9 +63,9 @@ export function TimeseriesChart() {
           <option value={30}>近 30 天</option>
           <option value={90}>近 90 天</option>
         </select>
-      </div>
-
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+      }
+    >
+      <PanelError>{error}</PanelError>
 
       {series.length > 0 && (
         <>
@@ -122,7 +122,7 @@ export function TimeseriesChart() {
           </div>
         </>
       )}
-      {series.length === 0 && !error && <p className="mt-4 py-6 text-center text-xs text-text-muted">加载中…</p>}
-    </section>
+      {series.length === 0 && !error && <PanelLoading />}
+    </PanelShell>
   )
 }

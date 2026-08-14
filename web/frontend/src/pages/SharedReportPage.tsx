@@ -27,7 +27,12 @@ import type { SharedReport } from '@/lib/types'
 import { SyntheticBanner, LimitationsSection, type RealReport } from './ReportPage'
 import SeverityBadge from '@/components/SeverityBadge'
 import type { Severity } from '@/lib/mock-data'
-import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight } from 'lucide-react'
+import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight, AlertCircle } from 'lucide-react'
+import { EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { tApiError } from '@/i18n/api-error'
+import { formatDateTime } from '@/i18n/format'
 
 /** 引擎的 severity 串收敛成 SeverityBadge 认识的档位；认不出来就不画徽章，
  *  不硬塞一个默认值假装知道严重程度。 */
@@ -38,12 +43,17 @@ function toSeverity(raw?: string): Severity | null {
 
 export default function SharedReportPage() {
   const { token } = useParams()
+  // 顺带订阅了 ui_lang（内部 useLocale）：切语言时整页重渲染，t() 才会重新求值。
+  useDocumentTitle('page.shared.meta.title')
   const [data, setData] = useState<SharedReport | null>(null)
   const [loading, setLoading] = useState(true)
   // 404 与"网络挂了"要分开说：前者是作者撤销了（正常结果），后者是故障。
   // 混成一句"加载失败"会让访客以为是自己网络的问题，一直重试。
   const [revoked, setRevoked] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // 存的是**异常对象**不是已翻好的字符串：存字符串的话，它在 catch 那一刻就
+  // 定死了语种，用户之后切语言这条错误提示会一直停在旧语言上。
+  // 译文在渲染处由 tApiError 现出（它还负责把语种对不上的后端原文降级成 detail）。
+  const [error, setError] = useState<unknown>(null)
 
   useEffect(() => {
     if (!token) return
@@ -59,7 +69,7 @@ export default function SharedReportPage() {
       .catch((e) => {
         if (!alive) return
         if (e instanceof ApiError && e.status === 404) setRevoked(true)
-        else setError(e instanceof Error ? e.message : '加载失败')
+        else setError(e)
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -79,33 +89,37 @@ export default function SharedReportPage() {
 
   if (revoked) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center animate-fade-in">
-        <Link2Off className="mx-auto h-10 w-10 text-text-muted" strokeWidth={1.25} />
-        <h1 className="mt-4 text-xl font-semibold text-text-primary">链接已失效</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          这条分享链接不存在，或者已经被作者撤销了。如果你需要查看，请向分享给你的人重新索取。
-        </p>
-        <Link
-          to="/"
-          className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-primary-dim"
-        >
-          了解 AudienceLens
-        </Link>
+      <div className="mx-auto max-w-2xl px-4 py-20 animate-fade-in">
+        <EmptyState
+          icon={Link2Off}
+          title={t('page.shared.revoked.title')}
+          description={t('page.shared.revoked.desc')}
+          action={
+            <Link to="/" className={PRIMARY_BUTTON_CLASS}>
+              {t('page.shared.revoked.cta')}
+            </Link>
+          }
+        />
       </div>
     )
   }
 
-  if (error || !data) {
+  if (error !== null || !data) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 text-center animate-fade-in">
-        <h1 className="text-xl font-semibold text-text-primary">加载失败</h1>
-        <p className="mt-2 break-all text-sm text-text-secondary">{error ?? '没有拿到报告内容'}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-6 rounded-lg border border-border px-4 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary"
-        >
-          重试
-        </button>
+      <div className="mx-auto max-w-2xl px-4 py-20 animate-fade-in">
+        {/* error === null（请求成功但 report 是空的）时 tApiError 走 fallbackKey，
+            正好就是"没有拿到报告内容"这句——两条路径本来就该说同一句话。 */}
+        <EmptyState
+          icon={Loader2}
+          tone="error"
+          title={t('page.shared.load_error.title')}
+          description={tApiError(error, 'page.shared.load_error.desc')}
+          action={
+            <button onClick={() => window.location.reload()} className={SECONDARY_BUTTON_CLASS}>
+              {t('common.action.retry')}
+            </button>
+          }
+        />
       </div>
     )
   }
@@ -117,21 +131,26 @@ export default function SharedReportPage() {
   const notes = report.persona_notes ?? []
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 animate-fade-in">
+    // 阅读型页面：正文列收窄居中，与评估报告同一档容器
+    <div className="mx-auto max-w-3xl px-4 py-8 animate-fade-in">
       {/* ETHICS.md 强制项之一。公开链接的访客没有任何上下文，这块尤其不能省。 */}
       <SyntheticBanner />
 
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-text-primary">
-          {data.target_title || report.meta?.target || '评审报告'}
+        <h1 className="font-display text-2xl font-bold text-text-primary">
+          {data.target_title || report.meta?.target || t('page.shared.header.title')}
         </h1>
+        {/* 分隔点写成 JSX 文本而不是拼进字符串：拼进去就得在译文里带一个前导 " · "，
+            那种带首尾空格的译文在资源文件里肉眼看不出来，改一次少一个空格没人发现。 */}
         <p className="mt-1 text-sm text-text-secondary">
           {data.task_type}
-          {data.completed_at && ` · ${new Date(data.completed_at).toLocaleString()}`}
-          {typeof consensus?.persona_count === 'number' && ` · ${consensus.persona_count} 位人格参与`}
+          {data.completed_at && <> · {formatDateTime(data.completed_at)}</>}
+          {typeof consensus?.persona_count === 'number' && (
+            <> · {t('page.shared.header.meta', { count: consensus.persona_count })}</>
+          )}
         </p>
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-bg-secondary/50 px-2.5 py-1 text-xs text-text-muted">
-          这是作者主动分享的只读报告
+          {t('page.shared.share_note.badge')}
         </p>
       </header>
 
@@ -139,14 +158,32 @@ export default function SharedReportPage() {
         <section className="mb-6 rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
             <Scale className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            总体结论
+            {t('page.shared.summary.title')}
           </h2>
           {summary.primary_recommendation && (
             <p className="text-sm leading-relaxed text-text-primary">{summary.primary_recommendation}</p>
           )}
+          {/* <v> 里包的是引擎产出的原值，只加粗、不翻译：报告正文的语言在评审入队
+              瞬间就冻结了，界面语言换了它也不会跟着换（契约 8.6：显示原文，不机翻）。 */}
           <div className="mt-3 flex flex-wrap gap-4 text-xs text-text-secondary">
-            {summary.release_risk && <span>发布风险：<strong className="text-text-primary">{summary.release_risk}</strong></span>}
-            {summary.evidence_quality && <span>证据质量：<strong className="text-text-primary">{summary.evidence_quality}</strong></span>}
+            {summary.release_risk && (
+              <span>
+                <Trans
+                  k="page.shared.release_risk.label"
+                  vars={{ value: summary.release_risk }}
+                  slots={{ v: (s) => <strong className="text-text-primary">{s}</strong> }}
+                />
+              </span>
+            )}
+            {summary.evidence_quality && (
+              <span>
+                <Trans
+                  k="page.shared.evidence_quality.label"
+                  vars={{ value: summary.evidence_quality }}
+                  slots={{ v: (s) => <strong className="text-text-primary">{s}</strong> }}
+                />
+              </span>
+            )}
           </div>
         </section>
       )}
@@ -155,7 +192,7 @@ export default function SharedReportPage() {
         <section className="mb-6 rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
             <ListChecks className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            优先修复（{fixes.length}）
+            {t('page.shared.fixes.title', { count: fixes.length })}
           </h2>
           <ol className="space-y-3">
             {fixes.map((f, i) => {
@@ -173,7 +210,9 @@ export default function SharedReportPage() {
                         <p className="mt-1 text-xs leading-relaxed text-text-secondary">{f.why_it_matters}</p>
                       )}
                       {f.suggested_fix && (
-                        <p className="mt-1 text-xs leading-relaxed text-text-muted">建议：{f.suggested_fix}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                          {t('page.shared.suggestion.label', { text: f.suggested_fix })}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -188,7 +227,7 @@ export default function SharedReportPage() {
         <section className="mb-6 grid gap-4 sm:grid-cols-2">
           {(consensus.agreed_points?.length ?? 0) > 0 && (
             <div className="rounded-xl border border-border bg-bg-card p-5">
-              <h2 className="mb-2 text-sm font-semibold text-text-primary">多数认同</h2>
+              <h2 className="mb-2 text-sm font-semibold text-text-primary">{t('page.shared.agreed.title')}</h2>
               <ul className="space-y-1.5 text-xs leading-relaxed text-text-secondary">
                 {consensus.agreed_points!.map((p, i) => <li key={i}>· {p}</li>)}
               </ul>
@@ -196,7 +235,7 @@ export default function SharedReportPage() {
           )}
           {(consensus.questioned_points?.length ?? 0) > 0 && (
             <div className="rounded-xl border border-border bg-bg-card p-5">
-              <h2 className="mb-2 text-sm font-semibold text-text-primary">存在质疑</h2>
+              <h2 className="mb-2 text-sm font-semibold text-text-primary">{t('page.shared.questioned.title')}</h2>
               <ul className="space-y-1.5 text-xs leading-relaxed text-text-secondary">
                 {consensus.questioned_points!.map((p, i) => <li key={i}>· {p}</li>)}
               </ul>
@@ -209,7 +248,7 @@ export default function SharedReportPage() {
         <section className="mb-6 rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
             <Users className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-            各角色视角（{notes.length}）
+            {t('page.shared.notes.title', { count: notes.length })}
           </h2>
           <div className="space-y-3">
             {notes.map((n) => (
@@ -235,7 +274,7 @@ export default function SharedReportPage() {
 
       {(report.information_gaps?.length ?? 0) > 0 && (
         <section className="mb-6 rounded-xl border border-border bg-bg-card p-5">
-          <h2 className="mb-2 text-sm font-semibold text-text-primary">信息缺口</h2>
+          <h2 className="mb-2 text-sm font-semibold text-text-primary">{t('page.shared.gaps.title')}</h2>
           <ul className="space-y-1.5 text-xs leading-relaxed text-text-secondary">
             {report.information_gaps!.map((g, i) => <li key={i}>· {g}</li>)}
           </ul>
@@ -248,12 +287,12 @@ export default function SharedReportPage() {
       {/* 访客大概率是第一次听说这个产品——给一条自然的了解入口。
           刻意不做成弹窗或拦截层：他是来看报告的，不是来看广告的。 */}
       <div className="mt-10 border-t border-border pt-6 text-center">
-        <p className="text-sm text-text-secondary">这份报告由 AudienceLens 的多角色评审团生成。</p>
+        <p className="text-sm text-text-secondary">{t('page.shared.footer.desc')}</p>
         <Link
           to="/"
           className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary transition-colors hover:text-brand-primary-dim"
         >
-          给自己的东西也跑一轮
+          {t('page.shared.footer.cta')}
           <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
         </Link>
       </div>

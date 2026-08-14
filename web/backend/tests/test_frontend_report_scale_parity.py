@@ -23,11 +23,35 @@ EVALUATION_PAGE = os.path.join(FRONTEND_SRC, "pages", "EvaluationPage.tsx")
 REPORT_PAGE = os.path.join(FRONTEND_SRC, "pages", "ReportPage.tsx")
 CALIBRATION_GAUGE = os.path.join(FRONTEND_SRC, "components", "CalibrationGauge.tsx")
 CALIBRATION_PY = os.path.join(REPO_ROOT, "src", "runner", "calibration.py")
+# 校准指标名的中文事实源。i18n 之后 ReportPage 里写的是 t('enum.calibration.x')，
+# 页面上已经没有「角色一致性」这个字面量了，所以下面两条断言改用 **key** 定位仪表盘，
+# 并在这里额外校验 key → 中文标签的映射没被改掉。
+# 为什么不把断言退化成"只找 key"：那样一来有人把 role_consistency 的标签改成
+# "视角覆盖度"，两个仪表盘的合格线就会张冠李戴而测试全绿。定位靠 key、语义靠这张表，
+# 两边都钉住才等价于 i18n 之前那条按中文字面量定位的断言。
+CALIBRATION_ZH = os.path.join(
+    FRONTEND_SRC, "i18n", "locales", "zh", "enum.calibration.ts"
+)
+CALIBRATION_LABELS_ZH = {
+    "role_consistency": "角色一致性",
+    "coverage": "视角覆盖度",
+    "hallucination": "无幻觉率",
+}
 
 
 def _read(path: str) -> str:
     with open(path, encoding="utf-8") as fh:
         return fh.read()
+
+
+def test_calibration_labels_still_mean_what_the_gauges_assume():
+    """key → 中文标签的映射是下面两条仪表盘断言的定位基础，先把它钉住。"""
+    zh = _read(CALIBRATION_ZH)
+    for key, label in CALIBRATION_LABELS_ZH.items():
+        assert re.search(rf"^\s*{key}:\s*'{label}'", zh, re.M), (
+            f"enum.calibration.{key} 不再是「{label}」。"
+            "改标签本身没问题，但要同步改这张表——否则按 key 定位仪表盘的断言会张冠李戴。"
+        )
 
 
 def test_dimension_max_score_matches_rubric_anchors():
@@ -99,8 +123,12 @@ def test_calibration_gauge_thresholds_come_from_the_engine():
     expected = _calibration_pass_lines()
     report = _read(REPORT_PAGE)
 
-    role_block = re.search(r'label="角色一致性"(.{0,200}?)/>', report, re.S)
-    coverage_block = re.search(r'label="视角覆盖度"(.{0,200}?)/>', report, re.S)
+    role_block = re.search(
+        r"label=\{t\('enum\.calibration\.role_consistency'\)\}(.{0,200}?)/>", report, re.S
+    )
+    coverage_block = re.search(
+        r"label=\{t\('enum\.calibration\.coverage'\)\}(.{0,200}?)/>", report, re.S
+    )
     assert role_block and coverage_block, "ReportPage 的校准仪表盘调用形状变了"
 
     role_pass = re.search(r"passLine=\{([0-9.]+)\}", role_block.group(1))
@@ -114,7 +142,9 @@ def test_calibration_gauge_thresholds_come_from_the_engine():
 def test_hallucination_gauge_has_no_invented_pass_line():
     """无幻觉率没有参与 overall_pass，就不许给它安一条合格线。"""
     report = _read(REPORT_PAGE)
-    block = re.search(r'label="无幻觉率"(.{0,300}?)/>', report, re.S)
+    block = re.search(
+        r"label=\{t\('enum\.calibration\.hallucination'\)\}(.{0,300}?)/>", report, re.S
+    )
     assert block, "ReportPage 的无幻觉率仪表盘调用形状变了"
     assert "passLine" not in block.group(1), (
         "无幻觉率的平均值不是 run_calibration_check 的判据，"

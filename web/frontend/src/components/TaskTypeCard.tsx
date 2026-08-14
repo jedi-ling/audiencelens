@@ -1,4 +1,4 @@
-﻿import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { TaskType } from '@/lib/mock-data'
 
 interface TaskTypeCardProps {
@@ -14,7 +14,9 @@ export default function TaskTypeCard({ taskType, selected, onClick }: TaskTypeCa
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all duration-200 cursor-pointer',
+        // h-full：在卡片网格（CARD_GRID_CLASS）里与同行卡片等高，
+        // 描述行数不一致时底边仍然对齐
+        'flex h-full flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all duration-200 cursor-pointer',
         'bg-bg-card hover:bg-bg-card-hover',
         selected
           ? 'border-brand-primary border-glow-green'

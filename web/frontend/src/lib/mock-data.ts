@@ -185,6 +185,20 @@ export interface Persona {
   pack?: string
   decisionRules?: string[]
   triggers?: string[]
+  /**
+   * 人格的表述层英文，后端 PersonaSummary 与中文同级双发（契约 D4：端点签名不变、
+   * 没有 lang 参数，中英并排下发）。事实源是 src/personas/en-US/<pack>.yaml 的 overlay。
+   *
+   * **身份字段不在这里**（10.3）：name / gender / age_range / region 恒是中文，
+   * 张伟在英文界面下仍叫张伟——region / age_range 会被拼进报告的 recruit_types，
+   * 用户照着去招真人受访者，改名等于向英文用户断言一个从未建模过的受众。
+   *
+   * 可以是 null，且 null 只有一种含义：**这条人格没有 overlay**。
+   * 渲染时不许回落成中文（回落的表现就是英文界面里混中文且没人发现，D8），
+   * 走 i18n/catalog.ts 的 localizePersona() 取，它会显式标记缺口。
+   */
+  archetype_en?: string | null
+  identity_summary_en?: string | null
 }
 
 export interface PersonaPack {
@@ -551,6 +565,15 @@ export interface TaskTypeDetail {
   stance_enum: string[]
   score_dimensions: string[]
   base_dimensions: string[]
+  /**
+   * 立场标签的英文**显示层**副本，与 `stance_enum` 逐位对应，位置即契约
+   * （后端 app/i18n/catalog_en.py 在 import 期断言两者等长，对不上直接起不来）。
+   *
+   * `stance_enum` 本身永不翻译：它是引擎的立场分桶键、后端 parity 测试逐字保护
+   * （契约 12.2）。所以英文不是"翻译 stance_enum"，而是另发一列只用来显示的标签。
+   * 取用走 i18n/catalog.ts 的 localizeStanceLabels()，别在页面里按下标裸取。
+   */
+  stance_labels_en?: string[]
 }
 
 export interface ReviewResultData {
@@ -627,6 +650,7 @@ export interface Review {
   artifact_bundle: Record<string, unknown>
   persona_pack?: string
   selected_personas?: string[]
+  adaptive_panel: boolean
   mode: ReviewMode
   status: 'pending' | 'running' | 'completed' | 'failed'
   created_at: string

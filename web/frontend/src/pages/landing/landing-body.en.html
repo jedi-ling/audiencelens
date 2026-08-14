@@ -1,0 +1,402 @@
+<!-- ══════════════════════════════════════════════════════════════════
+     landing-body.html 的英文兄弟件（契约 4.4）。由 LandingPage.tsx 按 ui_lang 选一份 ?raw 注入。
+
+     为什么是新建兄弟件而不是就地翻译中文原件：
+     tests/test_landing_capability_claims.py:96-105 在关键短语找不到时走 pytest.skip
+     而不是 fail。就地翻译会让 6 条「文案 ↔ 实现」断言**全部静默 skip 而测试全绿**——
+     防线形同虚设。中文原件因此一个字都不动。
+
+     这份文件自己的防线是 tests/test_landing_en_capability_claims.py：
+       · 英文能力声明 → 代码事实源（与中文那套一一对应）
+       · 历史上因「引擎里根本没有」被删掉的说法，英文侧也不许写回来
+       · data-target 数字、头像溢出数必须与中文原件相等（中文那侧由
+         test_public_claims.py 对着仓库真值核）
+       · LandingPage.tsx 的 JS 依赖的选择器（#heroAsk / #heroStageMount /
+         .debate-flip / .num[data-target] / .reveal …）必须齐全——少一个不会报错，
+         只会让英文首页少一段交互，没人看得出来
+
+     改结构（class / id / 属性 / 区块顺序）请两份一起改：
+     landing.css 与 LandingPage.tsx 是共用的，只改一份的表现是「换成英文之后
+     3D 场景不见了 / 滚动渐显不触发」，控制台一行报错都没有。
+     设计决策的事实源在中文原件的注释里，这里只保留**约束文案内容**的那几条。
+     ══════════════════════════════════════════════════════════════════ -->
+
+<!-- 全页固定视频背景：position:fixed 铺满视口，滚动时纹丝不动。
+     放在 .al-landing 最前面（第一个子节点），所有 section 内容叠在它上面。 -->
+<video class="hero-bg-video" autoplay muted loop playsinline poster="/videos/hero-bg-poster.jpg" aria-hidden="true">
+  <source src="/videos/hero-bg.mp4" type="video/mp4">
+</video>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <!-- 全幅 3D 背景挂载点。必须是 hero 的靠前子节点：文案与卡片压在它上面。
+       挂载由 LandingPage.tsx 命令式完成。 -->
+  <div id="heroStageMount"></div>
+  <div class="wrap">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <h1>A multi-agent synthetic audience platform<br><span class="h1-accent">independent panels cross-examine the sharpest disagreements</span></h1>
+        <p class="hero-sub">72 behavior-driven personas review independently in groups. A panel selector assembles the roster per task type, and a disagreement-aggregation pass pulls out the sharpest conflicts for cross-examination.</p>
+        <p class="hero-hint">No sign-up. A risk list in minutes.</p>
+
+        <form class="hero-ask" id="heroAsk">
+          <input type="text" id="heroAskInput" placeholder="Tell us what you want reviewed — “take a look at my pricing page”…" autocomplete="off">
+          <button type="submit">Start <span class="arw">→</span></button>
+        </form>
+
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/ask">Start a conversational review <span class="arw">→</span></a>
+          <a class="hero-cta-secondary" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">Read the source on GitHub →</a>
+        </div>
+
+      </div>
+
+      <!-- 独有视觉：报告里"争议点 + 反驳"区块的示意图。
+           两条铁律，改文案的人别破坏：
+           1) 卡里的数值是样例，不是真实评审输出——所以头部明写"示意图 · 样例数据"。
+           2) 只允许出现引擎真的会产出的字段：severity / evidence 等级 /
+              must_comment_on 覆盖率 / inferred 推断率 / 反驳正文 / 改票（Δc 与阈值 θ）。
+           曾经这里写的是"实时交叉质询 / ROUND 3 / 分歧度 / 说服力 / Δc +0.34"，
+           当时 cross_exam.py 返回的是 is_live_debate:False、vote_changes 恒空、delta 恒 0，
+           所以全部撤掉了。现在反驳与改票是真的，所以这两项可以出现——但
+           "ROUND 3""分歧度""说服力"依然不存在：只跑一轮，也不算说服力分。
+           别把这三个写回来（英文侧同理：no "ROUND 3", no disagreement score,
+           no persuasiveness score）。 -->
+      <div class="hero-col2">
+      <div class="debate-card reveal">
+        <div class="debate-head">
+          <span class="debate-tag">◈ Disagreement · rebuttal</span>
+          <span class="debate-round">Illustration · sample data</span>
+        </div>
+        <div class="debate-msg oppose">
+          <span class="pav" style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P05</span>
+          <div class="bubble">
+            <div class="who">P05 · <em>against · severity high</em></div>
+            “No mobile layout — 60% of first-visit traffic is phones. This one gets fixed first.”
+          </div>
+        </div>
+        <div class="debate-flip">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4 4v5h5M20 20v-5h-5M4.5 15a8 8 0 0 0 14.1 3M19.5 9a8 8 0 0 0-14.1-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Same disagreement · one rebuttal from each side
+        </div>
+        <div class="debate-msg agree">
+          <span class="pav" style="background:linear-gradient(135deg,#0071e3,#2997ff)">P12</span>
+          <div class="bubble">
+            <div class="who">P12 · <em>for · evidence direct</em></div>
+            “Desktop still drives most paid conversions. Mobile can wait until after the first release.”
+          </div>
+        </div>
+        <!-- 数值仍只用引擎真实产出的字段（见本卡顶部注释的两条铁律）。
+             "推断"这个词在 SOLUTION 区块（"证据三级标注"）才第一次被定义，
+             hero 里先看到这张卡的访客拿不到判断 34% 是好是坏的基准，
+             用原生 title 悬浮提示补一个口径，不增加常态视觉重量。 -->
+        <div class="debate-meter">
+          <div class="meter-cell"><b>92%</b><span>must-answer coverage</span></div>
+          <div class="meter-cell"><b>34%</b><span class="term-gloss" title="Anything above 40% inferred is flagged as over-inference. A third of this judgment rests on reasonable inference rather than on something observed directly in your material.">of this rests on inference</span></div>
+        </div>
+        <div class="debate-foot">Top-3 disagreements · three-level evidence tags · one round of cross-examination</div>
+      </div>
+      </div><!-- /hero-col2 -->
+    </div>
+  </div>
+</section>
+
+
+<!-- 信任条：技能规则「Used by / Trusted by 属于 hero 下方的独立区块，不能塞进 hero 同一列」。 -->
+<section class="sec-trust">
+  <div class="wrap">
+          <div class="proof">
+            <div class="avatars">
+              <span style="background:linear-gradient(135deg,#0071e3,#2997ff)">P1</span>
+              <span style="background:linear-gradient(135deg,#32ade6,#7fcdf0)">P2</span>
+              <!-- P3 用主色的低明度变体，归入蓝色系又和 P1 拉开明度 -->
+              <span style="background:linear-gradient(135deg,#0055b3,#0071e3)">P3</span>
+              <!-- 溢出数 = 人格总数 − 上面画出来的头像数。这里是隐式计数：写着 +63 时
+                   谁都不会联想到"人格数过期了"，72 人格上线后它就一直错着。
+                   中文原件那侧由 test_public_claims.py 对着仓库真值核；本文件由
+                   tests/test_landing_en_capability_claims.py 核"与中文原件相等"，
+                   改一边漏一边就会红。 -->
+              <span style="background:linear-gradient(135deg,#8a8a94,#adadb6)">+69</span>
+            </div>
+            <span class="sep"></span>
+            <!-- 测试数会随开发漂移，本页只允许 STATS 区写一处并带统计日期，
+                 所以 hero 这里放同样可自动核对的人格数 / 场景数 / Pack 数。 -->
+            <span class="proof-lead"><b>72</b> personas</span>
+            <span class="proof-sub">14 scenarios · 11 persona packs</span>
+            <!-- hero 里唯一有分量的"证据"是争议点示意卡，但那张卡明确标注是样例数据；
+                 真正可核对的证据（自动化测试数）在 STATS 区，隔了 6 屏。
+                 这里提前放一个锚点，把怀疑型访客早点引导到真证据那里。 -->
+            <a class="proof-jump" href="#numbers">Every number here is checkable in the repo ↓</a>
+          </div>
+
+          <div class="hero-models">
+            <span class="lbl">Works with</span>
+            <span class="m">Anthropic</span>
+            <span class="m">DeepSeek</span>
+            <span class="m">Kimi</span>
+            <span class="m">Qwen</span>
+            <span class="m">Zhipu GLM</span>
+            <span class="m">Ollama</span>
+          </div>
+  </div>
+</section>
+
+<!-- PAIN -->
+<section class="sec" id="pain">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Where you are today</div>
+      <h2 class="sec-title">You have read plenty of AI advice.<br>Still no idea whether to ship?</h2>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-card reveal">
+        <div class="n">01 / Human focus groups</div>
+        <h3>Slow and expensive</h3>
+        <p>Recruiting one human focus group starts at $5,000 and takes 2–4 weeks to schedule. By the time the findings reach you, the window may have closed.</p>
+        <div class="cost">$5,000+ · 2–4 weeks</div>
+      </div>
+      <div class="pain-card reveal">
+        <div class="n">02 / Asking a single AI</div>
+        <h3>One voice, talking to itself</h3>
+        <p>A single model hands you one blended recommendation. No conflict, no opposing side, no second position to weigh it against.</p>
+        <div class="cost">No conflict · no opposition</div>
+      </div>
+      <div class="pain-card reveal">
+        <div class="n">03 / Other synthetic tools</div>
+        <h3>Closed, stereotyped, unverifiable</h3>
+        <p>Most synthetic-user tools are closed black boxes that assemble personas out of demographic labels. You cannot inspect what a judgment rests on, and you cannot reconcile it against real outcomes afterwards.</p>
+        <div class="cost">Closed · unverifiable</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="sec" id="usecases">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Use cases</div>
+      <h2 class="sec-title">Built for the week before launch</h2>
+      <p class="sec-desc">One panel, 14 task types, covering the launches you can least afford to get wrong.</p>
+    </div>
+    <div class="use-grid">
+      <!-- 内容密度精简：4 张卡挑跨度最大的四个（游戏 / SaaS / 创业 BP 三个差异明显的
+           领域 + 对抗性视角这个独特机制），不逐一穷举 14 种任务类型——那是
+           /task-types 页面的职责。
+           use-card 图标加载失败时由 LandingPage.tsx 的 error 监听隐藏，
+           emoji :before 由 CSS 兜底（顺序：🎮💰📊⚔） -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-game.png" alt="Game review" loading="lazy"><h3>Steam page &amp; demo review</h3><p>Store copy, screenshots, the first minutes of the demo — find out why players leave within 20 seconds.</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pricing.png" alt="Pricing page review" loading="lazy"><h3>SaaS pricing pages</h3><p>Tier structure, anchoring, how convincing the CTA is — stress-test conversion risk before the real traffic arrives.</p></div>
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-pitch.png" alt="Pitch deck review" loading="lazy"><h3>Startup pitch decks</h3><p>Investor, accelerator mentor and technical co-founder perspectives — meet the sharpest questions before you are on stage.</p></div>
+      <!-- 这张卡曾写"红队对抗"，但引擎里没有红队模式、也没有红队人格包
+           （CLI 那个 red-team-audience 参数收下就丢，不影响任何一次评审）。
+           真实存在的是面板里几个专职唱反调的人格，照此写。 -->
+      <div class="use-card reveal"><img class="ico" src="/landing/icon-redteam.png" alt="Adversarial perspectives" loading="lazy"><h3>Adversarial perspectives</h3><p>The panel ships with personas whose whole job is to push back: a devil's advocate, a unit-economics skeptic, a hard-to-please reviewer.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- GAP -->
+<section class="gap sec-alt">
+  <div class="wrap reveal">
+    <p>They hand you one <span class="muted">“balanced recommendation”</span>,<br>never the <span class="gold">disagreement, the evidence grades, or a process you can check</span>.</p>
+  </div>
+</section>
+
+<!-- SOLUTION: three-stage -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2 class="sec-title">How a judgment is produced, constrained and verified</h2>
+      <p class="sec-desc">AudienceLens puts every judgment through a traceable pipeline, and every step of it can be read line by line in the open-source repo.</p>
+    </div>
+    <div class="stage">
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 01 produce</div>
+          <div class="kw">How a judgment is<br><span class="gold">produced</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">◇</div>
+            <div><h4>Independent review, in groups</h4><p>72 behavior-driven personas are split into packs and write their reviews independently, so nobody is anchored to anyone else's opinion up front.</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⇄</div>
+            <div><h4>Cross-examination on the top 3 disagreements</h4><p>The system picks the three points the panel splits on hardest and has each side rebut the other once, against the original arguments. Whatever everyone already agreed on is filtered out.</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⚖</div>
+            <div><h4>Vote changes are decided by code</h4><p>Who actually moved after the rebuttal is decided by code comparing stance and confidence before and after, and the threshold lives in an open-source config file.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 02 constrain</div>
+          <div class="kw">How a judgment is<br><span class="gold">constrained</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">⌘</div>
+            <div><h4>Three-level evidence tags + an inference ceiling</h4><p>Every conclusion carries its evidence level: direct (observed in your material) / inferred (reasonable inference) / gap (missing information). More than 40% inferred and the finding is flagged as over-inference.</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">⊘</div>
+            <div><h4>Ethics guardrails</h4><p>Identity is decoupled from behavior: personas are defined by behavioral traits, and the gender / age / region fields are stripped before anything is injected into the prompt. A separate check flags identity-to-behavior causal reasoning in the output.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-row reveal">
+        <div class="stage-key">
+          <div class="lbl">// 03 verify</div>
+          <div class="kw">How a judgment is<br><span class="gold">verified</span></div>
+        </div>
+        <div class="stage-list">
+          <div class="stage-item">
+            <div class="ico">⏱</div>
+            <div><h4>Predictions on the record · real outcomes filled back in</h4><p>When a review finishes, every prediction is timestamped and stored. Once you have run the real playtest you fill the actual outcome back in, and the system compares prediction against reality.</p></div>
+          </div>
+          <div class="stage-item">
+            <div class="ico">▲</div>
+            <div><h4>Per-persona hit rate</h4><p>After enough reviews accumulate you can look up how right each persona has been. When the sample is too small it is marked low_confidence.</p></div>
+          </div>
+          <div class="moat">What you get is a <b>traceable record of judgments</b>: predictions, filled-back outcomes and hit rates are all queryable and exportable. The system does not reweight personas by their track record on its own — whether to trust one of them more is your call.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- NUMBERED FLOW -->
+<section class="sec sec-alt" id="flow">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2 class="sec-title">From one sentence to a structured report</h2>
+      <p class="sec-desc">Automated end to end, progress streamed live, a launch-risk list in minutes.</p>    </div>
+    <!-- 内容密度精简：3 步走完"说什么→传什么→拿什么"，
+         中间"怎么评"交给上一个区块（SOLUTION 已独占展开过，这里不重复）。 -->
+    <div class="flow">
+      <div class="flow-step reveal"><div class="fn">01</div><h4>Say it in plain words</h4><p>A conversational entry point: just say what you want reviewed — a page, some copy, a concept, a pitch deck.</p></div>
+      <div class="flow-step reveal"><div class="fn">02</div><h4>Upload the material</h4><p>Text, screenshots, demo stills, deck pages. Images go into the vision model's context (pick a model that supports vision).</p></div>
+      <div class="flow-step reveal"><div class="fn">03</div><h4>Get a structured report</h4><p>An HTML review document, JSON data and a Markdown summary, with progress pushed live.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 中间路径太长，从 solution 到 capabilities 之间没有任何行动点。
+     这里插一个轻量次要 CTA，复用 hero 输入框的视觉语言但更克制。 -->
+<section class="sec-midcta">
+  <div class="wrap reveal">
+    <p class="midcta-text">Already know what you want reviewed?</p>
+    <a class="midcta-btn" href="/ask">Start now <span class="arw">→</span></a>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section class="sec sec-alt" id="capabilities">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2 class="sec-title">The engineering behind the panel</h2>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-multimodal.png" alt="Multimodal review" loading="lazy"></div>
+        <h3>Multimodal review</h3>
+        <p>Screenshots, demo stills and deck pages go straight into the vision model's context, so the reviewers actually see your interface. Models without vision (DeepSeek, most local Ollama models) fall back to reviewing the text and the run continues.</p>
+        <div class="meta">SCREENSHOT · DECK · UI → VISION (vision models only)</div>
+      </div>
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-model.png" alt="Model neutral" loading="lazy"></div>
+        <h3>Bring your own key, pick any model</h3>
+        <p>Native Anthropic support, plus DeepSeek, Kimi, Qwen, Zhipu GLM, local Ollama models and any other OpenAI-compatible service. Your key is stored encrypted on the server, and usage bills to your own model account.</p>
+        <div class="meta">Anthropic, DeepSeek, Kimi, Qwen, Zhipu GLM, Ollama</div>
+      </div>
+      <div class="cap-card reveal">
+        <div class="ico"><img src="/landing/icon-saas.png" alt="Ready to use" loading="lazy"></div>
+        <h3>Ready out of the box</h3>
+        <p>No sign-up needed to try it: redeem a CDK code without logging in, get a guest identity automatically, and claim those earlier reviews with one click after you sign in. Quota and data are isolated per account, and plans and usage are configured per tenant in the admin console.</p>
+        <div class="meta">Redemption codes, guest trial, multi-tenant isolation</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARE -->
+<section class="sec" id="compare">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2 class="sec-title">Not all synthetic research is the same</h2>
+      <p class="sec-desc">Disagreement handling, verifiable evidence, multimodal input, open source — the differences are all in this table. Every cell in the AudienceLens column maps to code in the repo.</p>
+    </div>
+    <div class="tbl-wrap reveal">
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th class="us">AudienceLens</th>
+            <th>SyntheticUsers</th>
+            <th>Outset</th>
+            <th>Yabble</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="dim-key">Method</td><td class="us">Multi-persona panel</td><td>Interview-style</td><td>Real human interviews</td><td>Chat-style</td></tr>
+          <tr><td class="dim-key">Disagreement handling</td><td class="us"><span class="ck">✓</span> Disagreement clustering + one rebuttal per side on the top 3, vote changes decided by code</td><td><span class="cx">✕</span> Single pass</td><td><span class="cx">✕</span> Depends on the moderator</td><td><span class="cx">✕</span> Single pass</td></tr>
+          <tr><td class="dim-key">Verifiable evidence</td><td class="us"><span class="ck">✓</span> Three-level tags + a hard ≤40% inference ceiling</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
+          <!-- Outset 这格不用 ✓/✕：真人录屏是**方法论不同**，不是"对手赢了这一格"。
+               用 .note 标出来，避免读者误读成 AudienceLens 输给了真人录屏。 -->
+          <tr><td class="dim-key">Multimodal material</td><td class="us"><span class="ck">✓</span> Screenshots / decks into a vision model (vision models only)</td><td><span class="cx">✕</span> Text only</td><td><span class="note">Human screen recordings (a different method, not text material)</span></td><td><span class="cx">✕</span> Text only</td></tr>
+          <tr><td class="dim-key">Model choice</td><td class="us"><span class="ck">✓</span> Anthropic plus any OpenAI-compatible provider</td><td><span class="cx">✕</span> Locked to their own cloud</td><td><span class="cx">✕</span></td><td><span class="cx">✕</span></td></tr>
+          <tr><td class="dim-key">Open source</td><td class="us"><span class="cg">✓</span> MIT licensed</td><td><span class="cx">✕</span> Closed</td><td><span class="cx">✕</span> Closed</td><td><span class="cx">✕</span> Closed</td></tr>
+          <tr><td class="dim-key">Price</td><td class="us"><span class="cg">Your own key · pay per use</span></td><td>$60 / study</td><td>Quoted per project</td><td>$800 / mo</td></tr>
+        </tbody>
+      </table>
+      <!-- 竞品的价格/特性没有自动化测试兜底（己方数字有），所以必须写清来源和时效，
+           读者知道以对方官网为准。 -->
+      <p class="tbl-note">Competitor details were checked by hand against their public websites; if anything has changed since, their own site is the authority. Every cell in the AudienceLens column corresponds to runnable code and tests in this repo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="sec sec-alt" id="numbers">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">The numbers</div>
+      <h2 class="sec-title">Every one of these is checkable in the open-source repo</h2>
+      <p class="sec-desc">Personas, task types, automated tests — every number here maps to real code and real tests in the repo, not to a slide.</p>
+    </div>
+    <div class="stats">
+      <!-- 数字只能写实跑出来的值。测试数会随开发变动，所以这一格必须带统计日期，
+           2026-08-02 实测：引擎 pytest 1649 passed/6 skipped + 后端 399 passed/2 skipped
+           = 2048 passed / 8 skipped。不要写成 "all green" 抹掉那些 skipped。
+           人格数 / Pack 数 / 任务类型数这三格必须与中文原件逐字相等，
+           tests/test_landing_en_capability_claims.py 会比对 data-target。 -->
+      <div class="stat reveal"><div class="num" data-target="72">72</div><div class="lbl">behavior-driven personas</div></div>
+      <div class="stat reveal"><div class="num" data-target="14">14</div><div class="lbl">task types</div></div>
+      <div class="stat reveal"><div class="num" data-target="2048">2048</div><div class="lbl">automated tests passing<br><span style="font-size:.74rem;opacity:.68">measured 2026-08-02 · 8 more skipped</span></div></div>
+      <div class="stat reveal"><div class="num" data-target="11">11</div><div class="lbl">persona packs</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final" id="try">
+  <div class="wrap">
+    <div class="inner reveal">
+      <h2>Try it now</h2>
+      <p>72 AI reviewers are standing by, and you do not need an account to start.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/ask">Start a conversational review <span class="arw">→</span></a>
+        <a class="btn btn-ghost" href="https://github.com/jedilpf/audiencelens" target="_blank" rel="noopener">Source on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->

@@ -3,4 +3,25 @@
 {$SITE_DOMAIN} {
     reverse_proxy frontend:80
     encode gzip zstd
+
+    header {
+        # HSTS。裸机手册的 nginx 一直设着这条，Docker 这条路径此前完全没有——
+        # 两条部署路径的安全基线不该不一样，照 DEPLOY.md 走的人平白少一层。
+        #
+        # 不加 preload：进了浏览器预加载名单就很难退出来，域名将来要改用途、
+        # 或者子域需要跑非 HTTPS 服务时会很难受。要加请先确认长期只用 HTTPS。
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+        # 下面四条前端容器的 nginx 也设了（见 frontend/nginx.conf）。
+        # 在边缘再设一次是有意的防御纵深：将来若把 Caddy 指向别的 upstream、
+        # 或加一条不经过那个 nginx 的路由，安全头不会随之消失。
+        # Caddy 的 header 指令是覆盖而非追加，重复设不会产生两个同名头。
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+        # 别把服务端指纹送给扫描器
+        -Server
+    }
 }

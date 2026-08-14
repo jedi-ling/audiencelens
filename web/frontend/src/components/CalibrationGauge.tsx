@@ -10,6 +10,9 @@
  * passLine 不传时**不做好坏判断**，只用中性色：宁可不表态，也不能给一个没有事实
  * 依据的合格线涂上红绿。无幻觉率就是这种情况——overall_pass 根本没把它算进去。
  */
+import { t } from '@/i18n/runtime'
+import { formatPercent } from '@/i18n/format'
+
 interface CalibrationGaugeProps {
   label: string
   /** 取不到就传 null/undefined。**不要**替它兜底成 0：0 会被画成一根满红的
@@ -22,10 +25,13 @@ interface CalibrationGaugeProps {
   passLineNote?: string
 }
 
-const COLOR_PASS = '#34c759'
+// 深色主题：合格线颜色沿用深色语义 token（status-completed / severity-high / severity-critical），
+// 弧线底色和缺省色沿用 border / text-muted——原来的 #e5e5ea 弧线在 #1c1c1e 卡片上亮得刺眼。
+const COLOR_PASS = '#32d74b'
 const COLOR_NEAR = '#ff9f0a'
-const COLOR_FAIL = '#ff3b30'
-const COLOR_NEUTRAL = '#86868b'
+const COLOR_FAIL = '#ff453a'
+const COLOR_NEUTRAL = '#636366'
+const COLOR_TRACK = '#38383a'
 
 export default function CalibrationGauge({ label, value, max = 1, passLine, passLineNote }: CalibrationGaugeProps) {
   const missing = value === null || value === undefined || Number.isNaN(value)
@@ -71,7 +77,7 @@ export default function CalibrationGauge({ label, value, max = 1, passLine, pass
             y1={75 + 52 * Math.sin(passRad)}
             x2={70 + 68 * Math.cos(passRad)}
             y2={75 + 68 * Math.sin(passRad)}
-            stroke="#86868b"
+            stroke="#8e8e93"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -89,16 +95,18 @@ export default function CalibrationGauge({ label, value, max = 1, passLine, pass
         <circle cx="70" cy="75" r="4" fill={color} />
       </svg>
       <div className="text-center">
-        <span className="font-display text-lg font-bold" style={{ color }}>
-          {missing ? '—' : `${percentage.toFixed(0)}%`}
+        <span className="font-display text-lg font-bold tabular-nums" style={{ color }}>
+          {/* 百分比走 @/i18n/format：原来是 toFixed(0) + 写死的 '%'，
+              百分号的位置与小数点写法各语种不同，那是 Intl 的事（契约 6.5）。 */}
+          {missing ? t('common.calibration_gauge.readout.empty') : formatPercent(percentage / 100)}
         </span>
         <p className="text-xs text-text-secondary mt-0.5">{label}</p>
         <p className="text-[10px] text-text-muted mt-0.5">
           {missing
-            ? '这项没算出来'
+            ? t('common.calibration_gauge.missing.hint')
             : passLine === undefined
-              ? '无合格线'
-              : `合格线 ${((passLine / max) * 100).toFixed(0)}%`}
+              ? t('common.calibration_gauge.no_pass_line.hint')
+              : t('common.calibration_gauge.pass_line.value', { value: formatPercent(passLine / max) })}
         </p>
         {passLineNote && <p className="text-[10px] text-text-muted">{passLineNote}</p>}
       </div>

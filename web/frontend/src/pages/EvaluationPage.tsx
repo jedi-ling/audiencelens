@@ -15,6 +15,11 @@ import {
 } from '@/lib/mock-data'
 import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, AlertCircle, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
 import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { PageShell, PageHeader, EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
+import { t } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { formatDateTime, formatNumber } from '@/i18n/format'
+import { tApiError } from '@/i18n/api-error'
 
 /** 「还没生成」和「加载失败」必须分开：前者是正常状态，后者是故障。
  *  后端 GET /api/evaluations/{id} 在没有记分卡时返回 404，其余状态码都是真故障。 */
@@ -22,17 +27,14 @@ function isNotGenerated(err: unknown): boolean {
   return err instanceof ApiError && err.status === 404
 }
 
-function errMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 /** created_at / completed_at 在库里都可能是 null（评审还没跑完、旧数据缺列）。
  *  以前直接 new Date(null) → 1970-01-01，页面上煞有介事地显示一个假时间。
  *  取不到就明说取不到。 */
 function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
+  if (!iso) return t('page.evaluation.time.empty')
   const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('zh-CN')
+  // 解析不出来的时间戳同样明说取不到：交给 formatDateTime 会在 DEV 直接抛。
+  return Number.isNaN(d.getTime()) ? t('page.evaluation.time.empty') : formatDateTime(d)
 }
 
 /** 单维度满分。后端 evaluation_service.py 每个 _eval_* 都只产出 {0,1,2,3}，
@@ -58,10 +60,19 @@ function dimensionBarClass(result: { score: number; passed: boolean }): string {
 /** 维度 id 在本地词表里找不到时要说「不认识这个 id」，不能把 snake_case 原样
  *  当成正常标题直出——那看起来像是产品本来就长这样，没人会去查为什么。 */
 function dimensionLabel(id: string, name?: string): string {
-  return name ?? `${id}（未知维度）`
+  return name ?? t('page.evaluation.unknown_dimension.label', { id })
+}
+
+/** 维度分的「x/3」。两处都用它，免得一处改了另一处没改。 */
+function scoreText(score: number): string {
+  return t('page.evaluation.score.value', {
+    score: formatNumber(score),
+    max: formatNumber(DIMENSION_MAX_SCORE),
+  })
 }
 
 export default function EvaluationPage() {
+  useDocumentTitle('page.evaluation.meta.title')
   const { id } = useParams()
   const [review, setReview] = useState<Review | null>(null)
   const [scorecard, setScorecard] = useState<EvaluationScorecard | null>(null)
@@ -116,10 +127,10 @@ export default function EvaluationPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <PageShell size="reading" animate={false} className="py-16 text-center">
         <Loader2 className="w-8 h-8 text-cyan animate-spin mx-auto mb-4" strokeWidth={1.25} />
-        <p className="text-text-secondary">加载评估报告...</p>
-      </div>
+        <p className="text-text-secondary">{t('page.evaluation.header.loading')}</p>
+      </PageShell>
     )
   }
 
@@ -129,36 +140,40 @@ export default function EvaluationPage() {
     const blocking = !scorecard ? scorecardError : reviewError
     const notGenerated = !scorecard && isNotGenerated(scorecardError)
     return (
-      <div className="max-w-6xl mx-auto px-4 py-16 text-center">
-        {notGenerated ? (
-          <>
-            <FlaskConical className="w-10 h-10 text-text-muted mx-auto mb-4" strokeWidth={1.25} />
-            <p className="text-text-secondary mb-2">评估报告尚未生成</p>
-            <p className="text-text-muted text-sm mb-6">请先在评审报告页运行评估</p>
-          </>
-        ) : (
-          <>
-            <AlertCircle className="w-10 h-10 text-severity-critical mx-auto mb-4" strokeWidth={1.25} />
-            <p className="text-text-secondary mb-2">没能加载评估报告</p>
-            <p className="text-text-muted text-sm mb-1 break-all">{errMessage(blocking)}</p>
-            <p className="text-text-muted text-sm mb-6">这不代表评估没跑过——接口可能临时抖动，点下面重试</p>
-            <button
-              onClick={handleRetry}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary-dim transition-all mb-6"
-            >
-              <Loader2 className="w-4 h-4" strokeWidth={1.25} />
-              重试
-            </button>
-          </>
-        )}
-        <Link
-          to={`/review/${id}/report`}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-all text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
-          返回评审报告
-        </Link>
-      </div>
+      <PageShell size="reading" animate={false} className="py-16">
+        <div className="mx-auto max-w-2xl">
+          {notGenerated ? (
+            <EmptyState
+              icon={FlaskConical}
+              title={t('page.evaluation.not_generated.title')}
+              description={t('page.evaluation.not_generated.desc')}
+            />
+          ) : (
+            <EmptyState
+              icon={AlertCircle}
+              tone="error"
+              title={t('page.evaluation.load_error.title')}
+              // 后端 message 的语种由 tApiError 按 message_lang 判定；语种对不上时
+              // 出前端译文，绝不把一句中文原文塞进英文界面的句子中间。
+              description={t('page.evaluation.load_error.desc', {
+                message: tApiError(blocking, 'common.ui.unknown_error'),
+              })}
+              action={
+                <button onClick={handleRetry} className={PRIMARY_BUTTON_CLASS}>
+                  <Loader2 className="w-4 h-4" strokeWidth={1.25} />
+                  {t('common.action.retry')}
+                </button>
+              }
+            />
+          )}
+          <div className="mt-4 text-center">
+            <Link to={`/review/${id}/report`} className={SECONDARY_BUTTON_CLASS}>
+              <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
+              {t('page.evaluation.back.cta')}
+            </Link>
+          </div>
+        </div>
+      </PageShell>
     )
   }
 
@@ -174,20 +189,21 @@ export default function EvaluationPage() {
   })
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={`/review/${id}/report`} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
-          <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-semibold text-text-primary truncate">评估报告</h1>
-          <p className="text-sm text-text-secondary">{review.target_title}</p>
-        </div>
-      </div>
+    // 阅读型页面：正文列收窄居中（recharts 自带响应式容器，图表不需要横向滚动兜底）
+    <PageShell size="reading">
+      <PageHeader
+        leading={
+          <Link to={`/review/${id}/report`} aria-label={t('page.evaluation.header.aria')} className="p-2 rounded-lg hover:bg-bg-card transition-colors">
+            <ArrowLeft className="w-5 h-5 text-text-secondary" strokeWidth={1.25} />
+          </Link>
+        }
+        title={t('page.evaluation.header.title')}
+        subtitle={review.target_title}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-1 rounded-xl border border-border bg-bg-card p-6 flex flex-col items-center justify-center">
-          <h3 className="text-sm font-medium text-text-muted mb-4">总体评分</h3>
+          <h3 className="text-sm font-medium text-text-muted mb-4">{t('page.evaluation.overall.title')}</h3>
           <div className={cn(
             'w-28 h-28 rounded-full flex items-center justify-center border-4 mb-4',
             scorecard.overall_score > 70
@@ -197,14 +213,14 @@ export default function EvaluationPage() {
                 : 'border-severity-critical bg-severity-critical/10'
           )}>
             <span className={cn(
-              'text-3xl font-bold font-mono',
+              'text-3xl font-bold font-mono tabular-nums',
               scorecard.overall_score > 70
                 ? 'text-brand-primary'
                 : scorecard.overall_score >= 50
                   ? 'text-severity-medium'
                   : 'text-severity-critical'
             )}>
-              {scorecard.overall_score}
+              {formatNumber(scorecard.overall_score)}
             </span>
           </div>
           <span className={cn(
@@ -213,30 +229,36 @@ export default function EvaluationPage() {
               ? 'bg-brand-primary/10 text-brand-primary'
               : 'bg-severity-critical/10 text-severity-critical'
           )}>
-            {scorecard.passed ? '✅ 评估通过' : '❌ 评估未通过'}
+            {scorecard.passed
+              ? t('page.evaluation.state.overall_pass')
+              : t('page.evaluation.state.overall_fail')}
           </span>
           <p className="text-xs text-text-muted mt-2">
-            {scorecard.results.filter((r) => r.passed).length}/{scorecard.results.length} 维度通过
+            {t('page.evaluation.overall.desc', {
+              passed: formatNumber(scorecard.results.filter((r) => r.passed).length),
+              count: scorecard.results.length,
+            })}
           </p>
           {/* 明说总体评分是 0–100：同一页下面的维度分是 0–3，不标满分的话
               两个量纲长得一样，用户会把「2」当成极低分 */}
-          <p className="text-xs text-text-muted mt-0.5">满分 100</p>
+          <p className="text-xs text-text-muted mt-0.5">{t('page.evaluation.overall.hint')}</p>
         </div>
 
         <div className="lg:col-span-2 rounded-xl border border-border bg-bg-card p-6">
-          <h3 className="text-sm font-medium text-text-muted mb-4">维度雷达图</h3>
+          <h3 className="text-sm font-medium text-text-muted mb-4">{t('page.evaluation.radar.title')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={radarData}>
-              <PolarGrid stroke="#e5e5ea" />
-              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#86868b' }} />
+              {/* 深色底上 #e5e5ea 网格会亮得刺眼；刻度/网格/雷达线统一用深色适配色 */}
+              <PolarGrid stroke="#38383a" />
+              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#8e8e93' }} />
               {/* 轴上限 = 单维度满分 3，不是 0–100：按 100 画会把满分压成一个贴着
                   圆心的点，整张雷达图恒定塌陷成一团 */}
-              <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#86868b' }} />
+              <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#636366' }} />
               <Radar
-                name="评分"
+                name={t('page.evaluation.radar.label')}
                 dataKey="score"
-                stroke="#32ade6"
-                fill="#32ade6"
+                stroke="#0a84ff"
+                fill="#0a84ff"
                 fillOpacity={0.2}
                 strokeWidth={2}
               />
@@ -253,7 +275,7 @@ export default function EvaluationPage() {
         <div className="rounded-xl border-2 border-severity-critical/30 bg-severity-critical/5 p-4 md:p-5 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <AlertOctagon className="w-5 h-5 text-severity-critical" strokeWidth={1.25} />
-            <h3 className="text-base font-semibold text-severity-critical">关键失败项</h3>
+            <h3 className="text-base font-semibold text-severity-critical">{t('page.evaluation.critical.title')}</h3>
           </div>
           <ul className="space-y-2">
             {scorecard.critical_failures.map((cf, i) => (
@@ -267,7 +289,7 @@ export default function EvaluationPage() {
       )}
 
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-text-primary mb-4">维度详情</h3>
+        <h3 className="text-lg font-semibold text-text-primary mb-4">{t('page.evaluation.dimensions.title')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {scorecard.results.map((result) => {
             const dim = EVALUATION_DIMENSIONS.find((d) => d.id === result.dimension)
@@ -289,7 +311,7 @@ export default function EvaluationPage() {
                     'w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold font-mono',
                     result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
-                    {result.score}/{DIMENSION_MAX_SCORE}
+                    {scoreText(result.score)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -298,7 +320,7 @@ export default function EvaluationPage() {
                         'text-xs px-1.5 py-0.5 rounded',
                         result.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                       )}>
-                        {result.passed ? '通过' : '未通过'}
+                        {result.passed ? t('page.evaluation.state.pass') : t('page.evaluation.state.fail')}
                       </span>
                     </div>
                     <p className="text-xs text-text-muted mt-0.5 line-clamp-1">{dim?.description}</p>
@@ -311,13 +333,13 @@ export default function EvaluationPage() {
                 </button>
                 {expanded && (
                   <div className="px-4 pb-4 border-t border-border pt-3">
-                    <p className="text-xs text-text-muted mb-2">{dim?.description ?? '本地词表里没有这个维度的说明'}</p>
+                    <p className="text-xs text-text-muted mb-2">{dim?.description ?? t('page.evaluation.dimension.hint')}</p>
                     <p className="text-sm text-text-secondary leading-relaxed">{result.details}</p>
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                        <span>评分（合格线 2 分）</span>
+                        <span>{t('page.evaluation.score.label')}</span>
                         <span className={cn('font-mono font-bold', dimensionScoreClass(result))}>
-                          {result.score}/{DIMENSION_MAX_SCORE}
+                          {scoreText(result.score)}
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-bg-secondary overflow-hidden">
@@ -342,8 +364,10 @@ export default function EvaluationPage() {
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-warm-orange" strokeWidth={1.5} />
           <p className="text-xs text-text-secondary break-all">
             {/* 别写死"8 维"：维度条数来自 scorecard.results，后端 rubric 改了这句就成假话 */}
-            伦理摘要没能加载（{errMessage(ethicsError)}）——不代表没有伦理问题，只是这一块没取到。
-            上面的 {scorecard.results.length} 项维度评分不受影响。
+            {t('page.evaluation.ethics_error.desc', {
+              message: tApiError(ethicsError, 'common.ui.unknown_error'),
+              count: scorecard.results.length,
+            })}
           </p>
         </div>
       )}
@@ -351,8 +375,9 @@ export default function EvaluationPage() {
       {ethicsData.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-purple-400" strokeWidth={1.25} />
-            <h3 className="text-lg font-semibold text-text-primary">伦理摘要</h3>
+          {/* lucide 调色板里没有 purple 语义 token；用品牌蓝保持一致，伦理摘要本就是辅助区 */}
+          <Shield className="w-5 h-5 text-brand-primary" strokeWidth={1.25} />
+            <h3 className="text-lg font-semibold text-text-primary">{t('page.evaluation.ethics.title')}</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {ethicsData.map((er) => (
@@ -364,18 +389,18 @@ export default function EvaluationPage() {
                     'ml-auto text-xs px-2 py-0.5 rounded font-medium',
                     er.passed ? 'bg-brand-primary/10 text-brand-primary' : 'bg-severity-critical/10 text-severity-critical'
                   )}>
-                    {er.passed ? '通过' : '未通过'}
+                    {er.passed ? t('page.evaluation.state.pass') : t('page.evaluation.state.fail')}
                   </span>
                 </div>
                 <div className="space-y-2">
                   <div>
                     <div className="flex items-center justify-between text-xs text-text-muted mb-1">
-                      <span>伦理评分</span>
+                      <span>{t('page.evaluation.ethics_score.label')}</span>
                       <span className={cn(
                         'font-mono font-bold',
                         er.score > 70 ? 'text-brand-primary' : er.score >= 50 ? 'text-severity-medium' : 'text-severity-critical'
                       )}>
-                        {er.score}
+                        {formatNumber(er.score)}
                       </span>
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-bg-secondary overflow-hidden">
@@ -391,7 +416,7 @@ export default function EvaluationPage() {
                   {/* 刻板印象风险是三档枚举，不是百分比：这里只给档位徽标，
                       不再做百分比和进度条——把枚举画成进度条是在编造精度。 */}
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-text-muted">刻板印象风险</span>
+                    <span className="text-text-muted">{t('page.evaluation.stereotype.label')}</span>
                     <span className={cn(
                       'px-2 py-0.5 rounded font-medium',
                       stereotypeRiskBadgeClass(er.stereotype_risk)
@@ -401,7 +426,9 @@ export default function EvaluationPage() {
                   </div>
                   {er.violations.length > 0 && (
                     <div className="pt-1">
-                      <div className="text-xs text-text-muted mb-1.5">违规项 {er.violations.length}</div>
+                      <div className="text-xs text-text-muted mb-1.5">
+                        {t('page.evaluation.violations.label', { count: er.violations.length })}
+                      </div>
                       <ul className="space-y-1.5">
                         {er.violations.map((v, i) => (
                           <li key={`${v.rule ?? 'legacy'}-${i}`} className="rounded-lg bg-bg-secondary/60 px-2 py-1.5">
@@ -432,22 +459,22 @@ export default function EvaluationPage() {
       <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
         <div className="flex items-center gap-2 mb-3">
           <Clock className="w-4 h-4 text-text-muted" strokeWidth={1.25} />
-          <h3 className="text-sm font-medium text-text-muted">评估时间线</h3>
+          <h3 className="text-sm font-medium text-text-muted">{t('page.evaluation.timeline.title')}</h3>
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-text-secondary">评审创建</span>
+            <span className="text-text-secondary">{t('page.evaluation.created.label')}</span>
             <span className="text-text-muted font-mono text-xs">{formatTime(review.created_at)}</span>
           </div>
           {review.completed_at && (
             <div className="flex items-center gap-2">
-              <span className="text-text-secondary">评审完成</span>
+              <span className="text-text-secondary">{t('page.evaluation.completed.label')}</span>
               <span className="text-text-muted font-mono text-xs">{formatTime(review.completed_at)}</span>
             </div>
           )}
           {skill && (
             <div className="flex items-center gap-2">
-              <span className="text-text-secondary">使用技能</span>
+              <span className="text-text-secondary">{t('page.evaluation.skill.label')}</span>
               {/* SKILLS[].icon 是图片路径不是 emoji，直接当文本渲染会显示出路径 */}
               <span className={cn('flex items-center gap-1.5 text-xs', skill.color)}>
                 <img src={skill.icon} alt="" className="h-4 w-4 object-contain" loading="lazy" />
@@ -457,6 +484,6 @@ export default function EvaluationPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -161,6 +161,35 @@
       },
       "description": "优先修复列表（按影响人数 × severity 加成排序）"
     },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["prediction_id", "type", "claim", "issue", "intervention", "target_metric", "direction", "comparison", "success_criterion", "verification_window", "verification_method", "confidence", "confidence_basis", "status", "is_synthetic"],
+        "properties": {
+          "prediction_id": { "type": "string" },
+          "type": { "const": "intervention_hypothesis" },
+          "claim": { "type": "string" },
+          "issue": { "type": "string" },
+          "intervention": { "type": "string" },
+          "target_metric": { "type": "string" },
+          "direction": { "enum": ["increase", "decrease"] },
+          "comparison": { "const": "treatment_vs_current_control" },
+          "success_criterion": { "type": "string" },
+          "verification_window": { "type": "string" },
+          "verification_method": { "type": "string" },
+          "severity": { "type": ["string", "null"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidence_basis": { "const": "synthetic_panel_heuristic_not_empirically_calibrated" },
+          "affected_personas": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": ["string", "null"] },
+          "status": { "const": "pending_verification" },
+          "is_synthetic": { "const": true }
+        },
+        "additionalProperties": false
+      },
+      "description": "从优先修复项派生的可证伪干预假设；不虚构效果量，须由真实对照数据验证"
+    },
     "persona_notes": {
       "type": "array",
       "items": {
@@ -245,6 +274,10 @@
         "fell_back_to_auto": { "type": "boolean" },
         "notice": { "type": "string" }
       }
+    },
+    "adaptive_panel": {
+      "type": "object",
+      "description": "自适应扩面审计轨迹；method=marginal_value_proxy_v1 是启发式代理值，不是已测量的信息增益"
     },
     "simulation_notice": {
       "type": "string",

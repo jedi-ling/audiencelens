@@ -2,15 +2,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { Sliders } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminSettingRow } from '@/lib/types'
+import { PanelShell, PanelError, PanelEmpty, PanelLoading } from './panel'
 
 export function SettingsPanel() {
   const [rows, setRows] = useState<AdminSettingRow[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       setRows((await adminApi.listSettings()).settings)
+      setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -47,14 +50,11 @@ export function SettingsPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Sliders className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-        运行时配置
-        <span className="font-mono text-[10px] font-normal text-text-muted">改动无需重启</span>
-      </h2>
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+    <PanelShell icon={Sliders} title="运行时配置" hint="改动无需重启">
+      <PanelError>{error}</PanelError>
+      {!loaded && !error && <PanelLoading />}
       <div className="mt-4 divide-y divide-border">
+        {loaded && rows.length === 0 && <PanelEmpty />}
         {rows.map((row) => (
           <div key={row.key} className="flex items-center gap-3 py-3">
             <div className="min-w-0 flex-1">
@@ -77,7 +77,7 @@ export function SettingsPanel() {
           </div>
         ))}
       </div>
-    </section>
+    </PanelShell>
   )
 }
 

@@ -475,19 +475,36 @@ class Settings:
     def sanitized(self) -> dict:
         """给 /health 用：绝不泄露密钥。
 
+        /health 不鉴权，任何人都能打。所以这里的口径是
+        **「前端真的要用的才给」**，而不是「不是密钥就都给」。
+
         不含 admin_enabled——那等于向公网广播「这里有后台管理接口」，
         而后台是静态共享令牌，没必要主动告诉扫描器它存在。
+
+        此前还回过 env / ratelimit_enabled / queue_backend / ledger_enabled /
+        review_concurrency 五项，前端一个都没消费（唯一的调用点是
+        session-store.ts，它只读下面这四个）。它们单看都不是秘密，
+        但组合起来是一张侦察表：ratelimit_enabled=false + quota_enabled=false
+        + server_key_present=true 合起来就是「这里可以免费无限调模型」，
+        省掉了攻击者自己试探的成本。没人用的字段没有理由留在公开响应里。
+
+        改这里要同步 web/frontend/src/lib/types.ts 的 HealthConfig，
+        有 test_health_config_parity 守着两边不漂移。
+
+        ⚠️ 这里给的是**进程启动时的 env 快照**。key_mode 和平台 key 都能在
+        后台面板运行时覆盖（写库，不改 env），所以 /api/health 不能直接用这份
+        快照——见 api/platform.py::health，它会用 db 里的实际值覆盖这两项。
+        单独调 sanitized() 时请自己意识到这一点。
         """
         return {
-            "env": self.env,
+            # 前端隐藏/显示登录入口
             "auth_enabled": self.auth_enabled,
+            # 下面两项一起决定「这次评审能不能跑起来」（见 session-store 的 canReview）。
+            # 两者都会被 /api/health 用运行时实际值覆盖。
             "key_mode": self.key_mode,
             "server_key_present": bool(self.server_llm_key),
+            # 前端隐藏/显示配额进度条
             "quota_enabled": self.quota_enabled,
-            "ratelimit_enabled": self.ratelimit_enabled,
-            "queue_backend": self.queue_backend,
-            "ledger_enabled": self.ledger_enabled,
-            "review_concurrency": self.review_concurrency,
         }
 
 

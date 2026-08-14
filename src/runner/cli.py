@@ -13,6 +13,8 @@ from typing import Callable, List, Optional
 import yaml
 
 try:
+    from .adaptive_panel import recommend_next_persona
+    from .predictions import build_falsifiable_predictions
     from .aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
     from .calibration import run_calibration_check
     from .cross_exam import (
@@ -45,6 +47,8 @@ try:
     from .llm_client import is_retryable_error
     from .validator import load_schema, validate_output
 except ImportError:
+    from runner.adaptive_panel import recommend_next_persona
+    from runner.predictions import build_falsifiable_predictions
     from runner.aggregator import aggregate_report, load_aggregation_rules, render_markdown_report, render_html_report
     from runner.calibration import run_calibration_check
     from runner.cross_exam import (
@@ -740,6 +744,9 @@ def run_panel(
     selected_personas: Optional[List[str]] = None,
     mode: Optional[str] = None,
     enable_cross_exam: Optional[bool] = None,
+    adaptive_panel: bool = False,
+    adaptive_initial_size: int = 3,
+    adaptive_min_score: float = 0.35,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -872,6 +879,24 @@ def run_panel(
     precheck = precheck_panel(panel_selected, artifact_bundle)
     valid_personas = precheck["valid_personas"]
 
+    # 自适应面板只对自动选人启用。用户显式点名角色时，少跑其中任何一个都违背
+    # 用户意图；这种情况下保留 fixed 执行，并在报告里说明为什么没有自适应缩面。
+    adaptive_requested = bool(adaptive_panel)
+    adaptive_disabled_reason = ""
+    if adaptive_requested and requested_personas:
+        adaptive_disabled_reason = "explicit_persona_selection"
+    adaptive_enabled = adaptive_requested and not requested_personas and bool(valid_personas)
+    try:
+        adaptive_initial_size = max(1, int(adaptive_initial_size))
+    except (TypeError, ValueError):
+        raise ValueError("adaptive_initial_size must be a positive integer")
+    try:
+        adaptive_min_score = float(adaptive_min_score)
+    except (TypeError, ValueError):
+        raise ValueError("adaptive_min_score must be a number between 0 and 1")
+    if not 0 <= adaptive_min_score <= 1:
+        raise ValueError("adaptive_min_score must be a number between 0 and 1")
+
     # matched 必须在截断与预检**之后**才能定稿：以前它在 truncate_panel 之前算好
     # 就不再动了，点名 5 人但 mode 限 3 人时，报告会说 5 个全参与、missing 为空——
     # 用户以为自己点的角色都发过言。这里按真正进入评审的名单收敛一遍，
@@ -926,13 +951,61 @@ def run_panel(
                 pass
         return result
 
-    if workers <= 1 or len(valid_personas) <= 1:
-        persona_results = [_run(p) for p in valid_personas]
-    else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+    def _run_batch(batch):
+        if workers <= 1 or len(batch) <= 1:
+            return [_run(p) for p in batch]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(workers, len(batch))) as ex:
             # 按提交顺序收集 future 结果，保证与输入人格顺序一致（确定性）
-            futures = [ex.submit(_run, p) for p in valid_personas]
-            persona_results = [f.result() for f in futures]
+            futures = [ex.submit(_run, p) for p in batch]
+            return [f.result() for f in futures]
+
+    adaptive_decisions = []
+    if adaptive_enabled:
+        initial_count = min(adaptive_initial_size, len(valid_personas))
+        executed_personas = list(valid_personas[:initial_count])
+        persona_results = _run_batch(executed_personas)
+
+        while len(executed_personas) < len(valid_personas):
+            unresolved_evidence = sorted({
+                str(gap).strip()
+                for result in persona_results
+                if result.get("output")
+                for gap in (result["output"].get("missing_information") or [])
+                if str(gap).strip()
+            })
+            recommendation = recommend_next_persona(
+                candidates=valid_personas,
+                selected=executed_personas,
+                task_type=task_type,
+                unresolved_evidence=unresolved_evidence,
+                min_score=adaptive_min_score,
+            )
+            recommendation["panel_size_before"] = len(executed_personas)
+            recommendation["unresolved_evidence"] = unresolved_evidence
+
+            # 人格调用已经逐步发生，可以在扩面前执行真实成本刹车；固定并发路径只能
+            # 在全员跑完后阻止交叉质询，自适应路径则可以少发后续人格调用。
+            running_cost = sum(float(item.get("cost") or 0.0) for item in persona_results)
+            max_run_cost = float(budget_config.get("max_cost_per_run_usd") or 0.0)
+            if max_run_cost > 0 and running_cost >= max_run_cost:
+                recommendation["should_continue"] = False
+                recommendation["recommended_persona_id"] = None
+                recommendation["stop_reason"] = "cost_budget_reached"
+            elif not recommendation["should_continue"]:
+                recommendation["stop_reason"] = "marginal_value_below_threshold"
+            else:
+                recommendation["stop_reason"] = None
+            adaptive_decisions.append(recommendation)
+
+            if not recommendation["should_continue"]:
+                break
+            next_id = recommendation["recommended_persona_id"]
+            next_persona = next(p for p in valid_personas if p.get("id") == next_id)
+            executed_personas.append(next_persona)
+            persona_results.extend(_run_batch([next_persona]))
+    else:
+        executed_personas = list(valid_personas)
+        persona_results = _run_batch(valid_personas)
 
     persona_outputs = []
     failed_personas = []
@@ -1035,7 +1108,7 @@ def run_panel(
             cross_exam_data = run_cross_exam_stage(
                 persona_outputs=persona_outputs,
                 controversy_points=controversy_points,
-                personas=valid_personas,
+                personas=executed_personas,
                 template_path=cross_exam_prompt_path,
                 rules=rules,
                 budget_config=budget_config,
@@ -1059,9 +1132,33 @@ def run_panel(
         cross_exam_data,
         # 受众画像只有人格 YAML 里有（persona_outputs 是 LLM 的输出，没有这些字段），
         # 不传的话 next_human_test.recruit_types 会如实留空
-        panel_personas=valid_personas,
+        panel_personas=executed_personas,
         persona_pack=load_persona_pack_meta(personas_path),
     )
+
+    # 把“建议”提升成可验证假设：每条都有目标指标、对照方式、方向、验证窗口，
+    # 但绝不凭空编效果量。confidence 明示为合成面板启发式，等待 Ledger 真实结果校准。
+    report["predictions"] = build_falsifiable_predictions(
+        report, task_type, panel_size=len(persona_outputs)
+    )
+
+    report["adaptive_panel"] = {
+        "requested": adaptive_requested,
+        "enabled": adaptive_enabled,
+        "disabled_reason": adaptive_disabled_reason or None,
+        "method": "marginal_value_proxy_v1" if adaptive_enabled else "fixed_panel",
+        "initial_size": min(adaptive_initial_size, len(valid_personas)) if adaptive_enabled else None,
+        "eligible_personas": len(valid_personas),
+        "executed_personas": len(executed_personas),
+        "saved_persona_calls": len(valid_personas) - len(executed_personas),
+        "min_score": adaptive_min_score if adaptive_enabled else None,
+        "decisions": adaptive_decisions,
+        "limitation": (
+            "The expansion score is an explainable heuristic, not measured information gain; "
+            "its weights require calibration against verified outcomes."
+            if adaptive_enabled else None
+        ),
+    }
 
     if simulated:
         report["simulation_notice"] = SIMULATION_WARNING
@@ -1229,7 +1326,7 @@ def run_panel(
         # 需要的就是这份原件。
         "persona_outputs": persona_outputs,
         # 同一批输出对应的人格 YAML 定义，反驳轮渲染身份卡要用
-        "panel_personas": valid_personas,
+        "panel_personas": executed_personas,
         # 降级标记也放顶层：调用方在落库前就能判断要不要提示用户 / 要不要按满额计费
         "degraded": degraded,
         "failed_personas": failed_personas,

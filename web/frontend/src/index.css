@@ -26,7 +26,20 @@
   --color-warm-orange-dim: #e08c00;
   --color-text-primary: #ffffff;
   --color-text-secondary: #8e8e93;
-  --color-text-muted: #636366;
+  /* #636366 提到 #86868b。原值在卡片底色 #1c1c1e 上对比度只有 2.84，
+   * 在纯黑上也才 3.51——都低于 WCAG AA 正文要求的 4.5。
+   *
+   * 关键是这跟背景图**无关**：即使把面板做到完全不透明，天花板也是 3.51。
+   * 所以加多厚的遮罩都没用（实测把面板 alpha 一路推到 0.96，仍只有 4.31），
+   * 只能改色。
+   *
+   * 取 #86868b 而不是更亮的值，是为了保住 primary > secondary > muted 的层级：
+   *   primary   #ffffff  对比度 15.9
+   *   secondary #8e8e93  对比度 5.22
+   *   muted     #86868b  对比度 4.70  ← 比 secondary 暗一档，且过 4.5
+   * 再暗一档（#7c7c80）只有 4.09，就掉出标准了——4.70 是"既守住层级又达标"
+   * 的那个窗口，几乎没有下调余地，动它之前先重算。 */
+  --color-text-muted: #86868b;
   --color-severity-critical: #ff453a;
   --color-severity-high: #ff9f0a;
   --color-severity-medium: #c77700;
@@ -79,7 +92,7 @@ html, body {
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  opacity: 0.85;
+  opacity: 0.35;
 }
 
 ::selection {
@@ -201,6 +214,41 @@ html, body {
   backdrop-filter: blur(12px) saturate(180%);
   -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.glass-card {
+  background: rgba(28, 28, 30, 0.75);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hover-lift {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.35);
+}
+
+.badge-evidence-direct {
+  background: rgba(50, 215, 75, 0.12);
+  color: #32d74b;
+  border: 1px solid rgba(50, 215, 75, 0.25);
+}
+
+.badge-evidence-inferred {
+  background: rgba(255, 159, 10, 0.12);
+  color: #ff9f0a;
+  border: 1px solid rgba(255, 159, 10, 0.25);
+}
+
+.badge-evidence-gap {
+  background: rgba(142, 142, 147, 0.12);
+  color: #8e8e93;
+  border: 1px solid rgba(142, 142, 147, 0.25);
 }
 
 .scanline-overlay {

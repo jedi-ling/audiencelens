@@ -3,6 +3,7 @@ import type { Review, ReviewListItem, Example, ReviewModeConfig, TaskTypeDetail,
 import { fetchReviews, fetchReview, deleteReview, fetchExamples, fetchReviewModes, fetchTaskTypes } from '@/lib/api'
 import { api } from '@/lib/apiClient'
 import type { PersonaPack, ReviewMode, TaskType } from '@/lib/types'
+import { tApiError } from '@/i18n/api-error'
 
 interface ReviewState {
   reviews: ReviewListItem[]
@@ -77,7 +78,7 @@ export const useReviewStore = create<ReviewState>((set) => ({
       set({ reviews, loading: false, reviewsError: null })
     } catch (e) {
       // 不清空 reviews：拉失败时把上一次的列表留着，比当场变成"空空如也"更诚实。
-      set({ loading: false, reviewsError: e instanceof Error ? e.message : '评审列表加载失败' })
+      set({ loading: false, reviewsError: tApiError(e, 'error.store.review_list') })
     }
   },
   fetchReviewById: async (id: string) => {
@@ -122,7 +123,7 @@ export const useReviewStore = create<ReviewState>((set) => ({
       const examples = await fetchExamples()
       set({ examples, examplesError: null })
     } catch (e) {
-      set({ examplesError: e instanceof Error ? e.message : '示例加载失败' })
+      set({ examplesError: tApiError(e, 'error.store.examples') })
     }
   },
   // 下面两个是 UI 配置项（模式说明、任务类型说明），页面都有静态兜底文案，

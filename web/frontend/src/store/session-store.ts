@@ -10,6 +10,7 @@
 import { create } from 'zustand'
 import { api, claimPendingReviews, getToken, setToken } from '@/lib/apiClient'
 import type { HealthConfig, Identity, KeyStatus, UsageSummary } from '@/lib/types'
+import { tApiError } from '@/i18n/api-error'
 
 interface SessionState {
   config: HealthConfig | null
@@ -63,7 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       // key/用量非关键路径，失败不该阻断启动
       await Promise.allSettled([get().refreshKeys(), get().refreshUsage()])
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : '后端连接失败' })
+      set({ error: tApiError(e, 'error.store.bootstrap') })
     } finally {
       set({ loading: false })
     }

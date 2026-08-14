@@ -15,11 +15,28 @@ import {
   Cpu,
   Bot,
 } from 'lucide-react'
+import { t } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
 
-const sections = [
+/**
+ * 章节表。存的是 **key 不是文案**：这个数组在模块求值时就固定了，存翻译结果
+ * 的话切换语言不会重新求值，整页政策会一直停在打开页面时的那种语言。
+ * 与 Layout.tsx 的 navItems 同一条规矩。
+ */
+const sections: {
+  icon: React.ElementType
+  titleKey: PlainMessageKey
+  color: string
+  borderColor: string
+  bgColor: string
+  iconBg: string
+  items: { type: string; labelKey: PlainMessageKey; detailKeys: PlainMessageKey[] }[]
+  providers?: { name: string; icon: React.ElementType; color: string }[]
+}[] = [
   {
     icon: Database,
-    title: '数据收集说明',
+    titleKey: 'page.privacy.collection.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
@@ -27,46 +44,46 @@ const sections = [
     items: [
       {
         type: 'collect',
-        label: '我们收集的数据',
-        details: [
-          '你上传的评审材料（文本、截图等），随评审记录长期保存，直到你删除',
-          '选择的任务类型、角色配置、评审模式',
-          '评审报告、各角色意见、你的追问与回复',
+        labelKey: 'page.privacy.collection_collected.label',
+        detailKeys: [
+          'page.privacy.collection_collected_materials.desc',
+          'page.privacy.collection_collected_config.desc',
+          'page.privacy.collection_collected_report.desc',
           // 对话持续化上线后新增的一类数据。此前这一条不存在，因为那段对话
           // 只活在浏览器内存里、从不离开设备；现在它会落到服务器数据库，
           // 政策里就必须写明——否则这一页对用户就是不实的。
-          '对话页里的往返消息（包括发起评审之前的澄清），存在服务器上，刷新与换设备后可继续',
+          'page.privacy.collection_collected_chat.desc',
           // 图片改为落盘之后新增。此前它只以 data URI 形式活在浏览器内存里，
           // 从不落到服务器磁盘；现在会，政策就得写明。
-          '你在对话里上传的图片，以文件形式存在服务器磁盘上（数据库里只存引用，不存图片本身）',
-          '注册邮箱与密码哈希（仅注册用户；密码用 PBKDF2-HMAC-SHA256 加盐哈希，我们无法还原）',
-          '用量记录：每次评审的 token 数、花费、时间',
+          'page.privacy.collection_collected_images.desc',
+          'page.privacy.collection_collected_account.desc',
+          'page.privacy.collection_collected_usage.desc',
         ],
       },
       {
         type: 'no-collect',
-        label: '我们不收集的数据',
-        details: [
-          '不收集浏览历史、不做跨站追踪',
-          '不收集设备指纹、不接入第三方广告或分析 SDK',
-          '除注册邮箱外，不主动索取任何身份信息（不要手机号、不要实名）',
+        labelKey: 'page.privacy.collection_not.label',
+        detailKeys: [
+          'page.privacy.collection_not_history.desc',
+          'page.privacy.collection_not_fingerprint.desc',
+          'page.privacy.collection_not_identity.desc',
         ],
       },
       {
         type: 'key',
-        label: 'API Key 处理',
-        details: [
-          '你的 LLM API Key 加密后存进数据库（Fernet / AES-128-CBC + HMAC 认证加密）',
-          '加密密钥与登录令牌密钥分离配置，轮换登录密钥不会导致密钥失效',
-          '页面上只回显掩码（如 sk-ant-…4f2a）；数据导出也只给掩码，不含明文',
-          '你可以随时在设置页删除它',
+        labelKey: 'page.privacy.collection_apikey.label',
+        detailKeys: [
+          'page.privacy.collection_apikey_encrypted.desc',
+          'page.privacy.collection_apikey_separate.desc',
+          'page.privacy.collection_apikey_masked.desc',
+          'page.privacy.collection_apikey_delete.desc',
         ],
       },
     ],
   },
   {
     icon: Eye,
-    title: '数据使用说明',
+    titleKey: 'page.privacy.usage.title',
     color: 'text-cyan',
     borderColor: 'border-cyan/30',
     bgColor: 'bg-cyan/5',
@@ -74,27 +91,41 @@ const sections = [
     items: [
       {
         type: 'use',
-        label: '数据用途',
-        details: [
-          '你的材料只用于这一次评审：发给你选定的模型服务商，生成给你看的报告',
-          '材料与报告会随评审记录保存，方便你回看历史、继续追问——直到你自己删除',
-          '评审结果仅你本人可访问（按账号隔离；未登录时按匿名身份隔离）',
+        labelKey: 'page.privacy.usage_purpose.label',
+        detailKeys: [
+          'page.privacy.usage_purpose_single.desc',
+          'page.privacy.usage_purpose_retained.desc',
+          'page.privacy.usage_purpose_isolated.desc',
         ],
       },
       {
         type: 'use',
-        label: '我们不会做的事',
-        details: [
-          '不用你的内容训练任何模型——我们不训练模型，也不向任何人出售或共享你的数据',
-          '不拿你的项目内容做案例展示、宣传素材或公开样本',
-          '不在你未要求时读取你的内容；运维排障也不会把你的材料复制到别处',
+        labelKey: 'page.privacy.usage_never.label',
+        detailKeys: [
+          'page.privacy.usage_never_training.desc',
+          'page.privacy.usage_never_showcase.desc',
+          'page.privacy.usage_never_copy.desc',
+        ],
+      },
+      {
+        type: 'use',
+        labelKey: 'page.privacy.usage_admin.label',
+        detailKeys: [
+          // 早期版本这里写的是"不在你未要求时读取你的内容"——管理后台上线评审
+          // 巡检功能后，这条承诺已经不成立了：处理客诉、排查滥用、核对计费
+          // 争议时，运营方（目前是本站唯一的开发者）可以在未经你主动求助的
+          // 情况下打开评审内容。与其让承诺继续挂着不实的文案，不如把真实
+          // 边界写清楚。
+          'page.privacy.usage_admin_access.desc',
+          'page.privacy.usage_admin_audit.desc',
+          'page.privacy.usage_admin_unchanged.desc',
         ],
       },
     ],
   },
   {
     icon: Lock,
-    title: '数据安全措施',
+    titleKey: 'page.privacy.security.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
@@ -102,20 +133,20 @@ const sections = [
     items: [
       {
         type: 'security',
-        label: '技术保障',
-        details: [
-          'API Key 用 Fernet 对称加密后落库（AES-128-CBC + HMAC-SHA256 认证加密）',
-          '登录密码用 PBKDF2-HMAC-SHA256（20 万轮）加盐哈希，不可还原',
-          '邮箱验证与密码重置令牌只存哈希摘要，一次性、可过期',
-          'CORS 严格白名单 + 安全响应头 + WebSocket Origin 验证',
-          '上传类型/大小限制，分块流式读取，超限即中止',
+        labelKey: 'page.privacy.security_tech.label',
+        detailKeys: [
+          'page.privacy.security_tech_key.desc',
+          'page.privacy.security_tech_password.desc',
+          'page.privacy.security_tech_token.desc',
+          'page.privacy.security_tech_cors.desc',
+          'page.privacy.security_tech_upload.desc',
         ],
       },
     ],
   },
   {
     icon: ShieldCheck,
-    title: '你不必只听我们的承诺',
+    titleKey: 'page.privacy.verify.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
@@ -123,20 +154,20 @@ const sections = [
     items: [
       {
         type: 'verify',
-        label: '可验证，而不是只能相信',
-        details: [
-          '代码开源：这一页写的每条承诺，都能在源码里查证是否属实',
-          '自带密钥（BYOK）：模型调用用你自己的额度，账单和用量都在你自己的服务商后台',
-          '用本站（托管形态）时：材料会先上传到本站服务器并落库，再由服务器代你调用模型——不经过服务器是做不到的，所以我们不这么说',
-          '要做到"数据不出你的机器"，只有自建或本地跑 CLI / Python / MCP 这一条路：那时材料从头到尾在你的机器上，我们连接触的机会都没有',
-          '随时带走或删干净：设置页两个按钮，不用发邮件申请、不用等人工审核',
+        labelKey: 'page.privacy.verify_checkable.label',
+        detailKeys: [
+          'page.privacy.verify_checkable_oss.desc',
+          'page.privacy.verify_checkable_byok.desc',
+          'page.privacy.verify_checkable_hosted.desc',
+          'page.privacy.verify_checkable_selfhost.desc',
+          'page.privacy.verify_checkable_export.desc',
         ],
       },
     ],
   },
   {
     icon: Globe,
-    title: '第三方服务',
+    titleKey: 'page.privacy.third_party.title',
     color: 'text-cyan',
     borderColor: 'border-cyan/30',
     bgColor: 'bg-cyan/5',
@@ -144,15 +175,16 @@ const sections = [
     items: [
       {
         type: 'third-party',
-        label: 'LLM 服务商',
-        details: [
-          '使用 Anthropic / OpenAI / DeepSeek / Ollama API 进行 AI 评审',
-          '除你自行选择的 LLM 服务商外，我们不把你的材料转给任何第三方',
-          'Ollama 档指向的是「运行本系统的那台机器」的 localhost：你自建时它就是你的机器，用本站时它是本站服务器——不是你的电脑',
-          '所以"数据不离开用户设备"只在自建 / CLI / Python / MCP 形态下成立，托管形态下不成立',
+        labelKey: 'page.privacy.third_party_llm.label',
+        detailKeys: [
+          'page.privacy.third_party_llm_providers.desc',
+          'page.privacy.third_party_llm_only.desc',
+          'page.privacy.third_party_llm_ollama.desc',
+          'page.privacy.third_party_llm_scope.desc',
         ],
       },
     ],
+    // 服务商名是品牌专名，不翻译（契约 6.11）。
     providers: [
       { name: 'Anthropic', icon: Bot, color: 'text-brand-primary' },
       { name: 'OpenAI', icon: Cpu, color: 'text-cyan' },
@@ -162,7 +194,7 @@ const sections = [
   },
   {
     icon: Trash2,
-    title: '数据保留',
+    titleKey: 'page.privacy.retention.title',
     color: 'text-brand-primary',
     borderColor: 'border-brand-primary/30',
     bgColor: 'bg-brand-primary/5',
@@ -170,16 +202,14 @@ const sections = [
     items: [
       {
         type: 'retention',
-        label: '保留策略',
-        details: [
-          '评审记录保存在服务器数据库，直到你主动删除——我们不设自动过期',
-          '设置页可「导出我的全部数据」，一份 JSON 带走全部内容',
+        labelKey: 'page.privacy.retention_policy.label',
+        detailKeys: [
+          'page.privacy.retention_policy_forever.desc',
+          'page.privacy.retention_policy_export.desc',
           // 这份清单是逐项对着 user_data_service.delete_user_data 的实现写的。
           // 加了新表就必须同步加进来，否则清单会慢慢变成"看起来删干净了"。
-          '设置页可「删除我的账号与数据」：评审、材料、报告、追问、对话记录、上传的图片（磁盘上的字节一并删除）、伦理体检记录（含内容摘录）、'
-            + 'API Key、账号本身立即物理删除',
-          '例外（我们如实说明）：用量与兑换流水会保留，但 user_id 会被改写成不可回指的墓碑标识——'
-            + '财务对账所需，此后无法关联到你本人',
+          'page.privacy.retention_policy_delete.desc',
+          'page.privacy.retention_policy_exception.desc',
         ],
       },
     ],
@@ -187,15 +217,16 @@ const sections = [
 ]
 
 function ItemBadge({ type }: { type: string }) {
+  // 这张表在**渲染期**求值，所以直接 t() 是安全的（模块级常量才必须存 key）。
   const config: Record<string, { icon: React.ElementType; label: string; className: string }> = {
-    collect: { icon: CheckCircle2, label: '收集', className: 'bg-brand-primary/10 text-brand-primary' },
-    'no-collect': { icon: XCircle, label: '不收集', className: 'bg-severity-critical/10 text-severity-critical' },
-    key: { icon: Lock, label: '密钥', className: 'bg-cyan/10 text-cyan' },
-    use: { icon: Eye, label: '用途', className: 'bg-cyan/10 text-cyan' },
-    security: { icon: ShieldCheck, label: '安全', className: 'bg-brand-primary/10 text-brand-primary' },
-    'third-party': { icon: Wifi, label: '第三方', className: 'bg-cyan/10 text-cyan' },
-    retention: { icon: Trash2, label: '保留', className: 'bg-brand-primary/10 text-brand-primary' },
-    verify: { icon: ShieldCheck, label: '可验证', className: 'bg-brand-primary/10 text-brand-primary' },
+    collect: { icon: CheckCircle2, label: t('page.privacy.collect.badge'), className: 'bg-brand-primary/10 text-brand-primary' },
+    'no-collect': { icon: XCircle, label: t('page.privacy.no_collect.badge'), className: 'bg-severity-critical/10 text-severity-critical' },
+    key: { icon: Lock, label: t('page.privacy.key.badge'), className: 'bg-cyan/10 text-cyan' },
+    use: { icon: Eye, label: t('page.privacy.use.badge'), className: 'bg-cyan/10 text-cyan' },
+    security: { icon: ShieldCheck, label: t('page.privacy.security.badge'), className: 'bg-brand-primary/10 text-brand-primary' },
+    'third-party': { icon: Wifi, label: t('page.privacy.third_party.badge'), className: 'bg-cyan/10 text-cyan' },
+    retention: { icon: Trash2, label: t('page.privacy.retention.badge'), className: 'bg-brand-primary/10 text-brand-primary' },
+    verify: { icon: ShieldCheck, label: t('page.privacy.verify.badge'), className: 'bg-brand-primary/10 text-brand-primary' },
   }
   const c = config[type] || config.use
   const Icon = c.icon
@@ -210,25 +241,29 @@ function ItemBadge({ type }: { type: string }) {
 import { cn } from '@/lib/utils'
 
 export default function PrivacyPage() {
+  useDocumentTitle('page.privacy.meta.title')
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
+    // 长文排版：max-w-3xl 收阅读宽度；正文 leading-7；段前距大于段后距（space-y-8 / mb-4）；
+    // 邮箱等长串加 break-all 防移动端横向溢出。
+    <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-10">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.25} />
-          返回首页
+          {t('page.privacy.header.link')}
         </Link>
         <h1 className="text-3xl md:text-4xl font-bold text-gradient-green font-display mb-3">
-          隐私政策
+          {t('page.privacy.header.title')}
         </h1>
         <p className="text-text-secondary">
-          我们重视您的数据隐私。本政策说明 AudienceLens 如何收集、使用和保护您的数据。
+          {t('page.privacy.header.subtitle')}
         </p>
         <div className="flex items-center gap-2 mt-4 text-xs text-text-muted">
           <ShieldCheck className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
-          <span>最后更新：2026 年 5 月</span>
+          <span>{t('page.privacy.header.meta')}</span>
         </div>
       </div>
 
@@ -244,12 +279,12 @@ export default function PrivacyPage() {
                 section.bgColor
               )}
             >
-              <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-3 mb-4">
                 <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', section.iconBg)}>
                   <SectionIcon className={cn('w-5 h-5', section.color)} strokeWidth={1.25} />
                 </div>
                 <h2 className={cn('text-xl font-semibold font-display', section.color)}>
-                  {section.title}
+                  {t(section.titleKey)}
                 </h2>
               </div>
 
@@ -258,13 +293,13 @@ export default function PrivacyPage() {
                   <div key={ii} className="pl-1">
                     <div className="flex items-center gap-2 mb-3">
                       <ItemBadge type={item.type} />
-                      <span className="text-sm font-medium text-text-primary">{item.label}</span>
+                      <span className="text-sm font-medium text-text-primary">{t(item.labelKey)}</span>
                     </div>
                     <ul className="space-y-2 ml-1">
-                      {item.details.map((d, di) => (
+                      {item.detailKeys.map((detailKey, di) => (
                         <li key={di} className="flex items-start gap-2.5 text-sm text-text-secondary">
                           <span className={cn('mt-1.5 w-1 h-1 rounded-full shrink-0', section.color === 'text-cyan' ? 'bg-cyan' : 'bg-brand-primary')} />
-                          {d}
+                          {t(detailKey)}
                         </li>
                       ))}
                     </ul>
@@ -274,7 +309,7 @@ export default function PrivacyPage() {
 
               {section.providers && (
                 <div className="mt-5 pt-4 border-t border-border/50">
-                  <p className="text-xs text-text-muted mb-3">支持的 LLM 服务商</p>
+                  <p className="text-xs text-text-muted mb-3">{t('page.privacy.third_party_providers.label')}</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {section.providers.map((p, pi) => {
                       const PIcon = p.icon
@@ -300,14 +335,14 @@ export default function PrivacyPage() {
             <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center">
               <Mail className="w-5 h-5 text-cyan" strokeWidth={1.25} />
             </div>
-            <h2 className="text-xl font-semibold text-cyan font-display">联系方式</h2>
+            <h2 className="text-xl font-semibold text-cyan font-display">{t('page.privacy.contact.title')}</h2>
           </div>
           <p className="text-sm text-text-secondary mb-3">
-            如果您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：
+            {t('page.privacy.contact.desc')}
           </p>
           <a
             href="mailto:audience-lens@example.com"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium"
+            className="inline-flex max-w-full items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium break-all"
           >
             <Mail className="w-4 h-4" strokeWidth={1.25} />
             audience-lens@example.com
@@ -316,7 +351,7 @@ export default function PrivacyPage() {
 
         <div className="text-center py-6 border-t border-border/50">
           <p className="text-xs text-text-muted">
-            AudienceLens 致力于保护您的数据隐私与安全
+            {t('page.privacy.footer.desc')}
           </p>
         </div>
       </div>

@@ -19,6 +19,7 @@ import {
   type HealthConfig,
   type SharedReport,
   type UploadConfig,
+  type ConfidenceCalibration,
   type HitRate,
   type Identity,
   type IntentResult,
@@ -281,6 +282,15 @@ export function getReviewJobId(reviewId: string): string | null {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // i18n 注入点：将来要发 Accept-Language 就加在这一行下面，全站唯一 fetch 出口。
+  //
+  // **本期刻意不发**（docs/I18N_CONTRACT.md D3）：后端没有任何代码会读它
+  // （错误消息目录本期不做）。发一个没有消费方的请求头，唯一的效果是让下一个人
+  // 打开 DevTools 看到 `Accept-Language: en` 之后以为语言已经传下去了，
+  // 然后花半天找"为什么后端不生效"。那是把"没做"伪装成"做了"。
+  //
+  // 另：评审产出物的语言走 POST body 的 report_lang 显式字段，不走这里——
+  // 协商语义（"我偏好"）和声明语义（"这次就用它"）不是一回事。
   const headers = new Headers(init.headers)
   if (!headers.has('Content-Type') && init.body && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
@@ -292,7 +302,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${BASE}${path}`, { ...init, headers })
   } catch {
-    throw new ApiError(0, 'upstream_error', '无法连接后端服务，请确认服务已启动。')
+    throw new ApiError(
+      0,
+      'upstream_error',
+      '无法连接后端服务，请确认服务已启动。',
+      undefined,
+      'zh-CN', // 这句是前端自己写的中文，如实标注语种，别让 tApiError 去猜
+    )
   }
 
   if (res.status === 204) return undefined as T
@@ -306,13 +322,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    const err = (body as { error?: { code: ApiErrorCode; message: string; detail?: unknown } })
-      ?.error
+    const err = (
+      body as {
+        error?: {
+          code: ApiErrorCode
+          message: string
+          detail?: unknown
+          /** 后端标注的 message 语种。老响应没有这个字段，保持 undefined = 未知。 */
+          message_lang?: string
+        }
+      }
+    )?.error
     throw new ApiError(
       res.status,
       err?.code ?? 'internal_error',
       err?.message ?? `请求失败（HTTP ${res.status}）`,
       err?.detail,
+      // 兜底那条 message 是我们自己在这里写的中文，语种是确定的，如实标注。
+      err?.message_lang ?? (err?.message === undefined ? 'zh-CN' : undefined),
     )
   }
   return body as T
@@ -359,6 +386,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
     }),
+
+  /** 登出所有设备：作废该账号已签发的全部令牌。
+   *
+   *  与 changePassword 不同，这里**不会**换一把新令牌给本设备——本设备也会
+   *  被登出。用户点这个按钮的语境是"我不确定哪台设备是我的"，"除了你都踢掉"
+   *  需要他信任当前设备，而他正因为不确定才点的。
+   *  调用方拿到响应后必须 setToken(null) 并跳回登录页。 */
+  revokeAllSessions: () =>
+    request<{ revoked: boolean }>('/api/auth/sessions/revoke-all', { method: 'POST' }),
 
   /** 改昵称。邮箱不在这里改——那要走"向新地址发验证信"的两步流程。 */
   updateProfile: (displayName: string) =>
@@ -486,6 +522,7 @@ export const api = {
     mode?: ReviewMode
     persona_pack?: PersonaPack
     selected_personas?: string[]
+    adaptive_panel?: boolean
     skill_type?: string | null
     project_key?: string | null
     /** 评审完成后自动运行 8 维质量评估 */
@@ -671,6 +708,12 @@ export const api = {
 
   hitRate: (personaId?: string) =>
     request<HitRate>(`/api/ledger/hit-rate${personaId ? `?persona_id=${personaId}` : ''}`),
+
+  /** 置信度校准。hitRate 回答"说中了几次"，这个回答"说自己有把握时准不准"。 */
+  calibration: (personaId?: string) =>
+    request<ConfidenceCalibration>(
+      `/api/ledger/calibration${personaId ? `?persona_id=${personaId}` : ''}`,
+    ),
 
   leaderboard: () => request<{ personas: LeaderboardEntry[] }>('/api/ledger/leaderboard'),
 

@@ -30,6 +30,110 @@ VALID_VERDICTS = ("hit", "miss", "partial", "unknown")
 MIN_SAMPLES_FOR_CONFIDENCE = 10
 
 
+def _calibration_metrics(rows) -> dict:
+    """Compute reliability metrics from (confidence, verdict) observations."""
+    observations = []
+    verdict_value = {"hit": 1.0, "partial": 0.5, "miss": 0.0}
+    for confidence, verdict in rows:
+        if confidence is None or verdict not in verdict_value:
+            continue
+        try:
+            predicted = max(0.0, min(1.0, float(confidence)))
+        except (TypeError, ValueError):
+            continue
+        observations.append((predicted, verdict_value[verdict]))
+
+    bins = []
+    calibration_error = 0.0
+    for index in range(5):
+        lower = index / 5
+        upper = (index + 1) / 5
+        members = [
+            (predicted, observed)
+            for predicted, observed in observations
+            if (
+                (lower <= predicted <= upper)
+                if index == 4
+                else (lower <= predicted < upper)
+            )
+        ]
+        if not members:
+            bins.append({
+                "lower": lower, "upper": upper, "sample_size": 0,
+                "mean_confidence": None, "observed_hit_score": None, "gap": None,
+            })
+            continue
+        mean_confidence = sum(item[0] for item in members) / len(members)
+        observed_score = sum(item[1] for item in members) / len(members)
+        gap = abs(mean_confidence - observed_score)
+        calibration_error += gap * len(members)
+        bins.append({
+            "lower": lower,
+            "upper": upper,
+            "sample_size": len(members),
+            "mean_confidence": round(mean_confidence, 3),
+            "observed_hit_score": round(observed_score, 3),
+            "gap": round(gap, 3),
+        })
+
+    sample_size = len(observations)
+    mean_confidence = (
+        sum(item[0] for item in observations) / sample_size if sample_size else None
+    )
+    observed_score = (
+        sum(item[1] for item in observations) / sample_size if sample_size else None
+    )
+    brier_score = (
+        sum((predicted - observed) ** 2 for predicted, observed in observations) / sample_size
+        if sample_size else None
+    )
+    low_confidence = sample_size < MIN_SAMPLES_FOR_CONFIDENCE
+    return {
+        "sample_size": sample_size,
+        "mean_predicted_confidence": round(mean_confidence, 3) if mean_confidence is not None else None,
+        "observed_hit_score": round(observed_score, 3) if observed_score is not None else None,
+        "brier_score": round(brier_score, 4) if brier_score is not None else None,
+        "expected_calibration_error": (
+            round(calibration_error / sample_size, 4) if sample_size else None
+        ),
+        "bins": bins,
+        "low_confidence": low_confidence,
+        "note": (
+            f"样本量 {sample_size} < {MIN_SAMPLES_FOR_CONFIDENCE}，校准指标仅供参考，不具统计意义"
+            if low_confidence else None
+        ),
+    }
+
+
+def confidence_calibration(
+    db: Session, user_id: Optional[str], persona_id: str = None
+) -> dict:
+    """Compare predicted confidence with verified outcomes.
+
+    ``partial`` maps to 0.5, ``hit`` to 1, and ``miss`` to 0. Unknown outcomes
+    and judgments without confidence are excluded and counted explicitly.
+    """
+    q = db.query(Judgment.confidence, Outcome.verdict).join(
+        Outcome, Outcome.judgment_id == Judgment.id
+    )
+    if user_id is not None:
+        q = q.filter(Judgment.user_id == user_id)
+    if persona_id:
+        q = q.filter(Judgment.persona_id == persona_id)
+    all_rows = q.all()
+    metrics = _calibration_metrics(all_rows)
+    metrics.update({
+        "persona_id": persona_id,
+        "verified_rows": len(all_rows),
+        "excluded_rows": len(all_rows) - metrics["sample_size"],
+        "outcome_mapping": {"hit": 1.0, "partial": 0.5, "miss": 0.0},
+        "confidence_source": (
+            "synthetic_panel_heuristic_pending_empirical_recalibration"
+        ),
+    })
+    return metrics
+
+
 def extract_judgments_from_report(report: dict) -> List[dict]:
     """从评审报告里抽出可证伪的预测。
 
@@ -38,6 +142,34 @@ def extract_judgments_from_report(report: dict) -> List[dict]:
     """
     out = []
     seen = set()
+
+    # 新报告优先使用显式可证伪预测。旧报告没有 predictions 时继续走下方兼容路径。
+    for prediction in report.get("predictions", []) or []:
+        claim = (prediction.get("claim") or "").strip()
+        if not claim or claim in seen:
+            continue
+        seen.add(claim)
+        out.append(
+            {
+                "persona_id": None,
+                "claim": claim,
+                "severity": prediction.get("severity"),
+                "confidence": prediction.get("confidence"),
+                "evidence": {
+                    key: prediction.get(key)
+                    for key in (
+                        "prediction_id", "type", "issue", "intervention", "target_metric",
+                        "direction", "comparison", "success_criterion", "verification_window",
+                        "verification_method", "confidence_basis", "affected_personas",
+                        "evidence", "is_synthetic",
+                    )
+                    if prediction.get(key) is not None
+                },
+            }
+        )
+
+    if out:
+        return out
 
     for fix in report.get("priority_fixes", []) or []:
         claim = (fix.get("title") or fix.get("issue") or "").strip()
@@ -90,7 +222,11 @@ def record_judgments(db: Session, review: Review, report: dict) -> int:
                 claim=r["claim"][:2000],
                 severity=r.get("severity"),
                 confidence=r.get("confidence"),
-                evidence={"note": r.get("evidence")} if r.get("evidence") else None,
+                evidence=(
+                    r.get("evidence")
+                    if isinstance(r.get("evidence"), dict)
+                    else ({"note": r.get("evidence")} if r.get("evidence") else None)
+                ),
                 predicted_at=now,
             )
         )

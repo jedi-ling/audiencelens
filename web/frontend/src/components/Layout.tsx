@@ -4,18 +4,29 @@ import { cn } from '@/lib/utils'
 import { Menu, X, User, LogOut, Settings, ChevronDown } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
 import { api } from '@/lib/apiClient'
+import { t } from '@/i18n/runtime'
+import { useLocale } from '@/i18n/locale'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
-const navItems = [
-  { path: '/', label: '首页' },
-  { path: '/ask', label: '对话评审' },
-  { path: '/history', label: '评审历史' },
-  { path: '/ledger', label: '判断复利' },
-  { path: '/tutorial', label: '使用教程' },
-  { path: '/skills', label: '技能中心' },
-  { path: '/task-types', label: '任务类型' },
-  { path: '/personas', label: '角色' },
-  { path: '/plans', label: '定价' },
-  { path: '/settings', label: '设置' },
+/**
+ * 导航项。
+ *
+ * 存的是 **key 不是文案**：这个数组在模块求值时就固定了，存翻译结果的话
+ * 切换语言不会重新求值，导航条会一直停在打开页面时的那种语言。
+ * 同理，任何模块级常量里的文案都必须存 key，在渲染处才 t()。
+ */
+const navItems: { path: string; labelKey: PlainMessageKey }[] = [
+  { path: '/', labelKey: 'nav.item.home' },
+  { path: '/ask', labelKey: 'nav.item.ask' },
+  { path: '/history', labelKey: 'nav.item.history' },
+  { path: '/ledger', labelKey: 'nav.item.ledger' },
+  { path: '/tutorial', labelKey: 'nav.item.tutorial' },
+  { path: '/skills', labelKey: 'nav.item.skills' },
+  { path: '/task-types', labelKey: 'nav.item.task_types' },
+  { path: '/personas', labelKey: 'nav.item.personas' },
+  { path: '/plans', labelKey: 'nav.item.plans' },
+  { path: '/settings', labelKey: 'nav.item.settings' },
 ]
 
 /** 全页背景图映射：13 个路由循环复用 4 张高质量素材图。
@@ -66,6 +77,10 @@ function getBgForRoute(path: string): string | undefined {
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
+  // 订阅 ui_lang：t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
+  // Layout 是根布局，订阅在这里就够全站顶栏/页脚跟着变；页面各自也要订阅
+  // （或者用了 useDocumentTitle 就已经间接订阅了）。
+  useLocale()
   const isCreatePage = location.pathname === '/review/new'
   // 对话评审是全高聊天界面，footer 会把页面顶出视口、抢滚动条
   const isAskPage = location.pathname === '/ask'
@@ -145,6 +160,17 @@ export default function Layout() {
     setAccountOpen(false)
   }, [location.pathname])
 
+  // 抽屉打开时锁定 body 滚动，否则矮屏手机上手滑滚动的是被遮罩盖住的背景页面，
+  // 抽屉本身内容又滚不动。Layout 几乎不会卸载，cleanup 以关闭抽屉为主要触发点。
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen])
+
   // Esc 键关闭移动端菜单
   useEffect(() => {
     if (!menuOpen) return
@@ -156,7 +182,7 @@ export default function Layout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-clip relative" style={{ isolation: 'auto' }}>
+    <div className="min-h-screen flex flex-col overflow-x-clip relative bg-black" style={{ isolation: 'auto' }}>
       {/* 全页背景图：按路由切换，position:fixed 铺满视口，滚动时纹丝不动。
          只对非 landing 页生效——landing 有自己的视频+粒子背景，不要叠加。
          z-index -1 让它落在所有内容之下。 */}
@@ -202,7 +228,7 @@ export default function Layout() {
                         : 'text-text-secondary hover:text-text-primary'
                     )}
                   >
-                    <span>{item.label}</span>
+                    <span>{t(item.labelKey)}</span>
                     <span
                       className={cn(
                         'absolute bottom-0.5 left-1/2 -translate-x-1/2 h-[3px] rounded-full bg-brand-primary transition-all duration-300',
@@ -219,9 +245,16 @@ export default function Layout() {
                 to="/review/new"
                 className="flex items-center px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap shrink-0 bg-brand-primary text-white hover:bg-brand-primary-dim transition-all"
               >
-                <span>新建评审</span>
+                <span>{t('nav.item.create_review')}</span>
               </Link>
             )}
+
+            {/* 语言切换器。只在 VITE_AL_LOCALES 配了多种语言时才渲染出东西
+                （判断在组件内部），默认构建下这里是 null，顶栏宽度一个像素都不变。
+                位置放在主按钮与账户区之间：它是"设置类"控件，不该挤进导航项里
+                抢主导航的横向空间——顶栏 10 个导航项本来就已经很满。
+                本体是图标 + 两字母码，约 48px，是这一排里最窄的控件。 */}
+            <LanguageSwitcher />
 
             {loggedIn ? (
               <div className="relative shrink-0">
@@ -229,7 +262,7 @@ export default function Layout() {
                   onClick={() => setAccountOpen((v) => !v)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap text-text-secondary hover:text-text-primary transition-all"
                   aria-expanded={accountOpen}
-                  aria-label="账户菜单"
+                  aria-label={t('nav.account.menu_aria')}
                 >
                   <User className="w-4 h-4" strokeWidth={1.5} />
                   <span className="max-w-[8rem] truncate">{identity?.email}</span>
@@ -247,14 +280,14 @@ export default function Layout() {
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary hover:bg-bg-card-hover hover:text-text-primary transition-colors"
                       >
                         <Settings className="w-4 h-4" strokeWidth={1.5} />
-                        设置
+                        {t('nav.account.settings')}
                       </Link>
                       <button
                         onClick={handleLogout}
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-colors"
                       >
                         <LogOut className="w-4 h-4" strokeWidth={1.5} />
-                        退出登录
+                        {t('nav.account.logout')}
                       </button>
                     </div>
                   </>
@@ -270,13 +303,13 @@ export default function Layout() {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
                 >
                   <User className="w-4 h-4" strokeWidth={1.5} />
-                  <span>游客</span>
+                  <span>{t('nav.account.guest')}</span>
                 </Link>
                 <Link
                   to="/login"
                   className="flex items-center px-3 py-2 rounded-lg text-sm whitespace-nowrap shrink-0 text-text-secondary hover:text-text-primary transition-all"
                 >
-                  <span>登录</span>
+                  <span>{t('nav.account.login')}</span>
                 </Link>
               </>
             )}
@@ -284,10 +317,10 @@ export default function Layout() {
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="菜单"
+            aria-label={t('nav.menu.toggle_aria')}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
-            className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-card transition-colors"
+            className="lg:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-card transition-colors"
           >
             {menuOpen ? (
               <X className="w-5 h-5" strokeWidth={1.25} />
@@ -309,7 +342,7 @@ export default function Layout() {
             id="mobile-menu"
             role="dialog"
             aria-modal="true"
-            aria-label="导航菜单"
+            aria-label={t('nav.menu.drawer_aria')}
             className="absolute left-0 top-0 bottom-0 w-64 bg-bg-card border-r border-black/[0.06] shadow-2xl animate-fade-in flex flex-col pt-20 px-4"
           >
             {visibleNavItems.map((item) => {
@@ -328,7 +361,7 @@ export default function Layout() {
                       : 'text-text-secondary hover:text-text-primary hover:bg-bg-card-hover'
                   )}
                 >
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </Link>
               )
             })}
@@ -339,7 +372,7 @@ export default function Layout() {
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center justify-center px-4 py-3 mt-4 rounded-full text-sm font-medium bg-brand-primary text-white hover:bg-brand-primary-dim transition-all"
               >
-                <span>新建评审</span>
+                <span>{t('nav.item.create_review')}</span>
               </Link>
             )}
 
@@ -354,7 +387,7 @@ export default function Layout() {
                   className="flex w-full items-center gap-2 px-4 py-3 rounded-xl text-sm text-text-secondary hover:bg-severity-critical/10 hover:text-severity-critical transition-all"
                 >
                   <LogOut className="w-4 h-4" strokeWidth={1.5} />
-                  退出登录
+                  {t('nav.account.logout')}
                 </button>
               </div>
             ) : (
@@ -363,16 +396,26 @@ export default function Layout() {
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center px-4 py-3 mt-2 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-all"
               >
-                <span>登录</span>
+                <span>{t('nav.account.login')}</span>
               </Link>
             )}
+
+            {/* 抽屉里是平铺版（不叠浮层）。同样只在多语言构建下才出现。 */}
+            <LanguageSwitcher variant="drawer" />
 
             <Link
               to="/privacy"
               onClick={() => setMenuOpen(false)}
-              className="mt-4 flex items-center gap-3 border-t border-black/5 px-4 py-3 pt-5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
+              className="mt-4 flex shrink-0 items-center gap-3 border-t border-black/5 px-4 py-3 pt-5 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
             >
-              <span>隐私政策</span>
+              <span>{t('nav.footer.privacy')}</span>
+            </Link>
+            <Link
+              to="/terms"
+              onClick={() => setMenuOpen(false)}
+              className="flex shrink-0 items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-all"
+            >
+              <span>{t('nav.footer.terms')}</span>
             </Link>
           </nav>
         </div>
@@ -382,11 +425,11 @@ export default function Layout() {
         // 过期 token 之前会静默退回匿名——用户只会莫名其妙发现自己"没登录了"，
         // 不知道发生了什么。这里显式说明，且不挡内容（可关闭）。
         <div className="flex items-center justify-center gap-3 border-b border-warm-orange/30 bg-warm-orange/10 px-4 py-2 text-sm text-warm-orange">
-          <span>登录已过期，请重新登录</span>
+          <span>{t('nav.session.expired')}</span>
           <Link to="/login" className="font-medium underline underline-offset-2 hover:text-text-primary" onClick={dismissSessionExpired}>
-            去登录
+            {t('nav.session.cta')}
           </Link>
-          <button onClick={dismissSessionExpired} className="ml-1 text-warm-orange/70 hover:text-warm-orange" aria-label="关闭提示">
+          <button onClick={dismissSessionExpired} className="ml-1 text-warm-orange/70 hover:text-warm-orange" aria-label={t('nav.session.dismiss_aria')}>
             <X className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
         </div>
@@ -398,21 +441,28 @@ export default function Layout() {
         // 产品本来就这么小气，而真正的动作（去邮箱点一下）是免费且立刻生效的。
         // 故意不给关闭按钮：关掉之后用户下次撞上限额仍然不知道原因。
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-cyan/30 bg-cyan/10 px-4 py-2 text-sm text-cyan">
+          {/* reviews_limit 是 number | null。原来直接渲染 {usage.reviews_limit}，
+              null 会渲染成空字符串，句子变成"每天只能评审  次。"——外化时被 t()
+              的类型逼出来的既有坑。不写成 ?? 0：那是在向用户断言一个不成立的数字。 */}
           <span>
-            邮箱尚未验证，每天只能评审 {usage.reviews_limit} 次。验证后解锁完整额度。
+            {typeof usage.reviews_limit === 'number'
+              ? t('nav.verify_banner.hint', { count: usage.reviews_limit })
+              : t('nav.verify_banner.hint_unknown')}
           </span>
           <button
             onClick={() => void resendVerifyEmail()}
             disabled={resendState === 'sending'}
             className="font-medium underline underline-offset-2 hover:text-text-primary disabled:opacity-60 disabled:no-underline"
           >
+            {/* 四态各一条 key，不是插值——三元里的分支条件是行为逻辑，
+                不该被 i18n 层吃掉。见 zh/nav.verify_banner.ts 的文件头。 */}
             {resendState === 'sending'
-              ? '发送中…'
+              ? t('nav.verify_banner.sending')
               : resendState === 'sent'
-                ? '已发送，请查收（含垃圾箱）·点此再发一次'
+                ? t('nav.verify_banner.success')
                 : resendState === 'failed'
-                  ? '发送失败，点此重试'
-                  : '重新发送验证邮件'}
+                  ? t('nav.verify_banner.error')
+                  : t('nav.verify_banner.cta')}
           </button>
         </div>
       )}
@@ -422,7 +472,7 @@ export default function Layout() {
       </main>
 
       {!isAskPage && (
-      <footer className="relative border-t border-white/[0.06] py-10 shrink-0 bg-black/60 backdrop-blur-md">
+      <footer className="relative z-[2] bg-black border-t border-white/[0.06] py-10 shrink-0">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-1 items-center md:items-start">
             <div className="flex items-center gap-2">
@@ -437,7 +487,7 @@ export default function Layout() {
               </span>
             </div>
             <span className="text-xs text-text-muted">
-              多代理合成用户评审系统
+              {t('nav.footer.tagline')}
             </span>
           </div>
 
@@ -448,14 +498,20 @@ export default function Layout() {
                 to={item.path}
                 className="text-xs text-text-muted hover:text-text-secondary transition-colors"
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             ))}
             <Link
               to="/privacy"
               className="text-xs text-text-muted hover:text-text-secondary transition-colors"
             >
-              隐私政策
+              {t('nav.footer.privacy')}
+            </Link>
+            <Link
+              to="/terms"
+              className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+            >
+              {t('nav.footer.terms')}
             </Link>
           </nav>
 
@@ -466,6 +522,18 @@ export default function Layout() {
             <span className="text-[10px] text-text-muted">
               © 2026 AudienceLens
             </span>
+            {/* ICP 备案号。工信部要求：在网站首页**底部**公示，且必须超链接到
+                beian.miit.gov.cn（《互联网信息服务管理办法》）。
+                target/rel 是安全惯例——noopener 防止新标签页通过 window.opener
+                回改本页。 */}
+            <a
+              href="https://beian.miit.gov.cn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+            >
+              苏ICP备2025198057号
+            </a>
           </div>
         </div>
       </footer>

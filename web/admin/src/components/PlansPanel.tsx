@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Tags } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminPlan, PlanEditableField } from '@/lib/types'
+import { PanelShell, PanelError, PanelEmpty, PanelLoading } from './panel'
 
 const FIELD_LABELS: Record<PlanEditableField, string> = {
   price_usd_month: '月价 (USD)',
@@ -15,12 +16,14 @@ const ALL_FIELDS = Object.keys(FIELD_LABELS) as PlanEditableField[]
 
 export function PlansPanel() {
   const [plans, setPlans] = useState<AdminPlan[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       setPlans((await adminApi.plans()).plans)
+      setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -59,15 +62,13 @@ export function PlansPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Tags className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-        套餐
-        <span className="font-mono text-[10px] font-normal text-text-muted">可编辑，改动无需重启</span>
-      </h2>
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+    <PanelShell icon={Tags} title="套餐" hint="可编辑，改动无需重启">
+      <PanelError>{error}</PanelError>
+
+      {!loaded && !error && <PanelLoading />}
 
       <div className="mt-4 space-y-4">
+        {loaded && plans.length === 0 && <PanelEmpty />}
         {plans.map((plan) => (
           <div key={plan.id} className="rounded-lg border border-border bg-bg-primary/60 p-3">
             <div className="mb-2 flex items-center gap-2">
@@ -128,6 +129,6 @@ export function PlansPanel() {
           </div>
         ))}
       </div>
-    </section>
+    </PanelShell>
   )
 }

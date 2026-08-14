@@ -486,6 +486,34 @@ class TestJobsAndReviewsInspection:
         r = client.get("/api/admin/reviews/does-not-exist", headers=_headers())
         assert r.status_code == 404
 
+    def test_review_detail_view_is_audited(self, client, monkeypatch, db):
+        """隐私政策原话："为处理客诉、排查滥用……运营方可以查看评审内容……
+        这类访问会记入后台审计日志"。report_json 全文都在这个端点里，
+        它就是政策那句话点名的对象——必须留痕，且要记下看的是哪份材料。
+        """
+        from app.models import Review
+
+        _enable_admin(monkeypatch)
+        review = Review(
+            user_id="anonymous",
+            task_type="concept_review",
+            artifact_bundle={},
+            status="completed",
+            target_title="不能被静默查看的材料",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+
+        client.get(f"/api/admin/reviews/{review.id}", headers=_headers())
+
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        hit = [e for e in entries if e["action"] == "review.view_detail" and e["target"] == review.id]
+        assert hit, "打开了评审内容，但审计日志里没有留痕"
+        assert hit[0]["detail"]["target_title"] == "不能被静默查看的材料", (
+            "留痕了但没带上看的是哪份材料——复盘时还得再反查一次数据库"
+        )
+
 
 class TestUserManagement:
     def _make_user(self, db, email="managed@example.com", plan="free"):

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminPersonaPackStat, AdminTaskTypeStat } from '@/lib/types'
+import { PanelShell, PanelError, PanelEmpty, PanelLoading, SubHeading } from './panel'
 
 /** 任务类型分布——水平条形图（完成/失败/其它 三色分段），无第三方图表库。 */
 export function TaskTypeStatsPanel() {
   const [taskTypes, setTaskTypes] = useState<AdminTaskTypeStat[]>([])
   const [packs, setPacks] = useState<AdminPersonaPackStat[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -14,6 +16,7 @@ export function TaskTypeStatsPanel() {
       const [tt, pp] = await Promise.all([adminApi.statsTaskTypes(), adminApi.statsPersonaPacks()])
       setTaskTypes(tt.task_types)
       setPacks(pp.persona_packs)
+      setLoaded(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
@@ -27,15 +30,13 @@ export function TaskTypeStatsPanel() {
   const maxPack = Math.max(1, ...packs.map((p) => p.total))
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <BarChart3 className="h-4 w-4 text-cyan" strokeWidth={1.5} />
-        任务类型 / 人格包分布
-      </h2>
-      {error && <p className="mt-2 font-mono text-xs text-severity-critical">{error}</p>}
+    <PanelShell icon={BarChart3} iconTone="text-cyan" title="任务类型 / 人格包分布">
+      <PanelError>{error}</PanelError>
+
+      {!loaded && !error && <PanelLoading />}
 
       <div className="mt-4 space-y-2">
-        {taskTypes.length === 0 && <p className="py-4 text-center text-xs text-text-muted">暂无评审数据</p>}
+        {loaded && taskTypes.length === 0 && <PanelEmpty />}
         {taskTypes.map((t) => {
           const other = t.total - t.completed - t.failed
           const width = (t.total / maxTotal) * 100
@@ -85,6 +86,6 @@ export function TaskTypeStatsPanel() {
           </div>
         </>
       )}
-    </section>
+    </PanelShell>
   )
 }

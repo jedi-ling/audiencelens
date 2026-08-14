@@ -75,8 +75,13 @@ services:
       # 危险默认值的逃生舱（只在确实要这么跑时才设 true）
       - AL_ALLOW_SHARED_ANONYMOUS=${AL_ALLOW_SHARED_ANONYMOUS:-false}
       - AL_ALLOW_CONSOLE_MAIL=${AL_ALLOW_CONSOLE_MAIL:-false}
+    # 指向 /api/health/ready 而不是 /api/health：后者返回的 "ok" 是写死的字符串，
+    # 数据库挂掉、磁盘满、连接池耗尽时它照样 200，容器会一直被判定为 healthy
+    # ——编排器不会有任何反应，而用户那边每个页面都在报错。
+    # ready 会真打一次 SELECT 1，不可用时返回 503（urlopen 收到 503 抛 HTTPError，
+    # 非零退出，healthcheck 因此判定失败）。
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready',timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3

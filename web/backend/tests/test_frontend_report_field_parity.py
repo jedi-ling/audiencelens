@@ -192,3 +192,93 @@ def test_min_personas_for_agreement_is_actually_rendered():
         "min_personas_for_agreement 只在类型声明里出现，没有在 JSX 里真的读它、"
         "渲染出「判定口径：同一议题被 ≥K/N 位人格各自独立提出」这句话"
     )
+
+
+# ============================== 报告顶层字段 ==============================
+#
+# 上面四条各自守着一个**子对象**（consensus / shared_concerns /
+# next_human_test / panel_selection）。它们守不住的是另一件事：
+# 引擎在报告上加了一个**新的顶层键**，前端一个字都不改。
+#
+# 这不是假想。adaptive_panel 与 predictions 两个顶层字段上线时，schema 声明了、
+# 引擎产出了、后端存了，而 ReportPage / SharedReportPage 一个都没接——
+# 整套测试（含上面四条）依然全绿，两个新能力在界面上完全不存在。
+# 这条测试就是补这个洞。
+#
+# 事实源用 report-schema.json 而不是正则扒 cli.py：schema 是这个仓库对报告
+# 形状的**声明式契约**，validator.py 真的拿它校验引擎输出。扒源码则要跟着
+# 赋值写法变，改个写法测试就瞎了。
+
+REPORT_SCHEMA = os.path.join(REPO_ROOT, "src", "schemas", "report-schema.json")
+SHARED_REPORT_PAGE = os.path.join(FRONTEND_SRC, "pages", "SharedReportPage.tsx")
+
+# 顶层字段里**故意**不在报告页渲染的。每一条都要写清楚为什么，
+# 否则这份清单会变成"把测试调绿"的垃圾桶。
+TOP_LEVEL_KNOWN_UNRENDERED = {
+    # 预算是运营/成本侧数据，报告页展示的是评审结论。成本在用量页与后台看。
+    "budget",
+}
+
+# 公开分享页是**白名单**渲染，刻意只给陌生人看结论层，
+# 所以它不参与"顶层字段必须都渲染"的比对——那会逼着把内部字段也公开出去。
+# 这里只单独钉住它必须保留的那几块（见 test_shared_page_keeps_its_whitelist）。
+
+
+def _schema_top_level_keys() -> set:
+    import json
+
+    with open(REPORT_SCHEMA, encoding="utf-8") as fh:
+        schema = json.load(fh)
+    keys = set(schema.get("properties", {}))
+    assert keys, "report-schema.json 里没解析出任何顶层 properties，路径或结构可能变了"
+    return keys
+
+
+def test_every_top_level_report_field_is_rendered_somewhere():
+    """schema 声明的顶层字段，报告页必须真的读它。
+
+    "读它"的判定是字段名在 ReportPage.tsx 里出现——粒度粗是有意的：
+    这条测试要防的是"整块功能在界面上不存在"，不是审查渲染得好不好。
+    粒度太细的话正常重构就会误报，一条会叫狼的测试活不过三次。
+    """
+    schema_keys = _schema_top_level_keys()
+    report = _read(REPORT_PAGE)
+
+    missing = {
+        key for key in schema_keys
+        if key not in TOP_LEVEL_KNOWN_UNRENDERED and not re.search(r"\b%s\b" % re.escape(key), report)
+    }
+    assert not missing, (
+        f"report-schema.json 声明了顶层字段 {sorted(missing)}，"
+        "但 ReportPage.tsx 里一次都没出现——引擎产出了，用户却看不到。\n"
+        "这正是 adaptive_panel / predictions 上线时发生过的事：schema 有、引擎有、"
+        "后端存了，界面上完全不存在，而所有测试都是绿的。\n"
+        "要么在报告页接上它，要么加进 TOP_LEVEL_KNOWN_UNRENDERED 并写明为什么不接。"
+    )
+
+
+def test_top_level_exclusions_are_not_stale():
+    """反向对照：豁免清单里的字段必须还真的在 schema 里。
+
+    引擎删掉一个字段后，豁免条目会变成一条没人会去清理的注释，
+    下一个人读到它会以为"这个功能存在但故意不展示"。
+    """
+    stale = TOP_LEVEL_KNOWN_UNRENDERED - _schema_top_level_keys()
+    assert not stale, (
+        f"TOP_LEVEL_KNOWN_UNRENDERED 里的 {sorted(stale)} 已经不在 report-schema.json 里了，"
+        "请把这条从清单里删掉"
+    )
+
+
+def test_shared_page_keeps_its_whitelist():
+    """公开分享页是白名单渲染，但白名单里那几块不能被重构悄悄删掉。
+
+    这里刻意**不**要求它渲染全部顶层字段——公开页给陌生人看，
+    多渲染一个字段就是多泄漏一层信息。只钉住"结论层必须还在"。
+    """
+    shared = _read(SHARED_REPORT_PAGE)
+    for key in ("executive_summary", "consensus", "priority_fixes", "persona_notes"):
+        assert re.search(r"\b%s\b" % key, shared), (
+            f"SharedReportPage.tsx 不再渲染 {key}——公开分享页少了结论层，"
+            "拿到链接的人会看到一个空壳报告"
+        )

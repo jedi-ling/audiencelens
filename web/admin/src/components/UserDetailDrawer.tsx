@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { KeyRound, Receipt, X } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import type { AdminUserDetail } from '@/lib/types'
+import { PanelLoading, EmptyPill, MiniStat } from './panel'
 
 const STATUS_COLOR: Record<string, string> = {
   completed: 'text-brand-primary',
@@ -39,21 +40,23 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
   const grantedTotal = (data?.cdk_redemptions ?? []).reduce((s, r) => s + r.credits, 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60" onClick={onClose}>
       <aside
-        className="h-full w-full max-w-2xl overflow-y-auto border-l border-border bg-bg-card p-6"
+        /* 宽度与 DetailDrawer 同档位：窄屏近乎全宽，sm 起限到 max-w-lg */
+        className="h-full w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-l border-border bg-bg-secondary p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="truncate font-mono text-sm text-text-primary">
+            <h2 className="truncate font-mono text-sm font-semibold text-text-primary">
               {data?.email ?? '加载中…'}
             </h2>
             <p className="mt-0.5 font-mono text-[10px] text-text-muted">{userId}</p>
           </div>
           <button
             onClick={onClose}
-            className="shrink-0 rounded-md border border-border p-1.5 text-text-muted hover:text-text-primary"
+            aria-label="关闭"
+            className="shrink-0 rounded-md border border-border p-1.5 text-text-muted hover:border-border-hover hover:text-text-primary transition-colors"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
@@ -61,18 +64,20 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
 
         {error && <p className="mt-4 font-mono text-xs text-severity-critical">{error}</p>}
 
+        {!data && !error && <PanelLoading />}
+
         {data && (
           <>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              <Cell label="套餐" value={data.plan} />
-              <Cell label="状态" value={data.is_active ? '正常' : '已停用'} bad={!data.is_active} />
-              <Cell label="评审总数" value={String(data.reviews.total)} />
-              <Cell label="次数余额" value={String(data.credit_balance)} />
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MiniStat label="套餐" value={data.plan} />
+              <MiniStat label="状态" value={data.is_active ? '正常' : '已停用'} tone={data.is_active ? 'muted' : 'bad'} />
+              <MiniStat label="评审总数" value={String(data.reviews.total)} />
+              <MiniStat label="次数余额" value={String(data.credit_balance)} />
             </div>
 
             <Section title="评审状态分布">
               {Object.keys(data.reviews.by_status).length === 0 ? (
-                <Empty>这个用户还没有跑过任何评审</Empty>
+                <EmptyPill>这个用户还没有跑过任何评审</EmptyPill>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(data.reviews.by_status).map(([status, n]) => (
@@ -91,7 +96,7 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
 
             <Section title="用量按 key 来源拆分">
               {data.usage_by_key_source.length === 0 ? (
-                <Empty>还没有任何用量记录</Empty>
+                <EmptyPill>还没有任何用量记录</EmptyPill>
               ) : (
                 <table className="w-full font-mono text-[11px]">
                   <thead className="text-text-muted">
@@ -120,7 +125,7 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
 
             <Section title="BYOK 密钥" icon={<KeyRound className="h-3.5 w-3.5" strokeWidth={1.5} />}>
               {data.api_keys.length === 0 ? (
-                <Empty>没有配置自带密钥——这个用户走的是平台 key</Empty>
+                <EmptyPill>没有配置自带密钥——这个用户走的是平台 key</EmptyPill>
               ) : (
                 <ul className="space-y-1.5">
                   {data.api_keys.map((k, i) => (
@@ -152,7 +157,7 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
 
             <Section title="兑换记录" icon={<Receipt className="h-3.5 w-3.5" strokeWidth={1.5} />}>
               {data.cdk_redemptions.length === 0 ? (
-                <Empty>没有兑换过任何码</Empty>
+                <EmptyPill>没有兑换过任何码</EmptyPill>
               ) : (
                 <>
                   <ul className="space-y-1">
@@ -178,7 +183,7 @@ export function UserDetailDrawer({ userId, onClose }: { userId: string; onClose:
 
             <Section title={`最近评审（${data.reviews.recent.length}）`}>
               {data.reviews.recent.length === 0 ? (
-                <Empty>没有评审记录</Empty>
+                <EmptyPill>没有评审记录</EmptyPill>
               ) : (
                 <ul className="space-y-1">
                   {data.reviews.recent.map((r) => (
@@ -220,32 +225,11 @@ function Section({
 }) {
   return (
     <div className="mt-5">
-      <p className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted">
+      <p className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary">
         {icon}
         {title}
       </p>
       {children}
     </div>
-  )
-}
-
-function Cell({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
-  return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-2.5">
-      <p className="font-mono text-[10px] text-text-muted">{label}</p>
-      <p
-        className={`mt-0.5 font-mono text-sm ${bad ? 'text-severity-critical' : 'text-text-primary'}`}
-      >
-        {value}
-      </p>
-    </div>
-  )
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-lg border border-border bg-bg-secondary px-3 py-3 text-center text-xs text-text-muted">
-      {children}
-    </p>
   )
 }

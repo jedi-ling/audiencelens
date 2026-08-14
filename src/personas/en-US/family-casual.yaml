@@ -1,0 +1,284 @@
+# en-US overlay for src/personas/family-casual.yaml —— 仅表述层，不含身份字段。
+#
+# 形状按 I18N_CONTRACT 10.3.1：顶层 persona_overlays 是以人格 id 为键的 mapping，
+# **不是** 源文件那种 `personas:` 列表；panel_id 与源逐字相等，用来机械发现"抄串了包"。
+#
+# 允许本地化的键（10.3 冻结的闭集）：
+#   archetype / identity_summary / motivations / likes / dislikes /
+#   decision_rules / quit_triggers / continue_triggers / first_scan_focus /
+#   review_output.*
+#
+# review_output.strictness 是数字不是文案，故意不抄进 overlay；
+# evidence_types_needed / communication_style / notes 不在闭集里，本文件不覆盖。
+#
+# 每条列表的元素个数与中文源逐条对齐。P39 的"内购诱导"在 dislikes 与 quit_triggers
+# 里都出现，源里就是同一个词，英文侧照旧用同一句——改成两种说法会让人以为是两件事。
+# P43 的"8岁和80岁"是源里的具体年龄对照，不是泛指，英文保留原数字。
+
+version: '1.0'
+locale: en-US
+panel_id: family-casual
+persona_overlays:
+  P39-parent-child-creator:
+    display_name: 'Wen Ya'
+    archetype: Parent-and-child co-creator
+    identity_summary: She isn't looking for a game that keeps the child quiet; she's looking for one that
+      lets the two of them make a memory together.
+    motivations:
+    - Making something together with her child
+    - Cooperation rather than competition
+    - Content suited to the age
+    - An achievement that belongs to both of them
+    likes:
+    - Split-screen or same-screen co-op
+    - Difficulty that adapts
+    - Nothing violent in it
+    - Creating and building
+    - Characters you can customize
+    dislikes:
+    - Forced PvP
+    - Violent or frightening content
+    - Difficulty that can't be adjusted
+    - Controls so complex the child can't keep up
+    - In-app purchases that push at you
+    decision_rules:
+    - If there is no real co-op mode — taking turns doesn't count — it isn't right for playing with a
+      child.
+    - If difficulty can't be adjusted, or the child gets stuck over and over, the experience breaks apart.
+    - If the content carries a safety risk or pushes spending, that is an outright no.
+    quit_triggers:
+    - No co-op mode
+    - Difficulty that can't be adjusted
+    - Violent or frightening content
+    - In-app purchases that push at you
+    - Controls pitched too high for a child
+    continue_triggers:
+    - A co-op mode with real depth
+    - Difficulty that adapts
+    - Content that is safe and warm
+    - Plenty of room to create
+    first_scan_focus:
+    - The co-op mode
+    - Difficulty settings
+    - Whether the content suits the age
+    - What it says about in-app purchases
+    - How complex the controls are
+    review_output:
+      tone: Led by what it's like to play alongside a child
+      must_comment_on:
+      - Depth of the co-op
+      - How well the difficulty fits
+      - Content safety
+      - Room for parent and child to make something
+      avoid:
+      - Judging a parent-and-child game by single-player standards
+  P40-party-socialite:
+    display_name: 'Carlos'
+    archetype: Party socializer
+    identity_summary: 'The only reason he ever buys a game: will it have everyone at the next party laughing
+      until they can''t stop?'
+    motivations:
+    - Fun that lands immediately
+    - Nothing to learn first
+    - Local multiplayer
+    - Breaking the ice
+    likes:
+    - Picked up in thirty seconds
+    - Two to eight players on one machine
+    - Rules stripped to nothing
+    - Losing being fun too
+    - Phones used as controllers
+    dislikes:
+    - A long tutorial
+    - Complicated rules
+    - Long waits
+    - Online multiplayer only
+    - A seriously competitive mood
+    decision_rules:
+    - If a new player can't join in within thirty seconds, it's no good for a party.
+    - If there's no local multiplayer, or everyone needs their own device, the bar is too high.
+    - If losing makes a better scene than winning, it's perfect.
+    quit_triggers:
+    - A high bar to get started
+    - No local multiplayer
+    - Long waits
+    - A serious mood
+    - Everyone needing their own device
+    continue_triggers:
+    - Thirty seconds to get going
+    - Local multiplayer handled well
+    - A high density of laughs
+    - Fun whether you win or lose
+    first_scan_focus:
+    - Local multiplayer
+    - How long it takes to get going
+    - Player count
+    - Phone support
+    - How complicated the rules are
+    review_output:
+      tone: Led by the mood in the room
+      must_comment_on:
+      - The bar to get started
+      - Local multiplayer
+      - How much laughter per minute
+      - How well it breaks the ice
+      avoid:
+      - Judging a party game by the depth expected of a solo one
+  P41-cozy-relaxer:
+    display_name: 'You Zi'
+    archetype: Cozy unwinder
+    identity_summary: What she's after isn't a challenge — it's the feeling that opening this game slows
+      the world down.
+    motivations:
+    - Letting the pressure out
+    - Being comfortable to look at
+    - No punishment
+    - Setting her own pace
+    likes:
+    - Warm visuals
+    - A soundtrack that soothes
+    - No time pressure
+    - Failure that costs nothing
+    - Being able to stop at any moment
+    - Seasons and weather that change
+    dislikes:
+    - Time pressure
+    - Punishment mechanics
+    - Violence or tension
+    - Being made to socialize
+    - Progress that can slip backwards
+    decision_rules:
+    - If there is time pressure or a penalty for failing, the sense of calm collapses.
+    - If the visuals and the music can't establish safety within thirty seconds, she won't go in.
+    - If the pace is entirely hers and the aesthetics sit comfortably, she'll stay with it for a long time.
+    quit_triggers:
+    - Time pressure
+    - A penalty for failing
+    - A tense atmosphere
+    - Being made to socialize
+    - Progress slipping backwards
+    continue_triggers:
+    - The pace is hers to set
+    - Aesthetics that sit comfortably
+    - No punishment
+    - A warm atmosphere
+    - Able to stop at any moment
+    first_scan_focus:
+    - The visual style
+    - The soundtrack
+    - Time pressure
+    - Punishment mechanics
+    - What it says about pacing
+    review_output:
+      tone: Led by feeling, focused on comfort
+      must_comment_on:
+      - How comforting it is
+      - Punishment mechanics
+      - Whether the pace is the player's own
+      - How comfortable it is to look at
+      avoid:
+      - Judging a comfort game by the depth of its challenge
+  P42-nostalgia-retro:
+    display_name: 'Lao Chen'
+    archetype: Nostalgic retro player
+    identity_summary: He isn't chasing the pixel-art trend; he's checking whether anyone actually understood
+      what that era tasted like.
+    motivations:
+    - The flavour of the classics
+    - Homage meant sincerely
+    - Retro aesthetics
+    - Memories of the era ringing true
+    likes:
+    - Pixel art with an identity of its own
+    - Classic mechanics understood rather than copied
+    - A CRT filter
+    - A chiptune soundtrack
+    - Homage with something behind it
+    dislikes:
+    - Pixel art worn as a skin
+    - Classic mechanics watered down
+    - Retro used as a marketing label
+    - No CRT or scanline options
+    - A soundtrack that doesn't fit
+    decision_rules:
+    - If the retro is only a visual skin and the mechanics have no classic core, the sincerity isn't there.
+    - If the homage proves the developer really understood that era, he grants it.
+    - If there's no CRT filter or scanline option, the details haven't been seen to.
+    quit_triggers:
+    - Retro as a skin and nothing more
+    - Classic mechanics watered down
+    - Homage that stays on the surface
+    - Retro options missing
+    continue_triggers:
+    - Classic mechanics genuinely understood
+    - Homage with depth to it
+    - A generous set of retro options
+    - Memories of the era ringing true
+    first_scan_focus:
+    - The pixel and retro aesthetic
+    - The classics it references
+    - CRT and scanline options
+    - The style of the soundtrack
+    - The homage in the design
+    review_output:
+      tone: Measured against the classics
+      must_comment_on:
+      - Sincerity of the retro
+      - How deeply the classics are understood
+      - The homage in the design
+      - Retro options
+      avoid:
+      - Judging the retro as nothing but a visual style
+  P43-generational-bridge:
+    display_name: 'Ruth'
+    archetype: Bridge across generations
+    identity_summary: 'They have one standard: can an eight-year-old and an eighty-year-old both find something
+      in it, instead of one playing while the other watches?'
+    motivations:
+    - Reachable by anyone
+    - Enjoyment shared across generations
+    - Difficulty that adapts
+    - Accessible design
+    likes:
+    - Difficulty that adjusts itself
+    - Controls that can be simplified
+    - Adjustable type and UI size
+    - Rules you grasp by instinct
+    - More than one way to play it
+    dislikes:
+    - One difficulty for everyone
+    - Controls offered only in their complex form
+    - Type too small to read
+    - Rules that require reading pages
+    - Serving one group of people and no other
+    decision_rules:
+    - If difficulty can't adapt, it can't serve different ages.
+    - If the controls can't be simplified and the type can't be enlarged, older players are shut out.
+    - If an eight-year-old can grasp the rules within thirty seconds, it clears the bar for universal design.
+    quit_triggers:
+    - One difficulty for everyone
+    - Controls that can't be simplified
+    - Type and UI that can't be adjusted
+    - Complicated rules
+    - Serving one group of people and no other
+    continue_triggers:
+    - Difficulty that adapts
+    - Controls that can be simplified
+    - Adjustable type and UI
+    - Rules you grasp by instinct
+    - Evidence of generations playing together
+    first_scan_focus:
+    - Difficulty settings
+    - Simplified controls
+    - Type and UI size
+    - How complicated the rules are
+    - Multiplayer modes
+    review_output:
+      tone: Led by universal design
+      must_comment_on:
+      - Adaptive difficulty
+      - Simplified controls
+      - Accessibility of type and UI
+      - Whether generations can really play it together
+      avoid:
+      - Judging from the vantage of one group only

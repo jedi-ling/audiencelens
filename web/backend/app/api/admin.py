@@ -833,6 +833,11 @@ async def user_detail(user_id: str, db: Session = Depends(get_db)):
     if not u:
         raise NotFound("用户不存在")
 
+    # 隐私政策明确写了"这类访问会记入后台审计日志"——列表页（/users）不记，
+    # 因为它不含评审内容；这个端点会带出 recent 评审标题，属于政策里说的
+    # "查看评审内容"，必须留痕，否则政策那句话就是空话。
+    audit_log_service.record(db, "user.view_detail", u.email)
+
     review_status = dict(
         db.query(Review.status, func.count(Review.id))
         .filter(Review.user_id == user_id)
@@ -1226,9 +1231,19 @@ async def list_reviews(
 
 @router.get("/reviews/{review_id}")
 async def review_detail(review_id: str, db: Session = Depends(get_db)):
+    """带出 report_json 全文——用户材料与评审结论都在里面。
+
+    隐私政策就是照着这个端点写的："为处理客诉、排查滥用、核对计费争议，
+    运营方可以查看评审内容……这类访问会记入后台审计日志"。target_title 记进
+    审计详情而不是只记 review_id：出事复盘时一眼能看出看的是哪份材料，
+    不用再反查一次数据库。
+    """
     r = db.get(Review, review_id)
     if not r:
         raise NotFound("评审不存在")
+    audit_log_service.record(
+        db, "review.view_detail", review_id, {"target_title": r.target_title}
+    )
     return {
         **_review_row(r),
         "persona_pack": r.persona_pack,

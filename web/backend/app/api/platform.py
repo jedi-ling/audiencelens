@@ -12,7 +12,9 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -36,6 +38,7 @@ from app.deps import (
 )
 from app.models import Job, Review, User
 from app.services import (
+    admin_settings_service,
     intent_service,
     job_service,
     key_service,
@@ -54,9 +57,71 @@ router = APIRouter()
 # ============================== 健康检查 ==============================
 
 @router.get("/health")
-async def health():
-    """探活 + 当前生效的链路开关（绝不泄露密钥）。"""
-    return {"status": "ok", "config": settings.sanitized()}
+async def health(db: Session = Depends(get_db)):
+    """探活 + 当前生效的链路开关（绝不泄露密钥）。
+
+    这条**不做依赖探测**（不判断数据库健不健康），是纯进程存活语义，
+    用于容器 healthcheck 之类"进程还在不在"的场景。要判断"服务是不是
+    真的能用"，用 /health/ready。
+
+    但它确实要读一次库，因为下面两项能在后台面板运行时覆盖：
+
+      · key_mode           —— admin_settings 表里的覆盖值（key_service.resolve_key
+                              读的就是它，不是 env）
+      · server_key_present —— 后台面板设的平台 key 存在**数据库**里
+                              （PLATFORM_KEY_OWNER 那行），而 settings.server_llm_key
+                              只是 env 里的 ANTHROPIC_API_KEY
+
+    不合成的话会出现这个具体故障：运营在后台配好平台 key、把 key_mode 切成
+    managed，前端拿到的仍是启动时的快照（byok / server_key_present=false），
+    于是 session-store 的 canReview() 判定为 false，"发起评审"按钮是灰的——
+    而后端 resolve_key 明明已经能解析出 key，跑得起来。
+    后台点了没反应、又没有任何报错，是最难排查的一类。
+
+    读库失败不该让存活探测跟着失败（那是 /health/ready 的职责），
+    所以这里回落到 env 快照并打日志。
+    """
+    config = settings.sanitized()
+    try:
+        config["key_mode"] = admin_settings_service.get(db, "key_mode", settings.key_mode)
+        config["server_key_present"] = bool(
+            settings.server_llm_key or key_service.get_platform_key_status(db)
+        )
+    except Exception as exc:  # noqa: BLE001  存活探测不因读库失败而失败
+        logger.warning("health: 读运行时覆盖值失败，回落 env 快照：%s", exc)
+    return {"status": "ok", "config": config}
+
+
+@router.get("/health/ready")
+async def health_ready(db: Session = Depends(get_db)):
+    """就绪探测：真的打一次数据库，不可用时返回 503。
+
+    为什么需要单独一条：上面的 /health 返回的 "ok" 是写死的字符串，
+    数据库挂掉、磁盘满、连接池耗尽时它**照样 200**。拿它接 UptimeRobot
+    这类外部监控，监控到的只是"uvicorn 进程还活着"——而用户看到的是
+    每个页面都在报错。这正是"监控一片绿、服务全挂"的经典形态。
+
+    刻意只查数据库，不查上游模型服务商：
+      · 上游是按调用计费的，健康检查每分钟打一次会产生真实账单
+      · 上游抖动不该让本服务被判定为宕机（评审会失败，但站点是能用的）
+    上游的可用性通过后台「系统健康度」的失败率趋势事后观察，不做实时探测。
+
+    不需要鉴权：外部监控探针没有令牌，加了鉴权就没法用了。
+    响应里也刻意不含任何业务数据，只有 ok/error 两种形态。
+    """
+    try:
+        # SELECT 1 是最轻的连通性探测：不读表、不加锁、不受数据量影响。
+        # 用 text() 显式包一层——SQLAlchemy 2.x 不再接受裸字符串 SQL。
+        db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001  连通性探测要抓所有异常
+        # 把异常类型带出去（不带消息——消息里可能有连接串/主机名）。
+        # 监控告警里能看到 OperationalError 还是 TimeoutError，排查方向完全不同。
+        logger.error("readiness probe failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "checks": {"database": type(exc).__name__}},
+        )
+    return {"status": "ok", "checks": {"database": "ok"}}
 
 
 # ============================== 认证（埋线）==============================
@@ -361,6 +426,43 @@ async def change_password(
     # 换新令牌让**本设备**继续用，其他设备上的旧会话则已作废。
     # 这正是改密码该有的语义：把别人踢出去，自己不用重登。
     return {"changed": True, "token": token}
+
+
+@router.post("/auth/sessions/revoke-all", dependencies=[Depends(rate_limit("auth", 20, 3600))])
+async def revoke_all_sessions(
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """登出所有设备：作废该账号当前已签发的全部 JWT。
+
+    为什么单独给一个入口，而不是让用户去改密码：
+    用户怀疑账号被盗时，第一反应是"把别人踢下线"，而改密码要求他先想出并
+    记住一个新密码——多一道摩擦，且在慌乱时最容易被拖延。撤销会话是止血，
+    改密码是治本，两件事不该被绑成一件。
+
+    这个能力对 BYOK 用户尤其重要：账号里存着他自己的模型 API Key，
+    会话被盗意味着别人能拿他的 key 跑评审花钱（虽然看不到明文）。
+
+    **本设备也会被登出**，前端拿到响应后要清掉本地令牌跳回登录页。
+    刻意不像 change_password 那样顺手换一把新令牌给本设备：
+    用户点这个按钮的语境是"我不确定哪台设备是我的"，此时"除了你都踢掉"
+    是个需要他信任当前设备的假设——而他正因为不确定才点的。
+    全部登出、重新登一次，语义上没有歧义。
+
+    要做到"看得见有哪些设备、逐个踢"需要为每次登录存一条会话记录
+    （设备/IP/最后活跃）。那是另一件事：新表、新数据，而且存 IP 要同步
+    改隐私政策。这里先给出安全价值最大的那一半。
+    """
+    _require_auth_enabled()
+    _require_own_identity(identity)
+    user = db.get(User, identity.user_id)
+    if not user:
+        raise NotFound("账号不存在")
+
+    revoke_user_sessions(db, user.id)
+    audit_target = user.email
+    logger.info("user %s revoked all sessions", audit_target)
+    return {"revoked": True}
 
 
 class UpdateProfileRequest(BaseModel):
@@ -1240,6 +1342,62 @@ def _valid_persona_packs() -> set:
     return {pid for pid, personas in packs.items() if personas}
 
 
+def _validate_artifact(artifact: dict) -> None:
+    """入队**前**把材料包的形状问题拦下来。
+
+    此前 artifact 只声明成 `dict`，没有任何结构校验。形状写错时的实际表现是：
+    接口 200 收下 → 评审入队 → 跑到最后抛 AllPersonasFailedError，
+    错误消息是「本次没有任何人格进入评审（预设面板为空，或全部被证据预检
+    跳过）」——指向的是人格面板，而真正的原因是**材料里根本没有 materials
+    数组**（evidence_precheck.load_evidence_types 只读这个键，读不到就等于
+    没有任何证据类型，于是全部人格被跳过）。
+
+    这个失败形态有三重代价：
+      · 用户/接入方按错误提示去查人格配置，方向完全是错的
+      · 用平台 key 时已经占了一次配额（放行瞬间就预留）
+      · 真跑起来的话还会产生模型调用费用
+
+    实测踩过一次：传 {"text": "..."} 而不是 {"materials": [...]}，
+    全程无警告，直到最后才失败。校验放在入队前，错误说清楚该怎么改。
+
+    刻意只校验**形状**，不校验内容长短：材料多短算够用是引擎的判断
+    （evidence_precheck 的 coverage 阈值），不该在 API 层再设一道
+    口径不同的门槛。
+    """
+    materials = artifact.get("materials")
+    if materials is None:
+        raise BadRequest(
+            "artifact 缺少 materials 数组。正确形状："
+            '{"title": "标题", "materials": [{"type": "text", "text": "材料正文"}]}。'
+            "只传 title 或把正文直接放在 artifact 顶层都不行——评审会因为读不到"
+            "任何证据而把全部人格跳过，最终失败。"
+        )
+    if not isinstance(materials, list):
+        raise BadRequest(f"artifact.materials 必须是数组，收到的是 {type(materials).__name__}")
+    if not materials:
+        raise BadRequest("artifact.materials 是空数组，没有任何材料可供评审")
+
+    for i, m in enumerate(materials):
+        if not isinstance(m, dict):
+            raise BadRequest(f"artifact.materials[{i}] 必须是对象，收到的是 {type(m).__name__}")
+        mtype = m.get("type")
+        if not mtype:
+            raise BadRequest(f'artifact.materials[{i}] 缺少 type（文本材料用 "text"，图片用 "image"）')
+        if mtype == "image":
+            if not m.get("image_data"):
+                raise BadRequest(f"artifact.materials[{i}] 是图片但没有 image_data")
+        elif not (m.get("text") or m.get("description")):
+            # 这里点名 text 是因为引擎读的就是它（runner/cli.py 组装
+            # artifact_texts 时取 description or text）。写成别的键名不会报错，
+            # 只会让人格收到一份空材料——照样调用模型、照样计费、
+            # 产出一份基于空白的报告。那比直接失败更糟。
+            raise BadRequest(
+                f'artifact.materials[{i}] 缺少 text（文本材料的正文字段名是 "text"）。'
+                "用别的键名不会报错，但人格会收到空材料——照样调用模型、照样计费，"
+                "产出一份基于空白的报告。"
+            )
+
+
 class CreateReviewRequest(BaseModel):
     task_type: str
     artifact: dict = Field(description="材料包：{title, materials:[{type,text}]}")
@@ -1257,6 +1415,8 @@ class CreateReviewRequest(BaseModel):
     enable_evaluation: bool = False
     # 追加红队对抗视角提示（与 skill_type 独立——选了别的技能也能叠加红队）
     enable_red_team: bool = False
+    # 自动面板才可用；显式 selected_personas 时引擎保留全员并在报告中解释禁用原因。
+    adaptive_panel: bool = False
 
 
 # 路径不能用 /skills/quota —— api/__init__.py 已经有 /api/skills/{skill_type}，
@@ -1311,6 +1471,9 @@ async def create_review_v2(
         raise BadRequest(f"未知任务类型：{body.task_type}")
     if body.mode not in intent_service.VALID_MODES:
         raise BadRequest(f"未知模式：{body.mode}")
+    # 放在配额检查**之前**：材料形状错了不该白占一次配额
+    # （check_quota 在放行的瞬间就预留名额，见 _reserve_review_slot）。
+    _validate_artifact(body.artifact)
     # persona_pack 拼错此前静默回落 game-core——用户选 A 包，跑的是 B 包。
     # 报告的每一条人格都来自 B 包，而用户以为看到的是 A 包的视角。
     persona_pack = (body.persona_pack or "game-core").strip()
@@ -1346,6 +1509,7 @@ async def create_review_v2(
         project_key=body.project_key,
         enable_evaluation=body.enable_evaluation,
         enable_red_team=enable_red_team,
+        adaptive_panel=body.adaptive_panel,
         key_source=resolved.source,
         mode=body.mode,
         status="pending",
@@ -1433,6 +1597,7 @@ async def get_review_v2(
         "mode": review.mode,
         "persona_pack": review.persona_pack,
         "selected_personas": review.selected_personas,
+        "adaptive_panel": review.adaptive_panel,
         "skill_type": review.skill_type,
         "project_key": review.project_key,
         "status": review.status,
@@ -1954,6 +2119,17 @@ async def hit_rate(
     """历史命中率。样本不足时会如实标注 low_confidence。"""
     require_isolated_identity(identity)
     return ledger_service.hit_rate(db, identity.user_id, persona_id)
+
+
+@router.get("/ledger/calibration")
+async def confidence_calibration(
+    persona_id: Optional[str] = None,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """置信度与真实回填结果的可靠性：Brier 分数、ECE 与分箱明细。"""
+    require_isolated_identity(identity)
+    return ledger_service.confidence_calibration(db, identity.user_id, persona_id)
 
 
 @router.get("/ledger/leaderboard")

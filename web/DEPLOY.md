@@ -111,9 +111,32 @@ docker compose logs -f backend
 # 手动备份（自动备份由 install-backup-cron.sh 装的 crontab 定时跑）
 ./deploy/backup.sh
 
-# 查看/确认自动备份已装
-crontab -l | grep audiencelens-backup
+# 恢复演练：把最新备份恢复到临时库校验后删掉，**不碰生产库**。
+# install-backup-cron.sh 已经把它装成每周一次；这条是手动跑一次确认能通过。
+./deploy/restore.sh --drill
+
+# 真恢复（会先备份当前库、先演练一遍、再要求手输 RESTORE 确认）
+./deploy/restore.sh --to-production backups/reviews-YYYYmmdd-HHMMSS.db.gz
+
+# 查看/确认自动备份与演练都已装
+crontab -l | grep -E 'audiencelens-backup|audiencelens-restore-drill'
 ```
+
+## 健康检查（接外部监控用哪个）
+
+两条端点分工不同，接错了监控会一直显示绿色：
+
+| 端点 | 查什么 | 用在哪 |
+|---|---|---|
+| `GET /api/health` | 只回写死的 `ok` + 配置快照，**不碰数据库** | 容器 healthcheck（"进程还在不在"） |
+| `GET /api/health/ready` | 真打一次 `SELECT 1`，库不可用时返 **503** | 外部监控（UptimeRobot 等） |
+
+拿 `/api/health` 接 UptimeRobot 是个常见错误：数据库挂了它照样 200，
+监控一片绿而用户那边每个页面都在报错。**外部监控一律指向 `/api/health/ready`。**
+
+`/health/ready` 刻意不探上游模型服务商——上游按调用计费，每分钟探一次会产生
+真实账单；而且上游抖动不该让站点被判定为宕机（评审会失败，但站点是能用的）。
+上游可用性看后台「系统健康度」的失败率趋势。
 
 ## 关键事实（排障先看这里）
 

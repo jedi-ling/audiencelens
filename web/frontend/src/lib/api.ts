@@ -1,6 +1,13 @@
 import type { Review, ReviewListItem, Report, Persona, PersonaPack, Preset, WSMessage, Example, ReviewModeConfig, TaskTypeDetail, ReviewResultData, SkillType, SkillDetail, EvaluationScorecard, EthicsReport } from './mock-data'
 import { getToken, ApiError } from './apiClient'
 import type { ApiErrorCode } from './types'
+import { t } from '@/i18n/runtime'
+import { getHtmlLang, getLocale } from '@/i18n/locale'
+import type { PlainMessageKey } from '@/i18n/keys.gen'
+
+/** t() 的重载要求带插值的 key 必须传 vars；这里只喂无插值的 key，收窄一下签名，
+ *  免得每个调用点都写一个没有意义的空对象。同 i18n/api-error.ts 的写法。 */
+const tPlain = t as unknown as (key: PlainMessageKey) => string
 
 /** v1 链路统一出口：所有请求都带上登录态——
  *  后端按身份归属/裁剪数据，漏带 token 的调用会拿到匿名视角（见 fetchReport 的教训）。 */
@@ -51,7 +58,8 @@ function detailToMessage(detail: unknown): string | null {
           : null,
       )
       .filter((m): m is string => Boolean(m && m.trim()))
-    if (msgs.length) return msgs.join('；')
+    // 分隔符跟界面语言走：全角分号出现在英文句子里是排版错误。
+    if (msgs.length) return msgs.join(tPlain('error.fetch.separator'))
   }
   if (detail && typeof detail === 'object') {
     const m = (detail as { message?: unknown }).message
@@ -60,8 +68,15 @@ function detailToMessage(detail: unknown): string | null {
   return null
 }
 
-/** 读响应体、翻译成 ApiError。fallback 只在后端什么原因都没给时兜底。 */
-async function toApiError(res: Response, fallback: string): Promise<ApiError> {
+/** 读响应体、翻译成 ApiError。fallbackKey 只在后端什么原因都没给时兜底。
+ *
+ *  第五个实参是 messageLang——**这条 message 是什么语种**的如实标注，
+ *  由 tApiError 据此决定要不要把它显示在界面上（契约 D2）。三条分支各有各的答案：
+ *    · AppError 信封  → 后端自己标的 message_lang；老响应没有这个字段就保持 undefined
+ *    · HTTPException  → 自由文本，没有任何字段说它是什么语种，**不许猜**，留 undefined
+ *    · 兜底那一句     → 是我们自己在前端拼的，语种就是当前 ui_lang，确定，如实标注
+ *  不标注的后果不是"少一个字段"，是英文界面上混排中文而没有人发现。 */
+async function toApiError(res: Response, fallbackKey: PlainMessageKey): Promise<ApiError> {
   let body: unknown = null
   try {
     const text = await res.text()
@@ -70,18 +85,32 @@ async function toApiError(res: Response, fallback: string): Promise<ApiError> {
     body = null // 非 JSON（网关 HTML 错误页之类）：走 fallback，别把页面搞崩
   }
 
-  const structured = (body as { error?: { code?: ApiErrorCode; message?: string; detail?: unknown } } | null)?.error
+  const structured = (
+    body as {
+      error?: { code?: ApiErrorCode; message?: string; detail?: unknown; message_lang?: string }
+    } | null
+  )?.error
   if (structured?.message) {
-    return new ApiError(res.status, structured.code ?? 'internal_error', structured.message, structured.detail)
+    return new ApiError(
+      res.status,
+      structured.code ?? 'internal_error',
+      structured.message,
+      structured.detail,
+      structured.message_lang,
+    )
   }
 
   const detail = (body as { detail?: unknown } | null)?.detail
   const message = detailToMessage(detail)
+  if (message !== null) {
+    return new ApiError(res.status, STATUS_TO_CODE[res.status] ?? 'internal_error', message, detail)
+  }
   return new ApiError(
     res.status,
     STATUS_TO_CODE[res.status] ?? 'internal_error',
-    message ?? `${fallback}（HTTP ${res.status}）`,
+    t('error.fetch.http_status', { message: tPlain(fallbackKey), status: res.status }),
     detail,
+    getHtmlLang(getLocale()),
   )
 }
 
@@ -125,7 +154,7 @@ export async function fetchReviewsPage(
   limit: number = REVIEWS_PAGE_SIZE,
 ): Promise<ReviewsPage> {
   const res = await authedFetch(`/api/reviews?offset=${offset}&limit=${limit}`)
-  if (!res.ok) throw await toApiError(res, '加载评审列表失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.review_list')
   const items = (await res.json()) as ReviewListItem[]
 
   const raw = res.headers.get('X-Total-Count')
@@ -167,31 +196,31 @@ export async function fetchReviewsAll(): Promise<{
 
 export async function fetchReview(id: string): Promise<Review> {
   const res = await authedFetch(`/api/reviews/${id}`)
-  if (!res.ok) throw await toApiError(res, '加载评审失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.review')
   return res.json()
 }
 
 export async function fetchReport(reviewId: string): Promise<{ report_json: Report; report_markdown: string; calibration: unknown }> {
   const res = await authedFetch(`/api/reviews/${reviewId}/report`)
-  if (!res.ok) throw await toApiError(res, '加载报告失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.report')
   return res.json()
 }
 
 export async function fetchPersonas(): Promise<Persona[]> {
   const res = await authedFetch('/api/personas')
-  if (!res.ok) throw await toApiError(res, '加载人格列表失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.personas')
   return res.json()
 }
 
 export async function fetchPersonaPacks(): Promise<PersonaPack[]> {
   const res = await authedFetch('/api/personas/packs')
-  if (!res.ok) throw await toApiError(res, '加载人格包失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.persona_packs')
   return res.json()
 }
 
 export async function fetchExamples(): Promise<Example[]> {
   const res = await authedFetch('/api/examples')
-  if (!res.ok) throw await toApiError(res, '加载示例失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.examples')
   return res.json()
 }
 
@@ -206,38 +235,38 @@ export async function extractMaterials(taskType: string, file: File): Promise<{ 
   })
   // 这个端点的错误最值得原样透出：加密 PDF / 纯图片扫描件 / 编码不对，
   // 后端都写明了用户该怎么办
-  if (!res.ok) throw await toApiError(res, '解析文件失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.extract_materials')
   return res.json()
 }
 
 export async function deleteReview(id: string): Promise<void> {
   const res = await authedFetch(`/api/reviews/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw await toApiError(res, '删除评审失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.delete_review')
 }
 
 
 export async function fetchTaskTypes(): Promise<TaskTypeDetail[]> {
   const res = await authedFetch('/api/task-types')
-  if (!res.ok) throw await toApiError(res, '加载任务类型失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.task_types')
   return res.json()
 }
 
 export async function fetchTaskType(taskType: string): Promise<TaskTypeDetail> {
   const res = await authedFetch(`/api/task-types/${taskType}`)
-  if (!res.ok) throw await toApiError(res, '加载任务类型失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.task_types')
   return res.json()
 }
 
 export async function fetchReviewModes(): Promise<ReviewModeConfig[]> {
   const res = await authedFetch('/api/review-modes')
-  if (!res.ok) throw await toApiError(res, '加载评审模式失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.review_modes')
   return res.json()
 }
 
 
 export async function fetchReviewResult(reviewId: string): Promise<ReviewResultData> {
   const res = await authedFetch(`/api/reviews/${reviewId}/result`)
-  if (!res.ok) throw await toApiError(res, '加载评审结果失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.review_result')
   return res.json()
 }
 
@@ -245,26 +274,26 @@ export async function fetchReviewResult(reviewId: string): Promise<ReviewResultD
  * SkillDetail 是错的，也从来没人调用过；技能中心页现在以它为"哪些技能可用"的事实源。 */
 export async function fetchSkills(): Promise<{ skill_type: string; name: string; description: string }[]> {
   const res = await authedFetch('/api/skills')
-  if (!res.ok) throw await toApiError(res, '加载技能列表失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.skills')
   return res.json()
 }
 
 
 export async function runEvaluation(reviewId: string): Promise<EvaluationScorecard> {
   const res = await authedFetch(`/api/evaluations/${reviewId}`, { method: 'POST' })
-  if (!res.ok) throw await toApiError(res, '运行质量评估失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.run_evaluation')
   return res.json()
 }
 
 export async function fetchEvaluation(reviewId: string): Promise<EvaluationScorecard> {
   const res = await authedFetch(`/api/evaluations/${reviewId}`)
-  if (!res.ok) throw await toApiError(res, '加载质量评估失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.evaluation')
   return res.json()
 }
 
 export async function fetchEthicsReport(reviewId: string): Promise<EthicsReport[]> {
   const res = await authedFetch(`/api/evaluations/${reviewId}/ethics`)
-  if (!res.ok) throw await toApiError(res, '加载伦理检查失败')
+  if (!res.ok) throw await toApiError(res, 'error.fetch.ethics')
   return res.json()
 }
 

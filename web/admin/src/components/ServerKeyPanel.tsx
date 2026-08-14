@@ -3,6 +3,7 @@ import { Lock, Wifi, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { adminApi } from '@/lib/adminClient'
 import { OPENAI_COMPATIBLE_PRESETS } from '@/lib/types'
 import type { AdminServerKeyStatus, TestConnectionResult } from '@/lib/types'
+import { PanelShell, PanelDesc, PanelError } from './panel'
 
 type Provider = 'anthropic' | 'openai_compatible'
 type TestStatus = 'idle' | 'testing' | 'success' | 'error'
@@ -101,16 +102,11 @@ export function ServerKeyPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-bg-card p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-        <Lock className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-        平台级 API Key
-        <span className="font-mono text-[10px] font-normal text-text-muted">managed/hybrid 模式垫付用</span>
-      </h2>
-      <p className="mt-1 text-xs text-text-muted">
+    <PanelShell icon={Lock} title="平台级 API Key" hint="managed/hybrid 模式垫付用">
+      <PanelDesc>
         托管模式下服务端垫付的 key。支持 Anthropic 原生或任意 OpenAI 兼容服务（DeepSeek / Kimi / 通义千问 / 智谱 GLM /
         Ollama 等）。点击「测试」验证连接是否可用。
-      </p>
+      </PanelDesc>
 
       <div className="mt-4 flex gap-2 font-mono text-xs">
         {(['anthropic', 'openai_compatible'] as Provider[]).map((p) => (
@@ -128,7 +124,7 @@ export function ServerKeyPanel() {
         ))}
       </div>
 
-      {error && <p className="mt-3 font-mono text-xs text-severity-critical">{error}</p>}
+      {error && <PanelError>{error}</PanelError>}
 
       {status?.configured ? (
         <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-primary/30 bg-bg-primary px-4 py-3">
@@ -177,7 +173,7 @@ export function ServerKeyPanel() {
       )}
 
       {provider === 'openai_compatible' && (
-        <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-3">
           {OPENAI_COMPATIBLE_PRESETS.map((preset) => (
             <button
               key={preset.id}
@@ -197,7 +193,7 @@ export function ServerKeyPanel() {
 
       {/* 模型 ID + API Base：两个服务商都能填。anthropic 留空则按人格分级自动选型，
           但也支持指定具体模型、或填第三方中转/代理地址——不是只有 OpenAI 兼容才有这种场景。 */}
-      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input
           type="text"
           value={model}
@@ -251,6 +247,6 @@ export function ServerKeyPanel() {
         </button>
       </div>
       {saved && <p className="mt-2 font-mono text-xs text-brand-primary">已保存</p>}
-    </section>
+    </PanelShell>
   )
 }

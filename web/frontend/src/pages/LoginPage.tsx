@@ -1,12 +1,17 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogIn } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
+import { t, Trans } from '@/i18n/runtime'
+import { useDocumentTitle } from '@/i18n/head'
+import { tApiError } from '@/i18n/api-error'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const login = useSessionStore((s) => s.login)
   const identity = useSessionStore((s) => s.identity)
+  // 顺带订阅了 ui_lang（内部 useLocale），切语言时整页重新求值 t()
+  useDocumentTitle('page.login.meta.title')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,7 +33,9 @@ export default function LoginPage() {
       await login(email.trim(), password)
       navigate('/ask') // 落进应用而不是营销落地页
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败')
+      // tApiError 而不是 err.message：后者在网络层会把 "Failed to fetch" 原样甩给用户，
+      // 在英文界面上还会把后端中文原文并排显示出来。
+      setError(tApiError(err, 'page.login.submit.error'))
     } finally {
       setBusy(false)
     }
@@ -38,17 +45,19 @@ export default function LoginPage() {
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center px-6 py-16">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
         <LogIn className="h-6 w-6 text-brand-primary" strokeWidth={1.5} />
-        <h1 className="text-xl font-semibold text-text-primary font-display">登录</h1>
-        <p className="text-sm text-text-secondary">登录后可以查看完整评审报告、保存你的评审历史</p>
+        <h1 className="text-xl font-semibold text-text-primary font-display">
+          {t('page.login.header.title')}
+        </h1>
+        <p className="text-sm text-text-secondary">{t('page.login.header.desc')}</p>
       </div>
 
       {/* 必须是真的 <form>：此前是一堆 input + 一个 onClick 的 div 式提交，
           代价不只是"不够规范"——回车提交要靠每个输入框自己挂 onKeyDown（漏一个就不灵）、
           浏览器和密码管理器认不出这是登录表单（不提示保存、自动填充后无法提交）、
           读屏软件也拿不到表单语义。 */}
-      <form onSubmit={submit} className="rounded-xl border border-border bg-bg-card p-6">
+      <form onSubmit={submit} className="rounded-xl border border-white/[0.08] bg-black/30 p-6">
         <label htmlFor="login-email" className="block text-xs text-text-muted">
-          邮箱
+          {t('page.login.email.label')}
         </label>
         <input
           id="login-email"
@@ -58,12 +67,12 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
-          placeholder="you@example.com"
+          placeholder={t('page.login.email.placeholder')}
           autoFocus
         />
 
         <label htmlFor="login-password" className="mt-4 block text-xs text-text-muted">
-          密码
+          {t('page.login.password.label')}
         </label>
         <input
           id="login-password"
@@ -73,7 +82,7 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="mt-1 w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none focus:border-brand-primary transition-colors"
-          placeholder="········"
+          placeholder={t('page.login.password.placeholder')}
         />
 
         <div className="mt-2 text-right">
@@ -81,7 +90,7 @@ export default function LoginPage() {
             to="/forgot-password"
             className="text-xs text-text-muted underline underline-offset-2 hover:text-brand-primary"
           >
-            忘记密码？
+            {t('page.login.forgot.link')}
           </Link>
         </div>
 
@@ -95,17 +104,27 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy || !email.trim() || !password}
-          className="mt-5 w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
+          className="mt-6 flex h-11 w-full items-center justify-center rounded-lg bg-brand-primary text-sm font-semibold text-white hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
         >
-          {busy ? '登录中…' : '登录'}
+          {busy ? t('page.login.submit.pending') : t('page.login.submit.cta')}
         </button>
       </form>
 
       <p className="mt-4 text-center text-sm text-text-muted">
-        还没有账号？
-        <Link to="/register" className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim">
-          注册一个
-        </Link>
+        {/* 整句进一条 key：链接文字拆出去的话，英文侧就没法把链接挪到句首/句中 */}
+        <Trans
+          k="page.login.signup.hint"
+          slots={{
+            link: (s) => (
+              <Link
+                to="/register"
+                className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
+              >
+                {s}
+              </Link>
+            ),
+          }}
+        />
       </p>
     </div>
   )
