@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { usePersonaStore, packName } from '@/store/persona-store'
 import { cn } from '@/lib/utils'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
+import PersonaAvatar from '@/components/PersonaAvatar'
 import { Search, X, GitCompare, ChevronDown, ChevronUp, Loader2, SlidersHorizontal, Bot } from 'lucide-react'
 import { PACK_CATEGORIES } from '@/lib/mock-data'
 import { PageShell, EmptyState, CARD_GRID_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
@@ -303,6 +304,7 @@ export default function PersonasPage() {
                     onClick={() => setExpandedId(isExpanded ? null : persona.id)}
                   >
                     <div className="flex items-start gap-3">
+                      <PersonaAvatar personaId={persona.id} size={44} className="mt-0.5" />
                       <div className="flex-1 min-w-0">
                         {/* name 与 archetype 曾经同行挤在一起（gap-2 的 flex row）：中文 archetype
                             大多两三个字，英文覆盖层常常长得多（"Cognitive load sensitivity"

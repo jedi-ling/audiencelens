@@ -6,6 +6,7 @@ import type { PlainMessageKey } from '@/i18n/keys.gen'
 import type { Persona } from '@/lib/mock-data'
 import { localizePersona } from '@/i18n/catalog'
 import PersonaRadarChart from './PersonaRadarChart'
+import PersonaAvatar from './PersonaAvatar'
 
 type PersonaStatus = 'pending' | 'running' | 'completed' | 'failed'
 
@@ -83,6 +84,7 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
       )}
     >
       <div className="flex items-start gap-3">
+        <PersonaAvatar personaId={persona.id} size={40} className="mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             {status !== undefined && (
