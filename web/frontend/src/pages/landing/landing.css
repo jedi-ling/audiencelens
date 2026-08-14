@@ -99,6 +99,11 @@
 /* 主标题两行整句断行：「让 72 个 AI 评审员，/ 在你上线前找到风险」。
    上限 4rem（64px），第一行约 660px < 文案列 720px，永不碎行 */
 .al-landing .hero h1{font-size:clamp(2.2rem,4.4vw,4rem);font-weight:800;line-height:1.14;letter-spacing:-.02em;margin-bottom:22px}
+/* 英文字符密度比中文低得多：中文那句 18 字在这个字号/列宽下排 2 行，
+   英文等价译文哪怕精简过依然要 60 字符上下，同一个 clamp 上限套上去会
+   排到 4 行、把标题区撑到卡片高度的 2 倍多（实测 510px），观感失衡。
+   缩小上限而不是死抠字数——文案以后会再改，字号规则不该跟着重调。 */
+html[lang="en"] .al-landing .hero h1{font-size:clamp(1.8rem,3.4vw,2.9rem)}
 /* // P1-2：适配中文副标题字距与多行阅读节奏 */
 .al-landing .hero-sub{font-size:clamp(1rem,1.2vw,1.1rem);color:var(--text-dim);max-width:600px;margin:0 0 32px;font-weight:400;letter-spacing:0;line-height:1.78}
 .al-landing .hero-sub b{color:var(--text);font-weight:600}
