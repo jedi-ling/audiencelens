@@ -1183,31 +1183,59 @@ def expected_catalog_keys() -> set[str]:
 （`:88` 和 `:94`）。即使报告成功产出英文，用户点进任何一条追问回复仍是中文——
 而追问是报告页最主要的二次交互。它必须与 10.1 同批落地。
 
-### 10.3 人格身份**不**本地化 —— 这是结论，不是取舍
+### 10.3 人格显示名英文化 —— 罗马音译，不是重新命名（推翻早期裁决，记录见下）
 
-**张伟在英文模式下仍叫张伟。**
+**本节曾经的结论是"张伟在英文模式下仍叫张伟，人格身份不本地化"。产品所有者明确要求
+连人格名也要英文，推翻了那条裁决。** 这是产品判断，记录在此供后来者查证，不是我自己改的口径。
 
-三条依据：
+原裁决的三条依据里，第 1 条（`region`/`age_range` 拼进 `recruit_types`，改名会让报告
+向用户断言一个从未建模过的受众）**依然成立，而且是唯一必须守住的红线**——但它管的是
+**地域/年龄画像不能变**，不是"名字必须是汉字"。这两件事上一版裁决没有分开讨论，
+现在分开：
 
-1. `region` 与 `age_range` 直接被 `_panel_audience_profiles`（`aggregator.py:357-383`）
-   拼成报告的 `recruit_types`，而那段代码的注释明写它的口径是
-   "取自人格档案的真实属性，可据此筛选同类真人受访者"。
-   把"林岚 / 中国华东"改成"Emily / 北美"，报告就在向英文用户断言一个面板从未建模过的受众，
-   **用户会照着去招募真人**。这是纪律 3 的假数据，也正是 `recruit_types` 那段注释当初写来防的事。
-2. 本系统对外的核心保证是"身份不驱动判断"（提示词的 `[IDENTITY-BEHAVIOR DECOUPLING]` 段 +
-   `counterfactual_identity.py` 的 payload 指纹审计）。
-   若身份真的不驱动判断，改名买不到任何评审质量；若它驱动了，改名就是在**静默改变结论**。两条都指向不改。
-3. 面板的真实构成就是中文市场加权的，显示英文名会让报告可信度**虚高**。
+- **禁止的是"把林岚改成 Emily、把中国华东改成北美"这种连人带地域一起换掉的操作。**
+- **允许的是给同一个身份的名字配一个能读的拉丁字母标签**——`region`/`age_range`/
+  `gender`/`behavior_profile`/`gaming_profile` 一个字不动，`recruit_types` 的口径
+  不受影响，向用户断言的受众画像与改名前完全一致。
 
-**允许本地化的只有"表述层"**：`archetype` / `identity_summary` / `motivations` /
-`likes` / `dislikes` / `decision_rules` / `quit_triggers` / `continue_triggers` /
-`first_scan_focus` / `review_output.*`，走 `src/personas/en-US/{pack}.yaml` overlay。
+**做法：`display_name` 罗马音译，与 `name` 是两个字段。**
 
-**overlay 禁止出现的键（靠一条测试机械卡死）**：
+- `name`（中文，识别字段）继续是后端匹配、审计、`persona_outputs.persona_name` 落库、
+  `recruit_types` 计算的唯一事实源，**永不改变**。
+- `display_name`（罗马音译）是**纯 UI 展示层**的新字段，走 overlay，
+  英文界面下替换 `name` 显示；中文界面不受影响，继续显示 `name`。
+- 生成方式：**确定性程序生成，不是 agent 逐条编**。用 `pypinyin`
+  （`Style.NORMAL`，去声调，逐字首字母大写）对 72 个人格的 `name` 批量转写，
+  已核对全部 72 条、无缺漏、YAML 格式未破坏。已是拉丁字母的名字（Marco / Aki /
+  Carlos / Ruth 等 10 条）原样保留。
+- **已知且被接受的折衷**：P23「朴俊赫」`region: 韩国`，这个名字是用汉字写的韩语
+  姓名（Hanja 传统），正确转写应为韩语罗马音 `Park Junhyuk`，而批量脚本统一走
+  汉语拼音库，产出的是 `Pu Jun He`——把一个韩语姓名错误地当成了汉语拼音处理。
+  产品所有者在被明确告知这个例外后选择"统一走拼音，不特殊处理"。这不是疏漏，
+  是记录在案的取舍，不要在后续批次里"顺手修正"。
+- 其余 61 个中文名，`region` 大量并非中国（北美/日本/欧洲/东南亚/德语区等）——
+  拼音显示名不是在断言这些人物是华裔，只是给同一个既有身份配一个可读的拉丁字母
+  标签，`region` 字段本身才是 `recruit_types` 的真正事实源，不受这次改动影响。
+
+原裁决的第 2、3 条依据（"身份不驱动判断"的保证、"面板是中文市场加权"）不再是
+不改名的理由，因为**没有改身份，只是给身份配了一个新的显示层字段**——判断逻辑、
+面板构成、`payload` 指纹审计全部不受影响。
+
+**允许本地化的表述层字段不变，新增 `display_name`**：`display_name`（新增）/
+`archetype` / `identity_summary` / `motivations` / `likes` / `dislikes` /
+`decision_rules` / `quit_triggers` / `continue_triggers` / `first_scan_focus` /
+`review_output.*`，走 `src/personas/en-US/{pack}.yaml` overlay。
+
+**overlay 仍然禁止出现的键（靠一条测试机械卡死，`display_name` 除外）**：
 `id` `name` `gender` `age_range` `region` `language` `mbti` `model_hint` `task_affinity`
 `behavior_profile` `gaming_profile`。
 `behavior_profile` 的值是 `panel_selector.LEVEL` 的键（很低/低/中/高/很高），
 翻了直接 `KeyError` 硬崩（`panel_selector.py:25-31` 的注释记录过这次崩溃）。
+
+**必须补的隔离测试**：`display_name` 绝不能流入 `recruit_types` / 引擎提示词 /
+`persona_outputs.persona_name` 落库——那三处必须继续读 `name`。这条比"禁翻键"
+更容易被忽略，因为 `display_name` 是新加的字段，没有历史包袱提醒后来者它只能
+待在展示层。
 
 **真正该做的是把 `persona.language` 从死字段变成面板准入条件**：
 人格 YAML 每条都已经带 `language`（29 条 `[zh-CN,en-US]`、10 条只有 `[zh-CN]`、

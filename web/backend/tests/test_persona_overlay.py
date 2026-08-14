@@ -348,3 +348,170 @@ class TestMergeAndEndpoint:
         assert r.status_code == 200, r.text
         for entry in r.json():
             assert entry["archetype_en"], f"{entry['id']} 的 archetype_en 被裁掉了"
+
+
+class TestDisplayNameIsolation:
+    """10.3（推翻早期裁决后）点名要求的隔离测试：`display_name` 是纯 UI 展示层
+    新增字段，与识别字段 `name` 是两个字段。`name` 继续是 recruit_types / 引擎
+    提示词 / `persona_outputs.persona_name` 落库的唯一事实源，一个字不动；
+    `display_name` 只活在展示链路上，绝不能顺着任何路径流回那三处。
+
+    这条比"禁翻键"（TestForbiddenKeys）更容易被忽略：`display_name` 是新加的
+    字段，闭集校验拦不住"新字段悄悄被下游当成 name 用"这种问题——闭集只管
+    "能不能进 overlay"，不管"合并之后谁读了它"。
+    """
+
+    def test_display_name_never_reaches_recruit_types_or_prompt(self, sources, monkeypatch):
+        pack_id = "game-core"
+        doc = sources[pack_id]
+        src_personas = doc["personas"]
+        merged = merge_persona_overlay(pack_id, src_personas, doc["panel_id"], LOCALE)
+        assert len(merged) == len(src_personas)
+
+        # 1) 合并结果里 display_name 只出现在 `display_name_en` 这个键，
+        #    不会污染 `name` 本身，也不会凭空冒出一个裸的 `display_name` 键
+        #    （源人格从来没有这个字段，merge 不能替它发明一个）。
+        for src, out in zip(src_personas, merged):
+            assert out["name"] == src["name"], f"{src['id']} 的 name 被 display_name 合并动过了"
+            assert "display_name" not in out, (
+                f"{src['id']} 的合并结果里冒出了裸的 display_name 键——"
+                "源人格没有这个字段，出现就说明合并逻辑把它当成了普通同级键"
+            )
+            assert out.get("display_name_en"), f"{src['id']} 缺 display_name_en"
+            assert not contains_cjk(out["display_name_en"])
+
+        # 2) aggregator._panel_audience_profiles 拿到的 name/region/age_range
+        #    与合并前逐字相同——display_name 的存在不改变 recruit_types 的输入。
+        import os
+        import sys
+
+        from app.config import settings
+
+        src_root = os.path.join(settings.repo_root, "src")
+        if src_root not in sys.path:
+            sys.path.insert(0, src_root)
+        from runner.aggregator import _panel_audience_profiles
+
+        profiles_before = _panel_audience_profiles(src_personas)
+        profiles_after = _panel_audience_profiles(merged)
+        assert profiles_before == profiles_after, (
+            "display_name 的存在改变了 _panel_audience_profiles 的聚合结果——"
+            "recruit_types 的输入本不该受它影响"
+        )
+        for src, out in zip(src_personas, merged):
+            assert out.get("region") == src.get("region"), f"{src['id']} 的 region 被动过了"
+            assert out.get("age_range") == src.get("age_range"), f"{src['id']} 的 age_range 被动过了"
+
+        # 3) review_service 传给 runner.cli.run_panel 的路径读的是
+        #    src/personas/<pack>.yaml（源文件），不是 overlay 合并后的对象——
+        #    这条本来就该成立（模块头写了"引擎不读这里"），这里把它钉死。
+        from app.db import session_scope
+        from app.models import Review
+        from app.services import review_service
+
+        import runner.cli
+        import yaml as _yaml
+
+        captured = {}
+
+        def _capture_and_boom(**kwargs):
+            captured.update(kwargs)
+            raise RuntimeError("测试桩：不真的跑评审，只拦截 run_panel 的入参")
+
+        monkeypatch.setattr(runner.cli, "run_panel", _capture_and_boom)
+
+        db = session_scope()
+        try:
+            review = Review(
+                user_id="display-name-isolation-test",
+                task_type="concept_review",
+                artifact_bundle={"title": "x", "materials": [{"type": "text", "text": "y"}]},
+                status="pending",
+                persona_pack=pack_id,
+            )
+            db.add(review)
+            db.commit()
+            review_id = review.id
+
+            with pytest.raises(RuntimeError):
+                review_service._execute_review(review_id, "sk-fake", "server", "display-name-isolation-test", "job-fake")
+        finally:
+            db.close()
+
+        assert "personas_path" in captured, "run_panel 没收到 personas_path，测试桩没接住调用"
+        expected_path = os.path.join(settings.repo_root, "src", "personas", f"{pack_id}.yaml")
+        assert os.path.normcase(captured["personas_path"]) == os.path.normcase(expected_path), (
+            f"引擎拿到的路径是 {captured['personas_path']!r}，"
+            f"应该逐字是源 yaml 路径 {expected_path!r}——一旦不是，说明有人把 overlay "
+            "合并后的对象喂给了引擎"
+        )
+        # 路径指向的文件本身不含任何 `_en` 同级键——证明引擎读到的是纯源文件，
+        # 合并结果从未落回磁盘冒充过源。
+        with open(captured["personas_path"], "r", encoding="utf-8") as f:
+            raw_doc = _yaml.safe_load(f)
+        for p in raw_doc["personas"]:
+            assert "display_name" not in p, f"{p['id']} 的源 yaml 里混入了 display_name"
+            assert "display_name_en" not in p, f"{p['id']} 的源 yaml 里混入了 display_name_en"
+            assert "name_en" not in p
+
+        # 4) 故意在合并后的字典里塞一个 display_name != name 的值，断言任何
+        #    "看起来像是取人格名给引擎用"的路径拿到的都是 name，不是 display_name。
+        poisoned = [dict(p) for p in merged]
+        for p in poisoned:
+            p["display_name_en"] = "DEFINITELY-NOT-" + p["name"]
+        # 4a) recruit_types 的聚合入口不读 display_name_en，塞了也不会体现在输出里
+        poisoned_profiles = _panel_audience_profiles(poisoned)
+        assert poisoned_profiles == profiles_before, (
+            "篡改 display_name_en 之后 recruit_types 的聚合结果变了——"
+            "说明该路径悄悄读取了 display_name_en"
+        )
+        for p in poisoned_profiles:
+            assert "DEFINITELY-NOT-" not in p
+        # 4b) persona_outputs.persona_name 落库的字段名来自引擎输出（note.get("persona_name")），
+        #     引擎输出的 name 只可能来自源 yaml 的 `name`（已在上面第 3 点钉死路径），
+        #     这里补一条静态断言：源 yaml 里没有任何字段名为 display_name 会被当作
+        #     persona_name 的候选来源。
+        for p in poisoned:
+            assert p["name"] != p["display_name_en"], "测试桩本身没生效"
+            # persona_outputs.persona_name 的事实源只能是 name，不是 display_name_en
+            assert p["name"] == next(
+                s["name"] for s in src_personas if s["id"] == p["id"]
+            ), f"{p['id']} 的 name 被污染成了别的值"
+
+
+class TestDisplayNameCoverage:
+    """全量覆盖率：11 个包、72 个人格全部有 display_name_en，且都不含中文字符。"""
+
+    def test_every_persona_in_every_pack_has_a_romanized_display_name(self, sources):
+        total = 0
+        offenders_missing = []
+        offenders_cjk = []
+        for pack_id, doc in sources.items():
+            src_personas = doc.get("personas", [])
+            merged = merge_persona_overlay(pack_id, src_personas, doc["panel_id"], LOCALE)
+            for p in merged:
+                total += 1
+                value = p.get("display_name_en")
+                if not value or not isinstance(value, str) or not value.strip():
+                    offenders_missing.append(p["id"])
+                    continue
+                if contains_cjk(value):
+                    offenders_cjk.append((p["id"], value))
+        assert len(sources) == 11, f"人格包数量是 {len(sources)}，不是契约里记的 11 个"
+        assert total == 72, f"人格总数是 {total}，不是契约里记的 72 个"
+        assert not offenders_missing, f"这些人格缺 display_name_en：{offenders_missing}"
+        assert not offenders_cjk, f"这些人格的 display_name_en 里混了中文：{offenders_cjk}"
+
+    def test_personas_endpoint_display_name_en_is_present_and_not_null(self, client):
+        r = client.get("/api/personas")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body, "人格列表是空的"
+        sample = []
+        for entry in body:
+            assert "display_name_en" in entry, f"{entry['id']} 的响应里根本没有 display_name_en 这个键"
+            assert entry["display_name_en"], f"{entry['id']} 的 display_name_en 是 null/空"
+            assert not contains_cjk(entry["display_name_en"]), f"{entry['id']} 的 display_name_en 里有中文"
+            if len(sample) < 3:
+                sample.append((entry["id"], entry["name"], entry["display_name_en"]))
+        assert len(sample) == 3, f"打印样本：{sample}"

@@ -34,6 +34,7 @@ import type {
   CrossExamArgument,
   CrossExamMode,
   CrossExamVoteChange,
+  Persona,
 } from '@/lib/mock-data'
 import {
   EVALUATION_DIMENSIONS,
@@ -44,10 +45,13 @@ import {
   toEthicsReportView,
 } from '@/lib/mock-data'
 import type { EthicsSeverity, RebuttalStatus, StereotypeRisk } from '@/lib/mock-data'
-import { t, Trans } from '@/i18n/runtime'
+import { t, Trans, missingMarker } from '@/i18n/runtime'
+import { getLocale } from '@/i18n/locale'
 import { useDocumentTitle } from '@/i18n/head'
 import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
 import { tApiError, tApiErrorParts } from '@/i18n/api-error'
+import { localizePersona } from '@/i18n/catalog'
+import { usePersonaStore } from '@/store/persona-store'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
@@ -359,6 +363,29 @@ function dimensionLabel(id: string, name?: string): string {
  *  这种前端自造的分组名才走 key 表。 */
 function noteStance(note: RealPersonaNote): string {
   return note.stance ?? note.primary_stance ?? t('page.report.stance.value')
+}
+
+/**
+ * 报告字段里的人格展示名（persona_notes 等）。
+ *
+ * 报告 JSON 里的 `persona_name` 就是后端 `persona_outputs.persona_name`——10.3 红线
+ * 钉死那个字段永远读 `name`，恒中文，这里**不改**它的事实源。这个函数只管
+ * "拿这个 persona_id 去当前人格库里找到人，换一张给屏幕看的脸"：
+ *   · 中文界面：报告自带的 persona_name 本来就是中文，直接用，不用查库。
+ *   · 英文界面：人格库里能找到 → 走 localizePersona 取 display_name_en
+ *     （缺 overlay 会被 localizePersona 自己标成 ⟦missing:…⟧，同一条规则）；
+ *     找不到（目录漂移——比如历史报告引用的人格已经从包里下线，人格库里
+ *     压根没有这一条）→ 同样显式标记，不回落成报告里的中文 persona_name，
+ *     那正是 D8 点名禁止的"英文界面里混中文且没人发现"。
+ */
+function personaDisplayName(personas: Persona[], id: string | undefined, fallbackName: string | undefined): string {
+  // fallbackName ?? id：与调用点原来的 `note.persona_name ?? note.persona_id` 是
+  // 同一个兜底顺序，只是从内联表达式挪进了这个函数，没有新造规则。
+  if (getLocale() === 'zh') return fallbackName ?? id ?? ''
+  const found = id ? personas.find((p) => p.id === id) : undefined
+  if (found) return localizePersona(found).name
+  console.error('[ReportPage] 报告引用的人格不在当前人格库里，无法取 display_name_en：', id)
+  return missingMarker(`persona.${id ?? 'unknown'}.display_name`, getLocale())
 }
 
 // ---------- ETHICS.md 强制项：Synthetic Banner + Limitations & Caveats ----------
@@ -1426,6 +1453,13 @@ export default function ReportPage() {
   // 切语言时整页重渲染、t() 的结果跟着变（契约 6.3）。
   useDocumentTitle('page.report.meta.title')
   const { id } = useParams()
+  // persona_notes 等报告字段只带 persona_id / persona_name（恒中文，10.3 红线）；
+  // 英文界面下换成 display_name_en 要靠这份人格库反查，同 ReviewProgressPage
+  // 的用法——全局 store，其它页面（PersonasPage 等）已经拉过的话这里直接复用。
+  const { personas: personaCatalog, initPersonas: initPersonaCatalog, initialized: personaCatalogInitialized } = usePersonaStore()
+  useEffect(() => {
+    if (!personaCatalogInitialized) initPersonaCatalog()
+  }, [personaCatalogInitialized, initPersonaCatalog])
   const [review, setReview] = useState<Review | null>(null)
   const [report, setReport] = useState<RealReport | null>(null)
   const [calibration, setCalibration] = useState<RealCalibration | null>(null)
@@ -2167,6 +2201,7 @@ export default function ReportPage() {
             {personaNotes.map((note) => {
               const stanceIndex = stanceData.findIndex((s) => s.name === noteStance(note))
               const stanceColor = STANCE_PALETTE[Math.max(stanceIndex, 0) % STANCE_PALETTE.length]
+              const displayName = personaDisplayName(personaCatalog, note.persona_id, note.persona_name)
               return (
                 <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -2179,9 +2214,9 @@ export default function ReportPage() {
                         color: stanceColor,
                       }}
                     >
-                      {(note.persona_name ?? note.persona_id).slice(0, 1)}
+                      {displayName.slice(0, 1)}
                     </div>
-                    <span className="font-medium text-text-primary">{note.persona_name ?? note.persona_id}</span>
+                    <span className="font-medium text-text-primary">{displayName}</span>
                     <span className="text-xs text-text-muted font-mono">{note.persona_id}</span>
                     <span
                       className="ml-auto text-xs font-medium px-2 py-0.5 rounded"

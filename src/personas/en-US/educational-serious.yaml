@@ -28,6 +28,7 @@ locale: en-US
 panel_id: educational-serious
 persona_overlays:
   P35-teacher-evaluator:
+    display_name: 'Fang Jin'
     archetype: Teacher evaluator
     identity_summary: She won't ask whether it's fun. She asks whether this thing can come into her classroom,
       and whether it is worth a period of class time.
@@ -77,6 +78,7 @@ persona_overlays:
       avoid:
       - Judging an educational product by pure entertainment standards
   P36-parent-gatekeeper:
+    display_name: 'Li Wei'
     archetype: Parent gatekeeper
     identity_summary: He isn't against games. He is asking on his child's behalf what this thing will take
       and what it will leave behind.
@@ -127,6 +129,7 @@ persona_overlays:
       avoid:
       - Overlooking risks to child safety
   P37-lifelong-learner:
+    display_name: 'Aki'
     archetype: Lifelong learner
     identity_summary: They aren't playing a game. They are using the medium of games to put themselves through
       an education.
@@ -177,6 +180,7 @@ persona_overlays:
       avoid:
       - Judging an educational game as if it were pure entertainment
   P38-special-needs-learner:
+    display_name: 'Xiao Cheng'
     archetype: Learner with special educational needs
     identity_summary: She isn't asking for special treatment. She is telling the developer who their design
       has left outside the door.

@@ -24,6 +24,7 @@ locale: en-US
 panel_id: indie-creative
 persona_overlays:
   P01-indie-connoisseur:
+    display_name: 'Lin Zhi Qiu'
     archetype: Indie connoisseur
     identity_summary: More than a hundred indie games go onto her Steam wishlist in a year — visual fidelity
       doesn't interest her, only whether there's a story that no one but you could tell.
@@ -71,6 +72,7 @@ persona_overlays:
       - Generic encouragement
       - Inventing content the developer never showed
   P02-creativity-seeker:
+    display_name: 'A Che'
     archetype: Seeker of new ideas
     identity_summary: They don't play to pass the time — they're hunting for what nobody has done before,
       and one counter-intuitive interaction excites them more than a hundred hours of polish.
@@ -116,6 +118,7 @@ persona_overlays:
       avoid:
       - Judging a work with one bright spot by the standard of all-round mediocrity
   P03-culture-consumer:
+    display_name: 'Su Man'
     archetype: Cultural consumer
     identity_summary: She takes indie games the way she takes films, novels and exhibitions — she wants
       a game to say something true about how some group of people actually lives.
@@ -163,6 +166,7 @@ persona_overlays:
       avoid:
       - Judging cultural expression on entertainment value alone
   P06-indie-narrative-designer:
+    display_name: 'Gu Yan'
     archetype: Narrative designer
     identity_summary: 'She reads a game the way a narrative designer does: the shape of the branching,
       the dialogue system, the rhythm of the emotion.'
@@ -215,6 +219,7 @@ persona_overlays:
       avoid:
       - Saying only whether the story is nice to hear, without analysing its structure
   P07-indie-rhythm-fanatic:
+    display_name: 'Ling Yin'
     archetype: Rhythm-game fanatic
     identity_summary: Judgement frames and chart design are their whole life; what they look at is the
       timing window, the invention in the charts, and who owns the music.

@@ -51,6 +51,12 @@ _LOCALE_SUFFIX = {"en-US": "_en"}
 # 闭集的意义是「新增一个可翻字段」必须是一次显式决定，而不是某个 agent 顺手多写一行。
 TRANSLATABLE_KEYS = frozenset(
     {
+        # 10.3（推翻早期裁决后）新增：纯 UI 展示层的罗马音译名，与识别字段
+        # `name` 是两个字段。`name` 继续是 recruit_types / 引擎 / persona_outputs
+        # 落库的唯一事实源，一个字不动；`display_name` 只活在展示链路上。
+        # 隔离由 test_persona_overlay.py 的
+        # test_display_name_never_reaches_recruit_types_or_prompt 机械卡死。
+        "display_name",
         "archetype",
         "identity_summary",
         "motivations",
@@ -245,6 +251,18 @@ def _merge_one(path, pack_id, persona, entry, suffix):
     persona_id = persona.get("id", "<无 id>")
     merged = dict(persona)
     for field, value in entry.items():
+        if field == "display_name":
+            # `display_name` 是 10.3（推翻早期裁决后）新增的纯展示字段，
+            # 它不是任何源字段的翻译——源人格从来只有 `name`，从未有过
+            # `display_name` 这个键。所以它是这张表里唯一一个**允许在源侧
+            # 不存在**的 overlay 字段，故意在这里显式分支写出来，而不是把
+            # 下面「源里没这个字段」的通用校验放宽掉：放宽会连带放过
+            # 「overlay 抄错了人格」这种真正的错误，显式分支才不是静默兜底。
+            if not isinstance(value, str) or not value.strip():
+                _fail("{}.display_name 必须是非空字符串".format(persona_id), path)
+            merged[field + suffix] = value
+            continue
+
         if field not in persona:
             _fail(
                 "{}.{} 在源人格里根本没有这个字段——overlay 不能凭空多出一层内容，"

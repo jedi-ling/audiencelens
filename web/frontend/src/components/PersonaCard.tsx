@@ -67,6 +67,10 @@ function stanceLabel(primaryStance: string): string {
 }
 
 export default function PersonaCard({ persona, status, progress, primaryStance, confidence, topIssue, selected, compact, onClick }: PersonaCardProps) {
+  // 名字与 archetype 同一次 localizePersona 调用取好：10.3 推翻早期裁决后，
+  // display_name（罗马音译）是纯展示层字段，英文界面下换掉这里显示的名字；
+  // persona.name 本身没变，仍是匹配 / 审计 / recruit_types 的唯一事实源。
+  const localizedText = localizePersona(persona)
   return (
     <div
       onClick={onClick}
@@ -84,10 +88,13 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
             {status !== undefined && (
               <div className={cn('w-2 h-2 rounded-full shrink-0', statusColors[status])} />
             )}
-            <h3 className="font-semibold text-text-primary truncate">{persona.name}</h3>
+            <h3 className="font-semibold text-text-primary truncate">{localizedText.name}</h3>
           </div>
-          {/* archetype 是表述层、按 ui_lang 取；上面那行 persona.name 恒中文（10.3）。 */}
-          <p className="text-xs text-text-secondary mb-2">{localizePersona(persona).archetype}</p>
+          {/* archetype 是表述层、按 ui_lang 取。
+              truncate 成单行：英文覆盖层常比中文长得多，任其自由折行会把卡片
+              顶成不同高度，和同一排的兄弟卡片对不齐（h-full 只保证外层等高，
+              不保证内容不把自己撑爆）。 */}
+          <p className="text-xs text-text-secondary mb-2 truncate">{localizedText.archetype}</p>
 
           {status !== undefined && (
             <div className="flex items-center gap-2 text-xs text-text-muted mb-2">

@@ -27,6 +27,7 @@ locale: en-US
 persona_overlays:
 
   P21-fragmented-whale:
+    display_name: 'Qin Lang'
     archetype: "Fragmented-Time Whale"
     identity_summary: "Every yuan he spends has to buy a value he can point to — but in the ten minutes he gets between meetings, efficiency is worth paying for."
     motivations:
@@ -76,6 +77,7 @@ persona_overlays:
         - "Saying \"whether you spend is up to you\" without analyzing the structure"
 
   P22-free-lunch-hunter:
+    display_name: 'A Ying'
     archetype: "Free-Lunch Hunter"
     identity_summary: "Her rule is simple: if she can get it free she will never pay a cent — but freeloading should still come with dignity."
     motivations:
@@ -128,6 +130,7 @@ persona_overlays:
         - "Assuming the player will spend money"
 
   P23-social-driven-mobile:
+    display_name: 'Pu Jun He'
     archetype: "Socially Driven Player"
     identity_summary: "His first reason for playing is that his guild and his friends are playing; the game itself is only the second reason."
     motivations:
@@ -181,6 +184,7 @@ persona_overlays:
         - "Judging only from a solo-play perspective"
 
   P24-anime-aesthete:
+    display_name: 'Xing Nai'
     archetype: "Anime-Aesthetics Devotee"
     identity_summary: "She comes for the characters and stays for the story; on gacha her position is \"I will spend money on someone I love, just don't lie to me.\""
     motivations:
@@ -236,6 +240,7 @@ persona_overlays:
         - "Saying \"the art looks nice\" without checking whether the characters have depth"
 
   P25-hypercasual-passerby:
+    display_name: 'Xiao Fei'
     archetype: "Hypercasual Passer-by"
     identity_summary: "Thirty seconds decides whether they stay; they do not learn rules and do not read tutorials — their thumbs move faster than their head does."
     motivations:
@@ -288,6 +293,7 @@ persona_overlays:
         - "Assuming the player reads any text at all"
 
   P44-mobile-monthly-card:
+    display_name: 'Lu Zi Hang'
     archetype: "Monthly-Card Regular"
     identity_summary: "The monthly card is not a purchase, it is a vote of confidence — buying one every month is how he tells the game he trusts it, which also means he expects to keep seeing a return."
     motivations:
@@ -338,6 +344,7 @@ persona_overlays:
         - "Ignoring the psychological contract the monthly-card player has entered into"
 
   P45-mobile-ad-tolerant:
+    display_name: 'A Yao'
     archetype: "Ad-Tolerant Player"
     identity_summary: "Watching ads is nothing to be embarrassed about, it is her supply line — 30 seconds of ad for one item, and she has done that math precisely."
     motivations:

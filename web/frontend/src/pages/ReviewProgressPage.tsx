@@ -837,7 +837,11 @@ export default function ReviewProgressPage() {
                                 : 'border-border bg-bg-secondary text-text-muted',
                         )}
                       >
-                        {(po.persona_name ?? '?').slice(0, 1)}
+                        {/* po.persona_name 是后端 persona_outputs.persona_name（10.3 红线：
+                            那个字段永远读 name，不读 display_name）；这里的头像首字母与下面
+                            那行展示名都改成"找得到本地人格就用 localizePersona 的展示名，
+                            找不到就退回后端原值"——不是给 persona_name 本身换事实源。 */}
+                        {(persona ? localizePersona(persona).name : (po.persona_name ?? '?')).slice(0, 1)}
                       </div>
                       <div
                         className={cn(
@@ -847,7 +851,7 @@ export default function ReviewProgressPage() {
                         )}
                       />
                     </div>
-                    <span className="font-medium text-text-primary text-sm">{po.persona_name}</span>
+                    <span className="font-medium text-text-primary text-sm">{persona ? localizePersona(persona).name : po.persona_name}</span>
                     {persona && <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>}
                   </div>
 
@@ -912,12 +916,12 @@ export default function ReviewProgressPage() {
                   {/* animate-ring-out 的 ::before 依赖这层 relative 定位 */}
                   <div className="animate-ring-out relative shrink-0">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full border border-brand-primary/40 bg-brand-primary/10 text-xs font-semibold text-brand-primary">
-                      {(persona?.name ?? pid).slice(0, 1)}
+                      {(persona ? localizePersona(persona).name : pid).slice(0, 1)}
                     </div>
                     <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 text-brand-primary bg-bg-card rounded-full" strokeWidth={2} />
                   </div>
                   <span className="font-medium text-text-primary text-sm truncate">
-                    {persona?.name ?? pid}
+                    {persona ? localizePersona(persona).name : pid}
                   </span>
                   {persona && <span className="text-xs text-text-muted shrink-0">{localizePersona(persona).archetype}</span>}
                   <span className="ml-auto text-xs text-brand-primary shrink-0">{t('page.progress.persona_done.badge')}</span>

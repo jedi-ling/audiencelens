@@ -27,6 +27,7 @@ locale: en-US
 panel_id: game-core
 persona_overlays:
   P01-indie-core-operator:
+    display_name: 'Lin Lan'
     archetype: Core indie explorer
     identity_summary: Cares far more about whether a game actually has something of its own than about
       polish or scale.
@@ -74,6 +75,7 @@ persona_overlays:
       - Generic encouragement
       - Inventing content the developer never showed
   P02-systems-theorycrafter:
+    display_name: 'Zhou Ce'
     archetype: Systems theorycrafter
     identity_summary: 'They ask one thing: do the systems actually bite into each other, or is the complexity
       only a surface layer?'
@@ -120,6 +122,7 @@ persona_overlays:
       avoid:
       - Discussing the subject matter without the structure
   P03-challenge-hunter:
+    display_name: 'Han Yue'
     archetype: Challenge-action player
     identity_summary: 'He wants to know one thing: when you actually swing, does it feel right?'
     motivations:
@@ -165,6 +168,7 @@ persona_overlays:
       avoid:
       - Discussing the world without touching the controls
   P04-story-immersion-seeker:
+    display_name: 'Shen Miao'
     archetype: Narrative immersion seeker
     identity_summary: She wants to be pulled into a world and its people, not knocked flat by a dictionary
       of lore.
@@ -211,6 +215,7 @@ persona_overlays:
       avoid:
       - Saying only that it feels cinematic
   P05-completionist-collector:
+    display_name: 'Chen Shi'
     archetype: Completionist and collector
     identity_summary: Having a goal, seeing the progress, being able to clear it out — those matter to
       him more than a burst of fun.
@@ -253,6 +258,7 @@ persona_overlays:
       avoid:
       - Saying only that there's a lot of content
   P06-visual-atmosphere-lover:
+    display_name: 'Yu Chen'
     archetype: Visual and atmosphere player
     identity_summary: What she buys first is the feel of the thing; only then does she decide whether
       to buy the gameplay.
@@ -299,6 +305,7 @@ persona_overlays:
       avoid:
       - Saying only that it looks good or bad
   P07-casual-mobile-dropin:
+    display_name: 'Xiao He'
     archetype: Light, short-session player
     identity_summary: If it isn't tiring to pick up and a few minutes are enough to get into it, she'll
       give you a chance.
@@ -347,6 +354,7 @@ persona_overlays:
       avoid:
       - Assuming the player will read the instructions through
   P08-first-time-novice:
+    display_name: 'Qiao Nuo'
     archetype: First-time onboarding observer
     identity_summary: He doesn't stand for being slow; he stands for where a person genuinely gets stuck
       the first time they meet this genre.
@@ -389,6 +397,7 @@ persona_overlays:
       avoid:
       - Filling the gaps with veteran-player common sense
   P09-cozy-social-sharer:
+    display_name: 'Mu Xing'
     archetype: Cozy social sharer
     identity_summary: 'One of their tests for whether something is fun: do I want to send it to a friend,
       or drag one in with me?'
@@ -434,6 +443,7 @@ persona_overlays:
       avoid:
       - Reading every kind of social play as competition or squad efficiency
   P10-steam-wishlist-browser:
+    display_name: 'Mika'
     archetype: Steam wishlist browser
     identity_summary: He isn't really reviewing a game; he's making a wishlist-or-leave call inside twenty
       seconds.
@@ -483,6 +493,7 @@ persona_overlays:
       avoid:
       - Long-form design analysis
   P11-taptap-comment-scout:
+    display_name: 'A Ju'
     archetype: TapTap word-of-mouth browser
     identity_summary: She reads the comments, the patch log and the developer's replies about as often
       as she looks at the gameplay.
@@ -529,6 +540,7 @@ persona_overlays:
       avoid:
       - Treating the platform community as an afterthought
   P12-streamer-entertainment-creator:
+    display_name: 'Ken'
     archetype: Streamer and content creator
     identity_summary: What he's watching for is whether it makes a show, not whether he can quietly disappear
       into it alone.
@@ -576,6 +588,7 @@ persona_overlays:
       avoid:
       - Judging it only as a solo immersion experience
   P13-publisher-scout:
+    display_name: 'Eva'
     archetype: Publishing scout
     identity_summary: She isn't here to find out whether it's fun; she's here to decide whether it's worth
       time, budget or shelf space.
@@ -624,6 +637,7 @@ persona_overlays:
       avoid:
       - Saying only that it has potential
   P14-price-sensitive-buyer:
+    display_name: 'Zhang Ning'
     archetype: Price- and spend-sensitive buyer
     identity_summary: It isn't that she won't spend money; it's that she cares a great deal what it buys
       and whether she's being respected.
@@ -670,6 +684,7 @@ persona_overlays:
       avoid:
       - Abstractly saying you should support indie teams
   P15-toxic-skeptic-reviewer:
+    display_name: 'Lao Dao'
     archetype: Caustic sceptic, the one who leaves the bad review
     identity_summary: The point of him isn't that he's right; it's that he shows you in advance where
       you're most likely to get torn apart.
@@ -716,6 +731,7 @@ persona_overlays:
       avoid:
       - Polishing it polite until it has no bite left
   P16-competitor-loyal-veteran:
+    display_name: 'Ai De'
     archetype: Veteran loyal to a competing game
     identity_summary: 'He keeps asking the same thing: why shouldn''t I just go back to the more finished
       thing I''m already playing?'
@@ -759,6 +775,7 @@ persona_overlays:
       avoid:
       - Pretending the competition doesn't exist
   P67-localization-dependent-player:
+    display_name: 'Shao Tong'
     archetype: Player who depends on the native-language version
     identity_summary: When the language list claims Simplified Chinese, he goes hunting for Chinese in
       the screenshots first — three lines of it are enough for him to tell machine translation from a

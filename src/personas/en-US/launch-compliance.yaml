@@ -24,6 +24,7 @@ locale: en-US
 panel_id: launch-compliance
 persona_overlays:
   P62-store-submission-reviewer:
+    display_name: 'Shen Ling'
     archetype: Platform submission reviewer
     identity_summary: Seven years inside the submission queues of four app stores. Her first reaction to
       a set of materials isn't whether the game is any good, it's which line is going to get it sent back
@@ -77,6 +78,7 @@ persona_overlays:
       - Judging whether the gameplay is any good
       - Saying "it should be fine" in place of a specific clause
   P63-china-license-gatekeeper:
+    display_name: 'Lu Wei'
     archetype: Publishing licence and ratings gatekeeper
     identity_summary: He has taken a dozen or so projects through licence filings and ratings paperwork,
       and the line he says most often is that a change like this means starting over — because once the
@@ -130,6 +132,7 @@ persona_overlays:
       - Predicting on the project's behalf whether approval will come through
       - Reassuring anyone that "these usually pass"
   P64-device-compat-tester:
+    display_name: 'A Qi'
     archetype: Device compatibility and performance tester
     identity_summary: Thirty-odd handsets sit on their desk all year round, half of them mid- and low-end
       models from three years ago. Their job is to disprove the sentence "it runs fine on my machine" —
@@ -182,6 +185,7 @@ persona_overlays:
       - Judging the art direction or which way the gameplay leans
       - Saying "it should run" in place of measured data
   P65-privacy-compliance-counsel:
+    display_name: 'Wen Yi'
     archetype: Privacy compliance counsel
     identity_summary: 'She reads a product by following the data: who collects it, what they collect, where
       it goes, how long it is kept, how it gets deleted — and any link in that chain written as "we may
@@ -234,6 +238,7 @@ persona_overlays:
       - Issuing a legal conclusion
       - Judging the product's positioning or its gameplay
   P66-refunded-churned-player:
+    display_name: 'Jiang Ye'
     archetype: Refunded and churned player
     identity_summary: He has taken refunds and he has walked away — once at two hours forty minutes, when
       it turned out not to be the thing the marketing sold; once after seventy hours, when he simply stopped

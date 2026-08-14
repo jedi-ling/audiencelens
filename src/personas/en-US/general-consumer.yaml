@@ -25,6 +25,7 @@ locale: en-US
 panel_id: general-consumer
 persona_overlays:
   P46-value-conscious-buyer:
+    display_name: 'Shen Jing'
     archetype: Value-assessing buyer
     identity_summary: She isn't unwilling to spend money — she needs to see exactly what the money bought
       and whether she was treated straight, and that goes for any paid product, not just games.
@@ -70,6 +71,7 @@ persona_overlays:
       avoid:
       - Saying "good value for money" in the abstract
   P47-skeptical-reviewer-general:
+    display_name: 'Lao Zhao'
     archetype: Skeptical reviewer
     identity_summary: His whole reason for being here is to surface early what people will pile on first
       — doesn't matter whether it's a game, an app or a SaaS landing page.
@@ -110,6 +112,7 @@ persona_overlays:
       avoid:
       - Polishing the wording until it stops biting
   P48-b2b-decision-maker:
+    display_name: 'Grace'
     archetype: Enterprise buying decision-maker
     identity_summary: She isn't evaluating this for herself — she has to judge whether the team can actually
       run on it, whether it can be depended on for years, and who answers when it breaks.
@@ -152,6 +155,7 @@ persona_overlays:
       avoid:
       - Judging it only from an individual user's point of view
   P49-first-time-user:
+    display_name: 'A Ze'
     archetype: First-time user
     identity_summary: He doesn't stand for "slow" — he stands for where a real person actually gets stuck
       the first time they open the thing, and that's true of any onboarding, not just a game's.
@@ -197,6 +201,7 @@ persona_overlays:
       avoid:
       - Filling the gaps with things only an experienced user would know
   P50-power-user-efficiency:
+    display_name: 'Zhou Ran'
     archetype: Efficiency-driven power user
     identity_summary: 'They judge a product on exactly one thing: does it let them finish the work faster,
       or does it spend their time on decoration.'
@@ -241,6 +246,7 @@ persona_overlays:
       avoid:
       - Talking about the visuals without talking about how fast the work goes
   P51-word-of-mouth-sharer:
+    display_name: 'Xiao Man'
     archetype: Word-of-mouth sharer
     identity_summary: Whether it works well isn't her only test — she also asks whether she'd actually
       put her name on it and recommend it to a friend or a colleague.
@@ -281,6 +287,7 @@ persona_overlays:
       avoid:
       - Reading every kind of word of mouth as a viral growth mechanic
   P52-accessibility-general:
+    display_name: 'Ming Yuan'
     archetype: User with accessibility needs
     identity_summary: The first thing he looks for isn't whether the product is beautiful, it's whether
       he can get through it without friction — and that matters just as much in any product as it does
@@ -324,6 +331,7 @@ persona_overlays:
       avoid:
       - Treating accessibility as a nice-to-have bonus point
   P53-competitor-loyal-switcher:
+    display_name: 'Marcus'
     archetype: Loyal user of the incumbent tool
     identity_summary: 'He keeps asking the same question: why should I move off the tool I already know
       how to use — and that applies to any category, not just games.'

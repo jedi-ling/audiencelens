@@ -31,6 +31,7 @@ locale: en-US
 panel_id: accessibility
 persona_overlays:
   P17-color-vision-aid:
+    display_name: 'Lu Cheng'
     archetype: Color vision accessibility needs
     identity_summary: The first thing he looks at isn't whether the art is beautiful — it's whether he can
       tell those colors apart.
@@ -80,6 +81,7 @@ persona_overlays:
       avoid:
       - 'Saying "the art looks good" without checking legibility'
   P18-cognitive-load-sensitive:
+    display_name: 'Su Nian'
     archetype: Cognitive load sensitivity
     identity_summary: It isn't that she can't handle complex games — she needs a game to respect her attention
       budget and hand her one thing at a time.
@@ -130,6 +132,7 @@ persona_overlays:
       avoid:
       - Assuming the player can process everything at once
   P19-motor-accessibility:
+    display_name: 'Hui Shan'
     archetype: Motor accessibility needs
     identity_summary: It isn't that they don't want to work the controls — they need the game to admit that
       not every pair of hands can hold down five keys at once.
@@ -182,6 +185,7 @@ persona_overlays:
       avoid:
       - Treating an assist mode as the same thing as an easy mode
   P20-hearing-accessibility:
+    display_name: 'He Jing'
     archetype: Hearing accessibility needs
     identity_summary: She isn't asking you to take the sound away — she's asking you to say everything the
       sound says a second time, where she can see it.

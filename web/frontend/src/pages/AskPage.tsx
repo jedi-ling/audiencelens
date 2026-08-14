@@ -331,8 +331,12 @@ export default function AskPage() {
 
   const personaNames = useMemo(() => {
     const map: Record<string, string> = {}
-    // archetype 是表述层，按 ui_lang 取；取不到才退回 name（恒中文，10.3）。
-    for (const p of personaRows) map[p.id] = localizePersona(p).archetype || p.name
+    // archetype 是表述层，按 ui_lang 取；取不到才退回展示名（10.3 推翻早期裁决后
+    // 是 display_name，走同一次 localizePersona 调用，不再直接读恒中文的 p.name）。
+    for (const p of personaRows) {
+      const localized = localizePersona(p)
+      map[p.id] = localized.archetype || localized.name
+    }
     return map
     // locale 进依赖数组：切语言要重算这张表
   }, [personaRows, locale])

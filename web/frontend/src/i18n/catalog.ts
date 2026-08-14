@@ -281,19 +281,28 @@ export function getPackCategoryName(id: string): string {
 }
 
 /* ================================================================== *
- * §D 人格的表述层文案（archetype / identity_summary）
+ * §D 人格的表述层文案（display_name / archetype / identity_summary）
  *
  * 与 §B1 / §B2 都不同，所以单开一节：
  *   · §B1 是"前端有源常量"，zh/en 都查 overlay；
  *   · §B2 是"后端只发中文"，en 才查 overlay；
  *   · 人格是**后端把中英并排发下来**（契约 D4，PersonaSummary 的
- *     archetype_en / identity_summary_en，事实源 src/personas/en-US/<pack>.yaml）。
- *     英文既不在前端资源里、也不需要 key 表——它是数据不是 UI 文案，
- *     72 条人格 × 2 个字段塞进 key 表只会让 i18n:check 去校验一批
- *     没有任何页面写死过的字符串。
+ *     archetype_en / identity_summary_en / display_name_en，事实源
+ *     src/personas/en-US/<pack>.yaml）。英文既不在前端资源里、也不需要 key 表
+ *     ——它是数据不是 UI 文案，72 条人格 × 3 个字段塞进 key 表只会让 i18n:check
+ *     去校验一批没有任何页面写死过的字符串。
  *
- * 身份字段（name / gender / age_range / region / language / mbti …）**不经过这里**：
- * 10.3 冻结了它们，张伟在英文界面下仍叫张伟。这个函数只收表述层那两条。
+ * `display_name`（罗马音译）是 10.3 推翻早期裁决后新增的纯展示层字段，
+ * 与 `name` 是两个字段：`name`（中文，识别字段）继续是后端匹配、审计、
+ * `persona_outputs.persona_name` 落库、`recruit_types` 计算的唯一事实源，
+ * 永不改变；`display_name` 只负责英文界面下这一屏怎么画。
+ *
+ * 身份字段（name 本身 / gender / age_range / region / language / mbti …）
+ * **不经过这里**：10.3 冻结了它们，`region`/`age_range` 拼进 `recruit_types`
+ * 的口径一个字没变。这个函数收的是"同一个身份的显示层"，不是身份本身——
+ * 返回值里的 `name` 是**给屏幕看的名字**，不是后端匹配用的那个 `name` 字段，
+ * 调用点不能把这个返回值回填进 recruit_types / 引擎提示词 /
+ * persona_outputs.persona_name，那三处必须继续读原始的 `p.name`。
  *
  * 缺 overlay 时**不回落中文**：后端注释写明 null 只有一种含义——这条人格没有
  * overlay（只可能是 .claude/agents / .trae 那两份开发工具链镜像）。
@@ -301,26 +310,33 @@ export function getPackCategoryName(id: string): string {
  * ================================================================== */
 
 export interface LocalizedPersonaText {
+  name: string
   archetype: string
   identity_summary: string
 }
 
 /**
- * 人格的 archetype / identity_summary，按当前 ui_lang 取好。
+ * 人格的 display_name / archetype / identity_summary，按当前 ui_lang 取好。
  *
- * 形参收整条人格而不是两个字符串：调用点（PersonaCard / PersonasPage /
- * CreateReviewPage / ReviewProgressPage / AskPage）都已经拿着整条，
+ * 形参收整条人格而不是三个字符串：调用点（PersonaCard / PersonasPage /
+ * CreateReviewPage / ReviewProgressPage / AskPage / ReportPage）都已经拿着整条，
  * 收整行也让"以后再加一条双发字段"不用改调用点签名——同 §B2 末段的理由。
+ *
+ * 返回值里的 `name`：中文界面下就是 `p.name` 本身（10.3 未冻结显示层，
+ * 但中文侧显示层与识别字段本来就是同一个字）；英文界面下是 `p.display_name_en`，
+ * 缺一条就显式标记，不回落成 `p.name`（那正是 D8 禁止的"英文界面混中文"）。
  */
 export function localizePersona(p: {
   id: string
+  name: string
   archetype: string
   identity_summary: string
   archetype_en?: string | null
   identity_summary_en?: string | null
+  display_name_en?: string | null
 }): LocalizedPersonaText {
   if (getLocale() === 'zh') {
-    return { archetype: p.archetype, identity_summary: p.identity_summary }
+    return { name: p.name, archetype: p.archetype, identity_summary: p.identity_summary }
   }
   const pick = (en: string | null | undefined, field: string): string => {
     if (en) return en
@@ -331,6 +347,7 @@ export function localizePersona(p: {
     return missingMarker(`persona.${p.id}.${field}`, getLocale())
   }
   return {
+    name: pick(p.display_name_en, 'display_name'),
     archetype: pick(p.archetype_en, 'archetype'),
     identity_summary: pick(p.identity_summary_en, 'identity_summary'),
   }

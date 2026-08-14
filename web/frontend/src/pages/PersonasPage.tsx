@@ -54,14 +54,16 @@ export default function PersonasPage() {
 
   const filteredPersonas = personas.filter((p) => {
     const matchPack = !selectedPack || p.pack === selectedPack
-    // 搜的是**屏幕上那行字**：英文界面下卡片显示的是 en overlay，
-    // 只搜中文源字段会让英文用户搜 "Color vision" 一条也搜不到，
-    // 而页面上明明白白写着这几个词——那种"搜不到但看得见"最像是搜索坏了。
-    // name 恒中文（10.3），所以它不进 localize，照旧直接比。
+    // 搜的是**屏幕上那行字**：英文界面下卡片显示的是 en overlay（含罗马音译的
+    // display_name，10.3 推翻早期裁决后新增），只搜中文源字段会让英文用户搜
+    // "Lu Cheng" 或 "Color vision" 一条也搜不到，而页面上明明白白写着这几个词
+    // ——那种"搜不到但看得见"最像是搜索坏了。p.name 也留着一起比：
+    // 用户仍然可能记得或粘贴中文名，两条路径都要能命中。
     const shown = localizePersona(p)
     const q = searchQuery.toLowerCase()
     const matchSearch = !searchQuery ||
       p.name.toLowerCase().includes(q) ||
+      shown.name.toLowerCase().includes(q) ||
       shown.archetype.toLowerCase().includes(q) ||
       shown.identity_summary.toLowerCase().includes(q)
     return matchPack && matchSearch
@@ -235,8 +237,8 @@ export default function PersonasPage() {
             <PersonaRadarChart
               data={comparePersonas[0].behavior_profile}
               compareData={comparePersonas[1].behavior_profile}
-              name1={comparePersonas[0].name}
-              name2={comparePersonas[1].name}
+              name1={localizePersona(comparePersonas[0]).name}
+              name2={localizePersona(comparePersonas[1]).name}
               size={280}
               mobileSize={200}
             />
@@ -244,7 +246,7 @@ export default function PersonasPage() {
           <div className="flex justify-center gap-8 mt-4">
             {comparePersonas.map((p) => (
               <div key={p.id} className="text-center">
-                <p className="font-medium text-text-primary">{p.name}</p>
+                <p className="font-medium text-text-primary">{localizePersona(p).name}</p>
                 <p className="text-xs text-text-muted">{localizePersona(p).archetype}</p>
               </div>
             ))}
@@ -302,10 +304,13 @@ export default function PersonasPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-text-primary">{persona.name}</span>
-                          <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>
-                        </div>
+                        {/* name 与 archetype 曾经同行挤在一起（gap-2 的 flex row）：中文 archetype
+                            大多两三个字，英文覆盖层常常长得多（"Cognitive load sensitivity"
+                            这种），挤在 name 右边就会自己先折行，把标题区顶成两行，
+                            同一排卡片高度就参差不齐。现在各占一行、各自 truncate 成单行
+                            省略号——宁可省略号，不要不可预期的折行撑高卡片。 */}
+                        <p className="font-medium text-text-primary truncate">{localizePersona(persona).name}</p>
+                        <p className="text-xs text-text-muted truncate mb-1.5">{localizePersona(persona).archetype}</p>
                         <p className="text-xs text-text-secondary line-clamp-2">{localizePersona(persona).identity_summary}</p>
                       </div>
                       <div className="shrink-0">

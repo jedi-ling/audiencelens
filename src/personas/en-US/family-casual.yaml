@@ -20,6 +20,7 @@ locale: en-US
 panel_id: family-casual
 persona_overlays:
   P39-parent-child-creator:
+    display_name: 'Wen Ya'
     archetype: Parent-and-child co-creator
     identity_summary: She isn't looking for a game that keeps the child quiet; she's looking for one that
       lets the two of them make a memory together.
@@ -72,6 +73,7 @@ persona_overlays:
       avoid:
       - Judging a parent-and-child game by single-player standards
   P40-party-socialite:
+    display_name: 'Carlos'
     archetype: Party socializer
     identity_summary: 'The only reason he ever buys a game: will it have everyone at the next party laughing
       until they can''t stop?'
@@ -123,6 +125,7 @@ persona_overlays:
       avoid:
       - Judging a party game by the depth expected of a solo one
   P41-cozy-relaxer:
+    display_name: 'You Zi'
     archetype: Cozy unwinder
     identity_summary: What she's after isn't a challenge — it's the feeling that opening this game slows
       the world down.
@@ -176,6 +179,7 @@ persona_overlays:
       avoid:
       - Judging a comfort game by the depth of its challenge
   P42-nostalgia-retro:
+    display_name: 'Lao Chen'
     archetype: Nostalgic retro player
     identity_summary: He isn't chasing the pixel-art trend; he's checking whether anyone actually understood
       what that era tasted like.
@@ -226,6 +230,7 @@ persona_overlays:
       avoid:
       - Judging the retro as nothing but a visual style
   P43-generational-bridge:
+    display_name: 'Ruth'
     archetype: Bridge across generations
     identity_summary: 'They have one standard: can an eight-year-old and an eighty-year-old both find something
       in it, instead of one playing while the other watches?'

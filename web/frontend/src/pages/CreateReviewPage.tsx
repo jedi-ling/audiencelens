@@ -1337,7 +1337,9 @@ export default function CreateReviewPage() {
                       key={p.id}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-brand-primary/10 text-brand-primary text-xs"
                     >
-                      {p.name}
+                      {/* 10.3 推翻早期裁决：展示名走 localizePersona，p.name 本身不动
+                          ——它仍是提交给后端 selected_personas 的那个 id 对应的匹配字段。 */}
+                      {localizePersona(p).name}
                       <button
                         onClick={() => togglePersona(p.id)}
                         className="hover:text-severity-critical transition-colors"
@@ -1472,7 +1474,9 @@ function PersonaSelectCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text-primary">{persona.name}</span>
+          {/* 10.3 推翻早期裁决：展示名走 localizePersona；persona.name 本身仍是
+              togglePersona(persona.id) 提交给后端的那个匹配字段，没有被这里换掉。 */}
+          <span className="text-sm font-medium text-text-primary">{localizePersona(persona).name}</span>
           <span className="text-xs text-text-muted">{localizePersona(persona).archetype}</span>
           {packLabel && (
             <span className="shrink-0 rounded bg-bg-secondary px-1.5 py-0.5 text-[10px] text-text-muted">
@@ -1480,7 +1484,6 @@ function PersonaSelectCard({
             </span>
           )}
         </div>
-        {/* 表述层按 ui_lang 取；上面的 persona.name 恒中文（10.3）。 */}
         <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{localizePersona(persona).identity_summary}</p>
       </div>
       <div className="shrink-0 hidden sm:block">
