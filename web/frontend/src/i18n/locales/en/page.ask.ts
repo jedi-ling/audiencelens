@@ -38,6 +38,15 @@ export default {
   'verify_nudge.hint':
     'This project still has {{total}} unverified predictions — record their outcomes first, and this review will stop repeating findings a playtest has already refuted.',
   'verify_nudge.cta': 'Record now',
+
+  /* 对话链路的高级选项 */
+  'advanced.label': 'Advanced',
+  'wide_screen.badge': 'Two-tier',
+  'wide_screen.tooltip':
+    'Every persona in the pack skims the materials in one cheap short call first; the deep-review panel is then picked by disagreement signal. Adds one cheap-tier round, itemised separately in the report.',
+  'adaptive.badge': 'Adaptive panel',
+  'adaptive.tooltip':
+    'Starts small and adds personas by marginal value, stopping below the threshold instead of filling the tier quota. The expansion score is an explainable heuristic, not measured information gain.',
   'examples.cta': 'Try an example',
   /* 这三条点一下就当作用户消息发出去，所以写的是英文用户真会打出来的话，
      不是中文句子的逐字对应。 */

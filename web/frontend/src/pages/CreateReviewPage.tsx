@@ -10,7 +10,7 @@ import { loadSkillTruth, NON_REVIEW_SKILL_TYPES } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
-import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw, Layers } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw, Layers, Target } from 'lucide-react'
 import { t, Trans } from '@/i18n/runtime'
 import {
   getTaskTypes,
@@ -165,6 +165,10 @@ export default function CreateReviewPage() {
   // 两层评审：全包初筛 → 分歧门禁 → 深评。默认关——它比常规评审多一轮
   // （廉价档）调用，该由用户显式选择而不是替他决定花这笔钱。
   const [wideScreen, setWideScreen] = useState(false)
+  // 自适应面板：从小面板起步，按可解释的边际价值代理逐个扩面。与 wide_screen
+  // 不互斥——实测两者各司其职（初筛宽漏斗 → 自适应省着花），
+  // tests/test_cli.py::test_wide_screen_and_adaptive_panel_compose 钉着这个交互。
+  const [adaptivePanel, setAdaptivePanel] = useState(false)
   // 技能清单以 /api/skills 为唯一事实源。以前第 0 步的名称/描述读的是本地 SKILLS，
   // 后端改了文案这一页不会跟，同一个技能在技能中心和创建页会显示两种说法。
   const [skills, setSkills] = useState<SkillTruth[] | null>(null)
@@ -387,6 +391,7 @@ export default function CreateReviewPage() {
         enable_evaluation: enableEvaluation,
         enable_red_team: enableRedTeam,
         wide_screen: wideScreen,
+        adaptive_panel: adaptivePanel,
       })
       navigate(`/review/${reviewId}`)
     } catch (e) {
@@ -1251,6 +1256,41 @@ export default function CreateReviewPage() {
                   {wideScreen && (
                     <p className="mt-3 text-xs text-text-muted leading-relaxed">
                       {t('page.create.wide_screen.hint')}
+                    </p>
+                  )}
+                </div>
+              </button>
+
+              {/* 自适应面板。与两层评审同为"选人"开关但不互斥：初筛负责宽漏斗、
+                  自适应负责省着花，实测两者叠加时自适应只在门禁结果里挑
+                  （见 test_wide_screen_and_adaptive_panel_compose）。 */}
+              <button
+                onClick={() => setAdaptivePanel(!adaptivePanel)}
+                className={cn(
+                  'w-full flex items-start gap-4 p-5 rounded-xl border-2 transition-all cursor-pointer text-left',
+                  'bg-bg-card hover:bg-bg-card-hover',
+                  adaptivePanel ? 'border-brand-primary/50 bg-brand-primary/5' : 'border-border'
+                )}
+              >
+                <div className={cn(
+                  'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
+                  adaptivePanel ? 'bg-brand-primary border-brand-primary' : 'border-border'
+                )}>
+                  {adaptivePanel && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={1.25} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
+                    <span className={cn('font-medium text-sm', adaptivePanel ? 'text-brand-primary' : 'text-text-primary')}>
+                      {t('page.create.adaptive.label')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    {t('page.create.adaptive.desc')}
+                  </p>
+                  {adaptivePanel && (
+                    <p className="mt-3 text-xs text-text-muted leading-relaxed">
+                      {t('page.create.adaptive.hint')}
                     </p>
                   )}
                 </div>

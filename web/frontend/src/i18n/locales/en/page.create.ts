@@ -109,6 +109,13 @@ export default {
     'First every persona in the selected pack skims the materials in one cheap short call (stance, severity, one-line concern); the deep-review panel is then picked by disagreement signal. Without it, the panel is simply the first few in preset order.',
   'wide_screen.hint':
     'Adds one round of cheap-tier model calls — far below the cost of a full review, and itemised separately in the report. Who advanced and why is listed in the report’s “Triage record”. If you name specific personas, this tier is skipped entirely: nothing you picked gets filtered out.',
+
+  /* 自适应面板 */
+  'adaptive.label': 'Adaptive panel (expand by marginal value)',
+  'adaptive.desc':
+    'Starts with a small panel and adds one persona at a time by task affinity, behavioural novelty and evidence-gap coverage; it stops once marginal value drops below the threshold instead of filling the tier quota.',
+  'adaptive.hint':
+    'The expansion score is an explainable heuristic, not measured information gain — its weights still need calibrating against real outcomes. The report lists every step: who was added and why it stopped. Naming personas explicitly disables this tier.',
   'evaluation.label': 'Add an evaluation report',
   'evaluation.desc_one':
     'When the review finishes, run a {{count}}-dimension evaluation and produce a scorecard plus an ethics report.',

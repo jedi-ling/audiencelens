@@ -429,6 +429,9 @@ export type MessageKey =
   | 'nav.verify_banner.hint_unknown'
   | 'nav.verify_banner.sending'
   | 'nav.verify_banner.success'
+  | 'page.ask.adaptive.badge'
+  | 'page.ask.adaptive.tooltip'
+  | 'page.ask.advanced.label'
   | 'page.ask.attach.hint'
   | 'page.ask.attachment_image.aria'
   | 'page.ask.attachment_limit.error'
@@ -588,6 +591,11 @@ export type MessageKey =
   | 'page.ask.upload.tooltip'
   | 'page.ask.verify_nudge.cta'
   | 'page.ask.verify_nudge.hint'
+  | 'page.ask.wide_screen.badge'
+  | 'page.ask.wide_screen.tooltip'
+  | 'page.create.adaptive.desc'
+  | 'page.create.adaptive.hint'
+  | 'page.create.adaptive.label'
   | 'page.create.category_all.tab'
   | 'page.create.confirm.desc'
   | 'page.create.confirm.title'
@@ -2022,6 +2030,9 @@ export type PlainMessageKey =
   | 'nav.verify_banner.hint_unknown'
   | 'nav.verify_banner.sending'
   | 'nav.verify_banner.success'
+  | 'page.ask.adaptive.badge'
+  | 'page.ask.adaptive.tooltip'
+  | 'page.ask.advanced.label'
   | 'page.ask.attach.hint'
   | 'page.ask.attachment_preview.tooltip'
   | 'page.ask.clarify.hint'
@@ -2129,6 +2140,11 @@ export type PlainMessageKey =
   | 'page.ask.upload.aria'
   | 'page.ask.upload.tooltip'
   | 'page.ask.verify_nudge.cta'
+  | 'page.ask.wide_screen.badge'
+  | 'page.ask.wide_screen.tooltip'
+  | 'page.create.adaptive.desc'
+  | 'page.create.adaptive.hint'
+  | 'page.create.adaptive.label'
   | 'page.create.category_all.tab'
   | 'page.create.confirm.desc'
   | 'page.create.confirm.title'
@@ -3447,6 +3463,9 @@ export interface MessageVars {
   'nav.verify_banner.hint_unknown': Record<string, never>
   'nav.verify_banner.sending': Record<string, never>
   'nav.verify_banner.success': Record<string, never>
+  'page.ask.adaptive.badge': Record<string, never>
+  'page.ask.adaptive.tooltip': Record<string, never>
+  'page.ask.advanced.label': Record<string, never>
   'page.ask.attach.hint': Record<string, never>
   'page.ask.attachment_image.aria': { index: string | number }
   'page.ask.attachment_limit.error': { count: number }
@@ -3606,6 +3625,11 @@ export interface MessageVars {
   'page.ask.upload.tooltip': Record<string, never>
   'page.ask.verify_nudge.cta': Record<string, never>
   'page.ask.verify_nudge.hint': { total: string | number }
+  'page.ask.wide_screen.badge': Record<string, never>
+  'page.ask.wide_screen.tooltip': Record<string, never>
+  'page.create.adaptive.desc': Record<string, never>
+  'page.create.adaptive.hint': Record<string, never>
+  'page.create.adaptive.label': Record<string, never>
   'page.create.category_all.tab': Record<string, never>
   'page.create.confirm.desc': Record<string, never>
   'page.create.confirm.title': Record<string, never>

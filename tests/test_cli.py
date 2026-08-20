@@ -386,6 +386,51 @@ class TestRunPanel:
         assert all(a.get("advanced_reason") for a in tri["advanced"])
         assert all(n.get("not_advanced_reason") for n in tri["not_advanced"])
 
+    def test_wide_screen_and_adaptive_panel_compose(self):
+        """两个选人开关同时打开时的交互 —— 实测确认过的行为，不是推测。
+
+        它们都影响"谁进深评"，同时开会不会互相打架是产品要回答的问题：
+          wide_screen  全包初筛 → 门禁收敛到档位上限（宽漏斗）
+          adaptive     从小面板起步，按边际价值逐个扩面（省着花）
+        实测（full 档、game-core 17 人）：
+          仅 wide_screen → 晋级 8、深评 8
+          仅 adaptive    → 深评 5
+          两个都开       → 晋级 8、深评 4（自适应在门禁结果里再挑）
+        即"先把全包过一遍选出最有分歧的 8 位，再只为其中真正有增量的几位付钱"。
+        两层各司其职，不冲突——UI 因此可以同时暴露两个开关而不做互斥。
+        """
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        common = dict(
+            task_type="concept_review",
+            artifact_bundle={"materials": [{"type": "text", "text": "核心循环是探索-战斗-成长"}]},
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="full",
+        )
+        both = run_panel(**common, wide_screen=True, adaptive_panel=True)["report"]
+
+        # 两层都真的跑了，不是一个把另一个吃掉
+        assert both["triage"]["enabled"] is True
+        assert both["adaptive_panel"]["enabled"] is True
+
+        # 深评人数 ≤ 晋级人数：自适应只能在门禁的结果里挑，不会把被筛掉的捞回来
+        advanced = len(both["triage"]["advanced"])
+        deep = len(both["persona_notes"])
+        assert deep <= advanced, (
+            f"自适应跑了 {deep} 位，超过门禁晋级的 {advanced} 位——"
+            "说明它绕过了初筛门禁去人格包里另选人"
+        )
+        deep_ids = {n["persona_id"] for n in both["persona_notes"]}
+        advanced_ids = {a["persona_id"] for a in both["triage"]["advanced"]}
+        assert deep_ids <= advanced_ids
+
     def test_wide_screen_defers_to_explicit_selection(self, sample_artifact_bundle):
         """显式点名人格时初筛让位——用户指定的角色一个都不能被门禁筛掉。"""
         os.environ.pop("ANTHROPIC_API_KEY", None)

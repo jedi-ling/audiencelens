@@ -42,6 +42,8 @@ interface ReviewState {
     enable_red_team?: boolean
     /** 两层评审：全包初筛 → 分歧门禁 → 深评（引擎 wide_screen） */
     wide_screen?: boolean
+    /** 自适应面板：按边际价值代理逐个扩面（引擎 adaptive_panel） */
+    adaptive_panel?: boolean
   }) => Promise<string>
   /** 后端在免费次数用完时会把高级技能/红队降级，并回一句 skill_degraded 说明。
    *  这句话必须让用户看见：否则他以为红队正常跑了，实际拿到的是普通模式的报告。
@@ -112,6 +114,7 @@ export const useReviewStore = create<ReviewState>((set) => ({
       // enable_red_team 都真实踩过这个坑（开关从 UI 传到后端被静默吞掉，
       // 用户以为开了、实际没开，且没有任何回执）。
       wide_screen: data.wide_screen ?? false,
+      adaptive_panel: data.adaptive_panel ?? false,
     })
     // 显式写 null 而不是"有值才写"：不覆盖的话，上一次降级的提示会挂在
     // store 上，下一次正常创建时被页面当成本次的降级又弹一遍。

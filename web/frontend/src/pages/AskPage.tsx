@@ -1050,7 +1050,12 @@ export default function AskPage() {
     void send(`就是${TASK_LABELS_ZH_FOR_ENGINE[candidate] ?? candidate}`)
   }
 
-  const confirmAndCreate = async (msgId: string, intent: IntentResult, personasOverride?: string[]) => {
+  const confirmAndCreate = async (
+    msgId: string,
+    intent: IntentResult,
+    personasOverride?: string[],
+    opts?: { wide_screen?: boolean; adaptive_panel?: boolean },
+  ) => {
     if (!intent.task_type) return
     // 全局防重：多张确认卡片共存时，任何一张在提交中都不允许再发——
     // 否则双击/连点会创建出两个评审
@@ -1077,6 +1082,10 @@ export default function AskPage() {
         })(),
         skill_type: intent.skill_type,
         project_key: intent.project_key,
+        // 对话链路此前完全没有高级选项：向导有第 4 步，而大多数用户走的是这里，
+        // 两个选人开关在这条路径上够不着。默认关，与向导一致。
+        wide_screen: opts?.wide_screen,
+        adaptive_panel: opts?.adaptive_panel,
       })
       // 高级技能次数用完被降级时，必须**在这里说出来**。后端已经把技能剥掉了，
       // 前端不吭声的话，用户看到的是一份悄悄少了一层的报告——他会以为产品
@@ -1279,7 +1288,7 @@ export default function AskPage() {
             busy={submittingId === m.id}
             onPickCandidate={pickCandidate}
             personaNames={personaNames}
-            onConfirm={(intent, personas) => void confirmAndCreate(m.id, intent, personas)}
+            onConfirm={(intent, personas, opts) => void confirmAndCreate(m.id, intent, personas, opts)}
             onGoSettings={() => navigate('/settings')}
             onGoLogin={() => navigate('/login')}
             onStartFollowUp={(reviewId, personaId, label) => setActiveChatContext({ reviewId, personaId, label })}
@@ -2802,7 +2811,11 @@ function ChatBubble({
   busy: boolean
   personaNames: Record<string, string>
   onPickCandidate: (candidate: string) => void
-  onConfirm: (intent: IntentResult, personas?: string[]) => void
+  onConfirm: (
+    intent: IntentResult,
+    personas?: string[],
+    opts?: { wide_screen?: boolean; adaptive_panel?: boolean },
+  ) => void
   onGoSettings: () => void
   onGoLogin: () => void
   onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
@@ -2811,6 +2824,10 @@ function ChatBubble({
   // 确认卡片上被用户手动移除的角色（呼叫角色可开庭前调整）。
   // hooks 必须在所有条件 return 之前调用，故放在这里而不是 confirm 分支里。
   const [removedPersonas, setRemovedPersonas] = useState<Set<string>>(new Set())
+  // 两个选人开关的本地状态。放在气泡组件里而不是提到 AskPage：每条确认卡
+  // 各自独立（一段对话里可能有多次评审提议），提上去会让上一条的选择泄漏到下一条。
+  const [wideScreen, setWideScreen] = useState(false)
+  const [adaptivePanel, setAdaptivePanel] = useState(false)
 
   // 评审卡片的进度追踪。hooks 必须在条件 return 之前，故对非 review 消息也声明
   // （reviewId 传 null 时 hook 内部直接跳过）。
@@ -3057,9 +3074,47 @@ function ChatBubble({
             )}
           </div>
 
+          {/* 高级选项：两个选人开关。对话链路此前一个都没有——向导第 4 步有，
+              而大多数用户走的是这条路。收在一行 chip 里而不是铺成卡片：
+              确认卡已经很密（类型/模式/评审团/技能/项目/人格/把握），
+              再加两张大卡会把主 CTA 挤出首屏。 */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+              {t('page.ask.advanced.label')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setWideScreen((v) => !v)}
+              aria-pressed={wideScreen}
+              title={t('page.ask.wide_screen.tooltip')}
+              className={cn(
+                'rounded-md border px-2 py-1 text-xs transition-colors',
+                wideScreen
+                  ? 'border-warm-orange/50 bg-warm-orange/10 text-warm-orange'
+                  : 'border-border text-text-muted hover:text-text-secondary'
+              )}
+            >
+              {t('page.ask.wide_screen.badge')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdaptivePanel((v) => !v)}
+              aria-pressed={adaptivePanel}
+              title={t('page.ask.adaptive.tooltip')}
+              className={cn(
+                'rounded-md border px-2 py-1 text-xs transition-colors',
+                adaptivePanel
+                  ? 'border-brand-primary/50 bg-brand-primary/10 text-brand-primary'
+                  : 'border-border text-text-muted hover:text-text-secondary'
+              )}
+            >
+              {t('page.ask.adaptive.badge')}
+            </button>
+          </div>
+
           <button
-            className="mt-4 w-full rounded-md bg-brand-primary py-2.5 font-semibold text-white shadow-[0_2px_10px_rgba(0,113,227,0.25)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.35)] disabled:opacity-50"
-            onClick={() => onConfirm(intent, activePersonas)}
+            className="mt-3 w-full rounded-md bg-brand-primary py-2.5 font-semibold text-white shadow-[0_2px_10px_rgba(0,113,227,0.25)] transition-all duration-150 hover:bg-brand-primary-dim hover:shadow-[0_4px_16px_rgba(0,113,227,0.35)] disabled:opacity-50"
+            onClick={() => onConfirm(intent, activePersonas, { wide_screen: wideScreen, adaptive_panel: adaptivePanel })}
             disabled={busy}
           >
             {busy ? t('page.ask.submit.pending') : t('page.ask.submit.cta')}

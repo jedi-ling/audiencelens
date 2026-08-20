@@ -145,7 +145,7 @@ def test_review_switches_reach_the_backend_from_the_ui() -> None:
     """
     import os
 
-    switches = ("enable_evaluation", "enable_red_team", "wide_screen")
+    switches = ("enable_evaluation", "enable_red_team", "wide_screen", "adaptive_panel")
 
     store = os.path.join(REPO_ROOT, "web", "frontend", "src", "store", "review-store.ts")
     with open(store, "r", encoding="utf-8") as f:
