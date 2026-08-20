@@ -24,7 +24,8 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router'
 import { api, ApiError } from '@/lib/apiClient'
 import type { SharedReport } from '@/lib/types'
-import { SyntheticBanner, LimitationsSection, EvidenceProfileSection, ModeBoundaryNote, type RealReport } from './ReportPage'
+import { toCrossExamView } from '@/lib/mock-data'
+import { SyntheticBanner, LimitationsSection, EvidenceProfileSection, ModeBoundaryNote, CrossExamSection, type RealReport } from './ReportPage'
 import SeverityBadge from '@/components/SeverityBadge'
 import type { Severity } from '@/lib/mock-data'
 import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight, AlertCircle } from 'lucide-react'
@@ -125,6 +126,9 @@ export default function SharedReportPage() {
   }
 
   const report = (data.report ?? {}) as RealReport
+  // 库里同时存在三代 cross_examination 形状，一律经 toCrossExamView 运行时收敛
+  // （与 ReportPage 同一个读法，不在这里另写一套）。
+  const sharedCrossExam = toCrossExamView(report.cross_examination)
   const summary = report.executive_summary
   const consensus = report.consensus
   const fixes = report.priority_fixes ?? []
@@ -295,6 +299,38 @@ export default function SharedReportPage() {
           </div>
         </section>
       )}
+
+      {/* 主要分歧 + 交叉质询：分享页的自我定位是"把报告发给合伙人看"，
+          而合伙人最该看到的恰恰是"评审团在哪儿吵起来了"。这两块是本产品
+          最有差异化的内容，数据白名单本来就给了（report 整体），此前只是
+          没渲染。CrossExamSection 从 ReportPage 复用而非复制一份。 */}
+      {(report.major_disagreements?.length ?? 0) > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">
+            {t('page.report.disagreements.title')}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {report.major_disagreements!.map((d, i) => (
+              <div key={i} className="overflow-x-auto rounded-xl border border-warm-orange/20 bg-bg-card p-4">
+                <p className="mb-2 text-sm font-medium text-text-primary">{d.topic}</p>
+                {(d.persona_stances?.length ?? 0) > 0 && (
+                  <ul className="space-y-1.5">
+                    {d.persona_stances!.map((ps, j) => (
+                      <li key={j} className="flex items-start gap-2 text-xs text-text-secondary">
+                        <span className="shrink-0 font-mono text-text-muted">{ps.persona_id}</span>
+                        <span className="shrink-0 rounded bg-bg-secondary px-1.5 text-text-primary">{ps.stance}</span>
+                        <span>{ps.evidence}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sharedCrossExam && <CrossExamSection view={sharedCrossExam} />}
 
       {/* 可证伪预测：分享页尤其需要——收链接的人没有上下文，
           "该拿什么去验证" 正是这份报告对他最有用的部分。 */}

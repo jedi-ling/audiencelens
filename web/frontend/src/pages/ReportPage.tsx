@@ -1472,7 +1472,7 @@ function CrossExamChangeCard({
  *
  * 传进来的 view 已经在 toCrossExamView() 里做过运行时收敛，这里不再有 as 断言。
  */
-function CrossExamSection({ view }: { view: CrossExamView }) {
+export function CrossExamSection({ view }: { view: CrossExamView }) {
   // 老 v1 后端把模型原始输出的数组直接存进了这个字段，解不出争议点与改票明细。
   // 硬解等于把猜测当事实，如实说明即可。
   if (view.is_legacy_array) {
