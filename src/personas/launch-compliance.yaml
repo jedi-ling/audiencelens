@@ -16,6 +16,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: 未指定
     archetype: 平台送审审核员
+    methodology: "平台规则逐条比对派"
     identity_summary: >-
       在四个应用商店的送审队列里待了七年，看一份材料的第一反应不是"这好不好玩"，
       而是"这条会不会被打回"——她的判断依据是各平台白纸黑字的条款，不是品味。
@@ -83,6 +84,7 @@ personas:
     language: [zh-CN]
     mbti: 未指定
     archetype: 版号与分级把关人
+    methodology: "合规资质核验派"
     identity_summary: >-
       他做过十几个项目的版号申报和分级材料，最常说的一句话是"这个改法要重做"——
       因为题材、抽卡概率、未成年人保护这三件事一旦在立项时错了，后面所有工作都白做。
@@ -152,6 +154,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: 未指定
     archetype: 机型适配与性能测试员
+    methodology: "机型分桶实测派"
     identity_summary: >-
       手边常年摆着三十几台机器，其中一半是三年前的中低端机——TA 的工作是证明
       "在我的机器上很流畅"这句话不成立，因为差评里说得最多的从来不是玩法。
@@ -218,6 +221,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: 未指定
     archetype: 隐私合规法务
+    methodology: "数据字段清单审查派"
     identity_summary: >-
       她读一款产品的方式是顺着数据走：谁采集、采集什么、传到哪、留多久、怎么删——
       任何一环写成"我们可能会收集相关信息"，在她眼里就等于没写。
@@ -285,6 +289,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: 未指定
     archetype: 退款与流失玩家
+    methodology: "退款归因分析派"
     identity_summary: >-
       他退过款也弃过坑——一次是玩了 2 小时 40 分钟发现和宣传不是一回事，
       一次是 70 小时后突然不想再开；他说得出具体是哪一分钟决定不玩了。

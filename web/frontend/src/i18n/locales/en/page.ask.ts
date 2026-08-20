@@ -25,6 +25,19 @@ export default {
   // 跟着 zh 改回原文案「从一句话开始」，见 zh 侧注释。
   'examples.title': 'Start with one sentence',
   'examples.hint': 'Or just describe what you want reviewed in the box below',
+
+  /* ---------------- 待验证追踪卡 ---------------- */
+  'tracking.title_one': '{{count}} prediction awaiting verification',
+  'tracking.title_other': '{{count}} predictions awaiting verification',
+  'tracking.meta_one': '{{count}} unverified · oldest on record {{days}} days',
+  'tracking.meta_other': '{{count}} unverified · oldest on record {{days}} days',
+  'tracking.hint':
+    'What you record here shapes the next review: findings a real playtest has refuted stop being carried into this project’s review context.',
+  'tracking_unnamed.label': 'Unnamed project',
+  'tracking_more.title': '{{total}}+ predictions awaiting verification',
+  'verify_nudge.hint':
+    'This project still has {{total}} unverified predictions — record their outcomes first, and this review will stop repeating findings a playtest has already refuted.',
+  'verify_nudge.cta': 'Record now',
   'examples.cta': 'Try an example',
   /* 这三条点一下就当作用户消息发出去，所以写的是英文用户真会打出来的话，
      不是中文句子的逐字对应。 */

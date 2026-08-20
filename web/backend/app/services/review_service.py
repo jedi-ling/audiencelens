@@ -154,6 +154,7 @@ def _execute_review(
             selected_personas=review.selected_personas,
             mode=review.mode,
             adaptive_panel=review.adaptive_panel,
+            wide_screen=review.wide_screen,
         )
 
         job_service.update_progress(job_id, 80)

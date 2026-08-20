@@ -14,6 +14,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # 语义去重是构建期选择（装不装 sentence-transformers，+2GB）。
+      # 默认 false；要开在 .env 写 INSTALL_SEMANTIC_DEDUP=true 后 --build。
+      args:
+        INSTALL_SEMANTIC_DEDUP: ${INSTALL_SEMANTIC_DEDUP:-false}
     ports:
       - "127.0.0.1:8000:8000"
     # 挂载点必须与容器内的仓库镜像布局一致（见 backend/Dockerfile 的 WORKDIR 说明）：

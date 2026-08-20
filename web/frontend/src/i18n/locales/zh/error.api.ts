@@ -14,6 +14,7 @@ import type { Messages } from '@/i18n/types'
 export default {
   bad_request: '请求参数有误',
   unauthorized: '请先登录',
+  session_expired: '登录已过期，请重新登录。',
   forbidden: '没有权限访问这项内容',
   not_found: '找不到这项内容',
   rate_limited: '操作太频繁，请稍后再试',

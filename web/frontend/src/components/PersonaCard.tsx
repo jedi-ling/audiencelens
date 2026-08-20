@@ -98,6 +98,16 @@ export default function PersonaCard({ persona, status, progress, primaryStance, 
               不保证内容不把自己撑爆）。 */}
           <p className="text-xs text-text-secondary mb-2 truncate">{localizedText.archetype}</p>
 
+          {/* 方法论流派标签（ARTi 式的"XX派"）。放 archetype 下面而不是替换它：
+              archetype 说"这是谁"，methodology 说"它怎么下判断"——后者与引擎
+              提示词同源（CORE_FIELDS），是卡片上唯一直接对应模型约束的元素。
+              undefined 时整块不渲染（旧数据/无标签 ≠ 缺翻译，见 localizePersona）。 */}
+          {localizedText.methodology && (
+            <span className="inline-block max-w-full truncate rounded border border-cyan/30 bg-cyan/10 px-1.5 py-0.5 text-[11px] leading-4 text-cyan mb-2">
+              {localizedText.methodology}
+            </span>
+          )}
+
           {status !== undefined && (
             <div className="flex items-center gap-2 text-xs text-text-muted mb-2">
               <span>{t(statusLabelKeys[status])}</span>

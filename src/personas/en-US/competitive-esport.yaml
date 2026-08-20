@@ -23,6 +23,7 @@ persona_overlays:
   P30-rank-climber:
     display_name: 'Zhao Rui'
     archetype: Ranked ladder climber
+    methodology: "Matchmaking-fairness Stress-testing"
     identity_summary: 'He holds a game to one standard: is its competitive system worth a thousand hours
       of climbing?'
     motivations:
@@ -75,6 +76,7 @@ persona_overlays:
   P31-speedrun-challenger:
     display_name: 'Ling Shi'
     archetype: Speedrun challenger
+    methodology: "Mechanics Limit-pushing Deconstruction"
     identity_summary: What they care about isn't finishing the game — it's how far this system can be understood
       and how far it can be pushed.
     motivations:
@@ -126,6 +128,7 @@ persona_overlays:
   P32-team-coordinator:
     display_name: 'Su Yao'
     archetype: Team coordinator
+    methodology: "Voiceless-coordination Validation"
     identity_summary: 'The way she judges a competitive game: queued with strangers, can the systems get
       her a win without her having to shout?'
     motivations:
@@ -177,6 +180,7 @@ persona_overlays:
   P33-esport-spectator:
     display_name: 'Marco'
     archetype: Esport spectator and participant
+    methodology: "Spectator-integration Auditing"
     identity_summary: He probably spends more time watching matches and arguing about the meta than he
       does playing.
     motivations:
@@ -228,6 +232,7 @@ persona_overlays:
   P34-mod-competitor:
     display_name: 'A Gan'
     archetype: Mod-scene competitive player
+    methodology: "Toolchain-openness Assessment"
     identity_summary: He doesn't play the base game — the base game is only where the competitive rules
       he writes himself begin.
     motivations:

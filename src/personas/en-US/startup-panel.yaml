@@ -27,6 +27,7 @@ persona_overlays:
   P54-angel-investor:
     display_name: 'Shen Yi Zhou'
     archetype: Angel investor
+    methodology: "Founder-insight Depth Probing"
     identity_summary: At this stage there's no data to read, so he's betting on the person — how deeply
       the founder understands the problem, how fast they move, and what they know that nobody else does.
     motivations:
@@ -74,6 +75,7 @@ persona_overlays:
   P55-vc-associate:
     display_name: 'Lin Ke'
     archetype: VC associate
+    methodology: "Growth-model Accounting"
     identity_summary: 'Fifty decks a week cross her desk and the job is to screen forty-nine of them out
       before the partners see them — market size, growth logic, exit path: every line has to add up.'
     motivations:
@@ -120,6 +122,7 @@ persona_overlays:
   P56-industry-analyst:
     display_name: 'Gu Xing'
     archetype: Industry analyst
+    methodology: "Market-window Benchmarking"
     identity_summary: 'His question never changes: where does this sit in the space right now, is the
       window still open, and what do you do when the giants show up.'
     motivations:
@@ -166,6 +169,7 @@ persona_overlays:
   P57-tech-dd-engineer:
     display_name: 'Zheng Bei'
     archetype: Technical due-diligence engineer
+    methodology: "Moat Replication-cost Estimation"
     identity_summary: 'He cares about exactly one thing: is the technical moat you''re describing a real
       moat, or something three competent engineers could rebuild in a month.'
     motivations:
@@ -213,6 +217,7 @@ persona_overlays:
   P58-early-adopter-customer:
     display_name: 'Tang Xiao Man'
     archetype: Seed user
+    methodology: "Workflow-fit Testing"
     identity_summary: 'She doesn''t care about the space or the valuation, only this: does this fit into
       the way I already work, and would I pay for it.'
     motivations:
@@ -259,6 +264,7 @@ persona_overlays:
   P59-incubator-screener:
     display_name: 'He Cheng'
     archetype: Incubator screener
+    methodology: "Pitch-clarity Triage"
     identity_summary: Four hundred applications a cohort and five minutes each on the first pass — what
       she's judging isn't the company, it's whether the application manages to explain it.
     motivations:
@@ -305,6 +311,7 @@ persona_overlays:
   P60-unit-economics-skeptic:
     display_name: 'Lao Fan'
     archetype: Business-model examiner
+    methodology: "Unit-economics Auditing"
     identity_summary: 'A serial founder who lost money twice before it sank in: however good the story
       is, if a single transaction doesn''t make money, scaling only makes you bleed faster.'
     motivations:
@@ -351,6 +358,7 @@ persona_overlays:
   P61-devils-advocate:
     display_name: 'Qin Dao'
     archetype: The sharp-tongued skeptic on the partnership
+    methodology: "Strongest-claim Stress-testing"
     identity_summary: He's the one whose job at the investment committee is to argue against — not to
       sink the company, but to keep you from being sunk by that same question in front of a real investor.
     motivations:

@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTJ
     archetype: 教师评估者
+    methodology: "课程标准对齐派"
     identity_summary: 她不会问"好不好玩"，她问的是"这东西能不能进我的课堂、值不值一节课的时间"。
     gaming_profile:
       experience: 轻度-教育型
@@ -69,6 +70,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ISFJ
     archetype: 家长把关人
+    methodology: "安全底线否决派"
     identity_summary: 他不是反对游戏，他是在替孩子问"这个东西会拿走什么、会留下什么"。
     gaming_profile:
       experience: 轻度
@@ -126,6 +128,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: INTP
     archetype: 终身学习者
+    methodology: "知识迁移验证派"
     identity_summary: 他们不是在"玩游戏"，他们是在用游戏这种媒介完成一次自我教育。
     gaming_profile:
       experience: 中核
@@ -183,6 +186,7 @@ personas:
     language: [zh-CN, ja-JP, en-US]
     mbti: ISFP
     archetype: 特殊教育需求者
+    methodology: "设计排他性检测派"
     identity_summary: 她不是在要求"特殊待遇"，她是在告诉开发者"你的设计把谁排除在了门外"。
     gaming_profile:
       experience: 轻度

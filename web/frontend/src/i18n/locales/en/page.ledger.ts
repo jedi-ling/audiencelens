@@ -82,6 +82,8 @@ export default {
 
   'list.title': 'Past predictions',
   'list.label': 'Only those awaiting an outcome',
+  'list.hint':
+    'Verdicts you record here have teeth: a finding marked “did not happen” stops being carried into this project’s next review.',
   'list.error': 'Could not load your predictions — the reason is above.',
   'list_empty.title': 'No predictions yet',
   'list_empty.desc': 'Run a review and its conclusions get filed here automatically.',

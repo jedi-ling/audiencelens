@@ -199,6 +199,13 @@ export interface Persona {
    */
   archetype_en?: string | null
   identity_summary_en?: string | null
+  /**
+   * 方法论流派标签（如「首屏承诺验证派」/ "First-screen Promise Auditing"）。
+   * 行为性字段，与身份红线无关；同一份值也进引擎提示词（persona_agent.CORE_FIELDS），
+   * 所以卡片上显示的判断框架与模型实际被约束的框架同源。
+   */
+  methodology?: string | null
+  methodology_en?: string | null
 }
 
 export interface PersonaPack {
@@ -651,6 +658,8 @@ export interface Review {
   persona_pack?: string
   selected_personas?: string[]
   adaptive_panel: boolean
+  /** 两层评审：全包初筛 → 分歧门禁 → 深评（引擎 wide_screen 开关的落库值） */
+  wide_screen?: boolean
   mode: ReviewMode
   status: 'pending' | 'running' | 'completed' | 'failed'
   created_at: string
@@ -1014,6 +1023,18 @@ export const SKILLS: { type: SkillType; name: string; description_zh: string; ic
 // 不引入后端没有的判分口径。评分和是否通过一律来自接口，本表不参与任何计算。
 // 权威词表是 GET /api/rubric（api.ts:322 的 fetchRubric），接上后这里应退化为纯离线兜底。
 // 防漂移的卡口见 web/backend/tests/test_frontend_constants_parity.py。
+/**
+ * 三档评审的能力边界。事实源是引擎 src/runner/cli.py 的 REVIEW_MODE_CONFIG——
+ * 这份常量被 web/backend/tests/test_frontend_constants_parity.py 与它逐项比对，
+ * 引擎改档位而这里没跟上会直接红。报告页的档位边界声明从这里取数字，
+ * 文案里不手写 3/6/8。
+ */
+export const REVIEW_MODE_BOUNDARIES = [
+  { id: 'quick', max_personas: 3, cross_examination: false, calibration: false },
+  { id: 'standard', max_personas: 6, cross_examination: true, calibration: false },
+  { id: 'full', max_personas: 8, cross_examination: true, calibration: true },
+]
+
 export const EVALUATION_DIMENSIONS: { id: string; name: string; description: string }[] = [
   { id: 'persona_differentiation', name: '人格差异度', description: '各人格是否有由行为规则支撑的稳定视角差异，而不只是措辞不同' },
   { id: 'input_grounding', name: '材料贴合度', description: '结论是否持续引用你提交的材料细节，而不是给一段通用建议' },

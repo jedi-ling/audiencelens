@@ -412,6 +412,83 @@ class TestLedger:
         assert stored.evidence["verification_method"] == "controlled_comparison"
         assert stored.evidence["confidence_basis"].endswith("not_empirically_calibrated")
 
+    def test_only_unverified_filters_before_the_limit(self, db):
+        """**先截断再过滤会静默丢数据。**
+
+        原实现是 SQL 里 `.limit(n)` 取最新 n 条，再在 Python 里跳过已回填的。
+        于是"最新的都已回填、更早的还欠着"这个再正常不过的状态下，接口会返回
+        空列表——而首页那张待验证追踪卡直接显示这个数，用户会看到「0 条待验证」
+        然后以为自己回填完了。
+
+        这里用 limit=2 复现同一形状（不必造 200 行）：3 条判断、最新 2 条已回填，
+        问"未回填的有哪些"，正确答案是那 1 条最早的，不是空。
+        """
+        from datetime import datetime, timedelta, timezone
+
+        from app.models import Judgment, Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-limit-order",
+            task_type="concept_review",
+            artifact_bundle={"title": "t"},
+            status="completed",
+        )
+        db.add(review)
+        db.flush()
+
+        now = datetime.now(timezone.utc)
+        ids = []
+        for days_ago, claim in [(9, "最早·还欠着"), (2, "较新·已回填"), (1, "最新·已回填")]:
+            j = Judgment(
+                review_id=review.id,
+                user_id="u-limit-order",
+                claim=claim,
+                predicted_at=now - timedelta(days=days_ago),
+            )
+            db.add(j)
+            db.flush()
+            ids.append(j.id)
+        db.commit()
+
+        ledger_service.verify_judgment(db, ids[1], "hit", "u-limit-order")
+        ledger_service.verify_judgment(db, ids[2], "hit", "u-limit-order")
+
+        rows = ledger_service.list_judgments(
+            db, "u-limit-order", only_unverified=True, limit=2
+        )["judgments"]
+
+        assert len(rows) == 1, (
+            "未回填的那条被 limit 挤掉了——截断发生在过滤之前。"
+            f"实际返回 {len(rows)} 条：{[r['claim'] for r in rows]}"
+        )
+        assert rows[0]["claim"] == "最早·还欠着"
+
+    def test_list_judgments_carries_review_context(self, db):
+        """待验证追踪卡按项目分组，靠的是 list_judgments 随行带出的评审上下文。
+        缺了这两个字段前端不会报错——所有判断会静默归进「未命名项目」一个组，
+        追踪卡等于退化成一个总数，所以这里必须钉住。"""
+        from app.models import Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-ledger-ctx",
+            task_type="concept_review",
+            artifact_bundle={"title": "t"},
+            target_title="定价页 v2",
+            project_key="官网改版",
+            status="completed",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        ledger_service.record_judgments(db, review, self._report())
+
+        rows = ledger_service.list_judgments(db, "u-ledger-ctx", only_unverified=True)["judgments"]
+        assert rows, "record_judgments 落了库，列表不该为空"
+        assert all(r["project_key"] == "官网改版" for r in rows)
+        assert all(r["review_title"] == "定价页 v2" for r in rows)
+
     def test_record_and_verify_and_hit_rate(self, db):
         from app.models import Review
         from app.services import ledger_service
@@ -429,7 +506,7 @@ class TestLedger:
         n = ledger_service.record_judgments(db, review, self._report())
         assert n == 3
 
-        judgments = ledger_service.list_judgments(db, "u-ledger")
+        judgments = ledger_service.list_judgments(db, "u-ledger")["judgments"]
         assert len(judgments) == 3
         assert all(j["outcome"] is None for j in judgments)  # 尚未验证
 
@@ -455,7 +532,7 @@ class TestLedger:
         db.add(review)
         db.commit()
         ledger_service.record_judgments(db, review, self._report())
-        jid = ledger_service.list_judgments(db, "u-bad")[0]["id"]
+        jid = ledger_service.list_judgments(db, "u-bad")["judgments"][0]["id"]
         with pytest.raises(BadRequest):
             ledger_service.verify_judgment(db, jid, "maybe", "u-bad")
 
@@ -468,7 +545,7 @@ class TestLedger:
         db.add(review)
         db.commit()
         ledger_service.record_judgments(db, review, self._report())
-        jid = ledger_service.list_judgments(db, "owner")[0]["id"]
+        jid = ledger_service.list_judgments(db, "owner")["judgments"][0]["id"]
         with pytest.raises(NotFound):
             ledger_service.verify_judgment(db, jid, "hit", "attacker")
 

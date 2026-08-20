@@ -237,16 +237,37 @@ def record_judgments(db: Session, review: Review, report: dict) -> int:
 def list_judgments(
     db: Session, user_id: str, review_id: str = None, only_unverified: bool = False, limit: int = 200
 ) -> List[dict]:
-    q = db.query(Judgment).filter(Judgment.user_id == user_id)
+    # eager 装载 outcome 与所属评审：下面每行都要读 j.outcome（序列化）和
+    # j.review 的标题/项目名（追踪卡按项目分组用），不 eager 的话是每行两条
+    # 额外 SELECT——这个接口是"待回填"工作台每次打开都调的。
+    from sqlalchemy.orm import contains_eager, joinedload
+
+    q = (
+        db.query(Judgment)
+        .outerjoin(Outcome, Outcome.judgment_id == Judgment.id)
+        .options(contains_eager(Judgment.outcome), joinedload(Judgment.review))
+        .filter(Judgment.user_id == user_id)
+    )
     if review_id:
         q = q.filter(Judgment.review_id == review_id)
-    rows = q.order_by(Judgment.predicted_at.desc()).limit(limit).all()
+    if only_unverified:
+        # **必须在 SQL 层过滤，不能取回来再在 Python 里跳过。**
+        # 下面的 .limit() 是在数据库里生效的：先截断再过滤，等于"最新的 200 条
+        # 里没有未回填的"就返回空——而"新的都回填了、旧的还欠着"是最正常不过的
+        # 状态。首页的待验证追踪卡直接显示这个数，用户会看到「0 条待验证」
+        # 然后以为自己已经回填完了。
+        # 回归测试：test_platform_links.py::test_only_unverified_filters_before_the_limit
+        q = q.filter(Outcome.id.is_(None))
+    # 多取一条探测截断：正好取满 limit 时无法区分"就这么多"和"还有更多"，
+    # 而追踪卡直接把这个数展示给用户——显示"恰好 200 条"而实际更多，
+    # 数字就失真了（本仓库对数字的底线）。探测行只用于判定，不进结果。
+    rows = q.order_by(Judgment.predicted_at.desc()).limit(limit + 1).all()
+    truncated = len(rows) > limit
+    rows = rows[:limit]
 
     out = []
     for j in rows:
         oc = j.outcome
-        if only_unverified and oc is not None:
-            continue
         out.append(
             {
                 "id": j.id,
@@ -256,6 +277,11 @@ def list_judgments(
                 "severity": j.severity,
                 "confidence": j.confidence,
                 "predicted_at": j.predicted_at.isoformat() if j.predicted_at else None,
+                # 评审上下文：追踪卡要显示"哪个项目/哪次评审留下的"。
+                # j.review 理论上恒存在（review_id 是 NOT NULL 外键），但被
+                # 直接 SQL 动过的库什么都可能发生，缺了就发 None 而不是炸接口。
+                "review_title": j.review.target_title if j.review else None,
+                "project_key": j.review.project_key if j.review else None,
                 "outcome": (
                     {
                         "verdict": oc.verdict,
@@ -268,7 +294,10 @@ def list_judgments(
                 ),
             }
         )
-    return out
+    # 端点把 truncated 一并透出（响应形状 {"judgments": [...], "truncated": bool}）。
+    # 挂在函数属性上会引入隐藏状态；改返回值又会破坏 admin 等既有调用方——
+    # 用最直白的方式：返回 dict 的调用方自己解包。
+    return {"judgments": out, "truncated": truncated}
 
 
 def verify_judgment(

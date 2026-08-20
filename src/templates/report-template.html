@@ -317,6 +317,56 @@
   <div class="validation-status {{'pass' if cal.overall_pass else 'fail'}}">{{'校准通过' if cal.overall_pass else '校准未通过'}}</div>
   {% endif %}
 
+  <!-- 证据构成：报告自身的可信度记账（口径与 validator 一致），不是产品得分。
+       刻意没有任何加权综合分。 -->
+  {% if evidence_profile and evidence_profile.total %}
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚖️</span> 证据构成（共 {{evidence_profile.total}} 条）</div>
+    <div style="font-size:13px;margin-bottom:8px">
+      直接观察 <b>{{evidence_profile.direct}}</b> · 合理推断 <b>{{evidence_profile.inferred}}</b> · 信息缺口 <b>{{evidence_profile.gap}}</b>
+      ｜ 推断占比 {{(evidence_profile.inferred_ratio * 100) | round | int}}%（上限 {{(evidence_profile.threshold * 100) | round | int}}%）
+    </div>
+    {% if dimension_scores %}
+    <table style="font-size:12px;width:100%">
+      <tr><th style="text-align:left">维度</th><th>均分（1-5）</th><th>区间</th><th>人数</th></tr>
+      {% for d in dimension_scores %}
+      <tr><td>{{d.dim}}</td><td style="text-align:center">{{d.avg}}</td><td style="text-align:center">{{d.min}}–{{d.max}}</td><td style="text-align:center">{{d.count}}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if triage and triage.enabled %}
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🔬</span> 初筛（两层评审 L1）</div>
+    <div style="font-size:12px;opacity:.8;margin-bottom:8px">
+      全包 {{triage.screened_count}} 位人格各一次廉价短调用，{{triage.advanced | length}} 位按分歧信号晋级深评。
+      初筛意见只用于选人，不是正式评审结论。
+      {% if triage.materials_truncated %}初筛阶段材料截断至 {{triage.material_char_limit}} 字符（深评读完整材料）。{% endif %}
+    </div>
+    {% for r in triage.not_advanced %}
+    <div style="font-size:12px;margin-bottom:3px;opacity:.75">
+      <b>{{r.persona_id}}</b>（{{r.stance}} · {{r.severity}}）：{{r.top_concern}}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if abstentions %}
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🚫</span> 弃权（{{abstentions | length}} 位）</div>
+    <div style="font-size:12px;opacity:.8;margin-bottom:8px">
+      材料里缺少这些人格评审所需的证据类型，按规矩不硬评——弃权，不计入任何结论。
+    </div>
+    {% for ab in abstentions %}
+    <div style="font-size:13px;margin-bottom:4px">
+      <b>{{ab.persona_id}}</b>{% if ab.missing_evidence %} · 缺少：{{ab.missing_evidence | join('、')}}{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Consensus -->
   <div class="section-card">
     {# 这一节统计的是**议题**：各人格的 key_issues 按相似度聚类后，看同一件事被

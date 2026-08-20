@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ENTJ
     archetype: 碎片时间鲸鱼
+    methodology: "付费效率精算派"
     identity_summary: 他花的每一分钱都要换到明确的价值感，但碎片时间里他愿意为效率买单。
     gaming_profile:
       experience: 核心
@@ -69,6 +70,7 @@ personas:
     language: [zh-CN, en-US, vi-VN]
     mbti: ISTP
     archetype: 免费午餐猎人
+    methodology: "免费线可达性测算派"
     identity_summary: 她的哲学是"能白嫖绝不花一分钱，但白嫖也要嫖得有尊严"。
     gaming_profile:
       experience: 中核
@@ -127,6 +129,7 @@ personas:
     language: [ko-KR, en-US, zh-CN]
     mbti: ESFJ
     archetype: 社交驱动型
+    methodology: "社交收益压力权衡派"
     identity_summary: 他玩游戏的第一理由是"我公会/朋友在玩"，第二理由才是游戏本身。
     gaming_profile:
       experience: 中核
@@ -185,6 +188,7 @@ personas:
     language: [ja-JP, zh-CN, en-US]
     mbti: ENFP
     archetype: 二次元审美党
+    methodology: "角色叙事诚意检验派"
     identity_summary: 她为角色而来，为剧情而留，对抽卡的态度是"我愿意为我爱的人花钱，但别骗我"。
     gaming_profile:
       experience: 核心
@@ -243,6 +247,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ESTP
     archetype: 超休闲过路客
+    methodology: "30秒本能筛选派"
     identity_summary: 30秒决定去留，不学规则不看教程，手指比脑子快。
     gaming_profile:
       experience: 轻度
@@ -301,6 +306,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTJ
     archetype: 月卡党
+    methodology: "月卡回报追踪派"
     identity_summary: 月卡不是消费，是信仰充值——每月一张月卡是他对游戏的信任投票，但也意味着他要持续看到回报。
     gaming_profile:
       experience: 中核
@@ -359,6 +365,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESFP
     archetype: 广告忍耐者
+    methodology: "广告换算记账派"
     identity_summary: 看广告不是丢人的事，是她的资源获取策略——30秒广告换一个道具，这笔账她算得很清楚。
     gaming_profile:
       experience: 轻度

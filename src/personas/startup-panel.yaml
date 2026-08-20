@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ENTP
     archetype: 天使投资人
+    methodology: "创始人认知深度派"
     identity_summary: 早期项目没有数据可看，他赌的是人——创始人对问题的理解深度、执行速度和不可替代的信息优势。
     gaming_profile:
       experience: 商业视角
@@ -62,6 +63,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTJ
     archetype: 机构VC投资经理
+    methodology: "增长模型算账派"
     identity_summary: 她每周过五十份BP，工作是替合伙人筛掉四十九份——市场规模、增长逻辑、退出路径，每一项都要能算账。
     gaming_profile:
       experience: 商业视角
@@ -113,6 +115,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INTJ
     archetype: 行业分析师
+    methodology: "赛道窗口对标派"
     identity_summary: 他的问题永远是：这个赛道现在处在什么位置，窗口还开着吗，巨头下场你怎么办。
     gaming_profile:
       experience: 商业视角
@@ -163,6 +166,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INTP
     archetype: 技术尽调工程师
+    methodology: "壁垒复制成本派"
     identity_summary: 他只关心一件事：你说的技术壁垒，是真的壁垒，还是三个熟练工程师一个月就能抄出来的东西。
     gaming_profile:
       experience: 核心
@@ -213,6 +217,7 @@ personas:
     language: [zh-CN]
     mbti: ENFP
     archetype: 种子用户代表
+    methodology: "工作流嵌入检验派"
     identity_summary: 她不管赛道和估值，只问一件事：这东西我现在的工作流里放得进去吗，我愿意为它掏钱吗。
     gaming_profile:
       experience: 轻度-中核
@@ -264,6 +269,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESTJ
     archetype: 孵化器筛选官
+    methodology: "材料清晰度初筛派"
     identity_summary: 一期收到四百份申请，每份初筛五分钟——她评的不是项目本身，而是这份申请材料有没有把项目讲清楚。
     gaming_profile:
       experience: 商业视角
@@ -314,6 +320,7 @@ personas:
     language: [zh-CN]
     mbti: ISTJ
     archetype: 商业模式审视者
+    methodology: "单位经济学审计派"
     identity_summary: 连续创业者出身，赔过两次才学会：故事再好，单笔生意不赚钱，规模化就是加速失血。
     gaming_profile:
       experience: 商业视角
@@ -364,6 +371,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESTP
     archetype: 毒舌怀疑型合伙人
+    methodology: "最强主张压力测试派"
     identity_summary: 投委会上专职唱反调的人——他的存在不是为了否定项目，而是让你在真正的投资人面前不被同一个问题问死。
     gaming_profile:
       experience: 商业视角

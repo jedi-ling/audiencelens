@@ -76,6 +76,12 @@
       "minLength": 1,
       "description": "原型标签"
     },
+    "methodology": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 16,
+      "description": "方法论流派标签：概括该人格怎么下判断（如「首屏承诺验证派」），比 archetype 更具体地指向判断方法；不含人口学信息"
+    },
     "identity_summary": {
       "type": "string",
       "minLength": 1,

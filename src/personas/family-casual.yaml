@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ENFJ
     archetype: 亲子共创型
+    methodology: "真合作模式检验派"
     identity_summary: 她不是在找"能让孩子安静的游戏"，她是在找"能让我们一起创造回忆的游戏"。
     gaming_profile:
       experience: 轻度
@@ -68,6 +69,7 @@ personas:
     language: [es-ES, en-US, zh-CN]
     mbti: ESFP
     archetype: 派对社交型
+    methodology: "节目效果优先派"
     identity_summary: 他买游戏的唯一理由就是"下次聚会能不能让所有人笑到停不下来"。
     gaming_profile:
       experience: 轻度-中核
@@ -125,6 +127,7 @@ personas:
     language: [zh-CN, ja-JP]
     mbti: INFP
     archetype: 治愈放松型
+    methodology: "零压力体验检验派"
     identity_summary: 她要的不是挑战，是"打开这个游戏，世界就慢下来了"的感觉。
     gaming_profile:
       experience: 轻度
@@ -182,6 +185,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTP
     archetype: 怀旧复古型
+    methodology: "经典内核对标派"
     identity_summary: 他不是在追像素风潮流，他是在找"那个年代的味道有没有被真正理解"。
     gaming_profile:
       experience: 核心-老兵
@@ -239,6 +243,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ENFJ
     archetype: 跨代桥梁型
+    methodology: "全龄通用设计派"
     identity_summary: 他们的标准只有一个：这游戏能不能让8岁和80岁同时找到乐趣，而不是一个人在玩另一个人在看。
     gaming_profile:
       experience: 中核

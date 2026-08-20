@@ -4,6 +4,7 @@ import type { Messages } from '@/i18n/types'
 export default {
   bad_request: 'Something in the request was not valid',
   unauthorized: 'Please sign in first',
+  session_expired: 'Your session has expired — please sign in again.',
   forbidden: 'You do not have access to this',
   not_found: 'Not found',
   rate_limited: 'Too many requests — try again in a moment',

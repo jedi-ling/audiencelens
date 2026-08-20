@@ -21,6 +21,23 @@
 - **Release Risk**: {{release_risk or "—"}}
 - **Evidence Quality**: {{evidence_quality or "—（各人格均未给出证据充分度）"}}
 
+## 证据构成
+{# 报告自身的可信度记账：结论建立在多少条直接观察/推断/信息缺口之上。
+   口径与 validator 一致（inferred / 全部条数）。刻意没有任何加权综合分。 #}
+{% if evidence_profile and evidence_profile.total %}
+- 共 {{evidence_profile.total}} 条证据：直接观察 {{evidence_profile.direct}} · 合理推断 {{evidence_profile.inferred}} · 信息缺口 {{evidence_profile.gap}}
+- 推断占比 {{"%.0f%%"|format(evidence_profile.inferred_ratio * 100)}}（上限 {{"%.0f%%"|format(evidence_profile.threshold * 100)}}，超限的单个人格会被三层校验拦下）
+{% else %}
+- （本次评审未产出证据构成账目）
+{% endif %}
+{% if dimension_scores %}
+### 维度均分（1-5 制，min–max 为人格间分布）
+| 维度 | 均分 | 区间 | 人数 |
+|---|---|---|---|
+{% for d in dimension_scores %}| {{d.dim}} | {{d.avg}} | {{d.min}}–{{d.max}} | {{d.count}} |
+{% endfor %}
+{% endif %}
+
 ## Consensus
 {# 这一节统计的是**议题**：把各人格的 key_issues 按相似度聚类后，看同一件事被多少
    位人格各自独立提到。以前这里列的是立场标签（"加愿望单"这种词）的频次分布，
@@ -103,6 +120,33 @@
 - {{v.persona_id}}：{{v.before}} → {{v.after}}{% if v.reason %}（{{v.reason}}）{% endif %}
 {% endfor %}
 {% endif %}
+{% endif %}
+
+{% if triage and triage.enabled %}
+## 初筛（两层评审 L1）
+{# 全包每人一次廉价短调用产出的粗筛信号，只用于选出深评面板——
+   初筛意见不是正式评审结论，正式结论以下方各章节为准。 #}
+- 全包 {{triage.screened_count}} 位人格初筛，{{triage.advanced | length}} 位晋级深评{% if triage.materials_truncated %}（初筛阶段材料截断至 {{triage.material_char_limit}} 字符，深评读完整材料）{% endif %}{% if triage.simulated %}（模拟模式）{% endif %}
+
+### 未晋级人格的初筛意见
+{% for r in triage.not_advanced %}
+- **{{r.persona_id}}**（{{r.stance}} · {{r.severity}}）：{{r.top_concern}}
+{% endfor %}
+{% if triage.failures %}
+### 初筛失败
+{% for f in triage.failures %}
+- {{f.persona_id}}：{{f.error}}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if abstentions %}
+## 弃权
+{# 证据预检跳过的人格：材料里没有它需要的证据类型，按规矩不硬评。
+   弃权 ≠ 失败——它是面板诚实性的正面证据，不计入任何结论。 #}
+{% for ab in abstentions %}
+- **{{ab.persona_id}}** 弃权{% if ab.missing_evidence %}（缺少：{{ab.missing_evidence | join('、')}}）{% endif %}
+{% endfor %}
 {% endif %}
 
 ## Persona-by-Persona Notes

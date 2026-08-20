@@ -252,6 +252,7 @@ CORE_FIELDS = [
     "id",
     "name",
     "archetype",
+    "methodology",  # 方法论标签：给模型一个可命名的判断框架，约束力强于抽象行为轴；不含人口学信息，进白名单是安全的
     "identity_summary",
     "behavior_profile",
     "motivations",

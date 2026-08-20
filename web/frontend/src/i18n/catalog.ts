@@ -313,6 +313,8 @@ export interface LocalizedPersonaText {
   name: string
   archetype: string
   identity_summary: string
+  /** undefined = 这条人格（或这份旧数据）没有方法论标签，整块不渲染。 */
+  methodology?: string
 }
 
 /**
@@ -334,9 +336,18 @@ export function localizePersona(p: {
   archetype_en?: string | null
   identity_summary_en?: string | null
   display_name_en?: string | null
+  methodology?: string | null
+  methodology_en?: string | null
 }): LocalizedPersonaText {
   if (getLocale() === 'zh') {
-    return { name: p.name, archetype: p.archetype, identity_summary: p.identity_summary }
+    return {
+      name: p.name,
+      archetype: p.archetype,
+      identity_summary: p.identity_summary,
+      // methodology 是新增字段，旧缓存/镜像数据里可能没有——undefined 时返回
+      // undefined，由调用方决定整块不渲染（badge 不显示 ≠ 缺翻译）。
+      methodology: p.methodology ?? undefined,
+    }
   }
   const pick = (en: string | null | undefined, field: string): string => {
     if (en) return en
@@ -350,6 +361,9 @@ export function localizePersona(p: {
     name: pick(p.display_name_en, 'display_name'),
     archetype: pick(p.archetype_en, 'archetype'),
     identity_summary: pick(p.identity_summary_en, 'identity_summary'),
+    // 与上面三个字段不同：中文源都没有 methodology 时（旧数据）这不是翻译缺口，
+    // 不该打 missing 标；中文有而英文没有才是缺口。
+    methodology: p.methodology ? pick(p.methodology_en, 'methodology') : undefined,
   }
 }
 

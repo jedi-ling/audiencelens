@@ -26,6 +26,7 @@ persona_overlays:
   P62-store-submission-reviewer:
     display_name: 'Shen Ling'
     archetype: Platform submission reviewer
+    methodology: "Store-rule Line-by-line Matching"
     identity_summary: Seven years inside the submission queues of four app stores. Her first reaction to
       a set of materials isn't whether the game is any good, it's which line is going to get it sent back
       — and she reads that off the platforms' written terms, not off taste.
@@ -80,6 +81,7 @@ persona_overlays:
   P63-china-license-gatekeeper:
     display_name: 'Lu Wei'
     archetype: Publishing licence and ratings gatekeeper
+    methodology: "Regulatory-credential Verification"
     identity_summary: He has taken a dozen or so projects through licence filings and ratings paperwork,
       and the line he says most often is that a change like this means starting over — because once the
       subject matter, the gacha odds or the protection of minors are wrong at the outset, everything built
@@ -134,6 +136,7 @@ persona_overlays:
   P64-device-compat-tester:
     display_name: 'A Qi'
     archetype: Device compatibility and performance tester
+    methodology: "Device-bucketed Field Testing"
     identity_summary: Thirty-odd handsets sit on their desk all year round, half of them mid- and low-end
       models from three years ago. Their job is to disprove the sentence "it runs fine on my machine" —
       because what the bad reviews talk about most is never the gameplay.
@@ -187,6 +190,7 @@ persona_overlays:
   P65-privacy-compliance-counsel:
     display_name: 'Wen Yi'
     archetype: Privacy compliance counsel
+    methodology: "Data-field Inventory Review"
     identity_summary: 'She reads a product by following the data: who collects it, what they collect, where
       it goes, how long it is kept, how it gets deleted — and any link in that chain written as "we may
       collect relevant information" is, to her, not written at all.'
@@ -240,6 +244,7 @@ persona_overlays:
   P66-refunded-churned-player:
     display_name: 'Jiang Ye'
     archetype: Refunded and churned player
+    methodology: "Refund-attribution Analysis"
     identity_summary: He has taken refunds and he has walked away — once at two hours forty minutes, when
       it turned out not to be the thing the marketing sold; once after seventy hours, when he simply stopped
       wanting to open it. He can tell you the exact minute he decided.

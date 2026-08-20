@@ -697,7 +697,7 @@ export const api = {
     if (opts.reviewId) q.set('review_id', opts.reviewId)
     if (opts.onlyUnverified) q.set('only_unverified', 'true')
     const qs = q.toString()
-    return request<{ judgments: Judgment[] }>(`/api/ledger/judgments${qs ? `?${qs}` : ''}`)
+    return request<{ judgments: Judgment[]; truncated?: boolean }>(`/api/ledger/judgments${qs ? `?${qs}` : ''}`)
   },
 
   verifyJudgment: (id: string, verdict: Verdict, source = 'playtest', note?: string) =>

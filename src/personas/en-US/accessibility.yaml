@@ -33,6 +33,7 @@ persona_overlays:
   P17-color-vision-aid:
     display_name: 'Lu Cheng'
     archetype: Color vision accessibility needs
+    methodology: "Color-redundancy Encoding Verification"
     identity_summary: The first thing he looks at isn't whether the art is beautiful — it's whether he can
       tell those colors apart.
     motivations:
@@ -83,6 +84,7 @@ persona_overlays:
   P18-cognitive-load-sensitive:
     display_name: 'Su Nian'
     archetype: Cognitive load sensitivity
+    methodology: "Progressive-disclosure Pacing Auditing"
     identity_summary: It isn't that she can't handle complex games — she needs a game to respect her attention
       budget and hand her one thing at a time.
     motivations:
@@ -134,6 +136,7 @@ persona_overlays:
   P19-motor-accessibility:
     display_name: 'Hui Shan'
     archetype: Motor accessibility needs
+    methodology: "Input Remappability Checklisting"
     identity_summary: It isn't that they don't want to work the controls — they need the game to admit that
       not every pair of hands can hold down five keys at once.
     motivations:
@@ -187,6 +190,7 @@ persona_overlays:
   P20-hearing-accessibility:
     display_name: 'He Jing'
     archetype: Hearing accessibility needs
+    methodology: "Audio-to-visual Equivalence Verification"
     identity_summary: She isn't asking you to take the sound away — she's asking you to say everything the
       sound says a second time, where she can see it.
     motivations:

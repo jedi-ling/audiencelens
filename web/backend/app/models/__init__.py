@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -68,6 +69,9 @@ class Review(Base):
     # 自动选人时先跑小面板，再按可解释的边际价值代理逐个扩面。
     # 显式点名人格时 runner 会自动禁用，保证用户指定的角色一个不少。
     adaptive_panel = Column(Boolean, default=False, nullable=False)
+    # 两层评审：全包初筛（L1，廉价短调用）→ 门禁 → 深评（L2）。
+    # 显式点名人格时引擎自动让位（与 adaptive_panel 同一条纪律）。
+    wide_screen = Column(Boolean, default=False, nullable=False)
     mode = Column(String, default="standard", nullable=False)
     status = Column(String, default="pending", nullable=False)
     error_message = Column(Text, nullable=True)
@@ -90,6 +94,12 @@ class Review(Base):
     # 减几列"——默认全不给、要给的一条条列出来，加新列时不会因为忘了改而漏。
     share_token = Column(String, unique=True, index=True, nullable=True)
     shared_at = Column(DateTime, nullable=True)
+
+    # 项目记忆的查询走 (user_id, project_key) 双条件（project_memory_service.
+    # collect_open_judgments 的 join 过滤），且发生在评审创建的同步路径上。
+    # 单列索引各有一个，但复合查询要么走其一再回表过滤，要么合并位图——
+    # 复合索引一步到位。老库的补丁在 db.py 的 _legacy_migrations。
+    __table_args__ = (Index("ix_reviews_user_project", "user_id", "project_key"),)
 
     persona_outputs = relationship("PersonaOutput", back_populates="review", cascade="all, delete-orphan")
     chat_messages = relationship("ReviewChatMessage", back_populates="review", cascade="all, delete-orphan")

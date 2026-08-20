@@ -114,6 +114,77 @@ export default {
   'panel_selection.title': '你点名的人格没有全部参与本次评审',
   'panel_selection.label': '实际参与：{{names}}',
 
+  /* ---------------- 证据构成（报告可信度记账） ----------------
+     度量的是**报告自身**：结论建立在多少直接观察/推断/信息缺口之上。
+     不是产品得分——合成面板给产品打综合分是假精确，给自己记账是诚实的。 */
+  'evidence_profile.title': '证据构成',
+  'evidence_profile.badge': '共 {{count}} 条证据',
+  'evidence_profile.desc':
+    '本报告的每条结论都标注了证据等级。这里是全体人格证据的构成账目——度量报告自身的可信度，不是产品得分。',
+  'evidence_direct.label': '直接观察 {{count}}',
+  'evidence_inferred.label': '合理推断 {{count}}',
+  'evidence_gap.label': '信息缺口 {{count}}',
+  'evidence_ratio.label': '推断占比 {{pct}} / 上限 {{cap}}',
+  'evidence_profile.hint':
+    '维度分为各人格 1-5 打分的简单均分，括号内是最低-最高分——分歧本身就是信息。刻意不做加权综合分：权重没有校准依据。维度名为输出 schema 的原始键，不翻译。',
+
+  /* ---------------- 章节锚点导航 ---------------- */
+  'nav_bar.aria': '报告章节导航',
+  'nav_summary.label': '摘要',
+  'nav_evidence.label': '可信度',
+  'nav_fixes.label': '优先修复',
+  'nav_personas.label': '圆桌',
+  'nav_disagreements.label': '分歧',
+  'nav_crossexam.label': '质询',
+  'nav_predictions.label': '预测',
+
+  /* ---------------- 档位边界声明 ----------------
+     数字 {{n}} 来自 REVIEW_MODE_BOUNDARIES（被 parity 测试钉在引擎 cli.py 上），
+     文案不手写人数。说的是"这一档包含/不包含什么"，不是催升级的营销话。 */
+  'mode_boundary_quick.desc':
+    '本报告为快速档：最多 {{n}} 位人格，不含交叉质询与校准检查——页面上没有「质询」一节不代表没有分歧，是这一档不跑这个环节（standard / full 档提供）。',
+  'mode_boundary_standard.desc':
+    '本报告为标准档：最多 {{n}} 位人格，含一轮仲裁式交叉质询；逐人格多智能体反驳与校准检查在 full 档提供。',
+  'mode_boundary_full.desc':
+    '本报告为完整档：最多 {{n}} 位人格，含多智能体交叉质询与校准检查，是覆盖最全的一档。',
+
+  /* ---------------- 初筛（两层评审 L1） ----------------
+     初筛意见只用于选人，不是正式评审结论——文案必须把这条边界说死。 */
+  'triage.title': '初筛记录',
+  'triage.badge': '全包 {{screened}} 位初筛 · {{advanced}} 位晋级深评',
+  'triage.desc': '每位人格一次廉价短调用（立场+严重度+一句话关切），按分歧信号选出深评面板。初筛意见只用于选人，正式结论以各章节为准。',
+  'triage.hint': '初筛阶段材料截断至 {{chars}} 字符，深评阶段读完整材料。',
+
+  /* ---------------- 圆桌弃权 ---------------- */
+  'abstain.label': '弃权',
+  'abstain.desc': '材料里缺少这位人格评审所需的证据类型，按规矩不硬评——弃权，不计入结论。',
+  'abstain.hint': '缺少：{{types}}',
+
+  /* ---------------- 证伪信号 ----------------
+     只做引擎字段的机械转述：success_criterion 在窗口内未达成 = 判断被证伪。 */
+  'falsify.title': '如何证伪这份报告',
+  'falsify.desc':
+    '上面每条预测都写明了达成判据与验证窗口。窗口内判据未达成，即该判断被证伪——去回填「没发生」，它就不再进入同项目下一次评审的上下文。',
+  'falsify.cta': '去回填验证结果',
+
+  /* ---------------- 项目记忆 ----------------
+     本次评审带入了同项目此前的历史判断。隐式注入的上下文如果不可见，
+     用户会看着报告里冒出来的结论不知道从哪来的——所以带没带、带了几条、
+     为什么没带，都要如实说。 */
+  'project_memory.title': '本次评审带入了项目历史',
+  'project_memory.desc':
+    '同一项目「{{project}}」此前评审留下的 {{count}} 条判断（来自 {{reviews}} 次历史评审）已作为背景材料交给每个人格。它们是背景，不是本次材料的直接证据。',
+  'project_memory.hint':
+    '已被真人测试回填为「没发生」的判断不会带入——回填结果直接决定下一次评审看不看得到它。',
+  'project_memory.meta': '最多带入 {{cap}} 条，按严重度优先。',
+  'project_memory_none.title': '本次评审没有带入项目历史',
+  /* carried=0 的四种原因，走 reason 变体块（契约允许块内叶子自由命名）。
+     叶子统一带 project_memory_ 前缀：reason 是 page.report 下的公共块，
+     不加前缀的话，将来别的功能往这个块里加枚举就会撞名。 */
+  'reason.project_memory_anonymous_identity':
+    '未登录状态不带入项目历史——匿名身份是所有访客共用的，带入会读到别人的评审结论。',
+  'reason.project_memory_ledger_disabled': '本部署关闭了判断留档，因此没有历史可带。',
+
   /* ---------------- 预算刹车 ---------------- */
   'budget.title': '成本达到单次上限，本次少跑了环节',
   /** 两个金额都取自 report.budget，不编造任何"省了多少"。 */
@@ -270,6 +341,8 @@ export default {
 
   /* ---------------- 优先修复项 ---------------- */
   'fixes.title': '优先修复项',
+  /** dedup_method === 'lexical' 时的如实标注。semantic 正常态不提示。 */
+  'fixes.hint': '（本次按词面相似度聚类——语义模型未安装，措辞略异的同一问题可能被拆成两条）',
   'fix_why.label': '为什么重要',
   'fix_suggestion.label': '修复建议',
   'fix_personas.label': '提出的人格',

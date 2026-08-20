@@ -25,6 +25,7 @@ try:
         run_cross_exam_protocol,
     )
     from .evidence_precheck import precheck_panel
+    from .triage import run_triage, rank_for_advance
     from .llm_client import chat_completion
     from .panel_selector import (
         DISSENTER_PREFIXES,
@@ -59,6 +60,7 @@ except ImportError:
         run_cross_exam_protocol,
     )
     from runner.evidence_precheck import precheck_panel
+    from runner.triage import run_triage, rank_for_advance
     from runner.llm_client import chat_completion
     from runner.panel_selector import (
         DISSENTER_PREFIXES,
@@ -747,6 +749,7 @@ def run_panel(
     adaptive_panel: bool = False,
     adaptive_initial_size: int = 3,
     adaptive_min_score: float = 0.35,
+    wide_screen: bool = False,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -873,11 +876,81 @@ def run_panel(
     unknown_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
 
     mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
-    if mode_config:
-        panel_selected = truncate_panel(panel_selected, mode_config["max_personas"])
 
-    precheck = precheck_panel(panel_selected, artifact_bundle)
-    valid_personas = precheck["valid_personas"]
+    # ——— 两层评审：全包初筛（L1）→ 门禁 → 深评（L2） ———
+    #
+    # 默认关（wide_screen=False）走老路：先按档位截断再预检——包里其余人格的
+    # 视角被直接扔掉。开启后改成：预检全包 → 每人一次廉价短调用（立场+严重度+
+    # 一句话关切）→ 确定性门禁按分歧信号选出深评面板。同样的档位人数上限，
+    # 但"选谁"从"预设顺序的前 N 个"变成"全包过目后分歧最大的 N 个"。
+    #
+    # 显式点名人格时不做初筛：用户指定的角色一个都不能被门禁筛掉，
+    # 这与 adaptive_panel 对点名的让位是同一条纪律。
+    triage_block = None
+    wide_screen_active = bool(wide_screen) and not requested_personas and mode_config is not None
+    if wide_screen_active:
+        # 初筛的对象是**整个人格包**（personas），不是预设面板子集——
+        # 这正是两层评审存在的意义：包里每个人格都过目一遍材料，
+        # 而不是预设名单外的人格连被考虑的机会都没有。
+        precheck = precheck_panel(personas, artifact_bundle)
+        valid_personas = precheck["valid_personas"]
+        max_advance = mode_config["max_personas"]
+        if len(valid_personas) > max_advance:
+            if simulated:
+                triage_call = None
+            else:
+                # 初筛用便宜档模型：这一层要的是"大概什么状况"的判断力，
+                # 不是深评质量。BYOK 指定了具体模型时尊重用户选择（非 Anthropic
+                # 服务商没有档位概念，fallback_model 对它们不是合法模型名）。
+                triage_model = model_override or budget_config.get(
+                    "fallback_model", budget_config.get("default_model")
+                )
+
+                def triage_call(prompt, _m=triage_model):
+                    return chat_completion(
+                        model=_m, prompt=prompt, api_key=effective_api_key,
+                        provider=provider, api_base=api_base,
+                        max_tokens=300, temperature=0.3,
+                    )
+            triage_out = run_triage(valid_personas, task_type, artifact_bundle, call_llm=triage_call)
+            pack_name = valid_personas[0].get("_pack") if valid_personas else None
+            dissenter_id = None
+            for _p in valid_personas:
+                from runner.panel_selector import _is_dissenter
+                if _is_dissenter(_p, pack_name):
+                    dissenter_id = _p["id"]
+                    break
+            advanced, not_advanced = rank_for_advance(
+                triage_out["results"], max_advance, dissenter_id=dissenter_id
+            )
+            advanced_ids = {a["persona_id"] for a in advanced}
+            valid_personas = [p for p in valid_personas if p["id"] in advanced_ids]
+            triage_block = {
+                "enabled": True,
+                "screened_count": len(triage_out["results"]) + len(triage_out["failures"]),
+                "advanced": advanced,
+                "not_advanced": not_advanced,
+                "failures": triage_out["failures"],
+                "materials_truncated": triage_out["materials_truncated"],
+                "material_char_limit": triage_out["material_char_limit"],
+                "input_tokens": triage_out["input_tokens"],
+                "output_tokens": triage_out["output_tokens"],
+                "simulated": simulated,
+            }
+        else:
+            # 包本来就不比档位上限大——没有什么可筛的，如实记原因而不是硬跑一层
+            triage_block = {
+                "enabled": False,
+                "reason": "pack_not_larger_than_panel",
+                "screened_count": 0,
+            }
+    else:
+        if mode_config:
+            panel_selected = truncate_panel(panel_selected, mode_config["max_personas"])
+        precheck = precheck_panel(panel_selected, artifact_bundle)
+        valid_personas = precheck["valid_personas"]
+        if wide_screen and requested_personas:
+            triage_block = {"enabled": False, "reason": "explicit_persona_selection", "screened_count": 0}
 
     # 自适应面板只对自动选人启用。用户显式点名角色时，少跑其中任何一个都违背
     # 用户意图；这种情况下保留 fixed 执行，并在报告里说明为什么没有自适应缩面。
@@ -1179,6 +1252,25 @@ def run_panel(
         ),
     }
 
+    # 初筛（两层评审 L1）进 report 本体：全包谁被筛过、谁晋级、为什么，
+    # 都要在重新打开历史报告时看得到。triage_block 为 None = 本次没请求 wide_screen。
+    if triage_block is not None:
+        report["triage"] = triage_block
+
+    # 弃权进 report 本体：证据预检跳过的人格此前只有一个**个数**进 cost_summary，
+    # persona_id / 原因 / 缺哪些证据全部丢弃——报告里"我选了 8 个人怎么只有 5 个
+    # 发言"没有任何交代。弃权和失败是两回事：失败是跑了没跑成（degradation），
+    # 弃权是"这次材料里没有我需要的证据类型，按规矩不硬评"——它是面板诚实性的
+    # 正面证据，应该作为一种立场展示出来，而不是藏在计数里。
+    report["abstentions"] = [
+        {
+            "persona_id": sk.get("persona_id"),
+            "reason": sk.get("reason"),
+            "missing_evidence": sk.get("missing") or [],
+        }
+        for sk in precheck["skipped_personas"]
+    ]
+
     # 校验/重试口径进 report 本体：只放在返回值顶层的话，重新打开历史报告就看不到
     # "这次配了哪些重试、有人因为校验没过被拦下来"了（与 degradation 同一个理由）。
     # gated_out 与 degradation.failed_personas 里的 failure_reason 一一对应，这里
@@ -1340,6 +1432,10 @@ def run_panel(
             "attempted_count": attempted_count,
             "failed_count": failed_count,
             "skipped_count": skipped_count,
+            # 初筛（L1）的 token 单列：它用的是便宜档模型，混进人格深评的
+            # 用量会让单价估算失真
+            "triage_input_tokens": (triage_block or {}).get("input_tokens", 0),
+            "triage_output_tokens": (triage_block or {}).get("output_tokens", 0),
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
             # 交叉质询单列一份便于对账（已包含在上面的 total_* 里，不要再加一遍）

@@ -36,6 +36,7 @@ const CODE_KEY = {
   upstream_error: 'error.api.upstream_error',
   internal_error: 'error.api.internal_error',
   admin_disabled: 'error.api.admin_disabled',
+  session_expired: 'error.api.session_expired',
 } as const satisfies Record<ApiError['code'], PlainMessageKey>
 
 export interface ApiErrorText {
@@ -71,16 +72,21 @@ export function tApiErrorParts(e: unknown, fallbackKey: PlainMessageKey): ApiErr
     // 语种对得上：用后端 message（它比 10 个粗 code 具体得多）。
     // 对不上：出前端译文，后端原文降级成 detail，绝不与界面语言混排。
     const matches = backendLang.toLowerCase() === getHtmlLang(locale).toLowerCase()
-    return matches ? { text: e.message } : { text: tPlain(CODE_KEY[e.code]), detail: e.message }
+    return matches ? { text: e.message } : { text: tPlain(CODE_KEY[e.code] ?? fallbackKey), detail: e.message }
   }
 
   // 后端没标语种（老响应，或 api/__init__.py 那套 {"detail": ...} 的第二套信封）。
   // 只能按 D2 的裁决走：zh 界面用后端 message，非 zh 界面用前端译文。
   // 这一步里"后端 message 是中文"是一个**假设**而不是事实——它正是
   // message_lang 这个字段存在的理由，也是它必须尽快铺满全部 raise 点的理由。
+  // CODE_KEY 是闭集且 satisfies 声称穷举，但 e.code 是**运行时数据**：后端先
+  // 加了新码（session_expired 就是先例）时这里查出 undefined，tPlain(undefined)
+  // 抛 MissingMessageError——错误处理函数自己变成炸弹，把调用方 catch 里
+  // 后续的收尾语句全部跳过。兜底到调用方给的 fallbackKey：文案粗一点，
+  // 但错误处理绝不能是新的错误源。
   return locale === 'zh'
     ? { text: e.message }
-    : { text: tPlain(CODE_KEY[e.code]), detail: e.message }
+    : { text: tPlain(CODE_KEY[e.code] ?? fallbackKey), detail: e.message }
 }
 
 /** 只要主文案时用这个。需要展示后端原文请用 tApiErrorParts。 */

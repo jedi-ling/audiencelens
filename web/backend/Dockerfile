@@ -15,6 +15,13 @@ WORKDIR /app/web/backend
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# 语义去重（争议点聚类的 embedding 层）。默认关：sentence-transformers 拖 torch，
+# 镜像体积 +2GB 以上——不该由默认安装替所有部署者做这个取舍。
+# 开启：docker compose build --build-arg INSTALL_SEMANTIC_DEDUP=true backend
+# 不开的话引擎自动回落词面相似度，报告里 dedup_method 会如实写 lexical，
+# 报告页也会提示"语义模型未安装"。
+ARG INSTALL_SEMANTIC_DEDUP=false
+RUN if [ "$INSTALL_SEMANTIC_DEDUP" = "true" ]; then       pip install --no-cache-dir sentence-transformers;     fi
 
 COPY app/ ./app/
 COPY run.py .

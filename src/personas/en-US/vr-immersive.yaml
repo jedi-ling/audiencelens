@@ -30,6 +30,7 @@ persona_overlays:
   P26-vr-motion-sensitive:
     display_name: 'Ye Zhou'
     archetype: VR motion sickness sensitivity
+    methodology: "Comfort-option Baseline Vetting"
     identity_summary: She wants to fall in love with VR, but her vestibular system says "think again" every
       single time.
     motivations:
@@ -85,6 +86,7 @@ persona_overlays:
   P27-presence-seeker:
     display_name: 'Shen Yuan'
     archetype: Presence seeker
+    methodology: "Physical-believability Testing"
     identity_summary: He didn't buy VR to play games. He bought it to go and live another life for a while
       — presence is the only hard currency.
     motivations:
@@ -141,6 +143,7 @@ persona_overlays:
   P28-vr-fitness-player:
     display_name: 'Chen Lan'
     archetype: VR fitness player
+    methodology: "Workout-data Verification"
     identity_summary: She isn't playing a game. She is using one to break a sweat — calories matter more
       than achievements.
     motivations:
@@ -197,6 +200,7 @@ persona_overlays:
   P29-social-vr-resident:
     display_name: 'Lumina'
     archetype: Social VR resident
+    methodology: "Social-space Safety Assessment"
     identity_summary: VR isn't a console to them, it's a second home — what they care about is whether the
       people they want to see are in this space.
     motivations:

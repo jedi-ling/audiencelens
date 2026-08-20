@@ -87,6 +87,74 @@ export default {
   'panel_selection.title': 'Not every persona you named took part in this review',
   'panel_selection.label': 'Took part: {{names}}',
 
+  /* ---------------- 证据构成（报告可信度记账） ---------------- */
+  'evidence_profile.title': 'Evidence make-up',
+  'evidence_profile.badge_one': '{{count}} evidence item',
+  'evidence_profile.badge_other': '{{count}} evidence items',
+  'evidence_profile.desc':
+    'Every conclusion in this report carries an evidence grade. This is the ledger of what the whole panel’s evidence is made of — a measure of the report’s own credibility, not a product score.',
+  'evidence_direct.label_one': 'Direct {{count}}',
+  'evidence_direct.label_other': 'Direct {{count}}',
+  'evidence_inferred.label_one': 'Inferred {{count}}',
+  'evidence_inferred.label_other': 'Inferred {{count}}',
+  'evidence_gap.label_one': 'Gap {{count}}',
+  'evidence_gap.label_other': 'Gaps {{count}}',
+  'evidence_ratio.label': 'inferred {{pct}} / cap {{cap}}',
+  'evidence_profile.hint':
+    'Dimension scores are plain averages of 1–5 persona ratings; the bracket shows min–max — the spread itself is information. There is deliberately no weighted overall score: no calibrated basis for weights exists. Dimension names are raw schema keys and are not translated.',
+
+  /* ---------------- 章节锚点导航 ---------------- */
+  'nav_bar.aria': 'Report sections',
+  'nav_summary.label': 'Summary',
+  'nav_evidence.label': 'Evidence',
+  'nav_fixes.label': 'Fixes',
+  'nav_personas.label': 'Roundtable',
+  'nav_disagreements.label': 'Disagreements',
+  'nav_crossexam.label': 'Cross-exam',
+  'nav_predictions.label': 'Predictions',
+
+  /* ---------------- 档位边界声明 ---------------- */
+  'mode_boundary_quick.desc':
+    'This is a quick-mode report: up to {{n}} personas, no cross-examination and no calibration check — a missing “Cross-examination” section does not mean there was no disagreement; this mode simply does not run that stage (standard / full do).',
+  'mode_boundary_standard.desc':
+    'This is a standard-mode report: up to {{n}} personas with one moderated round of cross-examination; per-persona multi-agent rebuttal and the calibration check ship in full mode.',
+  'mode_boundary_full.desc':
+    'This is a full-mode report: up to {{n}} personas with multi-agent cross-examination and the calibration check — the most complete tier.',
+
+  /* ---------------- 初筛（两层评审 L1） ---------------- */
+  'triage.title': 'Triage record',
+  'triage.badge': 'Whole pack of {{screened}} triaged · {{advanced}} advanced to deep review',
+  'triage.desc':
+    'One cheap short call per persona (stance + severity + one-line concern); the deep-review panel is picked by disagreement signal. Triage opinions only pick the panel — the sections below are the actual conclusions.',
+  'triage.hint': 'Triage saw materials truncated to {{chars}} characters; deep review reads them in full.',
+
+  /* ---------------- 圆桌弃权 ---------------- */
+  'abstain.label': 'Abstained',
+  'abstain.desc':
+    'The materials lack the evidence types this persona needs, so by rule it does not force a verdict — it abstains and is excluded from the conclusions.',
+  'abstain.hint': 'Missing: {{types}}',
+
+  /* ---------------- 证伪信号 ---------------- */
+  'falsify.title': 'How to falsify this report',
+  'falsify.desc':
+    'Every prediction above states its success criterion and verification window. If the criterion is not met within the window, that judgment is falsified — record “did not happen” and it stops being carried into this project’s next review.',
+  'falsify.cta': 'Record verification results',
+
+  /* ---------------- 项目记忆 ---------------- */
+  'project_memory.title': 'This review carried in the project’s history',
+  'project_memory.desc_one':
+    '{{count}} finding left by an earlier review of “{{project}}” (across {{reviews}} past reviews) was handed to every persona as background. It is context, not direct evidence about the current materials.',
+  'project_memory.desc_other':
+    '{{count}} findings left by earlier reviews of “{{project}}” (across {{reviews}} past reviews) were handed to every persona as background. They are context, not direct evidence about the current materials.',
+  'project_memory.hint':
+    'Findings a real playtest has marked as “did not happen” are not carried in — what you record on the verification step decides what the next review gets to see.',
+  'project_memory.meta': 'At most {{cap}} are carried in, highest severity first.',
+  'project_memory_none.title': 'No project history was carried into this review',
+  'reason.project_memory_anonymous_identity':
+    'Signed-out reviews never carry project history — the anonymous identity is shared by every visitor, so carrying it would surface other people’s findings.',
+  'reason.project_memory_ledger_disabled':
+    'This deployment has the judgment ledger switched off, so there is no history to carry.',
+
   /* ---------------- 预算刹车 ---------------- */
   'budget.title': 'Cost cap reached — this run skipped some stages',
   'budget.desc':
@@ -249,6 +317,8 @@ export default {
 
   /* ---------------- 优先修复项 ---------------- */
   'fixes.title': 'Priority fixes',
+  'fixes.hint':
+    '(clustered by lexical similarity — the semantic model is not installed, so the same issue phrased differently may appear twice)',
   'fix_why.label': 'Why it matters',
   'fix_suggestion.label': 'Suggested fix',
   'fix_personas.label': 'Raised by',

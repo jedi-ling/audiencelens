@@ -850,7 +850,22 @@ def apply_skill_hint(artifact_bundle: dict, skill_type: Optional[str]) -> dict:
         return artifact_bundle
     bundle = dict(artifact_bundle or {})
     materials = list(bundle.get("materials") or [])
-    materials.insert(0, {"type": "text", "text": f"[评审技能：{skill_type}] {hint}"})
+    materials.insert(
+        0,
+        {
+            "type": "text",
+            "text": f"[评审技能：{skill_type}] {hint}",
+            # 这条是系统注入的**指令**，不是用户提交的材料。前端回显"你当时说了
+            # 什么"时按这个标记跳过——AskPage.openReviewConversation 取的是
+            # materials 里第一条 type=="text"，而这条恰恰插在 0 号位，于是用了
+            # 技能的历史评审点开后，显示的是这段提示词而不是用户自己的话。
+            #
+            # 刻意**不**加 is_context：那个标记会让 evidence_precheck 跳过它，
+            # 而它现在的 type="text" 命中 FREEFORM_EVIDENCE_TYPES，是部分
+            # Wizard 材料包能通过证据预检的原因。改动那条要单独验证，不在这次范围内。
+            "is_injected": True,
+        },
+    )
     bundle["materials"] = materials
     return bundle
 
@@ -872,14 +887,26 @@ class ReviewService:
         enable_red_team: bool = False,
         enable_evaluation: bool = False,
         adaptive_panel: bool = False,
+        wide_screen: bool = False,
         key_source: Optional[str] = None,
     ) -> Review:
+        from app.services import project_memory_service
+
+        # 项目记忆必须和 v2 走同一个函数：tests/test_v1_v2_convergence.py 断言
+        # 两条链路交给 run_panel 的 artifact_bundle 逐字段相同，只在 v2 加就会红。
+        bundle = project_memory_service.attach_to_bundle(
+            self.session,
+            apply_skill_hint(artifact_bundle, skill_type),
+            user_id,
+            project_key,
+        )
+
         review = Review(
             id=str(uuid.uuid4()),
             user_id=user_id,
             task_type=task_type,
             target_title=artifact_bundle.get("title"),
-            artifact_bundle=apply_skill_hint(artifact_bundle, skill_type),
+            artifact_bundle=bundle,
             persona_pack=persona_pack,
             selected_personas=selected_personas,
             skill_type=skill_type,
@@ -890,6 +917,7 @@ class ReviewService:
             # 而报告页会显示"暂无评估结果"，看起来像是评估跑失败了。
             enable_evaluation=enable_evaluation,
             adaptive_panel=adaptive_panel,
+            wide_screen=wide_screen,
             key_source=key_source,
             mode=mode,
             status="pending",

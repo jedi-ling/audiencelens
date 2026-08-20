@@ -29,6 +29,7 @@ persona_overlays:
   P21-fragmented-whale:
     display_name: 'Qin Lang'
     archetype: "Fragmented-Time Whale"
+    methodology: "Pay-efficiency Actuarial Analysis"
     identity_summary: "Every yuan he spends has to buy a value he can point to — but in the ten minutes he gets between meetings, efficiency is worth paying for."
     motivations:
       - "Spending efficiency"
@@ -79,6 +80,7 @@ persona_overlays:
   P22-free-lunch-hunter:
     display_name: 'A Ying'
     archetype: "Free-Lunch Hunter"
+    methodology: "Free-track Reachability Calculus"
     identity_summary: "Her rule is simple: if she can get it free she will never pay a cent — but freeloading should still come with dignity."
     motivations:
       - "A complete experience at zero cost"
@@ -132,6 +134,7 @@ persona_overlays:
   P23-social-driven-mobile:
     display_name: 'Pu Jun He'
     archetype: "Socially Driven Player"
+    methodology: "Social Benefit-pressure Trade-off Analysis"
     identity_summary: "His first reason for playing is that his guild and his friends are playing; the game itself is only the second reason."
     motivations:
       - "Belonging"
@@ -186,6 +189,7 @@ persona_overlays:
   P24-anime-aesthete:
     display_name: 'Xing Nai'
     archetype: "Anime-Aesthetics Devotee"
+    methodology: "Character-narrative Sincerity Testing"
     identity_summary: "She comes for the characters and stays for the story; on gacha her position is \"I will spend money on someone I love, just don't lie to me.\""
     motivations:
       - "Emotional connection to characters"
@@ -242,6 +246,7 @@ persona_overlays:
   P25-hypercasual-passerby:
     display_name: 'Xiao Fei'
     archetype: "Hypercasual Passer-by"
+    methodology: "30-second Instinct Screening"
     identity_summary: "Thirty seconds decides whether they stay; they do not learn rules and do not read tutorials — their thumbs move faster than their head does."
     motivations:
       - "Instant gratification"
@@ -295,6 +300,7 @@ persona_overlays:
   P44-mobile-monthly-card:
     display_name: 'Lu Zi Hang'
     archetype: "Monthly-Card Regular"
+    methodology: "Monthly-pass Return Tracking"
     identity_summary: "The monthly card is not a purchase, it is a vote of confidence — buying one every month is how he tells the game he trusts it, which also means he expects to keep seeing a return."
     motivations:
       - "Getting the most out of the monthly card"
@@ -346,6 +352,7 @@ persona_overlays:
   P45-mobile-ad-tolerant:
     display_name: 'A Yao'
     archetype: "Ad-Tolerant Player"
+    methodology: "Ad-exchange Bookkeeping"
     identity_summary: "Watching ads is nothing to be embarrassed about, it is her supply line — 30 seconds of ad for one item, and she has done that math precisely."
     motivations:
       - "Getting resources at zero cost"

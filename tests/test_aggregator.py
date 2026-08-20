@@ -855,3 +855,77 @@ def test_report_with_calibration_is_json_serializable():
 
     report = {"validation": {"calibration": _json_safe({"coverage": coverage})}}
     json.dumps(report)  # 不抛异常即通过
+
+
+class TestEvidenceProfileAndDimensionScores:
+    """报告的"可信度记账"：证据构成 + 维度均分。
+
+    设计边界（有逻辑的参考，不是抄 ARTi）：ARTi 给股票打加权综合分，权重是拍的；
+    我们**不做**任何加权综合分——evidence_profile 度量的是报告自身的证据构成
+    （direct/inferred/gap 各多少条），dimension_scores 只给逐维度的简单均分加
+    min/max。这两块的每个数字都能从 persona_outputs 逐条对出来。
+    """
+
+    @staticmethod
+    def _rules():
+        return load_aggregation_rules(RULES_PATH)
+
+    def _personas(self):
+        return [
+            _make_persona(
+                "p1",
+                evidence=[
+                    {"content": "a", "inference_level": "direct"},
+                    {"content": "b", "inference_level": "direct"},
+                    {"content": "c", "inference_level": "inferred"},
+                    {"content": "d", "inference_level": "gap"},
+                ],
+            ),
+            _make_persona(
+                "p2",
+                evidence=[
+                    {"content": "e", "inference_level": "inferred"},
+                    {"content": "f"},  # 未标注等级：进分母、不算 inferred（与 validator 同口径）
+                ],
+            ),
+        ]
+
+    def test_profile_counts_match_inputs_and_validator_basis(self):
+        report = aggregate_report(self._personas(), "demo_first_play", "GameX", self._rules())
+        ep = report["evidence_profile"]
+        assert ep["total"] == 6
+        assert ep["direct"] == 2
+        assert ep["inferred"] == 2
+        assert ep["gap"] == 1
+        # 口径 = validator 的 inferred / 全部条数（未标注计入分母）
+        assert ep["inferred_ratio"] == round(2 / 6, 3)
+        # 阈值必须随报告落库，且与 validator 的常量同源——历史报告按当时规则解读
+        from runner.validator import MAX_INFERRED_RATIO
+
+        assert ep["threshold"] == MAX_INFERRED_RATIO
+        p2 = next(x for x in ep["per_persona"] if x["persona_id"] == "p2")
+        assert p2 == {
+            "persona_id": "p2", "direct": 0, "inferred": 1, "gap": 0,
+            "total": 2, "inferred_ratio": 0.5,
+        }
+
+    def test_dimension_scores_are_plain_averages_with_spread(self):
+        personas = self._personas()
+        personas[0]["scores"] = {"base": {"clarity": 4, "trust": 2}, "task_specific": {"pacing": 5}}
+        personas[1]["scores"] = {"base": {"clarity": 2}, "task_specific": {}}
+        report = aggregate_report(personas, "demo_first_play", "GameX", self._rules())
+        ds = {d["dim"]: d for d in report["dimension_scores"]}
+        assert ds["clarity"] == {"dim": "clarity", "avg": 3.0, "min": 2.0, "max": 4.0, "count": 2}
+        assert ds["trust"]["count"] == 1
+        assert ds["pacing"]["avg"] == 5.0
+        # 红线：不存在任何加权综合分
+        assert "overall_score" not in report
+        assert all("weight" not in d for d in report["dimension_scores"])
+
+    def test_empty_evidence_does_not_divide_by_zero(self):
+        personas = [_make_persona("p1", evidence=[])]
+        report = aggregate_report(personas, "demo_first_play", "GameX", self._rules())
+        assert report["evidence_profile"]["total"] == 0
+        assert report["evidence_profile"]["inferred_ratio"] == 0.0
+        assert report["dimension_scores"] == [] or isinstance(report["dimension_scores"], list)
+

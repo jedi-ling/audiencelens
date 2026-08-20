@@ -27,6 +27,7 @@ persona_overlays:
   P46-value-conscious-buyer:
     display_name: 'Shen Jing'
     archetype: Value-assessing buyer
+    methodology: "Pricing-terms Scrutiny"
     identity_summary: She isn't unwilling to spend money — she needs to see exactly what the money bought
       and whether she was treated straight, and that goes for any paid product, not just games.
     motivations:
@@ -73,6 +74,7 @@ persona_overlays:
   P47-skeptical-reviewer-general:
     display_name: 'Lao Zhao'
     archetype: Skeptical reviewer
+    methodology: "Hype-reality Gap Testing"
     identity_summary: His whole reason for being here is to surface early what people will pile on first
       — doesn't matter whether it's a game, an app or a SaaS landing page.
     motivations:
@@ -114,6 +116,7 @@ persona_overlays:
   P48-b2b-decision-maker:
     display_name: 'Grace'
     archetype: Enterprise buying decision-maker
+    methodology: "Procurement-risk Due Diligence"
     identity_summary: She isn't evaluating this for herself — she has to judge whether the team can actually
       run on it, whether it can be depended on for years, and who answers when it breaks.
     motivations:
@@ -157,6 +160,7 @@ persona_overlays:
   P49-first-time-user:
     display_name: 'A Ze'
     archetype: First-time user
+    methodology: "Onboarding-comprehensibility Testing"
     identity_summary: He doesn't stand for "slow" — he stands for where a real person actually gets stuck
       the first time they open the thing, and that's true of any onboarding, not just a game's.
     # 源是"顿号分隔的单个元素"（`[看懂、做到、不要丢脸、别让我查帮助文档]`），
@@ -203,6 +207,7 @@ persona_overlays:
   P50-power-user-efficiency:
     display_name: 'Zhou Ran'
     archetype: Efficiency-driven power user
+    methodology: "Workflow-efficiency Benchmarking"
     identity_summary: 'They judge a product on exactly one thing: does it let them finish the work faster,
       or does it spend their time on decoration.'
     motivations:
@@ -248,6 +253,7 @@ persona_overlays:
   P51-word-of-mouth-sharer:
     display_name: 'Xiao Man'
     archetype: Word-of-mouth sharer
+    methodology: "Recommendation-willingness Testing"
     identity_summary: Whether it works well isn't her only test — she also asks whether she'd actually
       put her name on it and recommend it to a friend or a colleague.
     motivations:
@@ -289,6 +295,7 @@ persona_overlays:
   P52-accessibility-general:
     display_name: 'Ming Yuan'
     archetype: User with accessibility needs
+    methodology: "Critical-path Accessibility Auditing"
     identity_summary: The first thing he looks for isn't whether the product is beautiful, it's whether
       he can get through it without friction — and that matters just as much in any product as it does
       in a game.
@@ -333,6 +340,7 @@ persona_overlays:
   P53-competitor-loyal-switcher:
     display_name: 'Marcus'
     archetype: Loyal user of the incumbent tool
+    methodology: "Migration-cost Accounting"
     identity_summary: 'He keeps asking the same question: why should I move off the tool I already know
       how to use — and that applies to any category, not just games.'
     motivations:

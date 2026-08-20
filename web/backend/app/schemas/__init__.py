@@ -26,6 +26,7 @@ class ReviewCreate(BaseModel):
     enable_red_team: bool = False
     enable_evaluation: bool = False
     adaptive_panel: bool = False
+    wide_screen: bool = False
 
 
 class PersonaOutputResponse(BaseModel):
@@ -53,6 +54,7 @@ class ReviewResponse(BaseModel):
     skill_type: Optional[str] = None
     project_key: Optional[str] = None
     adaptive_panel: bool = False
+    wide_screen: bool = False
     mode: str = "standard"
     status: str
     created_at: datetime
@@ -144,6 +146,10 @@ class PersonaSummary(BaseModel):
     archetype_en: Optional[str] = None
     identity_summary_en: Optional[str] = None
     display_name_en: Optional[str] = None
+    # 方法论流派标签（如「首屏承诺验证派」）。行为性字段，与 demographics 无关，
+    # 同一份值也会进提示词（persona_agent.CORE_FIELDS）——展示与引擎读的是同源。
+    methodology: Optional[str] = None
+    methodology_en: Optional[str] = None
 
 
 class PackSummary(BaseModel):

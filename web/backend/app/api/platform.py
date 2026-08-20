@@ -44,6 +44,7 @@ from app.services import (
     key_service,
     ledger_service,
     plan_service,
+    project_memory_service,
     quota_service,
     report_gating,
     review_service,
@@ -1417,6 +1418,8 @@ class CreateReviewRequest(BaseModel):
     enable_red_team: bool = False
     # 自动面板才可用；显式 selected_personas 时引擎保留全员并在报告中解释禁用原因。
     adaptive_panel: bool = False
+    # 两层评审开关：全包初筛后按分歧门禁选深评面板。默认关。
+    wide_screen: bool = False
 
 
 # 路径不能用 /skills/quota —— api/__init__.py 已经有 /api/skills/{skill_type}，
@@ -1498,6 +1501,14 @@ async def create_review_v2(
         # 红队开关与技能选择独立：选了受众面板也能叠加对抗视角提示
         bundle = apply_skill_hint(bundle, "red_team_audience")
 
+    # 项目记忆：同 project_key 下尚未被证伪的历史判断带进本次提示词。
+    # project_key 此前只是前端分组用的显示标签，从没被读回过——同一个产品
+    # 连评三版，第三版的人格对前两版一无所知。详见 project_memory_service。
+    # v1 的 ReviewService.create_review 调的是同一个函数（收敛测试会盯着）。
+    bundle = project_memory_service.attach_to_bundle(
+        db, bundle, identity.user_id, body.project_key
+    )
+
     review = Review(
         user_id=identity.user_id,
         task_type=body.task_type,
@@ -1510,6 +1521,7 @@ async def create_review_v2(
         enable_evaluation=body.enable_evaluation,
         enable_red_team=enable_red_team,
         adaptive_panel=body.adaptive_panel,
+        wide_screen=body.wide_screen,
         key_source=resolved.source,
         mode=body.mode,
         status="pending",
@@ -1598,6 +1610,7 @@ async def get_review_v2(
         "persona_pack": review.persona_pack,
         "selected_personas": review.selected_personas,
         "adaptive_panel": review.adaptive_panel,
+        "wide_screen": review.wide_screen,
         "skill_type": review.skill_type,
         "project_key": review.project_key,
         "status": review.status,
@@ -2090,11 +2103,11 @@ async def list_judgments(
     而这个接口没有，未登录访客曾能从这里把别人评审的结论一条条读出来。
     """
     require_isolated_identity(identity)
-    return {
-        "judgments": ledger_service.list_judgments(
-            db, identity.user_id, review_id=review_id, only_unverified=only_unverified
-        )
-    }
+    # service 已返回 {"judgments": [...], "truncated": bool}，直接透传。
+    # truncated=true 时前端把总数显示成 "N+"——正好取满 limit 的数字不可信。
+    return ledger_service.list_judgments(
+        db, identity.user_id, review_id=review_id, only_unverified=only_unverified
+    )
 
 
 @router.post("/ledger/judgments/{judgment_id}/verify")

@@ -29,6 +29,7 @@ persona_overlays:
   P01-indie-core-operator:
     display_name: 'Lin Lan'
     archetype: Core indie explorer
+    methodology: "Signature-mechanic Identification"
     identity_summary: Cares far more about whether a game actually has something of its own than about
       polish or scale.
     motivations:
@@ -77,6 +78,7 @@ persona_overlays:
   P02-systems-theorycrafter:
     display_name: 'Zhou Ce'
     archetype: Systems theorycrafter
+    methodology: "Systems-loop Deduction"
     identity_summary: 'They ask one thing: do the systems actually bite into each other, or is the complexity
       only a surface layer?'
     motivations:
@@ -124,6 +126,7 @@ persona_overlays:
   P03-challenge-hunter:
     display_name: 'Han Yue'
     archetype: Challenge-action player
+    methodology: "Hands-on Game-feel Testing"
     identity_summary: 'He wants to know one thing: when you actually swing, does it feel right?'
     motivations:
     - Feedback on every input
@@ -170,6 +173,7 @@ persona_overlays:
   P04-story-immersion-seeker:
     display_name: 'Shen Miao'
     archetype: Narrative immersion seeker
+    methodology: "Character-motivation Immersion Testing"
     identity_summary: She wants to be pulled into a world and its people, not knocked flat by a dictionary
       of lore.
     motivations:
@@ -217,6 +221,7 @@ persona_overlays:
   P05-completionist-collector:
     display_name: 'Chen Shi'
     archetype: Completionist and collector
+    methodology: "Goal-feedback Loop Auditing"
     identity_summary: Having a goal, seeing the progress, being able to clear it out — those matter to
       him more than a burst of fun.
     motivations:
@@ -260,6 +265,7 @@ persona_overlays:
   P06-visual-atmosphere-lover:
     display_name: 'Yu Chen'
     archetype: Visual and atmosphere player
+    methodology: "Visual-identity First Screening"
     identity_summary: What she buys first is the feel of the thing; only then does she decide whether
       to buy the gameplay.
     motivations:
@@ -307,6 +313,7 @@ persona_overlays:
   P07-casual-mobile-dropin:
     display_name: 'Xiao He'
     archetype: Light, short-session player
+    methodology: "Short-session Progress Verification"
     identity_summary: If it isn't tiring to pick up and a few minutes are enough to get into it, she'll
       give you a chance.
     motivations:
@@ -356,6 +363,7 @@ persona_overlays:
   P08-first-time-novice:
     display_name: 'Qiao Nuo'
     archetype: First-time onboarding observer
+    methodology: "First-confusion Logging"
     identity_summary: He doesn't stand for being slow; he stands for where a person genuinely gets stuck
       the first time they meet this genre.
     motivations:
@@ -399,6 +407,7 @@ persona_overlays:
   P09-cozy-social-sharer:
     display_name: 'Mu Xing'
     archetype: Cozy social sharer
+    methodology: "Shareable-moment Testing"
     identity_summary: 'One of their tests for whether something is fun: do I want to send it to a friend,
       or drag one in with me?'
     motivations:
@@ -445,6 +454,7 @@ persona_overlays:
   P10-steam-wishlist-browser:
     display_name: 'Mika'
     archetype: Steam wishlist browser
+    methodology: "First-screen Promise Auditing"
     identity_summary: He isn't really reviewing a game; he's making a wishlist-or-leave call inside twenty
       seconds.
     motivations:
@@ -495,6 +505,7 @@ persona_overlays:
   P11-taptap-comment-scout:
     display_name: 'A Ju'
     archetype: TapTap word-of-mouth browser
+    methodology: "Word-of-mouth Evidence-chain Tracing"
     identity_summary: She reads the comments, the patch log and the developer's replies about as often
       as she looks at the gameplay.
     motivations:
@@ -542,6 +553,7 @@ persona_overlays:
   P12-streamer-entertainment-creator:
     display_name: 'Ken'
     archetype: Streamer and content creator
+    methodology: "Streamability Assessment"
     identity_summary: What he's watching for is whether it makes a show, not whether he can quietly disappear
       into it alone.
     motivations:
@@ -590,6 +602,7 @@ persona_overlays:
   P13-publisher-scout:
     display_name: 'Eva'
     archetype: Publishing scout
+    methodology: "Market-positioning Calculus"
     identity_summary: She isn't here to find out whether it's fun; she's here to decide whether it's worth
       time, budget or shelf space.
     motivations:
@@ -639,6 +652,7 @@ persona_overlays:
   P14-price-sensitive-buyer:
     display_name: 'Zhang Ning'
     archetype: Price- and spend-sensitive buyer
+    methodology: "Price-value Reconciliation"
     identity_summary: It isn't that she won't spend money; it's that she cares a great deal what it buys
       and whether she's being respected.
     motivations:
@@ -686,6 +700,7 @@ persona_overlays:
   P15-toxic-skeptic-reviewer:
     display_name: 'Lao Dao'
     archetype: Caustic sceptic, the one who leaves the bad review
+    methodology: "Claim-evidence Confrontation"
     identity_summary: The point of him isn't that he's right; it's that he shows you in advance where
       you're most likely to get torn apart.
     motivations:
@@ -733,6 +748,7 @@ persona_overlays:
   P16-competitor-loyal-veteran:
     display_name: 'Ai De'
     archetype: Veteran loyal to a competing game
+    methodology: "Head-to-head Competitor Elimination"
     identity_summary: 'He keeps asking the same thing: why shouldn''t I just go back to the more finished
       thing I''m already playing?'
     motivations:
@@ -777,6 +793,7 @@ persona_overlays:
   P67-localization-dependent-player:
     display_name: 'Shao Tong'
     archetype: Player who depends on the native-language version
+    methodology: "Localization-authenticity Vetting"
     identity_summary: When the language list claims Simplified Chinese, he goes hunting for Chinese in
       the screenshots first — three lines of it are enough for him to tell machine translation from a
       real localization.

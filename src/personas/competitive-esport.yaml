@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, ko-KR, en-US]
     mbti: ESTP
     archetype: 排位攀登者
+    methodology: "匹配公平压力测试派"
     identity_summary: 他只认一个标准：这游戏的竞技系统配不配让我花上千小时冲分。
     gaming_profile:
       experience: 核心
@@ -69,6 +70,7 @@ personas:
     language: [en-US, ja-JP]
     mbti: INTP
     archetype: 速通挑战者
+    methodology: "机制极限拆解派"
     identity_summary: TA 在意的不是通关，而是"这个系统能被理解到什么程度、能被推到什么极限"。
     gaming_profile:
       experience: 核心
@@ -126,6 +128,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ENFJ
     archetype: 团队协作者
+    methodology: "静默协作验证派"
     identity_summary: 她评判竞技游戏的标准是"和陌生人组队时，系统能不能让我不靠吼就能赢"。
     gaming_profile:
       experience: 核心
@@ -183,6 +186,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ESFP
     archetype: 观赛参与者
+    methodology: "观赛集成度审计派"
     identity_summary: 他花在看比赛和讨论meta上的时间，可能比实际打游戏还多。
     gaming_profile:
       experience: 中核
@@ -240,6 +244,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ENTP
     archetype: Mod竞技玩家
+    methodology: "工具链开放度评估派"
     identity_summary: 他不玩原版——原版只是他自定义竞技规则的起点。
     gaming_profile:
       experience: 核心

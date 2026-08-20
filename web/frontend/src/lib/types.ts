@@ -50,6 +50,11 @@ export type ApiErrorCode =
   | 'upstream_error'
   | 'internal_error'
   | 'admin_disabled'
+  // 后端 deps.py 对失效令牌发的码。它曾只存在于后端：前端类型没跟上时，
+  // CODE_KEY[e.code] 查出 undefined → tPlain(undefined) 抛 MissingMessageError，
+  // 把调用方 catch 里错误处理之后的所有语句全部炸掉——实测就是 /ask 侧栏
+  // 两个"加载中"永远转圈的根因。
+  | 'session_expired'
 
 export class ApiError extends Error {
   code: ApiErrorCode
@@ -254,6 +259,7 @@ export interface ReviewDetail {
   persona_pack: string | null
   selected_personas: string[] | null
   adaptive_panel: boolean
+  wide_screen?: boolean
   skill_type: string | null
   project_key: string | null
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -379,6 +385,10 @@ export interface Judgment {
   severity: string | null
   confidence: number | null
   predicted_at: string | null
+  /** 所属评审的标题/项目名（ledger_service.list_judgments 随行带出）。
+   *  追踪卡按 project_key（缺则 review_title）分组展示"哪个项目还欠着回填"。 */
+  review_title?: string | null
+  project_key?: string | null
   outcome: {
     verdict: Verdict
     source: string | null

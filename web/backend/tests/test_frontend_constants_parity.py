@@ -89,3 +89,42 @@ def test_no_hardcoded_persona_counts(source: str) -> None:
     assert not re.search(r"persona_count:\s*\d", source), (
         "mock-data.ts 里又出现了写死的 persona_count；角色数只能来自 /api/personas/packs"
     )
+
+
+def test_review_mode_boundaries_match_engine_config(source: str) -> None:
+    """报告页的档位边界声明从 REVIEW_MODE_BOUNDARIES 取数字（人数上限、含不含
+    质询/校准）。事实源是引擎 src/runner/cli.py 的 REVIEW_MODE_CONFIG——
+    引擎调档位（比如 full 从 8 人调到 10 人）而前端常量没跟上时，边界声明
+    就会对用户说谎，而页面照常渲染不报任何错。"""
+    block = _block(source, "export const REVIEW_MODE_BOUNDARIES")
+    fe = {
+        m.group(1): {
+            "max_personas": int(m.group(2)),
+            "cross_examination": m.group(3) == "true",
+            "calibration": m.group(4) == "true",
+        }
+        for m in re.finditer(
+            r"\{ id: '(\w+)', max_personas: (\d+), cross_examination: (true|false), calibration: (true|false) \}",
+            block,
+        )
+    }
+    assert fe, "没解析出任何档位，说明这份常量的写法变了，卡口先失效了"
+
+    cli_path = os.path.join(REPO_ROOT, "src", "runner", "cli.py")
+    with open(cli_path, "r", encoding="utf-8") as f:
+        cli_src = f.read()
+    cfg_start = cli_src.index("REVIEW_MODE_CONFIG = {")
+    cfg_block = cli_src[cfg_start : cli_src.index(chr(10) + "}", cfg_start) + 2]
+    be = {
+        m.group(1): {
+            "max_personas": int(m.group(2)),
+            "cross_examination": m.group(3) == "True",
+            "calibration": m.group(4) == "True",
+        }
+        for m in re.finditer(
+            r'"(\w+)": \{"max_personas": (\d+), "cross_examination": (True|False), "calibration": (True|False)\}',
+            cfg_block,
+        )
+    }
+    assert be, "没从 cli.py 解析出 REVIEW_MODE_CONFIG，引擎侧写法变了，卡口先失效了"
+    assert fe == be, f"前端档位边界与引擎配置不一致：前端 {fe}，引擎 {be}"

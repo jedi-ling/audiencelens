@@ -8,7 +8,7 @@ from typing import List, Optional
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
-from runner.validator import check_identity_behavior_decoupling
+from runner.validator import MAX_INFERRED_RATIO, check_identity_behavior_decoupling
 
 try:
     from .similarity import get_issue_similarity
@@ -507,6 +507,65 @@ def aggregate_report(
         else ""
     )
 
+    # ——— 证据构成（evidence_profile）———
+    # 回答"这份报告的结论建立在什么之上"：多少条直接观察（direct）、多少条
+    # 合理推断（inferred）、多少条信息缺口（gap）。口径与 validator 完全一致：
+    # inferred_ratio = inferred / 全部证据条数，未标注等级的条目计入分母但
+    # 不算 inferred。这是对**报告自身可信度**的度量，不是产品得分——
+    # 合成面板给产品打一个综合分是假精确，给自己的证据构成记账是诚实的。
+    _ep_personas = []
+    _ep_d = _ep_i = _ep_g = _ep_total = 0
+    for p in persona_outputs:
+        _evs = [e for e in p.get("evidence", []) if isinstance(e, dict)]
+        _d = sum(1 for e in _evs if e.get("inference_level") == "direct")
+        _i = sum(1 for e in _evs if e.get("inference_level") == "inferred")
+        _g = sum(1 for e in _evs if e.get("inference_level") == "gap")
+        _ep_d += _d
+        _ep_i += _i
+        _ep_g += _g
+        _ep_total += len(_evs)
+        _ep_personas.append({
+            "persona_id": p.get("persona_id", ""),
+            "direct": _d,
+            "inferred": _i,
+            "gap": _g,
+            "total": len(_evs),
+            "inferred_ratio": round(_i / len(_evs), 3) if _evs else 0.0,
+        })
+    evidence_profile = {
+        "total": _ep_total,
+        "direct": _ep_d,
+        "inferred": _ep_i,
+        "gap": _ep_g,
+        "inferred_ratio": round(_ep_i / _ep_total, 3) if _ep_total else 0.0,
+        # 阈值随报告落库：历史报告要按**当时**的规则解读，规则改了不能追溯改写
+        "threshold": MAX_INFERRED_RATIO,
+        "per_persona": _ep_personas,
+    }
+
+    # ——— 维度均分（dimension_scores）———
+    # 各人格 scores.base / scores.task_specific 的逐维度简单均分（1-5 制原样）。
+    # 刻意不做加权综合分：权重没有任何校准依据，编一套就是 ARTi 式假精确。
+    # min/max 一起给：均分 3.0 可能是"全员 3"也可能是"1 和 5 对半"，
+    # 只报均值会把最有信息量的分歧抹掉。
+    _dim_acc = {}
+    for p in persona_outputs:
+        _sc = p.get("scores", {}) or {}
+        merged = {**(_sc.get("base") or {}), **(_sc.get("task_specific") or {})}
+        for dim, val in merged.items():
+            if isinstance(val, (int, float)):
+                _dim_acc.setdefault(dim, []).append(float(val))
+    dimension_scores = [
+        {
+            "dim": dim,
+            "avg": round(sum(vals) / len(vals), 2),
+            "min": min(vals),
+            "max": max(vals),
+            "count": len(vals),
+        }
+        for dim, vals in _dim_acc.items()
+    ]
+
     persona_notes = []
     for p in persona_outputs:
         top_evidence = [
@@ -600,6 +659,8 @@ def aggregate_report(
         "major_disagreements": disagreements,
         "priority_fixes": priority_fixes,
         "persona_notes": persona_notes,
+        "evidence_profile": evidence_profile,
+        "dimension_scores": dimension_scores,
         "information_gaps": information_gaps,
         "next_human_test": {
             "suggested_tasks": suggested_tasks,
@@ -664,6 +725,12 @@ def render_markdown_report(report: dict, template_path: str) -> str:
         "degradation": report.get("degradation"),
         "budget": report.get("budget"),
         "panel_selection": report.get("panel_selection"),
+        # 证据构成 / 弃权 / 维度均分：网页版有的账目导出件必须同样有——
+        # .md 是发给同事看的那一份，少了这三块等于账目只对本人公开。
+        "evidence_profile": report.get("evidence_profile"),
+        "abstentions": report.get("abstentions", []),
+        "dimension_scores": report.get("dimension_scores", []),
+        "triage": report.get("triage"),
     }
 
     return template.render(**context)
@@ -772,6 +839,11 @@ def render_html_report(report: dict, template_path: str) -> str:
         "compliance": report.get("compliance"),
         "validation": report.get("validation"),
         "panel_selection": report.get("panel_selection"),
+        # 与 Markdown 导出同批补齐：网页版有的账目，两份导出件必须同样有。
+        "evidence_profile": report.get("evidence_profile"),
+        "abstentions": report.get("abstentions", []),
+        "dimension_scores": report.get("dimension_scores", []),
+        "triage": report.get("triage"),
     }
 
     return template.render(**context)

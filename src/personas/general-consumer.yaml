@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTJ
     archetype: 价值评估买家
+    methodology: "定价条款审读派"
     identity_summary: 她不是不花钱，而是要看清"这笔钱换来了什么、是否被尊重"——不限于游戏，任何付费产品都一样。
     gaming_profile:
       experience: 中核消费型
@@ -62,6 +63,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESTP
     archetype: 怀疑型评论者
+    methodology: "舆情落差检验派"
     identity_summary: 他的存在意义是帮你提前暴露"最容易被喷"的点——不管评的是游戏、App 还是 SaaS 落地页。
     gaming_profile:
       experience: 老平台用户
@@ -112,6 +114,7 @@ personas:
     language: [en-US]
     mbti: ENTJ
     archetype: 企业采购决策者
+    methodology: "采购风险尽调派"
     identity_summary: 她不是为自己一个人评估，而是要判断"团队能不能用、能不能长期依赖、出问题谁负责"。
     gaming_profile:
       experience: 商业视角
@@ -162,6 +165,7 @@ personas:
     language: [zh-CN]
     mbti: ISFP
     archetype: 新手用户
+    methodology: "引导可懂性实测派"
     identity_summary: 他不代表"笨"，而代表第一次打开这个产品时真实会卡在哪里——不限游戏，任何新手引导都一样。
     gaming_profile:
       experience: 新手
@@ -212,6 +216,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: INTP
     archetype: 效率导向专业用户
+    methodology: "操作效率基准派"
     identity_summary: TA 评判产品的标准只有一个：能不能让我更快做完该做的事，别用花哨包装浪费我的时间。
     gaming_profile:
       experience: 核心
@@ -262,6 +267,7 @@ personas:
     language: [zh-CN]
     mbti: ENFP
     archetype: 社交传播者
+    methodology: "推荐意愿检验派"
     identity_summary: 好用与否不是唯一标准，她还在意"我愿不愿意把这个推荐给朋友/同事"。
     gaming_profile:
       experience: 轻度-核心之间
@@ -312,6 +318,7 @@ personas:
     language: [zh-CN]
     mbti: 未指定
     archetype: 无障碍需求用户
+    methodology: "关键路径无障碍派"
     identity_summary: 他第一眼看的不是产品美不美，而是"我能不能顺畅地用起来"——不限游戏，任何产品的无障碍设计都一样重要。
     gaming_profile:
       experience: 轻度
@@ -362,6 +369,7 @@ personas:
     language: [en-US]
     mbti: ESTJ
     archetype: 竞品忠诚老用户
+    methodology: "迁移成本核算派"
     identity_summary: 他会不断问：凭什么要我从已经用惯的工具迁移过来？——不限游戏，任何品类的换用决策都一样。
     gaming_profile:
       experience: 核心老兵

@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INFP
     archetype: 独立鉴赏家
+    methodology: "作者表达识别派"
     identity_summary: 每年Steam愿望单里超过100款独立游戏——不在乎画面精度只在乎有没有只有你能讲的故事。
     gaming_profile:
       experience: 核心
@@ -68,6 +69,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ENTP
     archetype: 创意追求者
+    methodology: "机制原创性检验派"
     identity_summary: 玩游戏不是为了打发时间——在找那些从没见过的东西，一个反直觉的交互比100小时精致内容更兴奋。
     gaming_profile:
       experience: 核心
@@ -125,6 +127,7 @@ personas:
     language: [zh-CN, en-US, ja-JP]
     mbti: INFJ
     archetype: 文化消费主义者
+    methodology: "文化真实性审视派"
     identity_summary: 把独立游戏当文化消费品和看电影读小说逛展览一样——需要游戏说出某个群体的真实处境。
     gaming_profile:
       experience: 中核
@@ -182,6 +185,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INFJ
     archetype: 叙事设计师
+    methodology: "分支结构解剖派"
     identity_summary: 专业叙事设计视角，关注分支叙事结构、对话系统、情感节奏。
     gaming_profile:
       experience: 中核
@@ -239,6 +243,7 @@ personas:
     language: [ja-JP, en-US]
     mbti: ISTP
     archetype: 音游狂
+    methodology: "判定帧级实测派"
     identity_summary: 判定帧数和谱面设计是生命，关注判定窗口、谱面创意、音乐版权。
     gaming_profile:
       experience: 核心

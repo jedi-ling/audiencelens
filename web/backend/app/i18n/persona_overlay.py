@@ -58,6 +58,10 @@ TRANSLATABLE_KEYS = frozenset(
         # test_display_name_never_reaches_recruit_types_or_prompt 机械卡死。
         "display_name",
         "archetype",
+        # 方法论流派标签：和 display_name 一样是展示可翻译字段。但与 display_name 不同，
+        # methodology 在中文源人格里**存在**，所以走 _merge_one 的通用「源里必须有该字段」
+        # 校验即可，不需要 source-absent 特殊分支。
+        "methodology",
         "identity_summary",
         "motivations",
         "likes",

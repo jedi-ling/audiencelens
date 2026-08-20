@@ -30,6 +30,7 @@ persona_overlays:
   P35-teacher-evaluator:
     display_name: 'Fang Jin'
     archetype: Teacher evaluator
+    methodology: "Curriculum-alignment Auditing"
     identity_summary: She won't ask whether it's fun. She asks whether this thing can come into her classroom,
       and whether it is worth a period of class time.
     motivations:
@@ -80,6 +81,7 @@ persona_overlays:
   P36-parent-gatekeeper:
     display_name: 'Li Wei'
     archetype: Parent gatekeeper
+    methodology: "Safety-baseline Veto Screening"
     identity_summary: He isn't against games. He is asking on his child's behalf what this thing will take
       and what it will leave behind.
     motivations:
@@ -131,6 +133,7 @@ persona_overlays:
   P37-lifelong-learner:
     display_name: 'Aki'
     archetype: Lifelong learner
+    methodology: "Knowledge-transfer Verification"
     identity_summary: They aren't playing a game. They are using the medium of games to put themselves through
       an education.
     motivations:
@@ -182,6 +185,7 @@ persona_overlays:
   P38-special-needs-learner:
     display_name: 'Xiao Cheng'
     archetype: Learner with special educational needs
+    methodology: "Design-exclusion Detection"
     identity_summary: She isn't asking for special treatment. She is telling the developer who their design
       has left outside the door.
     motivations:

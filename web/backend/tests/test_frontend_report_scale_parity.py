@@ -75,14 +75,32 @@ def test_dimension_max_score_matches_rubric_anchors():
 
 
 def test_dimension_charts_do_not_use_0_to_100_axis():
-    """维度图的坐标轴不许再是 0-100：满分 3 在 0-100 轴上恒定贴地。"""
-    for path in (EVALUATION_PAGE, REPORT_PAGE):
+    """维度图的坐标轴不许再是 0-100：满分 3 在 0-100 轴上恒定贴地。
+
+    ReportPage 的图表在 2026-08 抽进了 ReportCharts.tsx（recharts 懒加载，
+    报告正文不再等 256KB 图表库），YAxis 的字面 domain 随之搬家：
+    ReportCharts 里是 `domain={[0, maxScore]}`，上限由 ReportPage 以
+    `maxScore={DIMENSION_MAX_SCORE}` 传入——两个文件各查各的那一半，
+    合起来才等于原来那条"轴上限必须取 DIMENSION_MAX_SCORE"的约束。
+    """
+    report_charts = os.path.join(FRONTEND_SRC, "components", "ReportCharts.tsx")
+    for path in (EVALUATION_PAGE, REPORT_PAGE, report_charts):
         source = _read(path)
         assert "domain={[0, 100]}" not in source, (
             f"{path} 仍有 0-100 的图表坐标轴；维度分是 0-3，"
             "请用 DIMENSION_MAX_SCORE"
         )
-        assert "DIMENSION_MAX_SCORE]}" in source, f"{path} 的图表轴上限应取 DIMENSION_MAX_SCORE"
+    # EvaluationPage 的图表仍在页面内，字面上限还在原地
+    assert "DIMENSION_MAX_SCORE]}" in _read(EVALUATION_PAGE), (
+        f"{EVALUATION_PAGE} 的图表轴上限应取 DIMENSION_MAX_SCORE"
+    )
+    # ReportPage 侧：上限以 prop 传入懒加载的图表组件
+    assert "maxScore={DIMENSION_MAX_SCORE}" in _read(REPORT_PAGE), (
+        f"{REPORT_PAGE} 应把 DIMENSION_MAX_SCORE 作为 maxScore 传给 ScorecardBars"
+    )
+    assert "domain={[0, maxScore]}" in _read(report_charts), (
+        f"{report_charts} 的 YAxis 上限应取 maxScore prop"
+    )
 
 
 def test_dimension_score_is_not_rendered_out_of_100():

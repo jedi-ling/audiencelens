@@ -22,6 +22,7 @@ persona_overlays:
   P39-parent-child-creator:
     display_name: 'Wen Ya'
     archetype: Parent-and-child co-creator
+    methodology: "True Co-op Validation"
     identity_summary: She isn't looking for a game that keeps the child quiet; she's looking for one that
       lets the two of them make a memory together.
     motivations:
@@ -75,6 +76,7 @@ persona_overlays:
   P40-party-socialite:
     display_name: 'Carlos'
     archetype: Party socializer
+    methodology: "Entertainment-effect First Screening"
     identity_summary: 'The only reason he ever buys a game: will it have everyone at the next party laughing
       until they can''t stop?'
     motivations:
@@ -127,6 +129,7 @@ persona_overlays:
   P41-cozy-relaxer:
     display_name: 'You Zi'
     archetype: Cozy unwinder
+    methodology: "Zero-pressure Experience Testing"
     identity_summary: What she's after isn't a challenge — it's the feeling that opening this game slows
       the world down.
     motivations:
@@ -181,6 +184,7 @@ persona_overlays:
   P42-nostalgia-retro:
     display_name: 'Lao Chen'
     archetype: Nostalgic retro player
+    methodology: "Classic-core Benchmarking"
     identity_summary: He isn't chasing the pixel-art trend; he's checking whether anyone actually understood
       what that era tasted like.
     motivations:
@@ -232,6 +236,7 @@ persona_overlays:
   P43-generational-bridge:
     display_name: 'Ruth'
     archetype: Bridge across generations
+    methodology: "Universal-design Coverage Testing"
     identity_summary: 'They have one standard: can an eight-year-old and an eighty-year-old both find something
       in it, instead of one playing while the other watches?'
     motivations:

@@ -295,6 +295,115 @@ class TestRunPanel:
         assert "persona_count" in result["cost_summary"]
         assert "skipped_count" in result["cost_summary"]
 
+    def test_report_carries_abstentions_for_precheck_skips(self, sample_artifact_bundle):
+        """证据预检跳过的人格必须进 report["abstentions"]。
+
+        此前只有一个个数进 cost_summary["skipped_count"]，persona_id / 原因 /
+        缺哪些证据全部丢弃——报告里"我选了 8 个人怎么只有 5 个发言"没有任何交代。
+        弃权与失败（degradation）是两回事：弃权是"材料里没有我需要的证据类型，
+        按规矩不硬评"，是面板诚实性的正面证据，报告页把它当一种立场展示。
+        """
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=sample_artifact_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+        )
+        report = result["report"]
+        assert "abstentions" in report, "预检跳过的人格没有进报告本体"
+        # 没有显式点名人格时 panel_skipped 恒为空，skipped_count 全部来自预检——
+        # 两个口径必须相等，否则又是"计数和明细各说各话"。
+        assert len(report["abstentions"]) == result["cost_summary"]["skipped_count"]
+        for entry in report["abstentions"]:
+            assert entry["persona_id"]
+            assert entry["reason"]
+            assert isinstance(entry["missing_evidence"], list)
+        # 导出件与网页版必须说同样的话：.md 是发给同事看的那一份，
+        # 证据账目只在网页版出现等于账目只对本人公开。
+        assert "证据构成" in result["markdown"]
+        if report["abstentions"]:
+            assert "弃权" in result["markdown"]
+
+    def test_wide_screen_triages_whole_pack_then_gates(self, sample_artifact_bundle):
+        """两层评审：wide_screen=True 时全包初筛（L1）→ 门禁 → 深评（L2）。
+
+        game-core 包 17 人 > quick 档上限 3，所以必须发生初筛；晋级人数
+        必须收敛到档位上限；每个人的晋级/落选理由必须逐条可查——门禁是
+        确定性排序不是黑箱。老路（wide_screen=False）不受任何影响，
+        由本文件其他用例守着。
+        """
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        # 材料用对话链路的自由文本（type="text" 是万能证据，全包过预检）——
+        # 结构化 Wizard 材料下预检先按证据覆盖筛人是既有行为，不在本用例范围。
+        freeform_bundle = {
+            "task_type": "concept_review",
+            "target": "某独立游戏概念",
+            "materials": [{"type": "text", "text": "核心循环是探索-战斗-成长，参考 Hades。"}],
+        }
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=freeform_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="quick",
+            wide_screen=True,
+        )
+        report = result["report"]
+        assert "triage" in report, "wide_screen 请求了却没有初筛记录"
+        tri = report["triage"]
+        assert tri["enabled"] is True
+        assert tri["simulated"] is True
+        # 深评面板 = 晋级者，且不超过档位上限
+        assert len(tri["advanced"]) <= 3
+        deep_ids = {n["persona_id"] for n in report["persona_notes"]}
+        assert deep_ids == {a["persona_id"] for a in tri["advanced"]}
+        # 全包被筛：晋级 + 未晋级 + 失败 = 被筛总数，一个不许凭空消失
+        assert tri["screened_count"] == (
+            len(tri["advanced"]) + len(tri["not_advanced"]) + len(tri["failures"])
+        )
+        assert tri["screened_count"] == 17, "自由文本材料下 game-core 全包 17 人都该被初筛"
+        # 理由逐条可查
+        assert all(a.get("advanced_reason") for a in tri["advanced"])
+        assert all(n.get("not_advanced_reason") for n in tri["not_advanced"])
+
+    def test_wide_screen_defers_to_explicit_selection(self, sample_artifact_bundle):
+        """显式点名人格时初筛让位——用户指定的角色一个都不能被门禁筛掉。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=sample_artifact_bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="quick",
+            wide_screen=True,
+            selected_personas=["P01-indie-core-operator"],
+        )
+        tri = result["report"].get("triage")
+        assert tri is not None and tri["enabled"] is False
+        assert tri["reason"] == "explicit_persona_selection"
+
     def test_simulated_mode_carries_warning(self, sample_artifact_bundle):
         os.environ.pop("ANTHROPIC_API_KEY", None)
         result = run_panel(

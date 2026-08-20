@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ISTJ
     archetype: 色弱视觉辅助
+    methodology: "色彩冗余编码验证派"
     identity_summary: 他看游戏的第一眼不是画面美不美，而是"我能不能分得清那些颜色"。
     gaming_profile:
       experience: 核心
@@ -69,6 +70,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: INFP
     archetype: 认知负担敏感
+    methodology: "信息节奏渐进披露派"
     identity_summary: 她不是玩不了复杂游戏，而是需要游戏尊重她的注意力带宽——一次只给一件事。
     gaming_profile:
       experience: 核心
@@ -127,6 +129,7 @@ personas:
     language: [ja-JP, en-US]
     mbti: ISFJ
     archetype: 运动辅助需求
+    methodology: "输入可重构清单派"
     identity_summary: 他们不是不想操作，而是需要游戏承认——不是所有人的手都能同时按住五个键。
     gaming_profile:
       experience: 核心
@@ -188,6 +191,7 @@ personas:
     language: [en-US, de-DE]
     mbti: INFJ
     archetype: 听觉辅助需求
+    methodology: "听觉信息视觉等价派"
     identity_summary: 她不需要你把声音去掉，她需要你把声音说的每件事都用眼睛再说一遍。
     gaming_profile:
       experience: 中核

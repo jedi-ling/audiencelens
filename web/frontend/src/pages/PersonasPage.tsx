@@ -313,6 +313,14 @@ export default function PersonasPage() {
                             省略号——宁可省略号，不要不可预期的折行撑高卡片。 */}
                         <p className="font-medium text-text-primary truncate">{localizePersona(persona).name}</p>
                         <p className="text-xs text-text-muted truncate mb-1.5">{localizePersona(persona).archetype}</p>
+                        {/* 方法论流派标签：archetype 说"这是谁"，它说"它怎么下判断"。
+                            与引擎提示词同源（persona_agent.CORE_FIELDS）——卡片上唯一
+                            直接对应模型实际约束的元素。undefined 整块不渲染（旧数据）。 */}
+                        {localizePersona(persona).methodology && (
+                          <span className="inline-block max-w-full truncate rounded border border-cyan/30 bg-cyan/10 px-1.5 py-0.5 text-[11px] leading-4 text-cyan mb-1.5">
+                            {localizePersona(persona).methodology}
+                          </span>
+                        )}
                         <p className="text-xs text-text-secondary line-clamp-2">{localizePersona(persona).identity_summary}</p>
                       </div>
                       <div className="shrink-0">

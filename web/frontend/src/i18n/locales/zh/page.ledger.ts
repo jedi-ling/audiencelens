@@ -19,16 +19,16 @@
 import type { Messages } from '@/i18n/types'
 
 export default {
-  'meta.title': '判断复利',
+  'meta.title': '预测复盘',
 
-  'header.title': '判断复利',
+  'header.title': '预测复盘',
   'header.desc':
     '每次评审的预测都盖了时间戳留档。真人测试回来后回填结果——判断准不准，从此有据可查。',
 
   // ---- 整页加载失败横幅 ----
   // 未登录被拒在多租户形态下是常态路径而不是异常，所以 hint 要说清"为什么"，
   // cta 要给得出下一步动作。
-  'error.title': '判断复利数据加载失败',
+  'error.title': '预测复盘数据加载失败',
   'error.hint':
     '这一页放的是「属于你自己的」预测台账，未登录时后端无法区分谁是谁，所以拒绝返回。',
   'error.pending': '重试中…',
@@ -97,6 +97,8 @@ export default {
   // ---- 预测清单 ----
   'list.title': '历史预测',
   'list.label': '只看待验证',
+  /** 回填的真实后果（project_memory_service 红线 1），写在动作旁边而不是文档里。 */
+  'list.hint': '回填为「没发生」的判断，不再进入同项目下一次评审的上下文。',
   // 加载失败时这里曾照样打出"还没有预测记录"——把一次失败说成了"你没有数据"。
   // 所以 list.error 与 list_empty.* 是两条不同的话，不许合并。
   'list.error': '没能加载到预测记录，原因见上方。',

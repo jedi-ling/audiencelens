@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { ApiError, api } from '@/lib/apiClient'
 import type {
   ConfidenceCalibration,
@@ -56,7 +56,13 @@ export default function LedgerPage() {
   const [board, setBoard] = useState<LeaderboardEntry[]>([])
   const [valueMetrics, setValueMetrics] = useState<ValidationMetrics | null>(null)
   const [calibration, setCalibration] = useState<ConfidenceCalibration | null>(null)
-  const [onlyUnverified, setOnlyUnverified] = useState(false)
+  // ?pending=1 进来时直接筛到"只看待验证"。
+  // 首页那张待验证追踪卡写着「3 条未回填」，点进来却是全部记录混在一起、
+  // 要用户自己发现那个勾选框——承诺和落点对不上。带上这个参数就对上了。
+  const [searchParams] = useSearchParams()
+  const [onlyUnverified, setOnlyUnverified] = useState(
+    searchParams.get('pending') === '1'
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   // 回填是本页唯一的写操作，失败必须逐条看得见：以前 verify() 全程没有 try/catch，
@@ -301,10 +307,16 @@ export default function LedgerPage() {
 
       {/* 预测清单 + 回填 */}
       <SectionCard className="p-0">
-        <div className="flex items-center gap-3 border-b border-border px-6 py-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6 py-4">
           <h2 className="font-display text-sm font-semibold text-text-primary">
             {t('page.ledger.list.title')}
           </h2>
+          {/* 回填的真实后果就写在动作旁边：被判 miss 的判断不再进同项目下次评审
+              的上下文（project_memory_service 红线 1）。用户知道这个按钮有后果，
+              才有理由点它——这句是机制描述，不是鼓励语。 */}
+          <span className="basis-full text-xs text-text-muted md:basis-auto">
+            {t('page.ledger.list.hint')}
+          </span>
           <label className="ml-auto flex items-center gap-2 text-xs text-text-secondary">
             <input
               type="checkbox"

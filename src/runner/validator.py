@@ -29,6 +29,12 @@ def _dict_entries(value) -> List[dict]:
     return [e for e in value if isinstance(e, dict)]
 
 
+# 推断占比的硬上限。单一事实源：validator 用它拦人格（超了记 role_drift），
+# aggregator 用它给整份报告算证据构成（evidence_profile.threshold），
+# 前端展示的"40%"也来自报告里的这个值——三处引用一个常量，改档只改这里。
+MAX_INFERRED_RATIO = 0.4
+
+
 def validate_role_consistency(output: dict, persona: dict) -> dict:
     issues = []
     must_comment_on_check = output.get("must_comment_on_check", {})
@@ -50,8 +56,8 @@ def validate_role_consistency(output: dict, persona: dict) -> dict:
         inferred_ratio = 0.0
     else:
         inferred_ratio = inferred_count / len(evidence)
-    if inferred_ratio > 0.4:
-        issues.append(f"推断过度: inferred比例{inferred_ratio:.0%}超过40%")
+    if inferred_ratio > MAX_INFERRED_RATIO:
+        issues.append(f"推断过度: inferred比例{inferred_ratio:.0%}超过{MAX_INFERRED_RATIO:.0%}")
 
     consistent = len(issues) == 0
     return {

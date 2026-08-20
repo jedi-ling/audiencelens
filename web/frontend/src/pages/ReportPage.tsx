@@ -19,7 +19,7 @@
  */
 
 import { useParams, Link } from 'react-router'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { fetchReview, fetchReport, fetchReviewResult, fetchEvaluation, fetchEthicsReport, runEvaluation } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -45,6 +45,8 @@ import {
   toEthicsReportView,
 } from '@/lib/mock-data'
 import type { EthicsSeverity, RebuttalStatus, StereotypeRisk } from '@/lib/mock-data'
+import PersonaAvatar from '@/components/PersonaAvatar'
+import { REVIEW_MODE_BOUNDARIES } from '@/lib/mock-data'
 import { t, Trans, missingMarker } from '@/i18n/runtime'
 import { getLocale } from '@/i18n/locale'
 import { useDocumentTitle } from '@/i18n/head'
@@ -55,7 +57,10 @@ import { usePersonaStore } from '@/store/persona-store'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+// recharts（约 256KB min）绝不能静态 import：报告正文是纯文本，先渲染正文，
+// 两张图各自 lazy 补上。抽出的组件只收算好的数据，见 ReportCharts.tsx 头注释。
+const StancePie = lazy(() => import('@/components/ReportCharts').then((m) => ({ default: m.StancePie })))
+const ScorecardBars = lazy(() => import('@/components/ReportCharts').then((m) => ({ default: m.ScorecardBars })))
 import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy, Target, Layers } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
@@ -68,6 +73,10 @@ interface RealPriorityFix {
   affected_personas?: string[]
   suggested_fix?: string
   score?: number
+  /** 议题聚类用的档位：semantic（embedding）或 lexical（词面相似度兜底）。
+   *  引擎落库三处（fixes/disagreements/consensus 同口径），前端此前 0 处读——
+   *  语义模型没装、聚类静默降级这件事用户完全看不见。 */
+  dedup_method?: string
 }
 
 interface RealPersonaNote {
@@ -192,6 +201,43 @@ export interface RealReport {
    *  引擎刻意不编效果量（confidence_basis 恒为合成面板启发式），
    *  展示时必须把这个口径一起写出来，否则用户会把它当成实测结论。 */
   predictions?: RealPrediction[]
+  /** 证据预检弃权的人格（cli.py 写入 report["abstentions"]）。弃权≠失败：
+   *  失败是跑了没跑成（degradation），弃权是"材料里没有我需要的证据类型，
+   *  按规矩不硬评"。它是面板诚实性的正面证据，圆桌区把它当一种立场展示。 */
+  abstentions?: Array<{ persona_id?: string; reason?: string; missing_evidence?: string[] }>
+  /** 证据构成（aggregator 与 validator 同口径算出）：报告自身可信度的记账，
+   *  不是产品得分。threshold 随报告落库——历史报告按当时的规则解读。 */
+  evidence_profile?: {
+    total?: number
+    direct?: number
+    inferred?: number
+    gap?: number
+    inferred_ratio?: number
+    threshold?: number
+    per_persona?: Array<{
+      persona_id?: string
+      direct?: number
+      inferred?: number
+      gap?: number
+      total?: number
+      inferred_ratio?: number
+    }>
+  } | null
+  /** 逐维度简单均分（1-5 制原样）+ min/max。刻意没有加权综合分。 */
+  dimension_scores?: Array<{ dim?: string; avg?: number; min?: number; max?: number; count?: number }>
+  /** 两层评审 L1（全包初筛）的记录。enabled=false 带 reason（包不够大 /
+   *  显式点名让位）。初筛意见只用于选人，绝不混进正式结论。 */
+  triage?: {
+    enabled?: boolean
+    reason?: string
+    screened_count?: number
+    advanced?: Array<{ persona_id?: string; stance?: string; severity?: string; top_concern?: string; advanced_reason?: string }>
+    not_advanced?: Array<{ persona_id?: string; stance?: string; severity?: string; top_concern?: string }>
+    failures?: Array<{ persona_id?: string; error?: string }>
+    materials_truncated?: boolean
+    material_char_limit?: number
+    simulated?: boolean
+  } | null
   /** 自适应面板的执行轨迹。requested/enabled 分开是有意的：
    *  用户点名了角色时会被禁用，那种情况要说明"为什么没自适应"而不是装作没请求过。 */
   adaptive_panel?: RealAdaptivePanel | null
@@ -526,6 +572,164 @@ function ValidationGateNotice({ validation }: { validation?: RealValidation | nu
  * 启发式权重，不是历史命中率——单独把 "0.72" 摆出来，用户会当成实测置信度，
  * 而这正是本仓库反复防的那类过度声称。
  */
+/** 证据构成 + 维度均分——报告的"可信度记账"。
+ *
+ *  与 ARTi 综合评分的本质区别（有逻辑的参考，不是抄）：他们给股票打加权总分，
+ *  权重拍脑袋；我们**给报告自己记账**——结论建立在多少条直接观察、多少条推断、
+ *  多少条信息缺口之上，每个数字都能从人格输出逐条对出来。维度分只给简单均分
+ *  加 min/max（分歧本身就是信息），永不合成加权总分。
+ *  dim 是输出 schema 的 wire 键（clarity/trust/…），按本页 wire 键惯例
+ *  等宽字体原样展示（与 verification_method 同一先例），不做假翻译。 */
+export function EvidenceProfileSection({
+  profile,
+  dimensions,
+}: {
+  profile?: RealReport['evidence_profile']
+  dimensions?: RealReport['dimension_scores']
+}) {
+  const total = profile?.total ?? 0
+  const dims = (dimensions ?? []).filter((d) => d.dim && typeof d.avg === 'number')
+  if (total === 0 && dims.length === 0) return null
+
+  const direct = profile?.direct ?? 0
+  const inferred = profile?.inferred ?? 0
+  const gap = profile?.gap ?? 0
+  const ratio = profile?.inferred_ratio
+  const threshold = profile?.threshold
+  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0)
+
+  return (
+    <div id="sec-evidence" className="scroll-mt-14 mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Scale className="h-4 w-4 text-cyan" strokeWidth={1.25} />
+        <h3 className="text-sm font-semibold text-text-primary">{t('page.report.evidence_profile.title')}</h3>
+        {total > 0 && (
+          <span className="ml-auto text-xs text-text-muted">
+            {t('page.report.evidence_profile.badge', { count: total })}
+          </span>
+        )}
+      </div>
+      <p className="mb-4 text-xs leading-relaxed text-text-muted">
+        {t('page.report.evidence_profile.desc')}
+      </p>
+
+      {total > 0 && (
+        <>
+          {/* 三段构成条：direct / inferred / gap */}
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-bg-secondary">
+            <div className="bg-cyan" style={{ width: `${pct(direct)}%` }} />
+            <div className="bg-warm-orange" style={{ width: `${pct(inferred)}%` }} />
+            <div className="bg-border" style={{ width: `${pct(gap)}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <i className="h-2 w-2 rounded-full bg-cyan" />
+              {t('page.report.evidence_direct.label', { count: direct })}
+            </span>
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <i className="h-2 w-2 rounded-full bg-warm-orange" />
+              {t('page.report.evidence_inferred.label', { count: inferred })}
+            </span>
+            <span className="flex items-center gap-1.5 text-text-secondary">
+              <i className="h-2 w-2 rounded-full bg-border" />
+              {t('page.report.evidence_gap.label', { count: gap })}
+            </span>
+            {typeof ratio === 'number' && typeof threshold === 'number' && (
+              <span className={cn('ml-auto font-mono', ratio > threshold ? 'text-warm-orange' : 'text-text-muted')}>
+                {t('page.report.evidence_ratio.label', {
+                  pct: formatPercent(ratio),
+                  cap: formatPercent(threshold),
+                })}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {dims.length > 0 && (
+        <div className={cn('grid gap-x-6 gap-y-2 sm:grid-cols-2', total > 0 && 'mt-4 border-t border-border pt-4')}>
+          {dims.map((d) => (
+            <div key={d.dim} className="flex items-center gap-2 text-xs">
+              {/* dim 是 wire 键，等宽原样（本页惯例，见 verification_method） */}
+              <span className="w-32 shrink-0 truncate font-mono text-text-muted">{d.dim}</span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-secondary">
+                <div className="h-full bg-brand-primary" style={{ width: `${((d.avg ?? 0) / 5) * 100}%` }} />
+              </div>
+              <span className="w-20 shrink-0 text-right font-mono text-text-secondary">
+                {d.avg}/5
+                {typeof d.min === 'number' && typeof d.max === 'number' && d.min !== d.max && (
+                  <span className="text-text-muted"> ({d.min}–{d.max})</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-3 border-t border-border pt-2 text-[11px] leading-4 text-text-muted">
+        {t('page.report.evidence_profile.hint')}
+      </p>
+    </div>
+  )
+}
+
+/** 章节锚点导航。chip 上的数字全是**计数**不是评分——各章节的"分数"要等
+ *  维度均分聚合（第二批）做完才有诚实的来源，先不编。
+ *  只渲染真实存在的章节：计数为 0 的章节页面上本来就不出现，chip 也不该出现。 */
+function ReportNav({
+  items,
+}: {
+  items: Array<{ id: string; label: string; count?: number }>
+}) {
+  const shown = items.filter((it) => it.count === undefined || it.count > 0)
+  if (shown.length < 2) return null
+  return (
+    <nav
+      className="sticky top-0 z-30 -mx-4 mb-4 flex gap-2 overflow-x-auto border-b border-border bg-bg-primary/85 px-4 py-2 backdrop-blur md:-mx-0 md:px-0"
+      aria-label={t('page.report.nav_bar.aria')}
+    >
+      {shown.map((it) => (
+        <button
+          key={it.id}
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-bg-card px-3 py-1 text-xs text-text-secondary transition-colors hover:border-brand-primary/40 hover:text-text-primary"
+          onClick={() =>
+            document.getElementById(it.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        >
+          {it.label}
+          {typeof it.count === 'number' && (
+            <span className="font-mono text-[10px] text-text-muted">{it.count}</span>
+          )}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+/** 档位边界声明（ARTi 的"本研报聚焦深度增量……全景报告已覆盖 X"的对应物）。
+ *
+ *  同一个报告模板渲染三档数据，用户拿到 quick 档报告时页面上没有质询、没有
+ *  校准，却没有任何字告诉他"这不是评审没发现分歧，是这一档就不含这个环节"。
+ *  数字（人数上限）从 REVIEW_MODE_BOUNDARIES 取——那份常量被
+ *  test_frontend_constants_parity 钉在引擎 cli.py 的 REVIEW_MODE_CONFIG 上，
+ *  文案里不再手写 3/6/8，防止两处漂移。 */
+export function ModeBoundaryNote({ mode }: { mode?: string }) {
+  const entry = REVIEW_MODE_BOUNDARIES.find((m) => m.id === mode)
+  if (!entry) return null
+  const KEY = {
+    quick: 'page.report.mode_boundary_quick.desc',
+    standard: 'page.report.mode_boundary_standard.desc',
+    full: 'page.report.mode_boundary_full.desc',
+  } as const
+  const k = KEY[entry.id as keyof typeof KEY]
+  if (!k) return null
+  return (
+    <p className="mb-4 rounded-lg border border-border bg-bg-card px-4 py-2.5 text-xs leading-relaxed text-text-muted">
+      {t(k, { n: entry.max_personas })}
+    </p>
+  )
+}
+
 function PredictionsSection({ predictions }: { predictions?: RealPrediction[] }) {
   const rows = (predictions ?? []).filter((p) => p && (p.claim || p.intervention))
   if (rows.length === 0) return null
@@ -600,6 +804,26 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
           </li>
         ))}
       </ul>
+
+      {/* 证伪信号（ARTi"失效信号"的对应物，但只做机械转述不新造内容）：
+          success_criterion 在 verification_window 内未达成 = 该判断被证伪。
+          这句话是引擎字段的逆否，不是前端编的新结论。CTA 接回填工作台——
+          证伪不是终点，回填 miss 之后这条判断就不再进同项目下次评审的上下文。 */}
+      <div className="mt-4 rounded-lg border border-dashed border-border p-3">
+        <p className="text-xs font-medium text-text-primary">
+          {t('page.report.falsify.title')}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-text-muted">
+          {t('page.report.falsify.desc')}
+        </p>
+        <Link
+          to="/ledger?pending=1"
+          className="mt-2 inline-flex items-center gap-1 text-xs text-cyan hover:underline"
+        >
+          {t('page.report.falsify.cta')}
+          <ArrowRightLeft className="h-3 w-3" strokeWidth={1.5} />
+        </Link>
+      </div>
     </div>
   )
 }
@@ -726,6 +950,87 @@ function PanelSelectionNotice({ panelSelection }: { panelSelection?: RealPanelSe
               })}
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 后端在 artifact_bundle 上留的项目记忆元数据（project_memory_service.build_project_memory）。
+ *  只在用户**明确开了项目**（传了 project_key）时才存在——没开项目时后端整个键都不挂。 */
+interface ProjectMemoryMeta {
+  carried?: number
+  reason?: string
+  from_reviews?: number
+  project_key?: string
+  cap?: number
+}
+
+/** 项目记忆提示。
+ *
+ *  存在的理由是可审计性，不是装饰：这一层会把同项目的历史判断悄悄塞进**每个
+ *  人格**的提示词，用户看报告时如果不知道这件事发生过，就会把"人格提到了一个
+ *  当前材料里没有的问题"当成幻觉。所以带了要说带了几条、从几次评审来的；
+ *  没带也要说为什么没带（reason 是后端给的闭集，逐个翻译，不透传原始码）。
+ *
+ *  reason 的四个取值与 project_memory_service._skip_reason / build_project_memory
+ *  一一对应。后端加了新 reason 而这里没跟上时会走 null 分支整块不渲染——
+ *  宁可不显示，也不显示一个用户看不懂的英文枚举码。 */
+function ProjectMemoryNotice({ meta }: { meta?: ProjectMemoryMeta | null }) {
+  if (!meta) return null
+  const carried = meta.carried ?? 0
+
+  if (carried > 0) {
+    return (
+      <div className="mb-4 rounded-xl border border-cyan/30 bg-cyan/10 p-4">
+        <div className="flex items-start gap-3">
+          <Layers className="mt-0.5 h-5 w-5 shrink-0 text-cyan" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-cyan">{t('page.report.project_memory.title')}</p>
+            <p className="mt-1.5 text-sm text-text-primary">
+              {t('page.report.project_memory.desc', {
+                project: meta.project_key ?? '',
+                count: carried,
+                reviews: meta.from_reviews ?? 0,
+              })}
+            </p>
+            <p className="mt-1.5 text-xs text-text-muted">
+              {t('page.report.project_memory.hint')}
+            </p>
+            {typeof meta.cap === 'number' && carried >= meta.cap && (
+              <p className="mt-1 text-xs text-text-muted">
+                {t('page.report.project_memory.meta', { cap: meta.cap })}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // carried === 0：只渲染**可操作**的原因。
+  //   · anonymous_identity —— 登录就能解锁，值得占一个置顶位提醒；
+  //   · ledger_disabled —— 部署配置问题，运营者需要知道；
+  //   · no_open_judgments —— 每个新项目的第一次评审必然如此，显示它等于
+  //     给全部冷启动用户看一个"没有历史"的占位框，不可操作、纯噪音，不渲染；
+  //   · no_project_key —— 没开项目时后端根本不挂元数据，这里到不了；
+  //   · 未知枚举 —— 后端加了新 reason 而这里没跟上，宁可不显示也不摆
+  //     一个用户看不懂的英文码。
+  const reason = (['anonymous_identity', 'ledger_disabled'] as const).find(
+    (r) => r === meta.reason
+  )
+  if (!reason) return null
+  const reasonKey = `page.report.reason.project_memory_${reason}` as const
+
+  return (
+    <div className="mb-4 rounded-xl border border-border bg-bg-card p-4">
+      <div className="flex items-start gap-3">
+        <Layers className="mt-0.5 h-5 w-5 shrink-0 text-text-muted" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-text-secondary">
+            {t('page.report.project_memory_none.title')}
+          </p>
+          <p className="mt-1 text-sm text-text-muted">{t(reasonKey)}</p>
         </div>
       </div>
     </div>
@@ -1770,6 +2075,15 @@ export default function ReportPage() {
       <ValidationGateNotice validation={report.validation} />
       <BudgetNotice budget={report.budget} />
       <PanelSelectionNotice panelSelection={report.panel_selection} />
+      {/* 项目记忆在 artifact_bundle 上而不是 report 里：它是**入参**（评审开始
+          前就决定了带哪些历史），不是引擎的产出。所以取自 review 不是 report。 */}
+      <ProjectMemoryNotice
+        meta={
+          (review?.artifact_bundle as { project_memory?: ProjectMemoryMeta } | undefined)
+            ?.project_memory
+        }
+      />
+      <ModeBoundaryNote mode={review?.mode} />
       </div>
 
       {/* 页面头部独立成全宽一行：标题 + 操作组，和下面收窄的正文阅读列分层。
@@ -1982,8 +2296,41 @@ export default function ReportPage() {
         </div>
       )}
 
+      {/* 章节锚点导航：chip 上是计数不是评分（见 ReportNav 注释） */}
+      <ReportNav
+        items={[
+          { id: 'sec-summary', label: t('page.report.nav_summary.label') },
+          {
+            id: 'sec-evidence',
+            label: t('page.report.nav_evidence.label'),
+            count: report.evidence_profile?.total ?? 0,
+          },
+          { id: 'sec-fixes', label: t('page.report.nav_fixes.label'), count: priorityFixes.length },
+          {
+            id: 'sec-personas',
+            label: t('page.report.nav_personas.label'),
+            count: personaNotes.length + (report.abstentions?.length ?? 0),
+          },
+          {
+            id: 'sec-disagreements',
+            label: t('page.report.nav_disagreements.label'),
+            count: disagreements.length,
+          },
+          {
+            id: 'sec-crossexam',
+            label: t('page.report.nav_crossexam.label'),
+            count: crossExam ? crossExam.disputes.length : 0,
+          },
+          {
+            id: 'sec-predictions',
+            label: t('page.report.nav_predictions.label'),
+            count: (report.predictions ?? []).length,
+          },
+        ]}
+      />
+
       {/* ---------- 执行摘要 / 发布风险 ---------- */}
-      <div className={cn('rounded-xl border-2 p-4 md:p-6 mb-6', riskView.bg, riskView.border)}>
+      <div id="sec-summary" className={cn('scroll-mt-14 rounded-xl border-2 p-4 md:p-6 mb-6', riskView.bg, riskView.border)}>
         <div className="flex items-center gap-3 mb-3">
           <AlertTriangle className={cn('w-5 h-5 md:w-6 md:h-6', riskView.color)} strokeWidth={1.25} />
           <h2 className={cn('text-base md:text-lg font-bold font-display', riskView.color)}>
@@ -2038,6 +2385,9 @@ export default function ReportPage() {
         </dl>
       </div>
 
+      {/* ---------- 证据构成 + 维度均分（报告可信度记账） ---------- */}
+      <EvidenceProfileSection profile={report.evidence_profile} dimensions={report.dimension_scores} />
+
       {/* ---------- 立场分布 + 校准指标 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
@@ -2047,27 +2397,10 @@ export default function ReportPage() {
           {stanceData.length > 0 ? (
             <>
               <div className="min-h-[180px] md:min-h-[220px]">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={stanceData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {stanceData.map((d, i) => (
-                        <Cell key={i} fill={d.color} fillOpacity={0.8} stroke={d.color} strokeWidth={1} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
-                      itemStyle={{ color: '#ffffff' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {/* fallback 占位高度 = 真实图高度（220），chunk 到达时不跳版 */}
+                <Suspense fallback={<div className="h-[220px]" />}>
+                  <StancePie data={stanceData} />
+                </Suspense>
               </div>
               <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-2">
                 {stanceData.map((d) => (
@@ -2132,8 +2465,17 @@ export default function ReportPage() {
 
       {/* ---------- 优先修复项 ---------- */}
       {priorityFixes.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-text-primary mb-4">{t('page.report.fixes.title')}</h3>
+        <div id="sec-fixes" className="scroll-mt-14 mb-6">
+          <h3 className="text-lg font-semibold text-text-primary mb-4">
+            {t('page.report.fixes.title')}
+            {/* 聚类档位如实标注：lexical = 语义模型未安装、按词面相似度聚类，
+                措辞略异的同一问题可能被拆成两条。semantic 是正常态，不提示。 */}
+            {priorityFixes[0]?.dedup_method === 'lexical' && (
+              <span className="ml-2 align-middle text-xs font-normal text-text-muted">
+                {t('page.report.fixes.hint')}
+              </span>
+            )}
+          </h3>
           <div className="flex flex-col gap-3">
             {priorityFixes.map((fix, index) => {
               const expanded = expandedIssues.has(index)
@@ -2190,12 +2532,32 @@ export default function ReportPage() {
         </div>
       )}
 
-      {/* ---------- 人格视角 ---------- */}
-      {personaNotes.length > 0 && (
-        <div className="mb-6">
+      {/* ---------- 人格视角（圆桌） ---------- */}
+      {(personaNotes.length > 0 || (report.abstentions?.length ?? 0) > 0) && (
+        <div id="sec-personas" className="scroll-mt-14 mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-cyan" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">{t('page.report.personas.title')}</h3>
+          </div>
+          {/* 站队统计条（ARTi 圆桌顶部的对应物）：立场 × 人数 + 弃权数。
+              数字全部来自 stanceData / abstentions，不另算一份。 */}
+          <div className="mb-4 flex flex-wrap gap-2">
+            {stanceData.map((d) => (
+              <span
+                key={d.name}
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs"
+                style={{ borderColor: `${d.color}55`, color: d.color, backgroundColor: `${d.color}12` }}
+              >
+                {d.name}
+                <b className="font-mono">{d.value}</b>
+              </span>
+            ))}
+            {(report.abstentions?.length ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-text-muted">
+                {t('page.report.abstain.label')}
+                <b className="font-mono">{report.abstentions!.length}</b>
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {personaNotes.map((note) => {
@@ -2205,9 +2567,10 @@ export default function ReportPage() {
               return (
                 <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
                   <div className="flex items-center gap-2.5 mb-3">
-                    {/* 人格头像：与进度页同一套圆形身份标识，描边跟随立场色 */}
+                    {/* 人格头像：真实头像叠在字母圈上。PersonaAvatar 404 时自隐，
+                        字母圈从底下露出来兜底——不出现破图，也不空一块。 */}
                     <div
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold"
+                      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold"
                       style={{
                         borderColor: `${stanceColor}66`,
                         backgroundColor: `${stanceColor}1a`,
@@ -2215,6 +2578,7 @@ export default function ReportPage() {
                       }}
                     >
                       {displayName.slice(0, 1)}
+                      <PersonaAvatar personaId={note.persona_id ?? ''} size={32} className="absolute inset-0" />
                     </div>
                     <span className="font-medium text-text-primary">{displayName}</span>
                     <span className="text-xs text-text-muted font-mono">{note.persona_id}</span>
@@ -2256,7 +2620,82 @@ export default function ReportPage() {
                 </div>
               )
             })}
+            {/* 弃权卡（ARTi"依能力圈原则弃权"的对应物）：证据预检跳过的人格。
+                弃权≠失败——材料里没有它需要的证据类型，按规矩不硬评。
+                灰阶弱化呈现：它是面板诚实性的正面证据，但不该和真实意见抢注意力。 */}
+            {(report.abstentions ?? []).map((ab) => {
+              // 弃权条目只有 persona_id（预检跳过时报告里没有名字）——中文名
+              // 从人格目录反查兜底，否则中文界面会直出英文 id。
+              const abName = personaDisplayName(
+                personaCatalog,
+                ab.persona_id,
+                personaCatalog.find((p) => p.id === ab.persona_id)?.name
+              )
+              return (
+                <div
+                  key={ab.persona_id}
+                  className="rounded-xl border border-dashed border-border bg-bg-card/50 p-4 md:p-5"
+                >
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-xs font-semibold text-text-muted opacity-60">
+                      {abName.slice(0, 1)}
+                      <PersonaAvatar personaId={ab.persona_id ?? ''} size={32} className="absolute inset-0 grayscale opacity-60" />
+                    </div>
+                    <span className="font-medium text-text-secondary">{abName}</span>
+                    <span className="text-xs text-text-muted font-mono">{ab.persona_id}</span>
+                    <span className="ml-auto rounded px-2 py-0.5 text-xs font-medium text-text-muted bg-bg-secondary">
+                      {t('page.report.abstain.label')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    {t('page.report.abstain.desc')}
+                  </p>
+                  {(ab.missing_evidence?.length ?? 0) > 0 && (
+                    <p className="mt-1.5 text-xs text-text-muted">
+                      {t('page.report.abstain.hint', {
+                        types: ab.missing_evidence!.join(t('page.report.sep_enum')),
+                      })}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
+        </div>
+      )}
+
+      {/* ---------- 初筛记录（两层评审 L1） ----------
+          全包每人一次廉价短调用的粗筛信号。只用于解释"深评面板怎么选出来的"，
+          初筛意见不是正式评审结论——所以放在圆桌之后、用弱化样式渲染。 */}
+      {report.triage?.enabled && (
+        <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <div className="mb-1 flex items-center gap-2">
+            <Microscope className="h-4 w-4 text-cyan" strokeWidth={1.25} />
+            <h3 className="text-sm font-semibold text-text-primary">{t('page.report.triage.title')}</h3>
+            <span className="ml-auto text-xs text-text-muted">
+              {t('page.report.triage.badge', {
+                screened: report.triage.screened_count ?? 0,
+                advanced: (report.triage.advanced ?? []).length,
+              })}
+            </span>
+          </div>
+          <p className="mb-3 text-xs leading-relaxed text-text-muted">
+            {t('page.report.triage.desc')}
+            {report.triage.materials_truncated && (
+              <> {t('page.report.triage.hint', { chars: report.triage.material_char_limit ?? 0 })}</>
+            )}
+          </p>
+          {(report.triage.not_advanced ?? []).length > 0 && (
+            <div className="space-y-1">
+              {report.triage.not_advanced!.map((r) => (
+                <p key={r.persona_id} className="text-xs text-text-muted">
+                  <span className="font-mono">{r.persona_id}</span>
+                  <span className="mx-1 text-text-secondary">{r.stance} · {r.severity}</span>
+                  {r.top_concern}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -2323,7 +2762,7 @@ export default function ReportPage() {
 
       {/* ---------- 主要分歧 ---------- */}
       {disagreements.length > 0 && (
-        <div className="mb-6">
+        <div id="sec-disagreements" className="scroll-mt-14 mb-6">
           <div className="mb-4 flex items-center gap-2">
             <Scale className="w-5 h-5 text-warm-orange" strokeWidth={1.25} />
             <h3 className="text-lg font-semibold text-text-primary">{t('page.report.disagreements.title')}</h3>
@@ -2355,7 +2794,9 @@ export default function ReportPage() {
       )}
 
       {/* ---------- 交叉质询（争议点 / 反驳 / 改票）---------- */}
-      {crossExam ? <CrossExamSection view={crossExam} /> : <CrossExamAbsentNotice budget={report.budget} />}
+      <div id="sec-crossexam" className="scroll-mt-14">
+        {crossExam ? <CrossExamSection view={crossExam} /> : <CrossExamAbsentNotice budget={report.budget} />}
+      </div>
 
       {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -2414,7 +2855,9 @@ export default function ReportPage() {
       {/* ---------- 可证伪预测 ----------
            紧跟"下一步真人验证"：那一块说的是去做什么测试，
            这一块说的是测出什么结果算这次评审说对了。 */}
-      <PredictionsSection predictions={report.predictions} />
+      <div id="sec-predictions" className="scroll-mt-14">
+        <PredictionsSection predictions={report.predictions} />
+      </div>
 
       {/* ---------- 自适应面板轨迹 ---------- */}
       <AdaptivePanelSection adaptive={report.adaptive_panel} />
@@ -2525,25 +2968,19 @@ export default function ReportPage() {
 
             <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
               <h4 className="text-sm font-medium text-text-muted mb-4">{t('page.report.evaluation_dimension.label')}</h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={evaluationScorecard.results.map((r) => {
-                  const dim = EVALUATION_DIMENSIONS.find((d) => d.id === r.dimension)
-                  return {
-                    name: dimensionLabel(r.dimension, dim?.name),
-                    score: r.score,
-                    fill: r.passed ? '#0071e3' : '#ff3355',
-                  }
-                })}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#86868b' }} />
-                  <YAxis domain={[0, DIMENSION_MAX_SCORE]} ticks={[0, 1, 2, 3]} tick={{ fontSize: 10, fill: '#86868b' }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1c1c1e', border: '1px solid #38383a', borderRadius: '12px', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}
-                  itemStyle={{ color: '#ffffff' }}
-                  />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<div className="h-[200px]" />}>
+                <ScorecardBars
+                  maxScore={DIMENSION_MAX_SCORE}
+                  data={evaluationScorecard.results.map((r) => {
+                    const dim = EVALUATION_DIMENSIONS.find((d) => d.id === r.dimension)
+                    return {
+                      name: dimensionLabel(r.dimension, dim?.name),
+                      score: r.score,
+                      fill: r.passed ? '#0071e3' : '#ff3355',
+                    }
+                  })}
+                />
+              </Suspense>
             </div>
           </div>
 
@@ -2998,6 +3435,51 @@ function generateMarkdown(report: RealReport): string {
     lines.push(`- ${t('page.report.md_evidence.label', { value: evidenceQualityLabel(summary.evidence_quality) })}`)
     lines.push('')
   }
+  // 证据构成 + 弃权：网页版有的账目，兜底导出件必须同样有（与引擎
+  // report-template.md 同批补齐——四种报告形态说同样的话）。
+  const ep = report.evidence_profile
+  if (ep?.total) {
+    lines.push(`## ${t('page.report.evidence_profile.title')}`)
+    lines.push(
+      `- ${t('page.report.evidence_direct.label', { count: ep.direct ?? 0 })} · ` +
+        `${t('page.report.evidence_inferred.label', { count: ep.inferred ?? 0 })} · ` +
+        `${t('page.report.evidence_gap.label', { count: ep.gap ?? 0 })}`
+    )
+    if (typeof ep.inferred_ratio === 'number' && typeof ep.threshold === 'number') {
+      lines.push(
+        `- ${t('page.report.evidence_ratio.label', { pct: formatPercent(ep.inferred_ratio), cap: formatPercent(ep.threshold) })}`
+      )
+    }
+    for (const d of report.dimension_scores ?? []) {
+      if (d.dim && typeof d.avg === 'number') lines.push(`- \`${d.dim}\`: ${d.avg}/5 (${d.min}–${d.max}, n=${d.count})`)
+    }
+    lines.push('')
+  }
+  const tri = report.triage
+  if (tri?.enabled) {
+    lines.push(`## ${t('page.report.triage.title')}`)
+    lines.push(
+      t('page.report.triage.badge', {
+        screened: tri.screened_count ?? 0,
+        advanced: (tri.advanced ?? []).length,
+      })
+    )
+    for (const r of tri.not_advanced ?? []) {
+      lines.push(`- ${r.persona_id} (${r.stance} · ${r.severity}): ${r.top_concern}`)
+    }
+    lines.push('')
+  }
+  const abstentions = report.abstentions ?? []
+  if (abstentions.length > 0) {
+    lines.push(`## ${t('page.report.abstain.label')}`)
+    lines.push(t('page.report.abstain.desc'))
+    for (const ab of abstentions) {
+      const missing = (ab.missing_evidence ?? []).join(t('page.report.sep_enum'))
+      lines.push(`- ${ab.persona_id}${missing ? t('page.report.sep_colon') + missing : ''}`)
+    }
+    lines.push('')
+  }
+
   const fixes = report.priority_fixes ?? []
   if (fixes.length) {
     lines.push(`## ${t('page.report.fixes.title')}`)

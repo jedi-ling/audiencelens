@@ -11,6 +11,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INTJ
     archetype: 核心独立探索者
+    methodology: "独有机制辨识派"
     identity_summary: 更在意"这游戏是否真的有自己的一套东西"，而不是单纯polish和规模。
     gaming_profile:
       experience: 核心
@@ -64,6 +65,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INTP
     archetype: 系统推演党
+    methodology: "系统闭环推演派"
     identity_summary: TA 会问"系统之间是否互相咬合，还是只有一层表皮复杂度"。
     gaming_profile:
       experience: 核心
@@ -117,6 +119,7 @@ personas:
     language: [zh-CN, ko-KR, en-US]
     mbti: ISTP
     archetype: 挑战动作党
+    methodology: "实机手感检验派"
     identity_summary: 他只想知道一件事：打起来手感到底行不行。
     gaming_profile:
       experience: 核心
@@ -170,6 +173,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INFJ
     archetype: 叙事沉浸党
+    methodology: "角色动机沉浸派"
     identity_summary: 她要的是被世界和人物吸进去，不是被设定词典砸晕。
     gaming_profile:
       experience: 核心
@@ -223,6 +227,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ISFJ
     archetype: 完成/收集党
+    methodology: "目标反馈闭环派"
     identity_summary: 目标感、进度感、可清扫性，对他比"瞬间爽点"更重要。
     gaming_profile:
       experience: 核心
@@ -276,6 +281,7 @@ personas:
     language: [zh-CN, ja-JP, en-US]
     mbti: INFP
     archetype: 视觉氛围党
+    methodology: "视觉辨识度先行派"
     identity_summary: 她首先买的是"气质"，然后才决定要不要买玩法。
     gaming_profile:
       experience: 核心
@@ -329,6 +335,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESFJ
     archetype: 轻度碎片玩家
+    methodology: "短会话推进验证派"
     identity_summary: 只要上手不累、几分钟就能进入状态，她就愿意给你机会。
     gaming_profile:
       experience: 轻度
@@ -383,6 +390,7 @@ personas:
     language: [zh-CN]
     mbti: ISFP
     archetype: 新手上手观察者
+    methodology: "首次困惑记录派"
     identity_summary: 他不代表"笨"，而代表第一次接触这个类型时真实会卡在哪里。
     gaming_profile:
       experience: 新手
@@ -436,6 +444,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ENFP
     archetype: 治愈社交分享型
+    methodology: "可分享瞬间检验派"
     identity_summary: 好玩的标准之一，是"我想不想把它发给朋友/和朋友一起进来"。
     gaming_profile:
       experience: 轻度-核心之间
@@ -489,6 +498,7 @@ personas:
     language: [en-US]
     mbti: INTJ
     archetype: Steam愿望单浏览者
+    methodology: "首屏承诺验证派"
     identity_summary: 他不是真的在"评审游戏"，他是在做一个20秒内的愿望单/离开判断。
     gaming_profile:
       experience: 平台重度浏览
@@ -542,6 +552,7 @@ personas:
     language: [zh-CN]
     mbti: ESFP
     archetype: TapTap口碑型浏览者
+    methodology: "口碑证据链派"
     identity_summary: 她看评论、版本日志和开发者回应的频率，几乎和看玩法一样重。
     gaming_profile:
       experience: 平台口碑型
@@ -595,6 +606,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ENTP
     archetype: 主播/内容创作者
+    methodology: "可播性评估派"
     identity_summary: 他看的是"能不能出节目效果"，不是"能不能一个人安静地沉浸"。
     gaming_profile:
       experience: 核心
@@ -648,6 +660,7 @@ personas:
     language: [en-US]
     mbti: ENTJ
     archetype: 发行侦察官
+    methodology: "市场定位测算派"
     identity_summary: 她不是来感受"好不好玩"的，她是来判断"值不值得投时间、预算或货架位置"的。
     gaming_profile:
       experience: 商业视角
@@ -702,6 +715,7 @@ personas:
     language: [zh-CN]
     mbti: ISTJ
     archetype: 价格/付费敏感买家
+    methodology: "价格价值对账派"
     identity_summary: 她不是不花钱，而是非常在意"这笔钱换来了什么、是否被尊重"。
     gaming_profile:
       experience: 中核消费型
@@ -755,6 +769,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: ESTP
     archetype: 毒舌怀疑型差评者
+    methodology: "宣传证据对质派"
     identity_summary: 他的存在意义不是"代表真理"，而是帮你提前暴露最容易挨喷的点。
     gaming_profile:
       experience: 老平台用户
@@ -808,6 +823,7 @@ personas:
     language: [en-US]
     mbti: ESTJ
     archetype: 竞品忠诚老兵
+    methodology: "竞品对位淘汰派"
     identity_summary: 他会不断问：凭什么不去玩我已经在玩的那个更成熟的东西？
     gaming_profile:
       experience: 核心老兵
@@ -865,6 +881,7 @@ personas:
     language: [zh-CN]
     mbti: 未指定
     archetype: 母语版本依赖型玩家
+    methodology: "本地化真伪鉴别派"
     identity_summary: 语言标签写着支持简体中文，他先去截图里找中文——机翻和真做过本地化，他看三行字就分得出来。
     gaming_profile:
       experience: 中核

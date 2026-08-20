@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router'
 import { api, ApiError } from '@/lib/apiClient'
 import type { SharedReport } from '@/lib/types'
-import { SyntheticBanner, LimitationsSection, type RealReport } from './ReportPage'
+import { SyntheticBanner, LimitationsSection, EvidenceProfileSection, ModeBoundaryNote, type RealReport } from './ReportPage'
 import SeverityBadge from '@/components/SeverityBadge'
 import type { Severity } from '@/lib/mock-data'
 import { Loader2, Link2Off, Users, ListChecks, Scale, ArrowRight, AlertCircle } from 'lucide-react'
@@ -135,6 +135,30 @@ export default function SharedReportPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 animate-fade-in">
       {/* ETHICS.md 强制项之一。公开链接的访客没有任何上下文，这块尤其不能省。 */}
       <SyntheticBanner />
+      {/* 档位边界 + 证据构成：分享出去的报告更需要这两块——收到链接的人没有
+          任何上下文，不知道这是三档里的哪一档、结论建立在什么证据之上。
+          与报告页/两份导出件同批补齐（四种形态说同样的话）。 */}
+      <ModeBoundaryNote mode={data.mode} />
+      <EvidenceProfileSection profile={report.evidence_profile} dimensions={report.dimension_scores} />
+      {report.triage?.enabled && (
+        <p className="mb-4 rounded-lg border border-border bg-bg-card px-4 py-2.5 text-xs text-text-muted">
+          {t('page.report.triage.badge', {
+            screened: report.triage.screened_count ?? 0,
+            advanced: (report.triage.advanced ?? []).length,
+          })}
+          {' — '}
+          {t('page.report.triage.desc')}
+        </p>
+      )}
+      {(report.abstentions?.length ?? 0) > 0 && (
+        <p className="mb-4 rounded-lg border border-dashed border-border px-4 py-2.5 text-xs text-text-muted">
+          {t('page.report.abstain.label')}
+          {t('page.report.sep_colon')}
+          {report.abstentions!.map((ab) => ab.persona_id).join(t('page.report.sep_enum'))}
+          {' — '}
+          {t('page.report.abstain.desc')}
+        </p>
+      )}
 
       <header className="mb-8">
         <h1 className="font-display text-2xl font-bold text-text-primary">

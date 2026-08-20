@@ -158,6 +158,7 @@ def create_review(
         enable_red_team=enable_red_team,  # 同上，必须是降级后的值
         enable_evaluation=data.enable_evaluation,
         adaptive_panel=data.adaptive_panel,
+        wide_screen=data.wide_screen,
         project_key=data.project_key,
         # v1 也要落这两个字段。只改 v2 的话，从 v1 入口发起的评审在技能计次里
         # 完全看不见——用户走那条路就能无限用高级技能。这个仓库反复出现的
@@ -477,6 +478,8 @@ def list_personas():
             # 表述层英文（10.3）。缺 overlay 时是 None，前端按 D8 显式标缺译，
             # 不许回落中文——身份字段（name / region 等）本来就不翻。
             archetype_en=p.get("archetype_en"),
+            methodology=p.get("methodology"),
+            methodology_en=p.get("methodology_en"),
             identity_summary_en=p.get("identity_summary_en"),
             display_name_en=p.get("display_name_en"),
         ))
@@ -505,6 +508,8 @@ def list_personas_by_pack(pack: str):
             pack=p.get("_pack", pack),
             source=p.get("source", "yaml"),
             archetype_en=p.get("archetype_en"),
+            methodology=p.get("methodology"),
+            methodology_en=p.get("methodology_en"),
             identity_summary_en=p.get("identity_summary_en"),
             display_name_en=p.get("display_name_en"),
         ))
@@ -526,6 +531,8 @@ def get_persona_in_pack(pack: str, persona_id: str):
                 pack=p.get("_pack", pack),
                 source=p.get("source", "yaml"),
                 archetype_en=p.get("archetype_en"),
+            methodology=p.get("methodology"),
+            methodology_en=p.get("methodology_en"),
                 identity_summary_en=p.get("identity_summary_en"),
                 display_name_en=p.get("display_name_en"),
             )
@@ -547,6 +554,8 @@ def get_persona(persona_id: str):
         pack=p.get("_pack", ""),
         source=p.get("source", "yaml"),
         archetype_en=p.get("archetype_en"),
+            methodology=p.get("methodology"),
+            methodology_en=p.get("methodology_en"),
         identity_summary_en=p.get("identity_summary_en"),
             display_name_en=p.get("display_name_en"),
     )

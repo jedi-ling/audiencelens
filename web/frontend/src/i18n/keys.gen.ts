@@ -369,6 +369,7 @@ export type MessageKey =
   | 'error.api.not_found'
   | 'error.api.quota_exceeded'
   | 'error.api.rate_limited'
+  | 'error.api.session_expired'
   | 'error.api.unauthorized'
   | 'error.api.upstream_error'
   | 'error.fetch.delete_review'
@@ -572,6 +573,11 @@ export type MessageKey =
   | 'page.ask.sync_failed.error'
   | 'page.ask.token.tooltip'
   | 'page.ask.token.unit'
+  | 'page.ask.tracking.hint'
+  | 'page.ask.tracking.meta'
+  | 'page.ask.tracking.title'
+  | 'page.ask.tracking_more.title'
+  | 'page.ask.tracking_unnamed.label'
   | 'page.ask.type_picker.aria'
   | 'page.ask.type_picker.placeholder'
   | 'page.ask.type_picker.tooltip'
@@ -580,6 +586,8 @@ export type MessageKey =
   | 'page.ask.upload.aria'
   | 'page.ask.upload.error'
   | 'page.ask.upload.tooltip'
+  | 'page.ask.verify_nudge.cta'
+  | 'page.ask.verify_nudge.hint'
   | 'page.create.category_all.tab'
   | 'page.create.confirm.desc'
   | 'page.create.confirm.title'
@@ -771,6 +779,7 @@ export type MessageKey =
   | 'page.ledger.item.meta'
   | 'page.ledger.leaderboard.title'
   | 'page.ledger.list.error'
+  | 'page.ledger.list.hint'
   | 'page.ledger.list.label'
   | 'page.ledger.list.title'
   | 'page.ledger.list_empty.desc'
@@ -1003,6 +1012,9 @@ export type MessageKey =
   | 'page.register.submit.error'
   | 'page.register.submit.pending'
   | 'page.register.terms.consent'
+  | 'page.report.abstain.desc'
+  | 'page.report.abstain.hint'
+  | 'page.report.abstain.label'
   | 'page.report.adaptive.empty'
   | 'page.report.adaptive.hint'
   | 'page.report.adaptive.title'
@@ -1081,11 +1093,22 @@ export type MessageKey =
   | 'page.report.evaluation_full.cta'
   | 'page.report.evaluation_overall.label'
   | 'page.report.evaluation_run.error'
+  | 'page.report.evidence_direct.label'
+  | 'page.report.evidence_gap.label'
+  | 'page.report.evidence_inferred.label'
+  | 'page.report.evidence_profile.badge'
+  | 'page.report.evidence_profile.desc'
+  | 'page.report.evidence_profile.hint'
+  | 'page.report.evidence_profile.title'
+  | 'page.report.evidence_ratio.label'
   | 'page.report.failed.desc'
   | 'page.report.failed.empty'
   | 'page.report.failed.hint'
   | 'page.report.failed.label'
   | 'page.report.failed.title'
+  | 'page.report.falsify.cta'
+  | 'page.report.falsify.desc'
+  | 'page.report.falsify.title'
   | 'page.report.feedback.cta'
   | 'page.report.feedback.desc'
   | 'page.report.feedback.error'
@@ -1101,6 +1124,7 @@ export type MessageKey =
   | 'page.report.fix_personas.label'
   | 'page.report.fix_suggestion.label'
   | 'page.report.fix_why.label'
+  | 'page.report.fixes.hint'
   | 'page.report.fixes.title'
   | 'page.report.gaps.title'
   | 'page.report.gate.empty'
@@ -1157,6 +1181,17 @@ export type MessageKey =
   | 'page.report.md_vote.label'
   | 'page.report.md_vote_none.label'
   | 'page.report.meta.title'
+  | 'page.report.mode_boundary_full.desc'
+  | 'page.report.mode_boundary_quick.desc'
+  | 'page.report.mode_boundary_standard.desc'
+  | 'page.report.nav_bar.aria'
+  | 'page.report.nav_crossexam.label'
+  | 'page.report.nav_disagreements.label'
+  | 'page.report.nav_evidence.label'
+  | 'page.report.nav_fixes.label'
+  | 'page.report.nav_personas.label'
+  | 'page.report.nav_predictions.label'
+  | 'page.report.nav_summary.label'
   | 'page.report.next_test.title'
   | 'page.report.next_test_audience.label'
   | 'page.report.next_test_materials.label'
@@ -1178,6 +1213,13 @@ export type MessageKey =
   | 'page.report.predictions.desc'
   | 'page.report.predictions.hint'
   | 'page.report.predictions.title'
+  | 'page.report.project_memory.desc'
+  | 'page.report.project_memory.hint'
+  | 'page.report.project_memory.meta'
+  | 'page.report.project_memory.title'
+  | 'page.report.project_memory_none.title'
+  | 'page.report.reason.project_memory_anonymous_identity'
+  | 'page.report.reason.project_memory_ledger_disabled'
   | 'page.report.sep_colon'
   | 'page.report.sep_enum'
   | 'page.report.sep_semicolon'
@@ -1215,6 +1257,10 @@ export type MessageKey =
   | 'page.report.synthetic_banner.desc'
   | 'page.report.synthetic_banner.title'
   | 'page.report.threshold.error'
+  | 'page.report.triage.badge'
+  | 'page.report.triage.desc'
+  | 'page.report.triage.hint'
+  | 'page.report.triage.title'
   | 'page.report.unknown_level.value'
   | 'page.report.usage.desc'
   | 'page.report.usage.hint'
@@ -1917,6 +1963,7 @@ export type PlainMessageKey =
   | 'error.api.not_found'
   | 'error.api.quota_exceeded'
   | 'error.api.rate_limited'
+  | 'error.api.session_expired'
   | 'error.api.unauthorized'
   | 'error.api.upstream_error'
   | 'error.fetch.delete_review'
@@ -2069,6 +2116,8 @@ export type PlainMessageKey =
   | 'page.ask.stance_row.empty'
   | 'page.ask.submit.cta'
   | 'page.ask.submit.pending'
+  | 'page.ask.tracking.hint'
+  | 'page.ask.tracking_unnamed.label'
   | 'page.ask.type_picker.aria'
   | 'page.ask.type_picker.placeholder'
   | 'page.ask.type_picker.tooltip'
@@ -2076,6 +2125,7 @@ export type PlainMessageKey =
   | 'page.ask.ungrouped.title'
   | 'page.ask.upload.aria'
   | 'page.ask.upload.tooltip'
+  | 'page.ask.verify_nudge.cta'
   | 'page.create.category_all.tab'
   | 'page.create.confirm.desc'
   | 'page.create.confirm.title'
@@ -2224,6 +2274,7 @@ export type PlainMessageKey =
   | 'page.ledger.hours_saved.label'
   | 'page.ledger.leaderboard.title'
   | 'page.ledger.list.error'
+  | 'page.ledger.list.hint'
   | 'page.ledger.list.label'
   | 'page.ledger.list.title'
   | 'page.ledger.list_empty.desc'
@@ -2435,6 +2486,8 @@ export type PlainMessageKey =
   | 'page.register.submit.error'
   | 'page.register.submit.pending'
   | 'page.register.terms.consent'
+  | 'page.report.abstain.desc'
+  | 'page.report.abstain.label'
   | 'page.report.adaptive.empty'
   | 'page.report.adaptive.hint'
   | 'page.report.adaptive.title'
@@ -2485,10 +2538,16 @@ export type PlainMessageKey =
   | 'page.report.evaluation_dimension.label'
   | 'page.report.evaluation_full.cta'
   | 'page.report.evaluation_overall.label'
+  | 'page.report.evidence_profile.desc'
+  | 'page.report.evidence_profile.hint'
+  | 'page.report.evidence_profile.title'
   | 'page.report.failed.desc'
   | 'page.report.failed.empty'
   | 'page.report.failed.hint'
   | 'page.report.failed.title'
+  | 'page.report.falsify.cta'
+  | 'page.report.falsify.desc'
+  | 'page.report.falsify.title'
   | 'page.report.feedback.cta'
   | 'page.report.feedback.desc'
   | 'page.report.feedback.error'
@@ -2502,6 +2561,7 @@ export type PlainMessageKey =
   | 'page.report.fix_personas.label'
   | 'page.report.fix_suggestion.label'
   | 'page.report.fix_why.label'
+  | 'page.report.fixes.hint'
   | 'page.report.fixes.title'
   | 'page.report.gaps.title'
   | 'page.report.gate.empty'
@@ -2542,6 +2602,14 @@ export type PlainMessageKey =
   | 'page.report.md_risk.empty'
   | 'page.report.md_vote.empty'
   | 'page.report.meta.title'
+  | 'page.report.nav_bar.aria'
+  | 'page.report.nav_crossexam.label'
+  | 'page.report.nav_disagreements.label'
+  | 'page.report.nav_evidence.label'
+  | 'page.report.nav_fixes.label'
+  | 'page.report.nav_personas.label'
+  | 'page.report.nav_predictions.label'
+  | 'page.report.nav_summary.label'
   | 'page.report.next_test.title'
   | 'page.report.next_test_audience.label'
   | 'page.report.next_test_materials.label'
@@ -2559,6 +2627,11 @@ export type PlainMessageKey =
   | 'page.report.prediction_window.label'
   | 'page.report.predictions.desc'
   | 'page.report.predictions.title'
+  | 'page.report.project_memory.hint'
+  | 'page.report.project_memory.title'
+  | 'page.report.project_memory_none.title'
+  | 'page.report.reason.project_memory_anonymous_identity'
+  | 'page.report.reason.project_memory_ledger_disabled'
   | 'page.report.sep_colon'
   | 'page.report.sep_enum'
   | 'page.report.sep_semicolon'
@@ -2589,6 +2662,8 @@ export type PlainMessageKey =
   | 'page.report.summary_stance.label'
   | 'page.report.synthetic_banner.desc'
   | 'page.report.synthetic_banner.title'
+  | 'page.report.triage.desc'
+  | 'page.report.triage.title'
   | 'page.report.usage.hint'
   | 'page.report.vote.empty'
   | 'page.report.vote.title'
@@ -3306,6 +3381,7 @@ export interface MessageVars {
   'error.api.not_found': Record<string, never>
   'error.api.quota_exceeded': Record<string, never>
   'error.api.rate_limited': Record<string, never>
+  'error.api.session_expired': Record<string, never>
   'error.api.unauthorized': Record<string, never>
   'error.api.upstream_error': Record<string, never>
   'error.fetch.delete_review': Record<string, never>
@@ -3509,6 +3585,11 @@ export interface MessageVars {
   'page.ask.sync_failed.error': { count: number }
   'page.ask.token.tooltip': { input: string | number; output: string | number }
   'page.ask.token.unit': { value: string | number }
+  'page.ask.tracking.hint': Record<string, never>
+  'page.ask.tracking.meta': { count: number; days: string | number }
+  'page.ask.tracking.title': { count: number }
+  'page.ask.tracking_more.title': { total: string | number }
+  'page.ask.tracking_unnamed.label': Record<string, never>
   'page.ask.type_picker.aria': Record<string, never>
   'page.ask.type_picker.placeholder': Record<string, never>
   'page.ask.type_picker.tooltip': Record<string, never>
@@ -3517,6 +3598,8 @@ export interface MessageVars {
   'page.ask.upload.aria': Record<string, never>
   'page.ask.upload.error': { detail: string | number; filename: string | number }
   'page.ask.upload.tooltip': Record<string, never>
+  'page.ask.verify_nudge.cta': Record<string, never>
+  'page.ask.verify_nudge.hint': { total: string | number }
   'page.create.category_all.tab': Record<string, never>
   'page.create.confirm.desc': Record<string, never>
   'page.create.confirm.title': Record<string, never>
@@ -3708,6 +3791,7 @@ export interface MessageVars {
   'page.ledger.item.meta': { author: string | number; severity: string | number; time: string | number }
   'page.ledger.leaderboard.title': Record<string, never>
   'page.ledger.list.error': Record<string, never>
+  'page.ledger.list.hint': Record<string, never>
   'page.ledger.list.label': Record<string, never>
   'page.ledger.list.title': Record<string, never>
   'page.ledger.list_empty.desc': Record<string, never>
@@ -3940,6 +4024,9 @@ export interface MessageVars {
   'page.register.submit.error': Record<string, never>
   'page.register.submit.pending': Record<string, never>
   'page.register.terms.consent': Record<string, never>
+  'page.report.abstain.desc': Record<string, never>
+  'page.report.abstain.hint': { types: string | number }
+  'page.report.abstain.label': Record<string, never>
   'page.report.adaptive.empty': Record<string, never>
   'page.report.adaptive.hint': Record<string, never>
   'page.report.adaptive.title': Record<string, never>
@@ -4018,11 +4105,22 @@ export interface MessageVars {
   'page.report.evaluation_full.cta': Record<string, never>
   'page.report.evaluation_overall.label': Record<string, never>
   'page.report.evaluation_run.error': { reason: string | number }
+  'page.report.evidence_direct.label': { count: number }
+  'page.report.evidence_gap.label': { count: number }
+  'page.report.evidence_inferred.label': { count: number }
+  'page.report.evidence_profile.badge': { count: number }
+  'page.report.evidence_profile.desc': Record<string, never>
+  'page.report.evidence_profile.hint': Record<string, never>
+  'page.report.evidence_profile.title': Record<string, never>
+  'page.report.evidence_ratio.label': { cap: string | number; pct: string | number }
   'page.report.failed.desc': Record<string, never>
   'page.report.failed.empty': Record<string, never>
   'page.report.failed.hint': Record<string, never>
   'page.report.failed.label': { title: string | number }
   'page.report.failed.title': Record<string, never>
+  'page.report.falsify.cta': Record<string, never>
+  'page.report.falsify.desc': Record<string, never>
+  'page.report.falsify.title': Record<string, never>
   'page.report.feedback.cta': Record<string, never>
   'page.report.feedback.desc': Record<string, never>
   'page.report.feedback.error': Record<string, never>
@@ -4038,6 +4136,7 @@ export interface MessageVars {
   'page.report.fix_personas.label': Record<string, never>
   'page.report.fix_suggestion.label': Record<string, never>
   'page.report.fix_why.label': Record<string, never>
+  'page.report.fixes.hint': Record<string, never>
   'page.report.fixes.title': Record<string, never>
   'page.report.gaps.title': Record<string, never>
   'page.report.gate.empty': Record<string, never>
@@ -4094,6 +4193,17 @@ export interface MessageVars {
   'page.report.md_vote.label': { count: number }
   'page.report.md_vote_none.label': { count: number }
   'page.report.meta.title': Record<string, never>
+  'page.report.mode_boundary_full.desc': { n: string | number }
+  'page.report.mode_boundary_quick.desc': { n: string | number }
+  'page.report.mode_boundary_standard.desc': { n: string | number }
+  'page.report.nav_bar.aria': Record<string, never>
+  'page.report.nav_crossexam.label': Record<string, never>
+  'page.report.nav_disagreements.label': Record<string, never>
+  'page.report.nav_evidence.label': Record<string, never>
+  'page.report.nav_fixes.label': Record<string, never>
+  'page.report.nav_personas.label': Record<string, never>
+  'page.report.nav_predictions.label': Record<string, never>
+  'page.report.nav_summary.label': Record<string, never>
   'page.report.next_test.title': Record<string, never>
   'page.report.next_test_audience.label': Record<string, never>
   'page.report.next_test_materials.label': Record<string, never>
@@ -4115,6 +4225,13 @@ export interface MessageVars {
   'page.report.predictions.desc': Record<string, never>
   'page.report.predictions.hint': { pct: string | number }
   'page.report.predictions.title': Record<string, never>
+  'page.report.project_memory.desc': { count: number; project: string | number; reviews: string | number }
+  'page.report.project_memory.hint': Record<string, never>
+  'page.report.project_memory.meta': { cap: string | number }
+  'page.report.project_memory.title': Record<string, never>
+  'page.report.project_memory_none.title': Record<string, never>
+  'page.report.reason.project_memory_anonymous_identity': Record<string, never>
+  'page.report.reason.project_memory_ledger_disabled': Record<string, never>
   'page.report.sep_colon': Record<string, never>
   'page.report.sep_enum': Record<string, never>
   'page.report.sep_semicolon': Record<string, never>
@@ -4152,6 +4269,10 @@ export interface MessageVars {
   'page.report.synthetic_banner.desc': Record<string, never>
   'page.report.synthetic_banner.title': Record<string, never>
   'page.report.threshold.error': { source: string | number }
+  'page.report.triage.badge': { advanced: string | number; screened: string | number }
+  'page.report.triage.desc': Record<string, never>
+  'page.report.triage.hint': { chars: string | number }
+  'page.report.triage.title': Record<string, never>
   'page.report.unknown_level.value': { raw: string | number }
   'page.report.usage.desc': { calls: string | number; input: string | number; output: string | number }
   'page.report.usage.hint': Record<string, never>

@@ -11,6 +11,7 @@ personas:
     language: [en-US]
     mbti: ISFJ
     archetype: VR晕动敏感
+    methodology: "舒适选项底线派"
     identity_summary: 她想爱上VR，但她的前庭系统每次都在说"再想想"。
     gaming_profile:
       experience: 中核
@@ -69,6 +70,7 @@ personas:
     language: [zh-CN, en-US]
     mbti: INTJ
     archetype: 沉浸体验追求
+    methodology: "物理可信度检验派"
     identity_summary: 他买VR不是为了"玩游戏"，而是为了"去过另一种生活"——临场感是唯一的硬通货。
     gaming_profile:
       experience: 核心
@@ -127,6 +129,7 @@ personas:
     language: [en-US, zh-CN]
     mbti: ESTJ
     archetype: 体感健身玩家
+    methodology: "运动量数据验证派"
     identity_summary: 她不是在玩游戏，她是在用游戏让自己流汗——卡路里比成就重要。
     gaming_profile:
       experience: 中核
@@ -185,6 +188,7 @@ personas:
     language: [en-US, ja-JP]
     mbti: ENFP
     archetype: 社交VR居民
+    methodology: "社交空间安全评估派"
     identity_summary: VR对他们来说不是游戏机，是第二个家——他们关心的是"这个空间里有没有我想见的人"。
     gaming_profile:
       experience: 核心

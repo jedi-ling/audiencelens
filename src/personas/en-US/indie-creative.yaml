@@ -26,6 +26,7 @@ persona_overlays:
   P01-indie-connoisseur:
     display_name: 'Lin Zhi Qiu'
     archetype: Indie connoisseur
+    methodology: "Authorial-voice Recognition"
     identity_summary: More than a hundred indie games go onto her Steam wishlist in a year — visual fidelity
       doesn't interest her, only whether there's a story that no one but you could tell.
     motivations:
@@ -74,6 +75,7 @@ persona_overlays:
   P02-creativity-seeker:
     display_name: 'A Che'
     archetype: Seeker of new ideas
+    methodology: "Mechanic-originality Testing"
     identity_summary: They don't play to pass the time — they're hunting for what nobody has done before,
       and one counter-intuitive interaction excites them more than a hundred hours of polish.
     motivations:
@@ -120,6 +122,7 @@ persona_overlays:
   P03-culture-consumer:
     display_name: 'Su Man'
     archetype: Cultural consumer
+    methodology: "Cultural-authenticity Scrutiny"
     identity_summary: She takes indie games the way she takes films, novels and exhibitions — she wants
       a game to say something true about how some group of people actually lives.
     motivations:
@@ -168,6 +171,7 @@ persona_overlays:
   P06-indie-narrative-designer:
     display_name: 'Gu Yan'
     archetype: Narrative designer
+    methodology: "Branch-structure Dissection"
     identity_summary: 'She reads a game the way a narrative designer does: the shape of the branching,
       the dialogue system, the rhythm of the emotion.'
     motivations:
@@ -221,6 +225,7 @@ persona_overlays:
   P07-indie-rhythm-fanatic:
     display_name: 'Ling Yin'
     archetype: Rhythm-game fanatic
+    methodology: "Frame-level Judgment Testing"
     identity_summary: Judgement frames and chart design are their whole life; what they look at is the
       timing window, the invention in the charts, and who owns the music.
     motivations:

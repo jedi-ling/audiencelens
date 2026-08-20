@@ -2,10 +2,21 @@ from typing import List
 
 
 def load_evidence_types(artifact_bundle: dict) -> List[str]:
+    """材料包里出现过哪些证据类型。
+
+    带 `is_context: True` 的材料整条跳过：那是**背景上下文**（如项目历史判断），
+    不是关于本次待评审对象的证据。不跳过的话有两个具体后果：
+      · 它的 type 会进 available_types，参与下面 _fuzzy_match 的模糊匹配，
+        可能让某个人格因为"背景材料的类型名恰好像它要的证据"而被误判为证据充足；
+      · 若上下文材料用了 "text" 之类的类型，会直接命中 FREEFORM_EVIDENCE_TYPES，
+        让**全部**人格无条件通过证据预检——那道门槛就等于被上下文注入关掉了。
+    """
     materials = artifact_bundle.get("materials", [])
     seen = set()
     result = []
     for item in materials:
+        if item.get("is_context") is True:
+            continue
         t = item.get("type", "")
         if t and t not in seen:
             seen.add(t)

@@ -17,6 +17,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins, LogIn } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AmbientMotes from '@/components/AmbientMotes'
+import PendingVerificationCard, { PendingVerifyNudge } from '@/components/PendingVerificationCard'
 import { api, ApiError } from '@/lib/apiClient'
 import { fetchReviewsAll, fetchReview, deleteReview, fetchPersonas } from '@/lib/api'
 import { rememberPendingConversation } from '@/lib/apiClient'
@@ -366,9 +367,17 @@ export default function AskPage() {
           return next
         })
       } catch {
-        setProjects(null)
+        // 失败 ≠ 加载中。回写 null 会让渲染层的"Loading projects…"永远转圈
+        // （渲染只认 null=加载中）——过期 token 的访客侧栏就卡死在这。
+        // 空数组让项目区整块收起：对匿名/过期身份这就是正确形态。
+        setProjects([])
       }
     } catch (e) {
+      // 收尾状态**先于**算错误文案：tApiError 曾因未知错误码自己抛
+      // MissingMessageError（见 api-error.ts 的兜底注释），把它后面的语句
+      // 全炸掉——spinner 永远转圈的根因正是"错误处理先于状态收尾"。
+      setReviewHistory((prev) => prev ?? [])
+      setProjects((prev) => prev ?? [])
       setHistoryError(tApiError(e, 'page.ask.history.error'))
     }
   }, [])
@@ -471,9 +480,15 @@ export default function AskPage() {
    * 显示摘要，没跑完的会接着推进度）——没有持久化过完整对话记录，
    * 这是从 Review 自身数据能还原出的最接近"回到当时那个对话"的版本。 */
   const openReviewConversation = (r: Review) => {
-    const bundle = r.artifact_bundle as { materials?: { type: string; text?: string }[] } | undefined
+    const bundle = r.artifact_bundle as
+      | { materials?: { type: string; text?: string; is_injected?: boolean }[] }
+      | undefined
+    // 必须跳过 is_injected 的材料：后端会往 materials 里塞系统生成的内容
+    // （技能提示插在 0 号位、项目历史追加在末尾），而这里找的是"用户当时说的话"。
+    // 不过滤的话，用了技能的历史评审点开后，第一条 type=="text" 命中的是那段
+    // 提示词，用户会看到自己"说"了一句从没说过的系统指令。
     const userText =
-      bundle?.materials?.find((m) => m.type === 'text' && m.text)?.text ||
+      bundle?.materials?.find((m) => m.type === 'text' && m.text && !m.is_injected)?.text ||
       r.target_title ||
       TASK_TYPES.find((tt) => tt.id === r.task_type)?.name ||
       t('page.ask.restored_review.label')
@@ -1253,7 +1268,11 @@ export default function AskPage() {
             此时对话区基本是空的，需要一点氛围；一旦有真实对话就摘掉——
             正文文字底下飘东西会持续偷注意力。DOM 放在气泡前，天然在内容层下面 */}
         {isEmptyChat && <AmbientMotes className="-z-10" />}
-        {messages.map((m) => (
+        {/* 空会话时开场白不渲染成孤立气泡：一个带头像和时间戳的气泡加一段
+            悬在中间的示例，是两个互不相干的岛（实测截图里气泡贴上、示例悬中、
+            下方大片空白）。空状态应该是**一个**内聚的簇——问候当标题，
+            示例当选项，追踪卡当续篇，全部走下面那个居中容器。 */}
+        {!isEmptyChat && messages.map((m) => (
           <ChatBubble
             key={m.id}
             message={m}
@@ -1268,8 +1287,9 @@ export default function AskPage() {
         ))}
         {isEmptyChat && (
           // 空会话引导：空滚动区不能只有一行开场白悬在顶上——给出明确的下一步动作
-          <div className="mx-auto max-w-sm space-y-4 text-center">
-            <p className="text-base font-medium text-text-primary font-display">{t('page.ask.examples.title')}</p>
+          <div className="mx-auto w-full max-w-md space-y-4 text-center">
+            <p className="text-lg font-medium text-text-primary font-display">{t('page.ask.greeting.value')}</p>
+            <p className="text-sm text-text-secondary">{t('page.ask.examples.title')}</p>
             <div className="flex flex-col gap-2">
               {EXAMPLE_KEYS.map((k) => (
                 <button
@@ -1282,6 +1302,9 @@ export default function AskPage() {
               ))}
             </div>
             <p className="text-xs text-text-muted">{t('page.ask.examples.hint')}</p>
+            {/* 待验证追踪卡（ARTi 式"持续追踪中"）：把欠着回填的判断摆到发起
+                评审的主路径上。匿名/无数据/加载失败都自行消失，见组件头注释。 */}
+            <PendingVerificationCard />
           </div>
         )}
         {busy && <ThinkingIndicator />}
@@ -2962,6 +2985,8 @@ function ChatBubble({
               </span>
             )}
           </div>
+          {/* 该项目有未回填预测时提一句：先回填，本次评审就不会复读已被推翻的判断 */}
+          {intent.project_key && <PendingVerifyNudge projectKey={intent.project_key} />}
 
           {intent.matched_personas.length > 0 && (
             <div className="mt-3">

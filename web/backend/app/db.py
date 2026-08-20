@@ -216,6 +216,17 @@ def _legacy_migrations() -> None:
         # 而 SQLite 对类型名是宽容的（亲和性规则），两边都能过的写法只有 TIMESTAMP。
         patches.append("ALTER TABLE reviews ADD COLUMN shared_at TIMESTAMP")
 
+    # 项目记忆按 (user_id, project_key) 查历史判断（评审创建的同步路径）。
+    # 新库由模型的 __table_args__ 建；这一条给存量库补。IF NOT EXISTS 幂等，
+    # 每次启动都跑也无害。
+    if "wide_screen" not in columns:
+        # DEFAULT false 而不是 0：PostgreSQL 的 boolean 不与整数隐式互转（见 is_guest 的教训）
+        patches.append("ALTER TABLE reviews ADD COLUMN wide_screen BOOLEAN DEFAULT false NOT NULL")
+
+    patches.append(
+        "CREATE INDEX IF NOT EXISTS ix_reviews_user_project ON reviews (user_id, project_key)"
+    )
+
     if "persona_outputs" in inspector.get_table_names():
         po_columns = {c["name"] for c in inspector.get_columns("persona_outputs")}
         if "input_tokens" not in po_columns:
