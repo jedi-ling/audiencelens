@@ -523,6 +523,8 @@ export const api = {
     persona_pack?: PersonaPack
     selected_personas?: string[]
     adaptive_panel?: boolean
+    /** 两层评审：全包初筛 → 分歧门禁 → 深评（引擎 wide_screen） */
+    wide_screen?: boolean
     skill_type?: string | null
     project_key?: string | null
     /** 评审完成后自动运行 8 维质量评估 */

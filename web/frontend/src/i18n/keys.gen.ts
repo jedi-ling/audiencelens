@@ -680,6 +680,9 @@ export type MessageKey =
   | 'page.create.task_type.title'
   | 'page.create.task_type_open.desc'
   | 'page.create.task_type_scoped.desc'
+  | 'page.create.wide_screen.desc'
+  | 'page.create.wide_screen.hint'
+  | 'page.create.wide_screen.label'
   | 'page.evaluation.back.cta'
   | 'page.evaluation.completed.label'
   | 'page.evaluation.created.label'
@@ -2196,6 +2199,9 @@ export type PlainMessageKey =
   | 'page.create.target.placeholder'
   | 'page.create.task_type.desc'
   | 'page.create.task_type.title'
+  | 'page.create.wide_screen.desc'
+  | 'page.create.wide_screen.hint'
+  | 'page.create.wide_screen.label'
   | 'page.evaluation.back.cta'
   | 'page.evaluation.completed.label'
   | 'page.evaluation.created.label'
@@ -3692,6 +3698,9 @@ export interface MessageVars {
   'page.create.task_type.title': Record<string, never>
   'page.create.task_type_open.desc': { skill: string | number }
   'page.create.task_type_scoped.desc': { skill: string | number }
+  'page.create.wide_screen.desc': Record<string, never>
+  'page.create.wide_screen.hint': Record<string, never>
+  'page.create.wide_screen.label': Record<string, never>
   'page.evaluation.back.cta': Record<string, never>
   'page.evaluation.completed.label': Record<string, never>
   'page.evaluation.created.label': Record<string, never>

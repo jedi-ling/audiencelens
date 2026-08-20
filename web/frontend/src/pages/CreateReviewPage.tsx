@@ -10,7 +10,7 @@ import { loadSkillTruth, NON_REVIEW_SKILL_TYPES } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
-import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw, Layers } from 'lucide-react'
 import { t, Trans } from '@/i18n/runtime'
 import {
   getTaskTypes,
@@ -162,6 +162,9 @@ export default function CreateReviewPage() {
   const [extractError, setExtractError] = useState<ApiErrorText | null>(null)
   const [enableEvaluation, setEnableEvaluation] = useState(false)
   const [enableRedTeam, setEnableRedTeam] = useState(false)
+  // 两层评审：全包初筛 → 分歧门禁 → 深评。默认关——它比常规评审多一轮
+  // （廉价档）调用，该由用户显式选择而不是替他决定花这笔钱。
+  const [wideScreen, setWideScreen] = useState(false)
   // 技能清单以 /api/skills 为唯一事实源。以前第 0 步的名称/描述读的是本地 SKILLS，
   // 后端改了文案这一页不会跟，同一个技能在技能中心和创建页会显示两种说法。
   const [skills, setSkills] = useState<SkillTruth[] | null>(null)
@@ -383,6 +386,7 @@ export default function CreateReviewPage() {
         // enable_evaluation 评审完成后自动跑 8 维评估，enable_red_team 叠加对抗视角提示
         enable_evaluation: enableEvaluation,
         enable_red_team: enableRedTeam,
+        wide_screen: wideScreen,
       })
       navigate(`/review/${reviewId}`)
     } catch (e) {
@@ -1212,6 +1216,42 @@ export default function CreateReviewPage() {
                         <span key={k} className="px-2 py-0.5 rounded text-xs bg-red-400/10 text-red-400">{t(k)}</span>
                       ))}
                     </div>
+                  )}
+                </div>
+              </button>
+
+              {/* 两层评审。这个开关此前**只存在于 API**：引擎、门禁、测试、四形态
+                  渲染全都做完了，而界面上没有任何地方能打开它——建了没人够得着。
+                  显式点名人格时引擎会自动让位（初筛整层跳过），所以这里不做互斥禁用，
+                  由引擎按同一条纪律决定，报告里如实写明 reason。 */}
+              <button
+                onClick={() => setWideScreen(!wideScreen)}
+                className={cn(
+                  'w-full flex items-start gap-4 p-5 rounded-xl border-2 transition-all cursor-pointer text-left',
+                  'bg-bg-card hover:bg-bg-card-hover',
+                  wideScreen ? 'border-warm-orange/50 bg-warm-orange/5' : 'border-border'
+                )}
+              >
+                <div className={cn(
+                  'w-5 h-5 rounded border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
+                  wideScreen ? 'bg-warm-orange border-warm-orange' : 'border-border'
+                )}>
+                  {wideScreen && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={1.25} />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Layers className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
+                    <span className={cn('font-medium text-sm', wideScreen ? 'text-warm-orange' : 'text-text-primary')}>
+                      {t('page.create.wide_screen.label')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    {t('page.create.wide_screen.desc')}
+                  </p>
+                  {wideScreen && (
+                    <p className="mt-3 text-xs text-text-muted leading-relaxed">
+                      {t('page.create.wide_screen.hint')}
+                    </p>
                   )}
                 </div>
               </button>

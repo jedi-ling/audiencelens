@@ -40,6 +40,8 @@ interface ReviewState {
     skill_type?: SkillType
     enable_evaluation?: boolean
     enable_red_team?: boolean
+    /** 两层评审：全包初筛 → 分歧门禁 → 深评（引擎 wide_screen） */
+    wide_screen?: boolean
   }) => Promise<string>
   /** 后端在免费次数用完时会把高级技能/红队降级，并回一句 skill_degraded 说明。
    *  这句话必须让用户看见：否则他以为红队正常跑了，实际拿到的是普通模式的报告。
@@ -106,6 +108,10 @@ export const useReviewStore = create<ReviewState>((set) => ({
       skill_type: data.skill_type ?? null,
       enable_evaluation: data.enable_evaluation ?? false,
       enable_red_team: data.enable_red_team ?? false,
+      // 只加类型不加这一行就是"传了但被丢弃"——enable_evaluation /
+      // enable_red_team 都真实踩过这个坑（开关从 UI 传到后端被静默吞掉，
+      // 用户以为开了、实际没开，且没有任何回执）。
+      wide_screen: data.wide_screen ?? false,
     })
     // 显式写 null 而不是"有值才写"：不覆盖的话，上一次降级的提示会挂在
     // store 上，下一次正常创建时被页面当成本次的降级又弹一遍。

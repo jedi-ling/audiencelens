@@ -128,3 +128,40 @@ def test_review_mode_boundaries_match_engine_config(source: str) -> None:
     }
     assert be, "没从 cli.py 解析出 REVIEW_MODE_CONFIG，引擎侧写法变了，卡口先失效了"
     assert fe == be, f"前端档位边界与引擎配置不一致：前端 {fe}，引擎 {be}"
+
+
+def test_review_switches_reach_the_backend_from_the_ui() -> None:
+    """UI 上的评审开关必须一路传到后端 schema —— 断在中间是**静默**的。
+
+    这个仓库真实踩过两次：enable_evaluation 与 enable_red_team 都曾经从 UI
+    传出去、被后端 schema 静默丢弃，用户以为开了实际没开，且没有任何回执。
+    wide_screen（两层评审）是第三个走同一条链路的开关，加它时链路有四段：
+
+        CreateReviewPage 的 state → review-store 的 payload 透传
+        → 后端 CreateReviewRequest schema → Review 模型列
+
+    任何一段漏掉，功能都"看起来接上了"但不生效。只声明类型而不写透传是最
+    容易漏的一段（类型对了、tsc 绿了、值没传）。
+    """
+    import os
+
+    switches = ("enable_evaluation", "enable_red_team", "wide_screen")
+
+    store = os.path.join(REPO_ROOT, "web", "frontend", "src", "store", "review-store.ts")
+    with open(store, "r", encoding="utf-8") as f:
+        store_src = f.read()
+
+    from app.api.platform import CreateReviewRequest
+    from app.models import Review
+
+    backend_fields = set(CreateReviewRequest.model_fields)
+    review_columns = {c.name for c in Review.__table__.columns}
+
+    for sw in switches:
+        # 透传：payload 里必须真的有 `sw: ...` 这一行，不能只在类型声明里出现
+        assert f"{sw}: data.{sw}" in store_src, (
+            f"review-store 只声明了 {sw} 的类型却没往 payload 里写——"
+            "这正是「传了但被丢弃」的形状，tsc 不会报错"
+        )
+        assert sw in backend_fields, f"后端 CreateReviewRequest 缺 {sw}，请求体会被静默丢弃"
+        assert sw in review_columns, f"Review 模型缺 {sw} 列，开关不会落库，事后查不到这次开没开"

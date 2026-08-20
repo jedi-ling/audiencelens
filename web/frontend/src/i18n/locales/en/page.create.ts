@@ -102,6 +102,13 @@ export default {
   // ---- Step 4: options ----
   'option.title': 'Review options',
   'option.desc': 'Add extra passes to this review',
+
+  /* 两层评审开关 */
+  'wide_screen.label': 'Two-tier review (triage the whole pack, then go deep)',
+  'wide_screen.desc':
+    'First every persona in the selected pack skims the materials in one cheap short call (stance, severity, one-line concern); the deep-review panel is then picked by disagreement signal. Without it, the panel is simply the first few in preset order.',
+  'wide_screen.hint':
+    'Adds one round of cheap-tier model calls — far below the cost of a full review, and itemised separately in the report. Who advanced and why is listed in the report’s “Triage record”. If you name specific personas, this tier is skipped entirely: nothing you picked gets filtered out.',
   'evaluation.label': 'Add an evaluation report',
   'evaluation.desc_one':
     'When the review finishes, run a {{count}}-dimension evaluation and produce a scorecard plus an ethics report.',
