@@ -1252,6 +1252,14 @@ def run_panel(
         ),
     }
 
+    # 项目记忆进 report 本体：它本身挂在 artifact_bundle 上（是**入参**不是产出），
+    # 但导出件（md / html）只拿得到 report——不搬过来，发给同事的报告里就看不到
+    # "本次带了几条历史判断"，而报告里那些"当前材料里没有的问题"正来源于它。
+    # 只搬元数据不搬材料正文：正文已经在 bundle 里可审计，重复一份只会撑大报告。
+    _pm = (artifact_bundle or {}).get("project_memory")
+    if isinstance(_pm, dict) and _pm.get("carried"):
+        report["project_memory"] = _pm
+
     # 初筛（两层评审 L1）进 report 本体：全包谁被筛过、谁晋级、为什么，
     # 都要在重新打开历史报告时看得到。triage_block 为 None = 本次没请求 wide_screen。
     if triage_block is not None:

@@ -329,6 +329,11 @@ class TestRunPanel:
         # 导出件与网页版必须说同样的话：.md 是发给同事看的那一份，
         # 证据账目只在网页版出现等于账目只对本人公开。
         assert "证据构成" in result["markdown"]
+        # 可证伪预测是判断闭环的入口：导出件里没有它，同事拿到 .md 不知道
+        # 该去验证什么，回填/校准/项目记忆过滤整条链断在第一步。
+        if report.get("predictions"):
+            assert "可证伪预测" in result["markdown"]
+            assert "如何证伪" in result["markdown"]
         if report["abstentions"]:
             assert "弃权" in result["markdown"]
 
@@ -403,6 +408,57 @@ class TestRunPanel:
         tri = result["report"].get("triage")
         assert tri is not None and tri["enabled"] is False
         assert tri["reason"] == "explicit_persona_selection"
+
+    def test_project_memory_reaches_exports_not_just_web(self):
+        """项目记忆是**入参**（挂在 artifact_bundle 上），但导出件只拿得到 report。
+
+        不把它搬进 report，发给同事的 .md / .html 里就看不到"本次带了几条历史
+        判断"——而报告里那些"当前材料里根本没有的问题"正来源于它。读者会当成
+        幻觉。四种报告形态必须说同样的话。
+        """
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        bundle = {
+            "materials": [{"type": "text", "text": "核心循环是探索-战斗-成长"}],
+            "project_memory": {
+                "carried": 3, "from_reviews": 2, "project_key": "测试项目", "cap": 8,
+            },
+        }
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle=bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="quick",
+        )
+        assert result["report"]["project_memory"]["carried"] == 3
+        assert "测试项目" in result["markdown"]
+
+    def test_project_memory_absent_when_nothing_carried(self):
+        """carried=0 / 没有这个键时，报告里不该凭空出现"带入了历史"的段落。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = run_panel(
+            task_type="concept_review",
+            artifact_bundle={"materials": [{"type": "text", "text": "核心循环"}]},
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode="quick",
+        )
+        assert "project_memory" not in result["report"]
+        assert "本次带入的项目历史" not in result["markdown"]
 
     def test_simulated_mode_carries_warning(self, sample_artifact_bundle):
         os.environ.pop("ANTHROPIC_API_KEY", None)

@@ -32,6 +32,43 @@ class TestHealth:
         assert "server_llm_key" not in body  # 只暴露 server_key_present 布尔
 
 
+# ============================== 错误信封的语种标注 ==============================
+
+class TestErrorEnvelopeLang:
+    """错误信封必须带 message_lang —— 契约 §9.1 + D2。
+
+    这条卡口的由来：docs/I18N_CONTRACT.md 把 core/lang.py 列为「语种定义与
+    缺译标记（后端唯一）」，前端 lib/types.ts 为 `error.message_lang` 写好了
+    完整接收逻辑（注释还写着"本期后端恒给 zh-CN"），而后端**从未实现过**
+    ——message_lang 在整个后端零命中。文档和前端都在，后端没有，
+    于是那套"防止英文界面混中文"的机制从来没有真正启用。
+
+    没有测试的话这种漂移完全静默：接口照常 200/400，前端把 undefined
+    归为"老响应"走兜底，谁都不会发现契约是空的。
+    """
+
+    def test_app_error_payload_declares_message_lang(self):
+        from app.core.errors import BadRequest
+        from app.core.lang import BACKEND_MESSAGE_LANG, SUPPORTED_LANGS
+
+        payload = BadRequest("参数有误").to_payload()["error"]
+        assert payload["message_lang"] == BACKEND_MESSAGE_LANG
+        assert payload["message_lang"] in SUPPORTED_LANGS
+
+    def test_http_error_response_carries_message_lang(self, client):
+        """走真实 HTTP：装饰器/handler 链上任何一环丢了这个字段都要红。"""
+        r = client.post("/api/auth/register", json={"email": "a@b.com", "password": "12345678"})
+        assert r.status_code == 400
+        assert r.json()["error"]["message_lang"] == "zh-CN"
+
+    def test_missing_marker_never_falls_back_to_another_language(self):
+        """缺译绝不回落成另一种语言（D8）；形态必须与前端 runtime.ts 一致，
+        否则"一条 grep 覆盖前后端"这句话就不成立。"""
+        from app.core.lang import missing_marker
+
+        assert missing_marker("page.x.title", "en-US") == "⟦missing:en-US:page.x.title⟧"
+
+
 # ============================== 身份（默认匿名）==============================
 
 class TestIdentity:

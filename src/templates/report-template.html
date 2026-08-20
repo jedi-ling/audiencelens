@@ -337,6 +337,17 @@
   </div>
   {% endif %}
 
+  {% if project_memory and project_memory.carried %}
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🧠</span> 本次带入的项目历史</div>
+    <div style="font-size:13px;opacity:.85">
+      同项目「{{project_memory.project_key}}」此前评审留下的 <b>{{project_memory.carried}}</b> 条判断
+      （来自 {{project_memory.from_reviews}} 次历史评审）已作为背景材料交给每个人格。
+      它们是背景，不是本次材料的直接证据；被真人测试回填为「没发生」的判断不会带入。
+    </div>
+  </div>
+  {% endif %}
+
   {% if triage and triage.enabled %}
   <div class="section-card">
     <div class="section-title"><span class="icon">🔬</span> 初筛（两层评审 L1）</div>
@@ -656,6 +667,31 @@
 
   </div>
   {% endif %}
+
+  <!-- 可证伪预测：判断闭环的入口。必须在 information_gaps 的条件块**之外**——
+       第一版误插进了那个条件里面，信息缺口为空时整块预测跟着消失，
+       而这两件事毫无关系。（注意：HTML 注释里不能写字面量 Jinja 标签，
+       Jinja 不认 HTML 注释，会把它当成真标签解析并报未闭合错误。） -->
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🎯</span> 可证伪预测</div>
+    {% if predictions %}
+    {% for p in predictions %}
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">{{p.claim or p.intervention}}</div>
+      {% if p.target_metric %}<div style="opacity:.8">目标指标：{{p.target_metric}}{% if p.direction %}（{{p.direction}}）{% endif %}</div>{% endif %}
+      {% if p.success_criterion %}<div style="opacity:.8">判定标准：{{p.success_criterion}}</div>{% endif %}
+      {% if p.verification_window %}<div style="opacity:.8">验证窗口：{{p.verification_window}}</div>{% endif %}
+      {% if p.confidence is not none %}<div style="opacity:.7;font-size:12px">启发式置信度 {{(p.confidence * 100) | round | int}}% · {{p.confidence_basis or "合成面板启发式，未经真实结果校准"}}</div>{% endif %}
+    </div>
+    {% endfor %}
+    <div style="font-size:12px;opacity:.8;margin-top:6px">
+      <b>如何证伪</b>：窗口内判定标准未达成，即该条判断被证伪。回填「没发生」后，
+      它不再进入同项目下一次评审的上下文。
+    </div>
+    {% else %}
+    <div style="font-size:13px;opacity:.75">（本次评审没有产出可证伪预测）</div>
+    {% endif %}
+  </div>
 
   <!-- Information Gaps -->
   {% if information_gaps %}

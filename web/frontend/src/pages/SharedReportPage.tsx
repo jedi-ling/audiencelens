@@ -296,6 +296,34 @@ export default function SharedReportPage() {
         </section>
       )}
 
+      {/* 可证伪预测：分享页尤其需要——收链接的人没有上下文，
+          "该拿什么去验证" 正是这份报告对他最有用的部分。 */}
+      {(report.predictions?.length ?? 0) > 0 && (
+        <section className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">
+            {t('page.report.predictions.title')}
+          </h2>
+          <ul className="space-y-2">
+            {report.predictions!.map((p, i) => (
+              <li key={p.prediction_id ?? i} className="text-sm text-text-secondary">
+                <span className="text-text-primary">{p.claim || p.intervention}</span>
+                {p.success_criterion && (
+                  <span className="block text-xs text-text-muted">
+                    {t('page.report.prediction_criterion.label')}
+                    {t('page.report.sep_colon')}
+                    {p.success_criterion}
+                    {p.verification_window ? ` · ${p.verification_window}` : ''}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 border-t border-border pt-2 text-xs text-text-muted">
+            {t('page.report.falsify.desc')}
+          </p>
+        </section>
+      )}
+
       {(report.information_gaps?.length ?? 0) > 0 && (
         <section className="mb-6 rounded-xl border border-border bg-bg-card p-5">
           <h2 className="mb-2 text-sm font-semibold text-text-primary">{t('page.shared.gaps.title')}</h2>

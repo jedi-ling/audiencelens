@@ -7,6 +7,8 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.core.lang import BACKEND_MESSAGE_LANG
+
 
 class AppError(Exception):
     status_code = 500
@@ -19,7 +21,17 @@ class AppError(Exception):
         super().__init__(self.message)
 
     def to_payload(self) -> dict:
-        payload = {"error": {"code": self.code, "message": self.message}}
+        # message_lang 是**事实标注**不是协商结果：告诉前端"这条 message 是中文"。
+        # 没有它，前端只能猜；猜错的表现是英文界面上混一句中文且没人发现
+        # （契约 D2）。前端 lib/types.ts 早就为这个字段写好了接收逻辑，
+        # 后端此前从没给过——那套机制因此从未真正启用。
+        payload = {
+            "error": {
+                "code": self.code,
+                "message": self.message,
+                "message_lang": BACKEND_MESSAGE_LANG,
+            }
+        }
         if self.detail is not None:
             payload["error"]["detail"] = self.detail
         return payload
@@ -93,7 +105,13 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
     from app.config import settings
 
-    payload = {"error": {"code": "internal_error", "message": "服务器内部错误"}}
+    payload = {
+        "error": {
+            "code": "internal_error",
+            "message": "服务器内部错误",
+            "message_lang": BACKEND_MESSAGE_LANG,
+        }
+    }
     if settings.debug:
         payload["error"]["detail"] = f"{type(exc).__name__}: {exc}"
     return JSONResponse(status_code=500, content=payload)

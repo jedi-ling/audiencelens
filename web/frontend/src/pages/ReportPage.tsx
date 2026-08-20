@@ -3480,6 +3480,25 @@ function generateMarkdown(report: RealReport): string {
     lines.push('')
   }
 
+  // 可证伪预测：判断闭环的入口。四种报告形态必须同话——发给同事的 .md 里
+  // 没有"该验证什么"，回填/校准/项目记忆过滤这条链就断在第一步。
+  const preds = report.predictions ?? []
+  if (preds.length > 0) {
+    lines.push(`## ${t('page.report.predictions.title')}`)
+    for (const p of preds) {
+      lines.push(`### ${p.claim || p.intervention || ''}`)
+      if (p.target_metric) lines.push(`- ${t('page.report.prediction_metric.label')}${t('page.report.sep_colon')}${p.target_metric}`)
+      if (p.success_criterion) lines.push(`- ${t('page.report.prediction_criterion.label')}${t('page.report.sep_colon')}${p.success_criterion}`)
+      if (p.verification_window) lines.push(`- ${t('page.report.prediction_window.label')}${t('page.report.sep_colon')}${p.verification_window}`)
+      if (typeof p.confidence === 'number') {
+        lines.push(`- ${t('page.report.predictions.hint', { pct: formatPercent(p.confidence) }).replace(/<\/?emph>/g, '')}`)
+      }
+      lines.push('')
+    }
+    lines.push(`> **${t('page.report.falsify.title')}** ${t('page.report.falsify.desc')}`)
+    lines.push('')
+  }
+
   const fixes = report.priority_fixes ?? []
   if (fixes.length) {
     lines.push(`## ${t('page.report.fixes.title')}`)

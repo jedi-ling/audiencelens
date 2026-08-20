@@ -731,6 +731,8 @@ def render_markdown_report(report: dict, template_path: str) -> str:
         "abstentions": report.get("abstentions", []),
         "dimension_scores": report.get("dimension_scores", []),
         "triage": report.get("triage"),
+        "predictions": report.get("predictions", []),
+        "project_memory": report.get("project_memory"),
     }
 
     return template.render(**context)
@@ -844,6 +846,8 @@ def render_html_report(report: dict, template_path: str) -> str:
         "abstentions": report.get("abstentions", []),
         "dimension_scores": report.get("dimension_scores", []),
         "triage": report.get("triage"),
+        "predictions": report.get("predictions", []),
+        "project_memory": report.get("project_memory"),
     }
 
     return template.render(**context)

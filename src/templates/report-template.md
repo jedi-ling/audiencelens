@@ -16,6 +16,15 @@
 {% endif %}{% if persona_pack_version %}| persona_pack_version | {{persona_pack_version}} |
 {% endif %}| generated_at | {{generated_at}} |
 
+{% if project_memory and project_memory.carried %}
+## 本次带入的项目历史
+{# 隐式注入的上下文不可见就等于不可审计：读者看到报告里冒出一个当前材料里
+   没有的问题时，得能查到它是从哪来的。 #}
+- 同项目「{{project_memory.project_key}}」此前评审留下的 {{project_memory.carried}} 条判断
+  （来自 {{project_memory.from_reviews}} 次历史评审）已作为**背景材料**交给每个人格。
+- 它们是背景，不是本次材料的直接证据；被真人测试回填为「没发生」的判断不会带入。
+{% endif %}
+
 ## Executive Summary
 - **Primary Recommendation**: {{primary_recommendation or "—"}}
 - **Release Risk**: {{release_risk or "—"}}
@@ -168,6 +177,29 @@
 {% for t in pn.quit_triggers %}  - {{t}}
 {% endfor %}
 {% endfor %}
+
+## 可证伪预测
+{# 判断闭环的入口：每条预测带目标指标、判定标准、验证窗口。
+   真人测试后回填结果，被证伪的判断不再进入同项目下一次评审的上下文。
+   confidence 必须与它的口径同框出现——它是合成面板的启发式权重，
+   不是实测命中率，单独摆一个百分数会被读成后者。 #}
+{% if predictions %}
+{% for p in predictions %}
+### {{p.claim or p.intervention}}
+| 项 | 值 |
+|---|---|
+{% if p.target_metric %}| 目标指标 | {{p.target_metric}}{% if p.direction %}（{{p.direction}}）{% endif %} |
+{% endif %}{% if p.success_criterion %}| 判定标准 | {{p.success_criterion}} |
+{% endif %}{% if p.verification_window %}| 验证窗口 | {{p.verification_window}} |
+{% endif %}{% if p.verification_method %}| 验证方式 | {{p.verification_method}} |
+{% endif %}{% if p.confidence is not none %}| 启发式置信度 | {{"%.0f%%"|format(p.confidence * 100)}}（{{p.confidence_basis or "合成面板启发式，未经真实结果校准"}}） |
+{% endif %}
+{% endfor %}
+> **如何证伪**：窗口内判定标准未达成，即该条判断被证伪。回填「没发生」后，
+> 它不再进入同项目下一次评审的上下文。
+{% else %}
+- （本次评审没有产出可证伪预测）
+{% endif %}
 
 ## Information Gaps
 {% for gap in information_gaps %}
