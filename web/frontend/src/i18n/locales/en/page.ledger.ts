@@ -45,6 +45,16 @@ export default {
   'pending_verification.label': 'Awaiting outcome',
   'verified.label': 'Verified',
   'hit_rate.label': 'Hit rate',
+  /* ---- 你 vs 评审团 ---- */
+  'scoreboard.title': 'You vs the panel',
+  'scoreboard.desc':
+    'Hit rates for both sides across the same set of recorded outcomes. The more you record, the more this comparison is worth — it measures not just how accurate the tool is, but whether your own calls are getting better.',
+  /* 两个来源标签 = 同一句话的互斥变体，走 state 块（角色闭集里没有
+     'panel'/'user' 这种内容词）。叶子带 side_ 前缀避免与块内其他枚举撞名。 */
+  'state.side_panel': 'The panel',
+  'state.side_user': 'You',
+  'side.meta': '{{hit}} hit · {{partial}} partial · {{miss}} did not happen ({{total}} decided)',
+  'side.hint': 'Small sample — treat this number as indicative only, not statistically meaningful.',
 
   'leaderboard.title': 'Whose calls are worth listening to',
   'sample.value': 'n={{size}}',

@@ -56,6 +56,9 @@ export default function LedgerPage() {
   const [board, setBoard] = useState<LeaderboardEntry[]>([])
   const [valueMetrics, setValueMetrics] = useState<ValidationMetrics | null>(null)
   const [calibration, setCalibration] = useState<ConfidenceCalibration | null>(null)
+  // 你 vs 评审团。scoreboard 在任一方没有已定论样本时会给 comparable=false，
+  // 那种情况下只列数字不下结论——不拿 0/0 拼一个"你领先"。
+  const [scoreboard, setScoreboard] = useState<Awaited<ReturnType<typeof api.ledgerScoreboard>> | null>(null)
   // ?pending=1 进来时直接筛到"只看待验证"。
   // 首页那张待验证追踪卡写着「3 条未回填」，点进来却是全部记录混在一起、
   // 要用户自己发现那个勾选框——承诺和落点对不上。带上这个参数就对上了。
@@ -82,18 +85,20 @@ export default function LedgerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [j, s, b, v, c] = await Promise.all([
+      const [j, s, b, v, c, sb] = await Promise.all([
         api.listJudgments({ onlyUnverified }),
         api.hitRate(),
         api.leaderboard(),
         api.validationMetrics(),
         api.calibration(),
+        api.ledgerScoreboard(),
       ])
       setJudgments(j.judgments)
       setStats(s)
       setBoard(b.personas)
       setValueMetrics(v)
       setCalibration(c)
+      setScoreboard(sb)
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)))
     } finally {
@@ -243,6 +248,54 @@ export default function LedgerPage() {
           )}
           {/* note 是后端产出的自由文本，前端翻不了；它带 ⚠️ 前缀出现在这里就是原样转述 */}
           {valueMetrics.note && <p className="mt-4 text-xs text-warm-orange">⚠️ {valueMetrics.note}</p>}
+        </SectionCard>
+      )}
+
+      {/* 你 vs 评审团。
+          这一块是判断留档从"给工具打分"变成"给你自己打分"的落点：
+          回填一次同时算两边，而我们的 ground truth 是真人测试结果，
+          不掺股价那种运气噪音，所以这个对比是可信的。
+          comparable=false（任一方没有已定论样本）时只列数字不下结论。 */}
+      {scoreboard && (scoreboard.panel.sample_size > 0 || scoreboard.user.sample_size > 0) && (
+        <SectionCard className="mb-6">
+          <h2 className="mb-1 font-display text-sm font-semibold text-text-primary">
+            {t('page.ledger.scoreboard.title')}
+          </h2>
+          <p className="mb-4 text-xs leading-relaxed text-text-muted">
+            {t('page.ledger.scoreboard.desc')}
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {([
+              { key: 'panel', side: scoreboard.panel, label: t('page.ledger.state.side_panel'), tone: 'text-brand-primary' },
+              { key: 'user', side: scoreboard.user, label: t('page.ledger.state.side_user'), tone: 'text-cyan' },
+            ] as const).map(({ key, side, label, tone }) => (
+              <div key={key} className="rounded-xl border border-border bg-bg-secondary p-4">
+                <p className={`text-xs font-medium ${tone}`}>{label}</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-text-primary">
+                  {side.sample_size > 0 ? percent(side.hit_rate) : '—'}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">
+                  {t('page.ledger.side.meta', {
+                    hit: side.hit,
+                    partial: side.partial,
+                    miss: side.miss,
+                    total: side.sample_size,
+                  })}
+                </p>
+                {/* 样本不足必须写在数字旁边而不是页脚——诚实原则写进 UI */}
+                {side.sample_size > 0 && side.low_confidence && (
+                  <p className="mt-1.5 text-[11px] leading-4 text-warm-orange">
+                    {t('page.ledger.side.hint')}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          {!scoreboard.comparable && scoreboard.note && (
+            <p className="mt-3 border-t border-border pt-3 text-xs text-text-muted">
+              {scoreboard.note}
+            </p>
+          )}
         </SectionCard>
       )}
 

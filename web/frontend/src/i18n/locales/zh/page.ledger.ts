@@ -54,6 +54,19 @@ export default {
   'top_fixes.title': '真正被采纳的建议',
   'top_fixes.value': '×{{times}}',
 
+  /* ---- 你 vs 评审团 ----
+     判断留档从"给工具打分"变成"给你自己打分"的落点。两边用同一套回填与
+     同一套算法，所以可比；ground truth 是真人测试结果，不掺股价那种运气噪音。 */
+  'scoreboard.title': '你 vs 评审团',
+  'scoreboard.desc':
+    '同一批回填结果下，两边各自的命中率。回填得越多这个对比越可信——它衡量的不只是工具准不准，也是你自己的判断在不在变准。',
+  /* 两个来源标签 = 同一句话的互斥变体，走 state 块（角色闭集里没有
+     'panel'/'user' 这种内容词）。叶子带 side_ 前缀避免与块内其他枚举撞名。 */
+  'state.side_panel': '评审团',
+  'state.side_user': '你',
+  'side.meta': '说中 {{hit}} · 部分 {{partial}} · 没发生 {{miss}}（共 {{total}} 条已定论）',
+  'side.hint': '样本量偏小，这个数字仅供参考，不具统计意义。',
+
   // ---- 命中率总览 ----
   'total_judgments.label': '累计预测',
   'pending_verification.label': '待验证',

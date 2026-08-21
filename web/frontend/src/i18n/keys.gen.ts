@@ -804,10 +804,16 @@ export type MessageKey =
   | 'page.ledger.panel.label'
   | 'page.ledger.pending_verification.label'
   | 'page.ledger.sample.value'
+  | 'page.ledger.scoreboard.desc'
+  | 'page.ledger.scoreboard.title'
+  | 'page.ledger.side.hint'
+  | 'page.ledger.side.meta'
   | 'page.ledger.stat.empty'
   | 'page.ledger.state.hit'
   | 'page.ledger.state.miss'
   | 'page.ledger.state.partial'
+  | 'page.ledger.state.side_panel'
+  | 'page.ledger.state.side_user'
   | 'page.ledger.state.unknown'
   | 'page.ledger.task_adopted.value'
   | 'page.ledger.task_useful.value'
@@ -2326,10 +2332,15 @@ export type PlainMessageKey =
   | 'page.ledger.observed_hit.label'
   | 'page.ledger.panel.label'
   | 'page.ledger.pending_verification.label'
+  | 'page.ledger.scoreboard.desc'
+  | 'page.ledger.scoreboard.title'
+  | 'page.ledger.side.hint'
   | 'page.ledger.stat.empty'
   | 'page.ledger.state.hit'
   | 'page.ledger.state.miss'
   | 'page.ledger.state.partial'
+  | 'page.ledger.state.side_panel'
+  | 'page.ledger.state.side_user'
   | 'page.ledger.state.unknown'
   | 'page.ledger.top_fixes.title'
   | 'page.ledger.total_judgments.label'
@@ -3876,10 +3887,16 @@ export interface MessageVars {
   'page.ledger.panel.label': Record<string, never>
   'page.ledger.pending_verification.label': Record<string, never>
   'page.ledger.sample.value': { size: string | number }
+  'page.ledger.scoreboard.desc': Record<string, never>
+  'page.ledger.scoreboard.title': Record<string, never>
+  'page.ledger.side.hint': Record<string, never>
+  'page.ledger.side.meta': { hit: string | number; miss: string | number; partial: string | number; total: string | number }
   'page.ledger.stat.empty': Record<string, never>
   'page.ledger.state.hit': Record<string, never>
   'page.ledger.state.miss': Record<string, never>
   'page.ledger.state.partial': Record<string, never>
+  'page.ledger.state.side_panel': Record<string, never>
+  'page.ledger.state.side_user': Record<string, never>
   'page.ledger.state.unknown': Record<string, never>
   'page.ledger.task_adopted.value': { value: string | number }
   'page.ledger.task_useful.value': { value: string | number }
