@@ -517,6 +517,14 @@ class Judgment(Base):
     review_id = Column(String, ForeignKey("reviews.id"), index=True, nullable=False)
     user_id = Column(String, index=True, nullable=True, default="anonymous")
     persona_id = Column(String, index=True, nullable=True)  # 谁做的判断（None=评审团合议）
+    # 这条判断是**谁**下的：panel = 评审团（引擎产出的可证伪预测，默认），
+    # user = 用户自己下的判断。两者共用同一套 Outcome 回填与校准算法，
+    # 因此回填一次能同时给出"评审团准不准"和"你自己准不准"——
+    # 后者才是用户真正关心的复利，而我们的 ground truth（真人测试）
+    # 比股价干净，不掺运气噪音。
+    source = Column(String, index=True, nullable=False, default="panel")
+    # 用户判断相对评审团的立场：agree / disagree / partial。panel 判断恒为 None。
+    stance = Column(String, nullable=True)
     claim = Column(Text, nullable=False)                    # 预测内容，如"新手引导太长会劝退"
     severity = Column(String, nullable=True)                # low|medium|high|critical
     confidence = Column(Float, nullable=True)               # 0-1

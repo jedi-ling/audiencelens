@@ -46,6 +46,7 @@ import {
 } from '@/lib/mock-data'
 import type { EthicsSeverity, RebuttalStatus, StereotypeRisk } from '@/lib/mock-data'
 import PersonaAvatar from '@/components/PersonaAvatar'
+import MyJudgmentPanel from '@/components/MyJudgmentPanel'
 import { REVIEW_MODE_BOUNDARIES } from '@/lib/mock-data'
 import { t, Trans, missingMarker } from '@/i18n/runtime'
 import { getLocale } from '@/i18n/locale'
@@ -2858,6 +2859,16 @@ export default function ReportPage() {
       <div id="sec-predictions" className="scroll-mt-14">
         <PredictionsSection predictions={report.predictions} />
       </div>
+
+      {/* 我的判断：报告看完之后，把用户自己的看法也留档。与评审团的预测
+          并列进同一张表、用同一套回填与校准算法——回填一次能同时回答
+          "评审团准不准"和"你自己准不准"。 */}
+      {id && (
+        <MyJudgmentPanel
+          reviewId={id}
+          panelRecommendation={report.executive_summary?.primary_recommendation ?? undefined}
+        />
+      )}
 
       {/* ---------- 自适应面板轨迹 ---------- */}
       <AdaptivePanelSection adaptive={report.adaptive_panel} />

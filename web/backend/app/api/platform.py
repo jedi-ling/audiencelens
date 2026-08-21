@@ -2123,6 +2123,54 @@ async def verify_judgment(
     )
 
 
+class UserJudgmentRequest(BaseModel):
+    """用户自己的判断。claim 必填——没有内容的判断无法被证伪，也就无法回填。"""
+
+    claim: str
+    stance: str  # agree | disagree | partial
+    confidence: Optional[float] = None
+    rationale: Optional[List[str]] = None
+    based_on_judgment_id: Optional[str] = None
+
+
+@router.post("/ledger/reviews/{review_id}/my-judgment")
+async def create_my_judgment(
+    review_id: str,
+    body: UserJudgmentRequest,
+    identity: Identity = Depends(optional_identity),
+    db: Session = Depends(get_db),
+):
+    """记录**用户自己的**判断（与评审团的预测并列留档）。
+
+    留档层此前只记评审团的预测，回填后也只能回答"评审团准不准"。
+    用户真正关心的是自己的判断在变准——所以两边都要记，用同一套回填与
+    校准算法，日后才可比。
+    """
+    require_isolated_identity(identity)
+    return ledger_service.create_user_judgment(
+        db,
+        review_id=review_id,
+        user_id=identity.user_id,
+        claim=body.claim,
+        stance=body.stance,
+        confidence=body.confidence,
+        rationale=body.rationale,
+        based_on_judgment_id=body.based_on_judgment_id,
+    )
+
+
+@router.get("/ledger/scoreboard")
+async def ledger_scoreboard(
+    identity: Identity = Depends(optional_identity), db: Session = Depends(get_db)
+):
+    """你 vs 评审团：同一批回填结果下两个来源各自的命中率。
+
+    双方都有已定论样本时才给对比结论——不拿 0/0 拼一个"你领先"出来。
+    """
+    require_isolated_identity(identity)
+    return ledger_service.scoreboard(db, identity.user_id)
+
+
 @router.get("/ledger/hit-rate")
 async def hit_rate(
     persona_id: Optional[str] = None,

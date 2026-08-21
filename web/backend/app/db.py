@@ -227,6 +227,19 @@ def _legacy_migrations() -> None:
         "CREATE INDEX IF NOT EXISTS ix_reviews_user_project ON reviews (user_id, project_key)"
     )
 
+    if "judgments" in inspector.get_table_names():
+        j_columns = {c["name"] for c in inspector.get_columns("judgments")}
+        if "source" not in j_columns:
+            # 存量行全部是评审团产出的预测，回填成 'panel' 是事实而不是猜测
+            patches.append(
+                "ALTER TABLE judgments ADD COLUMN source VARCHAR DEFAULT 'panel' NOT NULL"
+            )
+            patches.append(
+                "CREATE INDEX IF NOT EXISTS ix_judgments_source ON judgments (source)"
+            )
+        if "stance" not in j_columns:
+            patches.append("ALTER TABLE judgments ADD COLUMN stance VARCHAR")
+
     if "persona_outputs" in inspector.get_table_names():
         po_columns = {c["name"] for c in inspector.get_columns("persona_outputs")}
         if "input_tokens" not in po_columns:

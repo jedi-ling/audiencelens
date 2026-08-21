@@ -702,6 +702,31 @@ export const api = {
     return request<{ judgments: Judgment[]; truncated?: boolean }>(`/api/ledger/judgments${qs ? `?${qs}` : ''}`)
   },
 
+  /** 记录用户自己的判断（与评审团预测并列留档，同一套回填与命中率算法） */
+  createMyJudgment: (
+    reviewId: string,
+    body: {
+      claim: string
+      stance: 'agree' | 'disagree' | 'partial'
+      confidence?: number
+      rationale?: string[]
+      based_on_judgment_id?: string
+    },
+  ) =>
+    request<{ id: string; source: string; stance: string; claim: string }>(
+      `/api/ledger/reviews/${reviewId}/my-judgment`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  /** 你 vs 评审团的命中率对比 */
+  ledgerScoreboard: () =>
+    request<{
+      panel: { hit: number; miss: number; partial: number; sample_size: number; hit_rate: number | null; low_confidence: boolean }
+      user: { hit: number; miss: number; partial: number; sample_size: number; hit_rate: number | null; low_confidence: boolean }
+      comparable: boolean
+      note: string | null
+    }>('/api/ledger/scoreboard'),
+
   verifyJudgment: (id: string, verdict: Verdict, source = 'playtest', note?: string) =>
     request<{ judgment_id: string; verdict: string }>(`/api/ledger/judgments/${id}/verify`, {
       method: 'POST',

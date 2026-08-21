@@ -155,6 +155,36 @@ export default {
   'triage.desc': '每位人格一次廉价短调用（立场+严重度+一句话关切），按分歧信号选出深评面板。初筛意见只用于选人，正式结论以各章节为准。',
   'triage.hint': '初筛阶段材料截断至 {{chars}} 字符，深评阶段读完整材料。',
 
+  /* ---------------- 我的判断 ----------------
+     留档层此前只记评审团的预测，回填后也只能回答"评审团准不准"。
+     用户真正关心的是自己的判断在不在变准——所以两边都要记。 */
+  'my_judgment.title': '记下你自己的判断',
+  'my_judgment.desc':
+    '评审团的预测已经留档。把你自己的看法也记下来，真人测试回填之后，你会同时看到「评审团准不准」和「你自己准不准」。',
+  'my_judgment.confirm': '同意评审团的结论',
+  'my_judgment.cta': '我有不同判断',
+  'my_judgment.placeholder': '你的判断是什么？写清楚一点，日后才能被验证。',
+  'my_judgment_save.cta': '保存我的判断',
+  'my_judgment.success': '已记下你的判断。真人测试回来后，在「预测复盘」里回填结果。',
+  'my_judgment.error': '判断内容不能为空——没有内容的判断无法被验证。',
+  'my_judgment.empty': '（同意评审团的主流建议）',
+  'my_confidence.label': '你的把握',
+  /** 默认不预填数字：替用户填的把握度会污染校准曲线。 */
+  'my_confidence.empty': '未填',
+  /* 立场三选一 = 一个控件的多个状态，走 state 变体块；理由是枚举式原因，
+     走 reason 块。两者都不自造新块（契约：块名闭集，加新块要 owner 裁决）。
+     叶子带 stance_/rationale_ 前缀，避免与块内其他功能的枚举撞名。 */
+  'state.stance_agree': '同意',
+  'state.stance_partial': '部分同意',
+  'state.stance_disagree': '不同意',
+  /* 理由用闭集不用自由文本：自由文本无法聚合，而这批理由的价值恰恰在于
+     "你不同意评审团的时候，通常是因为什么"。 */
+  'reason.rationale_own_data': '与我的实测数据不符',
+  'reason.rationale_priority': '优先级判断不同',
+  'reason.rationale_persona_fit': '这些人格不代表我的用户',
+  'reason.rationale_evidence_weak': '证据不够充分',
+  'reason.rationale_cost': '改动成本不划算',
+
   /* ---------------- 圆桌弃权 ---------------- */
   'abstain.label': '弃权',
   'abstain.desc': '材料里缺少这位人格评审所需的证据类型，按规矩不硬评——弃权，不计入结论。',

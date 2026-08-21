@@ -1195,6 +1195,17 @@ export type MessageKey =
   | 'page.report.mode_boundary_full.desc'
   | 'page.report.mode_boundary_quick.desc'
   | 'page.report.mode_boundary_standard.desc'
+  | 'page.report.my_confidence.empty'
+  | 'page.report.my_confidence.label'
+  | 'page.report.my_judgment.confirm'
+  | 'page.report.my_judgment.cta'
+  | 'page.report.my_judgment.desc'
+  | 'page.report.my_judgment.empty'
+  | 'page.report.my_judgment.error'
+  | 'page.report.my_judgment.placeholder'
+  | 'page.report.my_judgment.success'
+  | 'page.report.my_judgment.title'
+  | 'page.report.my_judgment_save.cta'
   | 'page.report.nav_bar.aria'
   | 'page.report.nav_crossexam.label'
   | 'page.report.nav_disagreements.label'
@@ -1231,6 +1242,11 @@ export type MessageKey =
   | 'page.report.project_memory_none.title'
   | 'page.report.reason.project_memory_anonymous_identity'
   | 'page.report.reason.project_memory_ledger_disabled'
+  | 'page.report.reason.rationale_cost'
+  | 'page.report.reason.rationale_evidence_weak'
+  | 'page.report.reason.rationale_own_data'
+  | 'page.report.reason.rationale_persona_fit'
+  | 'page.report.reason.rationale_priority'
   | 'page.report.sep_colon'
   | 'page.report.sep_enum'
   | 'page.report.sep_semicolon'
@@ -1256,6 +1272,9 @@ export type MessageKey =
   | 'page.report.stance.empty'
   | 'page.report.stance.title'
   | 'page.report.stance.value'
+  | 'page.report.state.stance_agree'
+  | 'page.report.state.stance_disagree'
+  | 'page.report.state.stance_partial'
   | 'page.report.summary.title'
   | 'page.report.summary_consensus.hint'
   | 'page.report.summary_consensus.label'
@@ -2624,6 +2643,17 @@ export type PlainMessageKey =
   | 'page.report.md_risk.empty'
   | 'page.report.md_vote.empty'
   | 'page.report.meta.title'
+  | 'page.report.my_confidence.empty'
+  | 'page.report.my_confidence.label'
+  | 'page.report.my_judgment.confirm'
+  | 'page.report.my_judgment.cta'
+  | 'page.report.my_judgment.desc'
+  | 'page.report.my_judgment.empty'
+  | 'page.report.my_judgment.error'
+  | 'page.report.my_judgment.placeholder'
+  | 'page.report.my_judgment.success'
+  | 'page.report.my_judgment.title'
+  | 'page.report.my_judgment_save.cta'
   | 'page.report.nav_bar.aria'
   | 'page.report.nav_crossexam.label'
   | 'page.report.nav_disagreements.label'
@@ -2654,6 +2684,11 @@ export type PlainMessageKey =
   | 'page.report.project_memory_none.title'
   | 'page.report.reason.project_memory_anonymous_identity'
   | 'page.report.reason.project_memory_ledger_disabled'
+  | 'page.report.reason.rationale_cost'
+  | 'page.report.reason.rationale_evidence_weak'
+  | 'page.report.reason.rationale_own_data'
+  | 'page.report.reason.rationale_persona_fit'
+  | 'page.report.reason.rationale_priority'
   | 'page.report.sep_colon'
   | 'page.report.sep_enum'
   | 'page.report.sep_semicolon'
@@ -2678,6 +2713,9 @@ export type PlainMessageKey =
   | 'page.report.share_visible.label'
   | 'page.report.stance.empty'
   | 'page.report.stance.value'
+  | 'page.report.state.stance_agree'
+  | 'page.report.state.stance_disagree'
+  | 'page.report.state.stance_partial'
   | 'page.report.summary_consensus.label'
   | 'page.report.summary_evidence.label'
   | 'page.report.summary_risk_absent.desc'
@@ -4229,6 +4267,17 @@ export interface MessageVars {
   'page.report.mode_boundary_full.desc': { n: string | number }
   'page.report.mode_boundary_quick.desc': { n: string | number }
   'page.report.mode_boundary_standard.desc': { n: string | number }
+  'page.report.my_confidence.empty': Record<string, never>
+  'page.report.my_confidence.label': Record<string, never>
+  'page.report.my_judgment.confirm': Record<string, never>
+  'page.report.my_judgment.cta': Record<string, never>
+  'page.report.my_judgment.desc': Record<string, never>
+  'page.report.my_judgment.empty': Record<string, never>
+  'page.report.my_judgment.error': Record<string, never>
+  'page.report.my_judgment.placeholder': Record<string, never>
+  'page.report.my_judgment.success': Record<string, never>
+  'page.report.my_judgment.title': Record<string, never>
+  'page.report.my_judgment_save.cta': Record<string, never>
   'page.report.nav_bar.aria': Record<string, never>
   'page.report.nav_crossexam.label': Record<string, never>
   'page.report.nav_disagreements.label': Record<string, never>
@@ -4265,6 +4314,11 @@ export interface MessageVars {
   'page.report.project_memory_none.title': Record<string, never>
   'page.report.reason.project_memory_anonymous_identity': Record<string, never>
   'page.report.reason.project_memory_ledger_disabled': Record<string, never>
+  'page.report.reason.rationale_cost': Record<string, never>
+  'page.report.reason.rationale_evidence_weak': Record<string, never>
+  'page.report.reason.rationale_own_data': Record<string, never>
+  'page.report.reason.rationale_persona_fit': Record<string, never>
+  'page.report.reason.rationale_priority': Record<string, never>
   'page.report.sep_colon': Record<string, never>
   'page.report.sep_enum': Record<string, never>
   'page.report.sep_semicolon': Record<string, never>
@@ -4290,6 +4344,9 @@ export interface MessageVars {
   'page.report.stance.empty': Record<string, never>
   'page.report.stance.title': { count: number }
   'page.report.stance.value': Record<string, never>
+  'page.report.state.stance_agree': Record<string, never>
+  'page.report.state.stance_disagree': Record<string, never>
+  'page.report.state.stance_partial': Record<string, never>
   'page.report.summary.title': { risk: string | number }
   'page.report.summary_consensus.hint': { min: string | number; total: string | number }
   'page.report.summary_consensus.label': Record<string, never>

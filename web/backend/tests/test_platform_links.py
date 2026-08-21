@@ -449,6 +449,122 @@ class TestLedger:
         assert stored.evidence["verification_method"] == "controlled_comparison"
         assert stored.evidence["confidence_basis"].endswith("not_empirically_calibrated")
 
+    def test_user_judgment_is_scored_alongside_the_panel(self, db):
+        """用户自己的判断与评审团预测并列留档，用同一套回填与命中率算法。
+
+        为什么复用 Judgment 表而不另起一张：两者必须可比。两张表 = 两套算法，
+        正是本仓库反复清理的"同一件事两套实现"。
+        """
+        from app.models import Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-scoreboard",
+            task_type="concept_review",
+            artifact_bundle={"title": "t"},
+            status="completed",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+
+        # 评审团的 3 条预测
+        ledger_service.record_judgments(db, review, self._report())
+        panel_rows = ledger_service.list_judgments(db, "u-scoreboard")["judgments"]
+        assert len(panel_rows) == 3
+
+        # 用户自己的判断
+        mine = ledger_service.create_user_judgment(
+            db,
+            review_id=review.id,
+            user_id="u-scoreboard",
+            claim="我认为引导长度不是主要问题，定价才是",
+            stance="disagree",
+            confidence=0.8,
+            rationale=["与我的实测数据不符", "优先级不同"],
+        )
+        assert mine["source"] == "user"
+        assert mine["stance"] == "disagree"
+
+        # 回填：评审团 2 中 1 错，用户 1 中
+        ledger_service.verify_judgment(db, panel_rows[0]["id"], "hit", "u-scoreboard")
+        ledger_service.verify_judgment(db, panel_rows[1]["id"], "hit", "u-scoreboard")
+        ledger_service.verify_judgment(db, panel_rows[2]["id"], "miss", "u-scoreboard")
+        ledger_service.verify_judgment(db, mine["id"], "hit", "u-scoreboard")
+
+        board = ledger_service.scoreboard(db, "u-scoreboard")
+        assert board["panel"]["hit"] == 2 and board["panel"]["miss"] == 1
+        assert board["user"]["hit"] == 1 and board["user"]["miss"] == 0
+        assert board["comparable"] is True
+        # 两边分母口径必须一致（都用 sample_size = 已定论条数）
+        assert board["panel"]["sample_size"] == 3
+        assert board["user"]["sample_size"] == 1
+
+    def test_scoreboard_refuses_to_compare_without_both_sides(self, db):
+        """任一方没有已回填样本时不给对比结论——不拿 0/0 拼一个"你领先"。"""
+        from app.models import Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-onesided", task_type="concept_review",
+            artifact_bundle={"title": "t"}, status="completed",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        ledger_service.record_judgments(db, review, self._report())
+        rows = ledger_service.list_judgments(db, "u-onesided")["judgments"]
+        ledger_service.verify_judgment(db, rows[0]["id"], "hit", "u-onesided")
+
+        board = ledger_service.scoreboard(db, "u-onesided")
+        assert board["comparable"] is False
+        assert board["note"]
+
+    def test_user_judgment_rejects_other_peoples_reviews(self, db):
+        """不能往别人的评审上挂自己的判断——报 NotFound 而不是 Forbidden，
+        不泄露"这个 id 存在"这个事实。"""
+        import pytest as _pytest
+
+        from app.core.errors import NotFound
+        from app.models import Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="owner-a", task_type="concept_review",
+            artifact_bundle={"title": "t"}, status="completed",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+
+        with _pytest.raises(NotFound):
+            ledger_service.create_user_judgment(
+                db, review_id=review.id, user_id="intruder-b",
+                claim="偷看", stance="agree",
+            )
+
+    def test_user_judgment_rejects_empty_claim_and_bad_stance(self, db):
+        import pytest as _pytest
+
+        from app.core.errors import BadRequest
+        from app.models import Review
+        from app.services import ledger_service
+
+        review = Review(
+            user_id="u-valid", task_type="concept_review",
+            artifact_bundle={"title": "t"}, status="completed",
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+
+        with _pytest.raises(BadRequest):
+            ledger_service.create_user_judgment(
+                db, review_id=review.id, user_id="u-valid", claim="   ", stance="agree")
+        with _pytest.raises(BadRequest):
+            ledger_service.create_user_judgment(
+                db, review_id=review.id, user_id="u-valid", claim="x", stance="maybe")
+
     def test_only_unverified_filters_before_the_limit(self, db):
         """**先截断再过滤会静默丢数据。**
 

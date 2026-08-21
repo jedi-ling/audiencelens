@@ -26,6 +26,14 @@ from app.models import Judgment, Outcome, Review
 
 VALID_VERDICTS = ("hit", "miss", "partial", "unknown")
 
+# 判断的来源。panel = 引擎产出的可证伪预测；user = 用户自己下的判断。
+# 两者共用同一套 Outcome 回填与校准算法，所以回填一次能同时回答
+# "评审团准不准"和"你自己准不准"。
+VALID_SOURCES = ("panel", "user")
+
+# 用户判断相对评审团的立场。
+VALID_STANCES = ("agree", "disagree", "partial")
+
 # 样本量低于此值时，命中率不具统计意义，必须标注
 MIN_SAMPLES_FOR_CONFIDENCE = 10
 
@@ -300,6 +308,97 @@ def list_judgments(
     return {"judgments": out, "truncated": truncated}
 
 
+def create_user_judgment(
+    db: Session,
+    review_id: str,
+    user_id: str,
+    claim: str,
+    stance: str,
+    confidence: Optional[float] = None,
+    rationale: Optional[List[str]] = None,
+    based_on_judgment_id: Optional[str] = None,
+) -> dict:
+    """记录**用户自己的**判断。
+
+    为什么这件事重要：留档层此前只记评审团的预测，回填之后也只能回答
+    "评审团准不准"。而用户真正关心的是自己的判断在变准——一个只给工具打分
+    的系统，用户没有理由长期用它。ARTi 的「创建我的判断」抓的就是这一点。
+
+    我们比按股价验证的产品更有底气：ground truth 是真人测试结果，
+    不掺"赶上普涨"那种运气噪音。所以"你 vs 评审团"这个对比在我们这里是可信的。
+
+    实现上刻意**复用 Judgment 表**而不是另起一张：用户判断和评审团预测要用
+    同一套 Outcome 回填、同一套 Brier/ECE 算法才可比。两张表 = 两套算法 = 不可比，
+    也就是本仓库反复清理的"同一件事两套实现"。
+    """
+    if stance not in VALID_STANCES:
+        raise BadRequest(f"stance 必须是 {', '.join(VALID_STANCES)} 之一")
+    claim = (claim or "").strip()
+    if not claim:
+        raise BadRequest("claim 不能为空——没有内容的判断无法被证伪，也就无法回填")
+
+    review = db.get(Review, review_id)
+    if not review or (review.user_id or "anonymous") != user_id:
+        raise NotFound("评审不存在")  # 不泄露他人数据的存在性
+
+    if confidence is not None:
+        try:
+            confidence = max(0.0, min(1.0, float(confidence)))
+        except (TypeError, ValueError):
+            raise BadRequest("confidence 必须是 0-1 之间的数字")
+
+    j = Judgment(
+        review_id=review_id,
+        user_id=user_id,
+        persona_id=None,
+        source="user",
+        stance=stance,
+        claim=claim[:2000],
+        confidence=confidence,
+        # 理由与"针对评审团哪条判断"都存进 evidence：它是 JSON 列，
+        # 不为此再加两列——这两个字段只有用户判断才有，加列会让 panel 行
+        # 永远是 NULL。
+        evidence={
+            "rationale": rationale or [],
+            "based_on_judgment_id": based_on_judgment_id,
+        },
+        predicted_at=datetime.now(timezone.utc),
+    )
+    db.add(j)
+    db.commit()
+    return {
+        "id": j.id,
+        "review_id": review_id,
+        "source": "user",
+        "stance": stance,
+        "claim": j.claim,
+        "confidence": j.confidence,
+    }
+
+
+def scoreboard(db: Session, user_id: str) -> dict:
+    """你 vs 评审团 —— 同一批回填结果下两个来源各自的命中率。
+
+    只有**双方都有已验证样本**时这个对比才有意义；任一方为空时如实说明，
+    不拿 0/0 拼一个"你 100% 领先"出来。
+    """
+    panel = hit_rate(db, user_id, source="panel")
+    user = hit_rate(db, user_id, source="user")
+    # sample_size = 已定论条数（hit+partial+miss，unknown 不计入分母），
+    # 与 hit_rate 里算 hit_rate 用的是同一个分母——两边口径必须一致。
+    comparable = panel["sample_size"] > 0 and user["sample_size"] > 0
+    return {
+        "panel": panel,
+        "user": user,
+        "comparable": comparable,
+        "note": (
+            None
+            if comparable
+            else "双方都要有已回填的判断才能比较——回填得越多，这个对比越可信。"
+        ),
+    }
+
+
 def verify_judgment(
     db: Session,
     judgment_id: str,
@@ -334,11 +433,20 @@ def verify_judgment(
     return {"judgment_id": judgment_id, "verdict": verdict, "source": source}
 
 
-def hit_rate(db: Session, user_id: Optional[str], persona_id: str = None) -> dict:
+def hit_rate(
+    db: Session,
+    user_id: Optional[str],
+    persona_id: str = None,
+    source: Optional[str] = None,
+) -> dict:
     """命中率统计。样本不足时如实标注，不吹牛。
 
     user_id=None 时不按用户过滤——用于后台管理面板的跨用户聚合视图；
     产品侧调用永远传具体 user_id，行为不变。
+
+    source=None 时统计全部（保持既有调用方行为不变）；传 'panel' / 'user'
+    可分别得到"评审团准不准"与"你自己准不准"——这两个数放在一起才是用户
+    真正关心的东西，而我们的 ground truth 是真人测试，不掺股价那种运气噪音。
     """
     q = db.query(Outcome.verdict, func.count(Outcome.id)).join(
         Judgment, Outcome.judgment_id == Judgment.id
@@ -347,6 +455,8 @@ def hit_rate(db: Session, user_id: Optional[str], persona_id: str = None) -> dic
         q = q.filter(Judgment.user_id == user_id)
     if persona_id:
         q = q.filter(Judgment.persona_id == persona_id)
+    if source:
+        q = q.filter(Judgment.source == source)
     counts = dict(q.group_by(Outcome.verdict).all())
 
     hit = int(counts.get("hit", 0))
@@ -358,6 +468,8 @@ def hit_rate(db: Session, user_id: Optional[str], persona_id: str = None) -> dic
     total_q = db.query(func.count(Judgment.id))
     if user_id is not None:
         total_q = total_q.filter(Judgment.user_id == user_id)
+    if source:
+        total_q = total_q.filter(Judgment.source == source)
     total_judgments = total_q.scalar() or 0
 
     rate = None

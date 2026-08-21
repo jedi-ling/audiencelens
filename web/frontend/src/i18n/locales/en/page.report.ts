@@ -128,6 +128,31 @@ export default {
     'One cheap short call per persona (stance + severity + one-line concern); the deep-review panel is picked by disagreement signal. Triage opinions only pick the panel — the sections below are the actual conclusions.',
   'triage.hint': 'Triage saw materials truncated to {{chars}} characters; deep review reads them in full.',
 
+  /* ---------------- 我的判断 ---------------- */
+  'my_judgment.title': 'Record your own call',
+  'my_judgment.desc':
+    'The panel’s predictions are already on record. Add your own view, and once a real playtest is recorded you will see both how accurate the panel was and how accurate you were.',
+  'my_judgment.confirm': 'I agree with the panel',
+  'my_judgment.cta': 'I see it differently',
+  'my_judgment.placeholder': 'What is your call? Be specific enough that it can be checked later.',
+  'my_judgment_save.cta': 'Save my call',
+  'my_judgment.success': 'Your call is on record. Record the real outcome under “Track record” once the playtest is back.',
+  'my_judgment.error': 'A call needs content — an empty one can never be verified.',
+  'my_judgment.empty': '(agrees with the panel’s primary recommendation)',
+  'my_confidence.label': 'Your confidence',
+  'my_confidence.empty': 'not set',
+  /* 立场三选一 = 一个控件的多个状态，走 state 变体块；理由是枚举式原因，
+     走 reason 块。两者都不自造新块（契约：块名闭集，加新块要 owner 裁决）。
+     叶子带 stance_/rationale_ 前缀，避免与块内其他功能的枚举撞名。 */
+  'state.stance_agree': 'Agree',
+  'state.stance_partial': 'Partly agree',
+  'state.stance_disagree': 'Disagree',
+  'reason.rationale_own_data': 'Conflicts with my own data',
+  'reason.rationale_priority': 'I rank the priority differently',
+  'reason.rationale_persona_fit': 'These personas are not my users',
+  'reason.rationale_evidence_weak': 'Evidence is too thin',
+  'reason.rationale_cost': 'Not worth the change cost',
+
   /* ---------------- 圆桌弃权 ---------------- */
   'abstain.label': 'Abstained',
   'abstain.desc':
