@@ -165,3 +165,52 @@ def test_review_switches_reach_the_backend_from_the_ui() -> None:
         )
         assert sw in backend_fields, f"后端 CreateReviewRequest 缺 {sw}，请求体会被静默丢弃"
         assert sw in review_columns, f"Review 模型缺 {sw} 列，开关不会落库，事后查不到这次开没开"
+
+
+def test_mode_cost_cross_exam_calls_match_engine():
+    """ModeCostCompare 里的 CROSS_EXAM_CALLS 硬编码了"各档交叉质询发几次调用"，
+    事实源是引擎两处：
+      · src/runner/cli.py 的 CROSS_EXAM_MODE_BY_REVIEW_MODE（哪档走哪种质询）
+      · src/runner/cross_exam.py 的分支（moderated=1 次；multi_agent=每争议点每方各 1 次）
+
+    这个数字直接画进了用户选档位时看的开销对比图。引擎把 standard 从仲裁式
+    改成多智能体（或反过来）而前端没跟上时，那张图就会对用户少报/多报开销，
+    而页面照常渲染、不报任何错——与 REVIEW_MODE_BOUNDARIES 是同一类失效。
+    """
+    comp = os.path.join(REPO_ROOT, "web", "frontend", "src", "components", "ModeCostCompare.tsx")
+    with open(comp, "r", encoding="utf-8") as f:
+        fe_src = f.read()
+    # _block 是为数组（以行首 ] 收尾）写的，这两个常量都是对象，就地取块
+    def _obj_block(src: str, header: str) -> str:
+        start = src.index(header)
+        return src[start:src.index(chr(10) + "}", start)]
+
+    block = _obj_block(fe_src, "const CROSS_EXAM_CALLS")
+    fe = {}
+    for m in re.finditer(r"(\w+):\s*(\d+|null)", block):
+        fe[m.group(1)] = None if m.group(2) == "null" else int(m.group(2))
+    assert fe, "没解析出 CROSS_EXAM_CALLS，前端写法变了，卡口先失效了"
+
+    cli_path = os.path.join(REPO_ROOT, "src", "runner", "cli.py")
+    with open(cli_path, "r", encoding="utf-8") as f:
+        cli_src = f.read()
+    ce_block = _obj_block(cli_src, "CROSS_EXAM_MODE_BY_REVIEW_MODE")
+    engine_modes = {
+        m.group(1): m.group(2)
+        for m in re.finditer(r'"(\w+)":\s*(MODE_\w+)', ce_block)
+    }
+    assert engine_modes, "没从 cli.py 解析出 CROSS_EXAM_MODE_BY_REVIEW_MODE"
+
+    # quick 不在那张表里 = 该档不跑质询，前端必须记 0
+    assert fe.get("quick") == 0, "quick 档不跑交叉质询，前端却记了非 0 次调用"
+
+    for mode, engine_mode in engine_modes.items():
+        if engine_mode == "MODE_MODERATED":
+            assert fe.get(mode) == 1, (
+                f"引擎 {mode} 档走仲裁式质询（总共 1 次调用），前端记的是 {fe.get(mode)}"
+            )
+        elif engine_mode == "MODE_MULTI_AGENT":
+            assert fe.get(mode) is None, (
+                f"引擎 {mode} 档走多智能体反驳（次数随分歧数变化，事前不可确定），"
+                f"前端不该记成固定的 {fe.get(mode)} 次——那是给用户一个假的确定数字"
+            )

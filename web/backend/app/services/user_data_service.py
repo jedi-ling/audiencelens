@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     AuthToken,
+    UserIdentity,
     CdkCode,
     CdkRedemption,
     Conversation,
@@ -72,6 +73,7 @@ EXPORTED_TABLES = frozenset({
     "jobs",
     "cdk_redemptions",
     "credit_ledger",
+    "user_identities",
 })
 
 # 明确不导出，每条都要有理由——"忘了"和"故意不给"必须能被区分开。
@@ -83,6 +85,9 @@ EXPORT_EXEMPT_TABLES = {
     "platform_settings": "平台运行时配置，非用户内容",
     "cdk_codes": "平台兑换码库存；用户自己的兑换记录见 cdk_redemptions",
     "admin_audit_log": "管理员操作审计流水，非用户内容",
+    # 后台管理面板的具名登录账号（跟产品侧 User 是两套完全独立的身份体系），
+    # 不是任何产品用户的内容。
+    "admin_users": "后台管理员登录账号，非产品用户内容",
 }
 
 
@@ -448,6 +453,19 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
             }
             for e in ledger
         ],
+        # 第三方登录绑定关系。用户有权知道自己的账号绑了哪个平台的哪个身份，
+        # 所以导出而不是豁免。provider_uid（QQ 的 openid）**只在本应用下有意义**
+        # ——它是 appid 维度的标识，不是这个人在腾讯那边的通用账号，
+        # 导出它不等于泄露了什么可以拿去别处用的东西。
+        "user_identities": [
+            {
+                "provider": i.provider,
+                "provider_uid": i.provider_uid,
+                "nickname": i.nickname,
+                "created_at": _iso(i.created_at),
+            }
+            for i in db.query(UserIdentity).filter(UserIdentity.user_id == user_id).all()
+        ],
     }
 
 
@@ -545,6 +563,17 @@ def delete_user_data(db: Session, user_id: str) -> Dict[str, int]:
     #      SQLite 默认关闭外键校验，所以本机怎么删都看着成功。
     #   2. 未过期的 reset_password 令牌是能改密码的凭据，账号都删了还留着它，
     #      与隐私页写的"账号本身立即物理删除"直接矛盾。
+    # 第三方登录绑定：模型上有 ondelete=CASCADE，但与 auth_tokens 同一个理由
+    # 显式再删一次——老库建表时没有那个子句，而 SQLite 默认不校验外键，
+    # 光靠 cascade 的话"本机测着好好的、上了 PostgreSQL 删号就 500"。
+    # 更要紧的是：这条映射不删，那个 QQ 号会一直指向一个已经不存在的账号，
+    # 用户重新用 QQ 登录时会撞上孤儿映射。
+    stats["user_identities_deleted"] = (
+        db.query(UserIdentity)
+        .filter(UserIdentity.user_id == user_id)
+        .delete(synchronize_session=False)
+    )
+
     stats["auth_tokens_deleted"] = (
         db.query(AuthToken)
         .filter(AuthToken.user_id == user_id)

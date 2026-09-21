@@ -3,6 +3,7 @@
 import pytest
 
 from app.config import settings
+from app.deps import ADMIN_AUTH_MAX_FAILURES
 
 ADMIN_TOKEN = "test-admin-token-xyz"
 
@@ -48,6 +49,80 @@ class TestAdminGate:
         _enable_admin(monkeypatch)
         r = client.get("/api/admin/overview", headers=_headers())
         assert r.status_code == 200
+
+
+class TestAdminLockoutCannotBeWeaponized:
+    """失败计数是用来挡令牌枚举的，不能同时变成一台人人可按的拒绝服务开关。"""
+
+    @pytest.fixture(autouse=True)
+    def _clean_counter(self):
+        from app.deps import reset_admin_auth_failures
+
+        reset_admin_auth_failures()
+        yield
+        reset_admin_auth_failures()
+
+    def test_missing_header_does_not_count_as_a_failure(self, client, monkeypatch):
+        """压根没带令牌 ≠ 认证失败。
+
+        记它的话，任何人对 /api/admin/* 打 10 个不带头的 GET（扫描器、前端
+        探测、忘了配 token 的运维，甚至浏览器预取）就能把**所有管理员**
+        锁 5 分钟，而且可以无限重复。它也挡不住枚举：枚举必须带上一个候选
+        令牌才有意义，而那种请求下面那条用例确认仍然计数。
+        """
+        _enable_admin(monkeypatch)
+        for _ in range(ADMIN_AUTH_MAX_FAILURES + 5):
+            assert client.get("/api/admin/overview").status_code == 401
+
+        # 正确令牌必须照常能进——锁定没有被这些请求触发
+        assert client.get("/api/admin/overview", headers=_headers()).status_code == 200
+
+    def test_wrong_token_still_counts_and_locks(self, client, monkeypatch):
+        """真正的枚举（带着一个猜的令牌）仍然要被挡住，否则这次改动
+        等于把爆破防护整个关掉。"""
+        _enable_admin(monkeypatch)
+        seen = set()
+        for _ in range(ADMIN_AUTH_MAX_FAILURES + 2):
+            seen.add(client.get("/api/admin/overview", headers=_headers("guess")).status_code)
+        assert 429 in seen, "带着错误令牌猛猜也不锁 = 允许离线枚举"
+
+    def test_admin_login_locks_per_username_not_just_per_client(self, client, monkeypatch, db):
+        """反代后所有请求同一个 peer IP，只按来源计数时"猛猜 alice 的密码"
+        会把 bob 一起锁在门外。加一份按用户名的计数之后，两人互不影响。"""
+        from app.models import AdminUser
+
+        _enable_admin(monkeypatch)
+        for name in ("alice-lock", "bob-lock"):
+            client.post(
+                "/api/admin/auth/users",
+                json={"username": name, "password": "test-pw-not-real-8chars"},
+                headers=_headers(),
+            )
+        try:
+            for _ in range(ADMIN_AUTH_MAX_FAILURES + 2):
+                client.post(
+                    "/api/admin/auth/login", json={"username": "alice-lock", "password": "nope"}
+                )
+
+            # alice 自己被锁（按用户名那份计数满了）
+            alice = client.post(
+                "/api/admin/auth/login",
+                json={"username": "alice-lock", "password": "test-pw-not-real-8chars"},
+            )
+            assert alice.status_code == 429
+
+            # 但 bob 不该被连坐。注意：按来源那份计数此刻也满了，所以这条
+            # 目前是"已知的取舍"——共享出口 IP 下仍会被连坐，见 deps.py 顶部
+            # 关于进程内计数的说明。这里只钉住"按用户名那一份确实在工作"。
+            from app.deps import _admin_auth_locked_for
+
+            assert _admin_auth_locked_for("admin-user:alice-lock") > 0
+            assert _admin_auth_locked_for("admin-user:bob-lock") == 0
+        finally:
+            db.query(AdminUser).filter(AdminUser.username.in_(("alice-lock", "bob-lock"))).delete(
+                synchronize_session=False
+            )
+            db.commit()
 
 
 class TestOverview:
@@ -659,3 +734,163 @@ class TestAdminDeleteReview:
         _enable_admin(monkeypatch)
         r = client.delete("/api/admin/reviews/nope", headers=_headers())
         assert r.status_code == 404
+
+
+class TestAdminNamedAccounts:
+    """具名账号登录：静态 AL_ADMIN_TOKEN 仍能创建账号（bootstrap），
+    账号登录后拿到的会话令牌能像静态令牌一样通过 require_admin。"""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup_admin_users(self, db):
+        from app.models import AdminUser
+
+        yield
+        db.query(AdminUser).delete()
+        db.commit()
+
+    def test_static_token_bootstraps_first_account(self, client, monkeypatch):
+        _enable_admin(monkeypatch)
+        r = client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        assert r.status_code == 200
+        assert r.json()["username"] == "alice-admin"
+
+    def test_login_then_use_session_token_as_admin_token(self, client, monkeypatch):
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+
+        login = client.post(
+            "/api/admin/auth/login", json={"username": "alice-admin", "password": "test-pw-not-real-8chars"}
+        )
+        assert login.status_code == 200
+        token = login.json()["token"]
+        assert token != ADMIN_TOKEN
+
+        r = client.get("/api/admin/overview", headers=_headers(token))
+        assert r.status_code == 200
+
+    def test_login_wrong_password_401(self, client, monkeypatch):
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        r = client.post("/api/admin/auth/login", json={"username": "alice-admin", "password": "wrong"})
+        assert r.status_code == 401
+
+    def test_deactivated_account_session_rejected(self, client, monkeypatch, db):
+        from app.models import AdminUser
+
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        token = client.post(
+            "/api/admin/auth/login", json={"username": "alice-admin", "password": "test-pw-not-real-8chars"}
+        ).json()["token"]
+
+        user = db.query(AdminUser).filter(AdminUser.username == "alice-admin").first()
+        client.delete(f"/api/admin/auth/users/{user.id}", headers=_headers())
+
+        r = client.get("/api/admin/overview", headers=_headers(token))
+        assert r.status_code == 401
+
+    def test_duplicate_username_rejected(self, client, monkeypatch):
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        r = client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "another-password"},
+            headers=_headers(),
+        )
+        assert r.status_code == 400
+
+    def test_short_password_rejected(self, client, monkeypatch):
+        _enable_admin(monkeypatch)
+        r = client.post(
+            "/api/admin/auth/users",
+            json={"username": "shorty", "password": "abc"},
+            headers=_headers(),
+        )
+        assert r.status_code in (400, 422)
+
+    def test_account_creation_is_audited_and_attributed(self, client, monkeypatch):
+        """新建一个能进后台的账号是这套系统里权限最高的动作之一，此前完全不留痕：
+        攻破一次主密钥就能悄悄留个长期后门，审计日志上一片空白。"""
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        hit = [e for e in entries if e["action"] == "admin_user.create"]
+        assert hit, "新建管理员账号没有留下审计记录"
+        assert hit[0]["target"] == "alice-admin"
+        # 用静态主密钥做的：署名必须如实写成 static-token，而不是空着
+        assert hit[0]["actor"] == "static-token"
+
+    def test_deactivation_is_audited_with_the_username(self, client, monkeypatch, db):
+        from app.models import AdminUser
+
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        user = db.query(AdminUser).filter(AdminUser.username == "alice-admin").first()
+        client.delete(f"/api/admin/auth/users/{user.id}", headers=_headers())
+
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        hit = [e for e in entries if e["action"] == "admin_user.deactivate"]
+        assert hit, "停用管理员账号没有留下审计记录"
+        # 记用户名而不是裸 uuid：只记 id 的话事后还得回库里查，
+        # 而那时账号可能已经被删了
+        assert hit[0]["target"] == "alice-admin"
+
+    def test_named_account_actions_are_attributed_to_that_account(self, client, monkeypatch):
+        """具名账号存在的全部意义就是"知道是谁干的"。require_admin 早就把
+        admin_user 放进了 request.state，但在这次改动之前全仓库没人读过它——
+        这个功能在它唯一的目的上是空转的。"""
+        _enable_admin(monkeypatch)
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(),
+        )
+        token = client.post(
+            "/api/admin/auth/login",
+            json={"username": "alice-admin", "password": "test-pw-not-real-8chars"},
+        ).json()["token"]
+
+        client.post(
+            "/api/admin/auth/users",
+            json={"username": "bob-admin", "password": "test-pw-not-real-8chars"},
+            headers=_headers(token),
+        )
+        entries = client.get("/api/admin/audit-log", headers=_headers()).json()["entries"]
+        hit = [e for e in entries if e["target"] == "bob-admin"]
+        assert hit and hit[0]["actor"] == "alice-admin", (
+            f"具名账号的操作没有署名到这个账号上：{hit}"
+        )
+
+    def test_arbitrary_string_is_not_accepted_as_session_token(self, client, monkeypatch):
+        """防混淆：一个随手编的字符串不能被误判成会话令牌蒙混过关。"""
+        _enable_admin(monkeypatch)
+        r = client.get("/api/admin/overview", headers=_headers("not-a-real-token"))
+        assert r.status_code == 401

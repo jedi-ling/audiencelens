@@ -123,8 +123,35 @@ def _start_job(job_id: str) -> None:
         db.close()
 
 
+def broadcast_review_cancelled(kind: str, ref_id: Optional[str]) -> None:
+    """取消一个评审任务时，把 review.cancelled 推给正在订阅的浏览器。
+
+    为什么必须有这条：取消是一个**真实可达**的功能（后台面板
+    POST /admin/jobs/{id}/cancel），而前端把 review.cancelled 当终态事件处理
+    （frontend/src/lib/ws.ts 的 TERMINAL）。后端从来不发它的后果不是"少一个
+    提示"：订阅中的页面永远等不到终态，一直转圈直到重连预算耗尽，然后静默
+    退化成轮询——用户看到的是"这个评审卡住了"，而它其实早就被取消了。
+
+    只对 kind == "review" 的任务发：别的任务类型没有 review_id 可以订阅，
+    往 ref_id 这个频道里推等于推给一个没人听的（或更糟：撞上同名的）频道。
+    广播失败不抛：取消本身已经成功，不能因为 WS 挂了把它变成一次失败的请求
+    （与 review_service._broadcast 同一个语义）。
+    """
+    if kind != "review" or not ref_id:
+        return
+    try:
+        from app.websocket import manager
+
+        manager.publish_threadsafe(
+            ref_id, {"event": "review.cancelled", "data": {"review_id": ref_id}}
+        )
+    except Exception as exc:  # noqa: BLE001 —— WS 挂了不该拖垮取消操作
+        logger.warning("ws broadcast failed (review.cancelled): %s", exc)
+
+
 def _finish_job(job_id: str, status: str, progress: int = None, error: str = None) -> None:
     db = session_scope()
+    kind = ref_id = None
     try:
         job = db.get(Job, job_id)
         if job:
@@ -135,8 +162,15 @@ def _finish_job(job_id: str, status: str, progress: int = None, error: str = Non
             if error:
                 job.error_message = error[:2000]
             db.commit()
+            kind, ref_id = job.kind, job.ref_id
     finally:
         db.close()
+    # 放在 finally 之后、会话关掉之后再发：广播里不碰 ORM 对象，
+    # 也不让一次 WS 故障把数据库会话吊在那里。
+    # 两条进程内取消路径都汇流到 _finish_job："future 还没被取走"（cancel()
+    # 直接结算）和"future 取走了但任务体一开始就看到取消标记"（_wrapped 里结算）。
+    if status == "cancelled":
+        broadcast_review_cancelled(kind, ref_id)
 
 
 def update_progress(job_id: str, progress: int) -> None:

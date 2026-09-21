@@ -23,8 +23,8 @@ from app.core.logging import logger
 from app.core.ratelimit import get_limiter
 from app.core.security import create_token, decode_token
 from app.db import get_db
-from app.models import User
-from app.services import admin_settings_service, key_service
+from app.models import User, UserIdentity
+from app.services import admin_auth_service, admin_settings_service, key_service
 
 # scope -> 不传 limit 时该读哪个旋钮（settings 属性名 == 后台设置项键名）。
 # 没登记的 scope 回落通用的「每分钟」上限。
@@ -43,6 +43,15 @@ _SCOPE_LIMIT_SETTINGS = {
 # 唯一能挡住离线枚举的就是失败计数。按来源 IP 记；
 # 反代后所有请求同一个 peer IP —— 那就退化成全局失败计数，
 # 仍然能挡住枚举，代价是攻击者可以让管理员一起被锁 5 分钟（可接受：锁定会自动过期）。
+#
+# ⚠️ 两条必须写明白的局限，别让下一个人以为这是一道硬防线：
+#   1. 计数器是**模块级、进程内**的字典。多 worker（uvicorn --workers N）或
+#      多副本部署时，每个进程各算各的，实际允许的失败次数是 N × 10，
+#      而锁定也只锁住碰巧路由到那个进程的请求。要真正封顶必须换共享存储
+#      （Redis），与 core/ratelimit.py 顶部记录的是同一个待办、同一套换法。
+#   2. 只按来源标识分桶挡不住"用一个共享出口 IP 把所有管理员一起锁掉"，
+#      所以具名账号登录那条路**额外**按用户名各记一份（见 api/admin.admin_login）：
+#      同 IP 刷 alice 的密码不会连带把 bob 锁在门外。
 ADMIN_AUTH_MAX_FAILURES = 10
 ADMIN_AUTH_WINDOW_SECONDS = 300.0
 _admin_auth_lock = threading.Lock()
@@ -83,7 +92,8 @@ class Identity:
 
     def __init__(self, user_id: str, email: Optional[str] = None, plan: str = "free",
                  is_anonymous: bool = True, session_expired: bool = False,
-                 display_name: Optional[str] = None):
+                 display_name: Optional[str] = None, is_guest: bool = False,
+                 login_provider: Optional[str] = None):
         self.user_id = user_id
         self.email = email
         self.plan = plan
@@ -94,15 +104,51 @@ class Identity:
         # 只有 probe_identity（/auth/me）会把它置真：那条路不 401，
         # 但必须如实告诉前端"你带来的令牌被拒了"，否则又回到静默降级。
         self.session_expired = session_expired
+        # 游客账号（is_anonymous=False，但邮箱是合成的、随时可能清缓存丢失）。
+        # 报告页要靠这个字段判断"该不该提示绑邮箱"——is_anonymous 分不出
+        # "共享匿名桶"和"已经铸造但没绑定的游客"这两种状态。
+        self.is_guest = is_guest
+        # 'qq' | 'email' | None。前端据此在昵称旁边标一个"QQ 登录"/"邮箱登录"，
+        # 用户账号多了容易分不清自己当初是怎么进来的。
+        #   · user_identities 表里有映射 → 用那个 provider（目前只有 'qq'）
+        #   · 没映射但不是游客（走过注册/绑定邮箱）→ 'email'
+        #   · 没映射且是游客（CDK/首次匿名评审铸造、还没绑定任何东西）→ None，
+        #     不硬贴"邮箱登录"——那时候压根没有邮箱，贴了就是在撒谎
+        self.login_provider = login_provider
+
+    def public_email(self) -> Optional[str]:
+        """能给前端看的邮箱；合成占位邮箱一律返回 None。
+
+        为什么必须挡：QQ 登录建号时邮箱是合成的 `qq-{openid}@qq.local`
+        （见 qq_auth_service 文件头）。原样回给 /auth/me 等于把一个**稳定的
+        第三方标识符**交到浏览器里——openid 是 appid 维度的用户主键，
+        落进前端状态、日志、第三方埋点之后就收不回来了，而它对用户界面
+        毫无用处（界面显示的是 display_name）。游客的 `guest-xxxx@guest.local`
+        同理：那不是一个能收信的地址，显示出来只会让人以为"我注册过这个邮箱"。
+
+        判据用 is_guest 而不是匹配域名：绑定邮箱转正后 is_guest 置回 False，
+        那时 email 是真的，必须照常返回（QQ 用户绑完邮箱也一样）。
+        域名匹配作为第二道保险，兜住"存量行 is_guest 不准"的情况。
+        返回 None 而不是删掉这个键：前端 Layout/SettingsPage 拿它当昵称的
+        兜底显示值（`identity?.display_name || identity?.email`），
+        少一个键和值为 null 在 TS 侧是两种东西，不去赌它们处理得一样。
+        """
+        if not self.email:
+            return None
+        if self.is_guest or self.email.endswith(("@qq.local", "@guest.local")):
+            return None
+        return self.email
 
     def to_dict(self) -> dict:
         return {
             "user_id": self.user_id,
-            "email": self.email,
+            "email": self.public_email(),
             "display_name": self.display_name,
             "plan": self.plan,
             "is_anonymous": self.is_anonymous,
             "session_expired": self.session_expired,
+            "is_guest": self.is_guest,
+            "login_provider": self.login_provider,
         }
 
 
@@ -233,12 +279,28 @@ async def current_identity(
     if revoked_at is not None and int(payload.get("iat") or 0) < revoked_at:
         raise SessionExpired("密码已修改，请用新密码重新登录")
 
+    identity_row = (
+        db.query(UserIdentity.provider)
+        .filter(UserIdentity.user_id == user.id)
+        .first()
+    )
+    if identity_row is not None:
+        login_provider = identity_row[0]
+    elif not user.is_guest:
+        login_provider = "email"
+    else:
+        # 游客且没有第三方映射：CDK 兑换 / 首次匿名评审铸造的账号，
+        # 从没走过任何"登录方式"，贴"邮箱登录"是在撒谎，宁可留白。
+        login_provider = None
+
     return Identity(
         user_id=user.id,
         email=user.email,
         plan=user.plan,
         is_anonymous=False,
         display_name=user.display_name,
+        is_guest=user.is_guest,
+        login_provider=login_provider,
     )
 
 
@@ -418,14 +480,21 @@ def _tokens_match(provided: str, expected: str) -> bool:
 
 
 async def require_admin(
-    request: Request, x_admin_token: Optional[str] = Header(default=None)
+    request: Request,
+    x_admin_token: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
 ) -> None:
-    """后台管理接口守卫：未配置 AL_ADMIN_TOKEN 时整体 503，配置了则校验共享密钥。
+    """后台管理接口守卫：未配置 AL_ADMIN_TOKEN 时整体 503，配置了则校验令牌。
 
+    令牌接受两种形式（先比静态串，落空了再当会话令牌解——静态串比对是
+    O(1) 恒定时间比对，走在前面不额外泄露信息）：
+      1. 静态主密钥——AL_ADMIN_TOKEN 原文，bootstrap/逃生舱用；
+      2. 具名账号会话令牌——admin_auth_service 登录签发的 JWT，
+         `admin:` 前缀 + AL_ADMIN_TOKEN 签名，可判断是谁在操作。
     三层防护：
       1. 恒定时间比较（_tokens_match），不泄露 timing side-channel；
       2. 失败计数 + 锁定：/api/admin/* 是唯一没挂通用限流的路由前缀，
-         而令牌是静态共享密钥、无有效期，不挡失败次数就等于允许离线枚举；
+         而静态令牌无有效期，不挡失败次数就等于允许离线枚举；
       3. 令牌强度下限在启动时校验（config.Settings._validate_admin_token）。
     成功一次即清零计数——管理员正常轮询不会把自己锁出去。
     """
@@ -439,9 +508,24 @@ async def require_admin(
             f"管理员令牌校验失败次数过多，请 {int(locked_for) + 1} 秒后再试。"
         )
 
-    if not x_admin_token or not _tokens_match(x_admin_token, settings.admin_token):
+    if not x_admin_token:
+        # 压根没带令牌**不算**一次认证失败。
+        # 记它的后果不是"计数偏高"：/api/admin/* 上任何一个未授权请求
+        # （扫描器、前端探测、运维忘了配 token、甚至一次浏览器预取）都会计数，
+        # 10 个这样的 GET 就能把**所有管理员**锁 5 分钟，而且可以无限重复——
+        # 那是一个人人可按的拒绝服务开关。它也挡不住任何枚举：枚举必须带上
+        # 一个候选令牌才有意义，而那种请求下面照常计数。
+        raise Unauthorized("管理员令牌无效")
+
+    if _tokens_match(x_admin_token, settings.admin_token):
+        reset_admin_auth_failures(client_key)
+        return
+
+    admin_user = admin_auth_service.resolve_session(db, x_admin_token, settings.admin_token)
+    if admin_user is None:
         _admin_auth_record_failure(client_key)
         logger.warning("后台令牌校验失败 | %s", client_key)
         raise Unauthorized("管理员令牌无效")
 
     reset_admin_auth_failures(client_key)
+    request.state.admin_user = admin_user

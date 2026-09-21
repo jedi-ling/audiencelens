@@ -55,14 +55,25 @@ def enqueue_review(
     provider: str = "anthropic",
     model: str = None,
     api_base: str = None,
+    guest_gated: bool = False,
 ) -> str:
     """入队一次评审，返回 job_id。
 
     provider/model/api_base：BYOK 选了非 Anthropic 服务商（DeepSeek/Kimi/通义千问/
     智谱GLM/Ollama…）时透传给引擎，见 src/runner/llm_client.py。
+
+    guest_gated：这次评审扣的是**游客体验额度**而不是 CDK 次数（发起时走了
+    guest_service 那条闸、整段跳过 check_quota）。它必须跟着 job.payload 落库，
+    因为两条异步失败路径（本模块的失败分支、app/db 的启动收尸）事后只能从
+    job.payload 判断"当初到底扣了谁的哪一份"——判断错的代价不是少退一点，
+    而是给游客**凭空发一次 CDK 余额**（cdk_service.refund_credit 只保证按
+    review_id 幂等，不核对有没有对应的扣减）。
     """
     job_id = job_service.create_job(
-        kind="review", ref_id=review_id, user_id=user_id, payload={"key_source": key_source}
+        kind="review",
+        ref_id=review_id,
+        user_id=user_id,
+        payload={"key_source": key_source, "guest_gated": bool(guest_gated)},
     )
     job_service.get_backend().submit(
         job_id,
@@ -75,6 +86,7 @@ def enqueue_review(
         provider,
         model,
         api_base,
+        guest_gated,
     )
     return job_id
 
@@ -88,6 +100,7 @@ def _execute_review(
     provider: str = "anthropic",
     model: str = None,
     api_base: str = None,
+    guest_gated: bool = False,
 ) -> None:
     """后台执行。异常向上抛给 job_service 记录为 failed。"""
     from runner.cli import run_panel  # 延迟导入：避免启动时就拉起重依赖
@@ -262,17 +275,38 @@ def _execute_review(
             # 留 ERROR 级堆栈 + 明确说清"用户次数被吞、需人工补"，
             # 钱的事情出问题必须在日志里看得见。
             try:
-                refunded = quota_service.refund_review_credit(
-                    db, user_id, review_id, key_source=key_source
-                )
-                if refunded:
-                    logger.info("review %s 失败，已退还 1 次评审次数给 %s", review_id, user_id)
-                # plan 模式的日名额是在入口占位的（quota_service._reserve_review_slot）。
-                # 评审没跑成，这个占位必须立刻还回去——否则用户被自己失败的评审
-                # 挡在门外，最长挡满一个 TTL。与上面的次数退还是两种资源，
-                # 各自独立，不能只做一半（credits 模式没有占位，这里自然是空操作）。
-                if quota_service.release_review_slot(db, user_id, key_source=key_source):
-                    logger.info("review %s 失败，已释放 %s 的 1 个日配额占位", review_id, user_id)
+                if guest_gated:
+                    # 这次评审扣的是**游客体验额度**，没有扣过 CDK 次数、
+                    # 也没有占过日名额（发起时整段跳过了 check_quota，
+                    # 见 api/platform.create_review_v2）。
+                    # 在这里调 refund_review_credit 就是凭空发一次 CDK 余额：
+                    # cdk_service.refund_credit 只按 review_id 保证"只退一次"，
+                    # 从不核对有没有对应的那条 -1。游客绑定邮箱后，这份凭空来的
+                    # 余额是能真的花出去的。退回当初真正扣掉的那一份才对。
+                    # （同步入队失败那条路一直是对的，本分支和 db._settle_reaped_reviews
+                    # 是这次补齐的——三条失败路径口径必须一致。）
+                    from app.services import guest_service
+
+                    if guest_service.refund_guest_credit(db, user_id):
+                        logger.info(
+                            "review %s 失败，已退还 1 次游客体验额度给 %s", review_id, user_id
+                        )
+                    # 游客跳过的只有 CDK 余额检查，终身 token 额度的占位是**照占的**
+                    # （quota_service.check_abuse_ceilings）。不放掉的话，一次失败的
+                    # 游客评审会在 TTL 内一直吃着运营者给这个身份的 token 额度。
+                    quota_service.release_review_slot(db, user_id, key_source=key_source)
+                else:
+                    refunded = quota_service.refund_review_credit(
+                        db, user_id, review_id, key_source=key_source
+                    )
+                    if refunded:
+                        logger.info("review %s 失败，已退还 1 次评审次数给 %s", review_id, user_id)
+                    # plan 模式的日名额是在入口占位的（quota_service._reserve_review_slot）。
+                    # 评审没跑成，这个占位必须立刻还回去——否则用户被自己失败的评审
+                    # 挡在门外，最长挡满一个 TTL。与上面的次数退还是两种资源，
+                    # 各自独立，不能只做一半（credits 模式没有占位，这里自然是空操作）。
+                    if quota_service.release_review_slot(db, user_id, key_source=key_source):
+                        logger.info("review %s 失败，已释放 %s 的 1 个日配额占位", review_id, user_id)
             except Exception:
                 db.rollback()
                 logger.exception(

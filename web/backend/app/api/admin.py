@@ -10,16 +10,24 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.errors import BadRequest, NotFound
+from app.core.errors import AdminDisabled, BadRequest, NotFound, RateLimited, Unauthorized
 from app.db import get_db
-from app.deps import rate_limit, require_admin
+from app.deps import (
+    _admin_auth_locked_for,
+    _admin_auth_record_failure,
+    _client_key,
+    rate_limit,
+    require_admin,
+    reset_admin_auth_failures,
+)
 from app.models import (
+    AdminUser,
     CdkCode,
     CdkRedemption,
     CreditLedger,
@@ -31,6 +39,7 @@ from app.models import (
     UserApiKey,
 )
 from app.services import (
+    admin_auth_service,
     admin_settings_service,
     audit_log_service,
     cdk_service,
@@ -41,6 +50,120 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
+
+# 登录本身不能挂 Depends(require_admin)——这一步还没有令牌可校验，
+# 用户名密码校验错误走独立路由，仍然复用同一套失败计数/锁定机制。
+auth_router = APIRouter(prefix="/admin/auth")
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminCreateUserRequest(BaseModel):
+    username: str
+    password: str = Field(min_length=8)
+
+
+def _admin_login_user_key(username: str) -> str:
+    """按用户名分桶的失败计数键。
+
+    为什么光有按来源（IP）的那一份不够：反代后所有请求的 peer IP 相同，
+    _client_key 于是退化成一个**全局**计数器——攻击者对着任意一个用户名
+    连错 10 次，就把所有管理员一起锁在门外 5 分钟，且可以无限续期。
+    再加一份按用户名的计数后，同一个共享出口 IP 下刷 alice 的密码只会锁住
+    alice 自己，bob 照常能登录；而针对某一个账号的爆破仍然被这一份挡住。
+    两份是"或"的关系：任一份满了就拒。
+    """
+    return f"admin-user:{(username or '').strip().lower()}"
+
+
+@auth_router.post("/login")
+async def admin_login(body: AdminLoginRequest, request: Request, db: Session = Depends(get_db)):
+    """具名账号登录，换回一枚会话令牌（放进原来的 X-Admin-Token 头里用）。"""
+    if not settings.admin_enabled:
+        raise AdminDisabled()
+
+    client_key = _client_key(request)
+    user_key = _admin_login_user_key(body.username)
+    locked_for = max(_admin_auth_locked_for(client_key), _admin_auth_locked_for(user_key))
+    if locked_for > 0:
+        raise RateLimited(f"登录失败次数过多，请 {int(locked_for) + 1} 秒后再试。")
+
+    user = admin_auth_service.authenticate(db, body.username, body.password)
+    if user is None:
+        _admin_auth_record_failure(client_key)
+        _admin_auth_record_failure(user_key)
+        raise Unauthorized("用户名或密码错误")
+
+    reset_admin_auth_failures(client_key)
+    reset_admin_auth_failures(user_key)
+    admin_auth_service.touch_last_login(db, user)
+    token = admin_auth_service.issue_session_token(user, settings.admin_token)
+    return {"token": token, "username": user.username}
+
+
+@router.get("/auth/users")
+async def list_admin_users(db: Session = Depends(get_db)):
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat(),
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+        }
+        for u in admin_auth_service.list_admin_users(db)
+    ]
+
+
+def acting_admin(request: Request) -> str:
+    """这次请求是谁在操作，用于审计署名。
+
+    require_admin 把解析出来的具名账号塞进了 request.state.admin_user，
+    但在这次改动之前**全仓库没有一处读过它**——"具名管理员账号"这个功能
+    唯一的目的（出事时知道是谁干的）因此从未真正实现。
+    落空时返回 "static-token"：用主密钥操作本身就是一条要记下来的事实
+    （它意味着这次操作没有具名账号可追责），不是"未知"。
+    """
+    user = getattr(request.state, "admin_user", None)
+    return getattr(user, "username", None) or audit_log_service.ACTOR_STATIC_TOKEN
+
+
+@router.post("/auth/users")
+async def create_admin_user(
+    body: AdminCreateUserRequest, request: Request, db: Session = Depends(get_db)
+):
+    try:
+        user = admin_auth_service.create_admin_user(db, body.username, body.password)
+    except ValueError as e:
+        raise BadRequest(str(e))
+    # 新建一个能进后台的账号是这套系统里权限最高的动作之一，此前完全不留痕：
+    # 攻破一次主密钥就能悄悄留下一个长期后门，事后审计日志上一片空白。
+    audit_log_service.record(
+        db, "admin_user.create", user.username, {"id": user.id}, actor=acting_admin(request)
+    )
+    return {"id": user.id, "username": user.username}
+
+
+@router.delete("/auth/users/{user_id}")
+async def deactivate_admin_user(
+    user_id: str, request: Request, db: Session = Depends(get_db)
+):
+    # 先取用户名再停用：审计行里要的是"谁被停用了"，只记一个 uuid
+    # 事后还得再去库里查一次才知道是谁，而那时账号可能已经被删了。
+    target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not admin_auth_service.deactivate(db, user_id):
+        raise NotFound("账号不存在")
+    audit_log_service.record(
+        db,
+        "admin_user.deactivate",
+        target.username if target is not None else user_id,
+        {"id": user_id},
+        actor=acting_admin(request),
+    )
+    return {"ok": True}
 
 
 # ============================== 系统概览 ==============================
@@ -1115,7 +1238,7 @@ TERMINAL_JOB_STATUSES = ("done", "failed", "cancelled")
 
 
 @router.post("/jobs/{job_id}/cancel")
-async def cancel_job(job_id: str, db: Session = Depends(get_db)):
+async def cancel_job(job_id: str, request: Request, db: Session = Depends(get_db)):
     """取消尚未开始的任务。
 
     只对 queued 生效：InProcessBackend 用线程池，已经在跑的线程杀不掉
@@ -1144,9 +1267,17 @@ async def cancel_job(job_id: str, db: Session = Depends(get_db)):
         j.status = "cancelled"
         j.finished_at = datetime.now(timezone.utc)
         db.commit()
+        # 这条分支绕过了 job_service._finish_job（那边已经带广播），
+        # 所以要自己把终态事件推出去——否则"backend.cancel 返回 False"
+        # 这一路上前端永远等不到终态，页面一直转圈（见 job_service 的说明）。
+        job_service.broadcast_review_cancelled(j.kind, j.ref_id)
 
     audit_log_service.record(
-        db, "job.cancel", job_id, {"backend_cancelled": backend_cancelled, "kind": j.kind}
+        db,
+        "job.cancel",
+        job_id,
+        {"backend_cancelled": backend_cancelled, "kind": j.kind},
+        actor=acting_admin(request),
     )
     return {**_job_row(j), "backend_cancelled": backend_cancelled}
 

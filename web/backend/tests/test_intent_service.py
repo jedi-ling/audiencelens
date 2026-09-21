@@ -221,3 +221,25 @@ class TestEveryPackIsReachableFromChat:
         assert parse_intent_heuristic("帮我看看这手游的付费设计合不合规").persona_pack == "mobile-f2p"
         # "审核"是"评审"的日常说法，不该被当成平台送审
         assert parse_intent_heuristic("帮我审核一下 Steam 商店页").persona_pack == "game-core"
+
+
+class TestStructuredOutputWiring:
+    """意图解析必须把形状约束传给 chat_completion 的 json_schema：不传的话，
+    llm_client 那边的强制工具调用/json_object 根本不启用，解析失败静默退化
+    到启发式档的老问题原封不动，界面上还完全看不出来。"""
+
+    def test_intent_parse_forwards_json_schema(self):
+        from app.services.intent_service import _INTENT_SCHEMA, parse_intent_llm
+
+        fake_response = (
+            '{"task_type": "concept_review", "mode": "standard", "persona_pack": "game-core",'
+            ' "confidence": 0.9, "clarifying_question": null, "skill_type": null,'
+            ' "persona_hint": null, "project_key": null}'
+        )
+        with patch("runner.llm_client.chat_completion", return_value=(fake_response, 10, 5)) as mock_chat:
+            result = parse_intent_llm("帮我评一下这个游戏概念", api_key="k")
+
+        assert result is not None and result.task_type == "concept_review"
+        assert mock_chat.call_args.kwargs["json_schema"] is _INTENT_SCHEMA
+        # 提示词允许模型选不出时填 null，schema 不能把这些字段写死成 string
+        assert _INTENT_SCHEMA["properties"]["task_type"]["type"] == ["string", "null"]

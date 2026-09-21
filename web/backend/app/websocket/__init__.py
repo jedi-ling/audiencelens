@@ -11,7 +11,35 @@ router = APIRouter()
 
 # 安全措施：WebSocket origin 白名单，防止跨站 WebSocket 劫持。
 # 生产部署时用 AL_CORS_ORIGINS 配置真实域名（与 HTTP CORS 同源）。
-ALLOWED_WS_ORIGINS = set(settings.cors_origins) | {"http://127.0.0.1:5173"}
+#
+# 白名单从两处配置推导，不再手写任何端口号：
+#   · AL_CORS_ORIGINS —— 与 HTTP CORS 同源，生产域名写在这里；
+#   · AL_PUBLIC_WEB_URL —— 本站前端地址（默认 http://localhost:5199）。
+#     它此前没有被算进来，而本仓库的开发前端就跑在 5199（.claude/launch.json
+#     与 vite.config.ts），白名单里却硬写着一个早已不用的 5173——
+#     实测从 http://127.0.0.1:5199 握手会被 4001 关掉，于是本地开发的 WS
+#     永远连不上、静默退化成轮询，而这条链路正是"实时进度"的全部意义。
+#
+# localhost 与 127.0.0.1 是同一个开发服务器的两种写法，浏览器却当成两个 origin
+# （Origin 头是逐字符比对的）。所以对配置里出现的这两种主机名互相补齐；
+# 只对这两个回环名做别名，生产域名一个字符都不放宽——未知 origin 照旧 4001。
+def _loopback_aliases(origin: str) -> set:
+    origin = (origin or "").strip().rstrip("/")
+    if not origin:
+        return set()
+    out = {origin}
+    if "//localhost" in origin:
+        out.add(origin.replace("//localhost", "//127.0.0.1"))
+    if "//127.0.0.1" in origin:
+        out.add(origin.replace("//127.0.0.1", "//localhost"))
+    return out
+
+
+ALLOWED_WS_ORIGINS = {
+    alias
+    for origin in list(settings.cors_origins) + [settings.public_web_url]
+    for alias in _loopback_aliases(origin)
+}
 
 
 class ConnectionManager:
@@ -62,13 +90,25 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # WS 事件契约（前端据此分支；新增事件请同步更新 docs/ARCHITECTURE.md）
+#
+# 这份清单必须与后端**实际发出去的**事件一字不差。之前它两头都不准：
+#   · 漏了 review.evaluation_completed —— review_service 真的在发；
+#   · 漏了 review.cancelled —— 前端 lib/ws.ts 把它当终态事件处理，而后端
+#     从来没发过，于是管理员取消一个任务后，订阅中的浏览器完全不知情，
+#     一直转圈到重连预算耗尽再静默退化成轮询。
+# 一份"看起来是契约、实际没人维护"的清单比没有更糟：它会让下一个人相信它。
 WS_EVENTS = (
     "review.started",
     "review.progress",
     "review.persona_completed",
+    "review.evaluation_completed",
     "review.completed",
     "review.failed",
+    "review.cancelled",
 )
+
+# 终态事件：前端收到其中任意一个就停止等待（见 frontend/src/lib/ws.ts 的 TERMINAL）。
+WS_TERMINAL_EVENTS = ("review.completed", "review.failed", "review.cancelled")
 
 
 def _resolve_ws_user(websocket: WebSocket) -> str:

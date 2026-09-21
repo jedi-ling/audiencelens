@@ -18,6 +18,11 @@ from app.models import AuthToken
 
 PURPOSE_VERIFY_EMAIL = "verify_email"
 PURPOSE_RESET_PASSWORD = "reset_password"
+# 第三方登录回调 → 前端的一次性交接码。
+# 为什么不直接把 JWT 拼进重定向 URL：那样会话令牌会留在浏览器历史、
+# Referer 和（若有中间层）访问日志里，有效期长达 7 天。交接码 30 秒过期、
+# 用一次即废（AuthToken.used_at），泄漏窗口小得多。
+PURPOSE_OAUTH_HANDOFF = "oauth_handoff"
 
 
 def _digest(token: str) -> str:
@@ -66,6 +71,19 @@ def consume(db: Session, raw_token: str, purpose: str) -> Optional[str]:
     if expires_at < datetime.now(timezone.utc):
         return None
 
-    row.used_at = datetime.now(timezone.utc)
+    # 作废必须是"条件更新 + 看 rowcount"，不能是先读后写。
+    # 先读后写在并发下是假的单次：OAuth 交接码只有 30 秒有效期，前端在这 30 秒
+    # 里重试一次（或攻击者拿到码后与本人抢跑）时，两个请求都读到 used_at is None、
+    # 都把它置上、都返回同一个 user_id —— 于是一个"一次性"交接码换出了两把
+    # 会话 JWT。密码重置码同理，重放窗口内能重置两次。
+    # WHERE used_at IS NULL 让数据库来裁决谁赢：只有 rowcount==1 的那个请求
+    # 算消费成功，另一个拿到 0，如实返回 None。
+    updated = (
+        db.query(AuthToken)
+        .filter(AuthToken.id == row.id, AuthToken.used_at.is_(None))
+        .update({"used_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    )
     db.commit()
+    if updated != 1:
+        return None
     return row.user_id

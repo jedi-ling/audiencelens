@@ -285,6 +285,25 @@ confidence 是你对 task_type 判断的把握（0-1）。若无法确定，task
 并在 clarifying_question 里写一句要问用户的话。"""
 
 
+# 交给 llm_client 做结构化输出的形状约束。与 _LLM_PROMPT 末尾那个示例 JSON 一一对应；
+# 改一处必须改另一处。可空字段用 ["string","null"]——模型选不出时填 null 是提示词
+# 明确允许的，写死 "string" 会让强制工具调用在这种正常情况下反而失败。
+_INTENT_SCHEMA = {
+    "type": "object",
+    "required": ["task_type", "mode", "persona_pack", "confidence"],
+    "properties": {
+        "task_type": {"type": ["string", "null"]},
+        "mode": {"type": ["string", "null"]},
+        "persona_pack": {"type": ["string", "null"]},
+        "confidence": {"type": "number"},
+        "clarifying_question": {"type": ["string", "null"]},
+        "skill_type": {"type": ["string", "null"]},
+        "persona_hint": {"type": ["string", "null"]},
+        "project_key": {"type": ["string", "null"]},
+    },
+}
+
+
 def parse_intent_llm(
     text: str,
     api_key: str,
@@ -328,6 +347,10 @@ def parse_intent_llm(
             provider=provider,
             api_base=api_base,
             max_tokens=512,
+            # 结构化交卷：回来的必然是合法 JSON，下面那句 re.search 只是留作
+            # 老服务商退回文本时的兜底。字段值的合法性（task_type 在不在表里等）
+            # 仍由后面的代码逐项校验，schema 只管形状，故意不写 enum。
+            json_schema=_INTENT_SCHEMA,
         )
         # 用量在解析之前就记：这次调用的钱已经花了，后面 JSON 解析成不成功
         # 都改变不了这个事实（解析失败会 return None 让调用方降级，

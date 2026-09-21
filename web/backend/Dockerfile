@@ -25,6 +25,10 @@ RUN if [ "$INSTALL_SEMANTIC_DEDUP" = "true" ]; then       pip install --no-cache
 
 COPY app/ ./app/
 COPY run.py .
+# 运维脚本也要进镜像。少了这一层，docs/MAINTENANCE.md 里那条
+# `python scripts/cleanup_orphan_uploads.py` 在容器里根本没有文件可跑——
+# 而孤儿上传清理只有在容器里跑才看得到挂载卷的真实内容。
+COPY scripts/ ./scripts/
 
 # 与 config.py 的 default_db（backend_dir/data/reviews.db）一致；compose 挂同一路径
 RUN mkdir -p /app/web/backend/data

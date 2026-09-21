@@ -116,7 +116,9 @@ def _settle_reaped_reviews(orphans) -> None:
     from app.services import quota_service
 
     db: Session = SessionLocal()
-    refunded = released = stale = 0
+    from app.services import guest_service
+
+    refunded = released = guest_refunded = stale = 0
     try:
         for review_id, user_id in orphans:
             uid = user_id or "anonymous"
@@ -127,10 +129,29 @@ def _settle_reaped_reviews(orphans) -> None:
                     .order_by(Job.created_at.desc())
                     .first()
                 )
+                payload = (job.payload or {}) if job else {}
                 # 谁付的钱在入队时就记在 job.payload 里了（review_service.enqueue_review）。
                 # 读不到就当 BYOK：BYOK 从来不扣次数也不占名额，退了才是凭空发额度。
-                key_source = ((job.payload or {}).get("key_source") if job else None) or "byok"
+                key_source = payload.get("key_source") or "byok"
                 if key_source != "server":
+                    continue
+                if payload.get("guest_gated"):
+                    # 游客体验额度那条路**整段跳过了 check_quota**（见
+                    # api/platform.create_review_v2），压根没扣过 CDK 次数、
+                    # 也没占过日名额。而 refund_review_credit → cdk_service.refund_credit
+                    # 是"按 review_id 幂等地写一条 +1"，不是"撤销刚才那条 -1"——
+                    # 它不核对有没有对应的扣减。对游客调它 = **凭空发一次 CDK 余额**，
+                    # 绑定邮箱之后就能真的花出去（评审本身还是平台垫付的）。
+                    # 所以这里退的必须是当初真正扣掉的那一份：游客体验额度。
+                    # 同步入队失败那条路一直是对的，这里和 review_service 那条
+                    # 异步路径是后补上的——三条路现在口径一致。
+                    if guest_service.refund_guest_credit(db, uid):
+                        guest_refunded += 1
+                    # 游客跳过的只有 CDK 余额检查；终身 token 额度的占位照占
+                    # （quota_service.check_abuse_ceilings），这里要放掉，
+                    # 否则它在 TTL 内继续吃着这个身份的额度。
+                    if quota_service.release_review_slot(db, uid, key_source="server"):
+                        released += 1
                     continue
                 if quota_service.refund_review_credit(db, uid, review_id, key_source="server"):
                     refunded += 1
@@ -148,10 +169,12 @@ def _settle_reaped_reviews(orphans) -> None:
         except Exception:
             db.rollback()
             log.exception("启动收尸：清理过期配额占位失败")
-        if refunded or released or stale:
+        if refunded or released or guest_refunded or stale:
             log.warning(
-                "启动收尸：退还 %d 次 CDK、释放 %d 个日配额占位、清理 %d 条过期占位",
+                "启动收尸：退还 %d 次 CDK、退还 %d 次游客体验额度、"
+                "释放 %d 个日配额占位、清理 %d 条过期占位",
                 refunded,
+                guest_refunded,
                 released,
                 stale,
             )
@@ -278,11 +301,30 @@ def _legacy_migrations() -> None:
             # `false` 关键字 SQLite 3.23+（2018）起支持，两边都成立。
             patches.append("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT false NOT NULL")
         if "email_verified_at" not in user_columns:
-            patches.append("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
+            # TIMESTAMP 而不是 DATETIME —— 同一个文件上面 reviews.shared_at 那条
+            # 已经把原因写清楚了：PostgreSQL 根本没有 DATETIME 这个类型，
+            #   ERROR: type "datetime" does not exist
+            # 而 SQLite 的类型亲和性规则对任何类型名都宽容，所以本机测不出来。
+            # 这条写错的后果不是"少一列"：_legacy_migrations 在 init_db 里跑，
+            # 任何缺这一列的存量 PG 库会在**启动时**直接抛错起不来。
+            patches.append("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP")
         if "token_quota_total" not in user_columns:
             # 可空 INTEGER，不带 DEFAULT：SQLite 与 PostgreSQL 都接受这条 DDL。
             # （对比上面 is_guest 那条踩过的坑：DEFAULT 0 在 PG 的 boolean 上会挂。）
             patches.append("ALTER TABLE users ADD COLUMN token_quota_total INTEGER")
+        if "guest_review_credits" not in user_columns:
+            # 同 token_quota_total：可空、不带 DEFAULT。老库里的存量用户
+            # （不管是不是游客）一律回填 NULL = 不受这个闸约束，语义与
+            # "非游客账号恒为 NULL"一致——这个字段是新功能上线之后才铸造的
+            # 游客才会有值，不能让存量游客突然被判定成"额度已用完"。
+            patches.append("ALTER TABLE users ADD COLUMN guest_review_credits INTEGER")
+
+    if "admin_audit_log" in inspector.get_table_names():
+        audit_columns = {c["name"] for c in inspector.get_columns("admin_audit_log")}
+        if "actor" not in audit_columns:
+            # 可空 VARCHAR、不带 DEFAULT：SQLite 与 PostgreSQL 都接受。
+            # 存量行留 NULL＝"当时没记署名"，不回填任何编造的值。
+            patches.append("ALTER TABLE admin_audit_log ADD COLUMN actor VARCHAR")
 
     # ethics_reports 补归属列。老库里这张表没有 review_id，写进去的行
     # 既查不回来也删不掉，而 violations_json 里含用户内容摘录——等于

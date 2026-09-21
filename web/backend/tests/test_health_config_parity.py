@@ -89,6 +89,7 @@ def test_health_config_stays_minimal():
         "key_mode",           # 与 server_key_present 一起决定"能不能跑评审"
         "server_key_present",
         "quota_enabled",      # 前端隐藏/显示配额进度条
+        "qq_login_enabled",   # 前端隐藏/显示「QQ 登录」按钮——没配齐就不该画那个按钮
     }
     actual = _health_config_keys()
 

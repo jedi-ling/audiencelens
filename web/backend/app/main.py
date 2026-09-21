@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import router as api_router
+from app.api.admin import auth_router as admin_auth_router
 from app.api.admin import router as admin_router
 from app.api.platform import router as platform_router
 from app.config import settings
@@ -100,4 +101,5 @@ register_error_handlers(app)
 app.include_router(api_router)
 app.include_router(platform_router, prefix="/api")  # /api/health 在 platform 里
 app.include_router(admin_router, prefix="/api")
+app.include_router(admin_auth_router, prefix="/api")
 app.include_router(ws_router)

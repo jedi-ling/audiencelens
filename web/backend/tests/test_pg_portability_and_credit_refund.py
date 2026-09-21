@@ -101,6 +101,52 @@ def _seed_account(db, uid="u-fk-del"):
     return uid, review.id
 
 
+class TestLegacyMigrationsAreDialectPortable:
+    """轻量迁移里的每一条 DDL 都必须在 PostgreSQL 上成立。
+
+    这里只能做静态检查（本机没有 PG），但这类错误的形状很固定——用了
+    SQLite 才认的类型名/写法。它们在开发机上 100% 测不出来：
+      · 新建库走 create_all，压根不经过 _legacy_migrations；
+      · SQLite 的类型亲和性规则对任何类型名都宽容。
+    而 _legacy_migrations 是在 init_db() 里跑的，一条写错的 DDL 不是"少一列"，
+    是**存量 PG 库启动即崩**。同一个文件里已经因此留过两处血泪注释
+    （reviews.shared_at 的 DATETIME、users.is_guest 的 DEFAULT 0），
+    第三次是 users.email_verified_at 又写成了 DATETIME。
+    """
+
+    def _statements(self):
+        import inspect
+        import re
+
+        from app import db as app_db
+
+        src = inspect.getsource(app_db._legacy_migrations)
+        return re.findall(r'"((?:ALTER TABLE|CREATE INDEX|DELETE FROM)[^"]+)"', src)
+
+    def test_there_are_statements_to_check(self):
+        assert len(self._statements()) > 10, "正则没匹配到迁移语句，这条测试在空转"
+
+    def test_no_sqlite_only_type_names(self):
+        """PostgreSQL 没有 DATETIME 这个类型（ERROR: type "datetime" does not exist），
+        两边都能过的写法是 TIMESTAMP。"""
+        bad = [s for s in self._statements() if " DATETIME" in s.upper()]
+        assert not bad, f"PostgreSQL 不认 DATETIME，改成 TIMESTAMP：\n  " + "\n  ".join(bad)
+
+        bad = [s for s in self._statements() if "AUTOINCREMENT" in s.upper()]
+        assert not bad, f"AUTOINCREMENT 是 SQLite 专有：\n  " + "\n  ".join(bad)
+
+    def test_boolean_columns_do_not_default_to_integers(self):
+        """PG 的 boolean 与整数不可隐式互转：
+        ERROR: column ... is of type boolean but default expression is of type integer"""
+        import re
+
+        bad = [
+            s for s in self._statements()
+            if re.search(r"BOOLEAN\s+DEFAULT\s+[01]\b", s, re.IGNORECASE)
+        ]
+        assert not bad, f"boolean 列的默认值要写 true/false：\n  " + "\n  ".join(bad)
+
+
 class TestFixtureItself:
     def test_foreign_keys_are_actually_enforced(self, fk_db):
         """先证明这个夹具是有效的：外键没真开的话，本文件其余断言全是假绿。"""

@@ -601,7 +601,13 @@ class PersonaService:
 
         presets = cls.load_presets()
         try:
-            panel = select_panel(task_type, personas, presets)
+            # target_size 传档位上限而不是让它凑到预设的 min_panel_size 就收手——
+            # 与 runner.cli.run_panel 同一口径（v2 链路那边同批修的）。不传的话，
+            # 预设点名的人格 id 只在 game-core 里存在，别的包全数落空、亲和度兜底
+            # 填到 4 人就停，standard 档承诺的 6 人从来兑现不了。
+            # 这里凑满之后，下面那段 random.sample 补人只在"包本身就不够人"时才会
+            # 走到——随机抓人是最后的兜底，不该是常态路径。
+            panel = select_panel(task_type, personas, presets, target_size=max_count)
             selected = panel["selected"]
         except ValueError:
             if personas:
@@ -782,7 +788,8 @@ personas:
 
             # 统一走 runner.llm_client：与评审同一条出口，BYOK 的 provider/端点/模型
             # 全部生效（以前是手搓 anthropic.Anthropic，等于把非官方端点用户排除在外）
-            effective_model = model or "claude-sonnet-4-20250514"
+            # 与 src/config/budget.yaml 的 default_model 同步（Sonnet 4 已在官方 API 退役）
+            effective_model = model or "claude-sonnet-5"
             content, in_tok, out_tok = chat_completion(
                 model=effective_model,
                 prompt=prompt,
@@ -1015,6 +1022,17 @@ class MaterialExtractor:
                 provider=resolved.provider,
                 api_base=resolved.api_base,
                 max_tokens=2000,
+                # 结构化交卷，形状与上面提示词里的示例 JSON 一致；下面的去围栏
+                # 只是老服务商退回文本时的兜底。materials 的键由 task_type 决定，
+                # 不能在 schema 里枚举，用 additionalProperties 收。
+                json_schema={
+                    "type": "object",
+                    "required": ["title", "materials"],
+                    "properties": {
+                        "title": {"type": "string"},
+                        "materials": {"type": "object", "additionalProperties": {"type": "string"}},
+                    },
+                },
             )
             content = content.strip()
 

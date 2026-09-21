@@ -384,9 +384,18 @@ class User(Base):
     display_name = Column(String, nullable=True)
     plan = Column(String, default="free", nullable=False)  # free | pro | ...（计费用）
     is_active = Column(Boolean, default=True, nullable=False)
-    # 游客身份：CDK 免登录兑换时自动签发（合成邮箱 + 不可登录的随机口令）。
-    # 是真实 User 行——配额/key/评审归属全部复用既有逻辑，只是没有可登录的凭据。
+    # 游客身份：CDK 免登录兑换 / 首次匿名发起评审时自动签发（合成邮箱 + 不可
+    # 登录的随机口令）。是真实 User 行——配额/key/评审归属全部复用既有逻辑，
+    # 只是没有可登录的凭据。绑定邮箱（POST /api/auth/bind-email）后原地转正：
+    # is_guest 置 false，email/password_hash 换成真的，user_id 不变，
+    # 历史评审/判断/次数全部跟着这同一行，不需要另建账号再迁移数据。
     is_guest = Column(Boolean, default=False, nullable=False)
+    # 游客的一次性体验额度（赠送 3 次生成评审的机会，与 quota_free_reviews_per_day
+    # 那个"每日刷新"的全局免费额度是两件独立的事，互不影响）。只在铸造游客身份
+    # 时赋初值；非游客账号恒为 NULL，quota_service 据此判断"要不要查这个闸"——
+    # 不能用 0 当"不适用"，0 和"3 次已用完"是两个完全不同的状态，混在一起会让
+    # 已转正的老游客账号被误判成"额度用完"。
+    guest_review_credits = Column(Integer, nullable=True)
     # 邮箱是否已验证。注册即可用（不挡住上手），但未验证的账号会被提示去验证——
     # 否则用户填错邮箱自己不知道，等到要找回密码时才发现联系不上，为时已晚。
     email_verified_at = Column(DateTime, nullable=True)
@@ -397,6 +406,51 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     api_keys = relationship("UserApiKey", back_populates="user", cascade="all, delete-orphan")
+
+
+class UserIdentity(Base):
+    """第三方登录身份 ↔ 本站账号的映射（QQ 互联，后续微信/GitHub 同表扩展）。
+
+    为什么单开一张表而不是在 users 上加 qq_openid 列：一个账号将来可能同时绑
+    QQ 和微信，加列的话每接一家就要改一次 users 表结构；而且"某个第三方 uid
+    是否已被占用"是这张表的唯一索引直接保证的，不需要在业务代码里查重。
+
+    provider_uid 存 QQ 的 openid：**它是 appid 维度的**，同一个 QQ 用户在不同
+    应用下 openid 不同，所以 (provider, provider_uid) 才是唯一键，单靠
+    provider_uid 不足以标识一个人。
+    """
+
+    __tablename__ = "user_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_uid", name="uq_user_identities_provider_uid"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    provider = Column(String, index=True, nullable=False)   # 'qq' | 'wechat' | ...
+    provider_uid = Column(String, index=True, nullable=False)
+    # 第三方给的昵称，只作首次建号时的显示名来源，不作事实源（用户改本站昵称后不该被覆盖）
+    nickname = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class AdminUser(Base):
+    """后台管理面板的具名登录账号。
+
+    与产品侧 User 完全分离——admin 面板此前只有一把共享的 AL_ADMIN_TOKEN，
+    谁拿着密码谁登录，无法区分是谁做的操作。这张表让每个人有自己的用户名/密码，
+    审计日志才能落到具体人头上。AL_ADMIN_TOKEN 保留作为 bootstrap 用的主密钥
+    （创建第一个账号、或所有账号密码都忘记时的逃生舱），不是互斥关系。
+    """
+
+    __tablename__ = "admin_users"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_login_at = Column(DateTime, nullable=True)
 
 
 class AuthToken(Base):
@@ -672,5 +726,9 @@ class AdminAuditLog(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     action = Column(String, index=True, nullable=False)  # 如 setting.update / plan.override / server_key.set
     target = Column(String, nullable=True)  # 被改动对象，如 setting key、plan id
+    # 操作者：具名管理员用户名 / "static-token"（用 AL_ADMIN_TOKEN 主密钥操作）/
+    # NULL（这条记录产生时还没记署名）。可空是刻意的——存量行确实不知道是谁，
+    # 回填任何值都是编造。见 services/audit_log_service.py 顶部说明。
+    actor = Column(String, nullable=True)
     detail = Column(Text, nullable=True)  # JSON 字符串，记录变更前后的值
     created_at = Column(DateTime, index=True, default=lambda: datetime.now(timezone.utc), nullable=False)

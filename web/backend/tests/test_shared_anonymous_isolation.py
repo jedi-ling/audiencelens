@@ -122,6 +122,48 @@ class TestSingleMachineFormStillWorks:
         assert client.delete("/api/keys/anthropic").status_code == 200
 
 
+class TestLedgerWritesAreAlsoGuarded:
+    """读那侧早就挂了守卫，写这侧漏了两个。
+
+    共享匿名桶下 user_id 对所有未登录访客相等，于是：
+      · /ledger/judgments/{id}/verify —— service 层那句 `j.user_id != user_id`
+        在他们之间恒等成立，任何访客都能给**别人的**预测盖上"成真了/没成真"
+        的章，而命中率、校准曲线、排行榜全都建立在这些回填之上；
+      · /validation/reviews/{id}/feedback —— upsert 的键是 (review_id, user_id)，
+        任何访客都能改写别人对某次评审的反馈，而那正是 /validation/metrics
+        那些"采用率/付费意愿"数字的来源（读那边早就挡住了，写这边没挡）。
+    """
+
+    def test_verify_judgment_rejected_for_shared_anonymous(self, client, monkeypatch):
+        _enable_auth(monkeypatch)
+        r = client.post(
+            "/api/ledger/judgments/whatever/verify", json={"verdict": "correct"}
+        )
+        assert r.status_code == 401, (
+            f"未登录访客能回填别人的判断：{r.status_code} {r.text[:200]}"
+        )
+
+    def test_review_feedback_rejected_for_shared_anonymous(self, client, monkeypatch):
+        _enable_auth(monkeypatch)
+        r = client.post(
+            "/api/validation/reviews/whatever/feedback", json={"useful": True}
+        )
+        assert r.status_code == 401, (
+            f"未登录访客能改写别人的评审反馈：{r.status_code} {r.text[:200]}"
+        )
+
+    def test_single_machine_form_still_allows_both(self, client, db):
+        """auth_enabled=false 的单机形态不能被这两道守卫误伤。
+        （这里只要求"不是 401"——不存在的 id 返回 404 是正常业务结果。）"""
+        assert settings.auth_enabled is False
+        assert client.post(
+            "/api/ledger/judgments/no-such-judgment/verify", json={"verdict": "correct"}
+        ).status_code != 401
+        assert client.post(
+            "/api/validation/reviews/no-such-review/feedback", json={"useful": True}
+        ).status_code != 401
+
+
 class TestGuestsAreNotCollateralDamage:
     """CDK 兑换出来的游客也走 optional_identity，但他们持 token、有独立
     user_id、is_anonymous=False —— 那是真实且互相隔离的身份，必须照常放行。

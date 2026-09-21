@@ -266,6 +266,17 @@ class Settings:
         self.email_token_ttl_seconds: int = _int("AL_EMAIL_TOKEN_TTL_SECONDS", 24 * 3600)
         self.reset_token_ttl_seconds: int = _int("AL_RESET_TOKEN_TTL_SECONDS", 3600)
 
+        # ---- QQ 登录（QQ 互联 OAuth2.0）----
+        # APP KEY 是密钥，只从环境变量读，绝不写进代码/仓库。
+        # 三项任一为空 = 该功能整体关闭（qq_login_enabled 为 False），
+        # 前端据此决定要不要画那个登录按钮——不做"按钮在但点了报错"。
+        self.qq_app_id: str = os.environ.get("AL_QQ_APP_ID", "").strip()
+        self.qq_app_key: str = os.environ.get("AL_QQ_APP_KEY", "").strip()
+        # 必须与 QQ 互联后台登记的回调地址**逐字符一致**，否则腾讯返回
+        # redirect uri is illegal(100010)。差一个尾斜杠、协议不同都会被拒，
+        # 所以这里不做任何拼接/规范化，原样用运维填的那一串。
+        self.qq_redirect_uri: str = os.environ.get("AL_QQ_REDIRECT_URI", "").strip()
+
         # ---- 上传 ----
         self.upload_dir: str = os.environ.get(
             "AL_UPLOAD_DIR", os.path.join(self.backend_dir, "data", "uploads")
@@ -314,6 +325,12 @@ class Settings:
     @property
     def is_managed(self) -> bool:
         return self.key_mode in ("managed", "hybrid")
+
+    @property
+    def qq_login_enabled(self) -> bool:
+        """三项配齐才算开。少一项就当没配——宁可不显示入口，
+        也不要让用户点进一个必然失败的登录流程。"""
+        return bool(self.qq_app_id and self.qq_app_key and self.qq_redirect_uri)
 
     @property
     def admin_enabled(self) -> bool:
@@ -505,6 +522,9 @@ class Settings:
             "server_key_present": bool(self.server_llm_key),
             # 前端隐藏/显示配额进度条
             "quota_enabled": self.quota_enabled,
+            # 前端据此决定要不要画「QQ 登录」按钮。三项配齐才为真——
+            # 没配全却把按钮画出来，用户点进去必然失败。
+            "qq_login_enabled": self.qq_login_enabled,
         }
 
 

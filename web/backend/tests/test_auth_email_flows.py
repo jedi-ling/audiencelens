@@ -174,6 +174,78 @@ class TestTokenStorage:
         ).status_code == 400
 
 
+class TestConsumeIsGenuinelySingleUse:
+    """作废令牌必须是"条件更新 + 看 rowcount"，不能是先读后写。
+
+    先读后写在并发下是**假的**单次：两个请求都读到 used_at is None、
+    都把它置上、都拿到同一个 user_id。OAuth 交接码只有 30 秒窗口，
+    前端重试一次（或攻击者拿到码后与本人抢跑）就能让一个"一次性"交接码
+    换出两把会话 JWT；密码重置码同理，窗口内能重置两次。
+    """
+
+    def test_losing_the_race_returns_none_instead_of_a_second_success(self, db):
+        """精确复现那一步：本次 consume 已经读到了"还没用过"的行，
+        另一个请求抢在写之前把它用掉了。条件更新会匹配到 0 行，如实返回 None。"""
+        from datetime import datetime as _dt, timezone
+
+        from app.models import AuthToken, User
+        from app.services import auth_token_service
+
+        user = User(email="race-consume@example.com", password_hash="x")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        try:
+            raw = auth_token_service.issue(
+                db, user.id, auth_token_service.PURPOSE_RESET_PASSWORD, 600
+            )
+
+            burned = {"done": False}
+
+            class _BurnOnFirstNow:
+                """consume 里第一次取当前时间（过期判断）时，模拟抢跑的那个请求
+                先把这行标记成已用。此后本次 consume 的条件更新必须落空。"""
+
+                @staticmethod
+                def now(tz=None):
+                    if not burned["done"]:
+                        burned["done"] = True
+                        from app.db import session_scope
+
+                        other = session_scope()
+                        try:
+                            other.query(AuthToken).filter(
+                                AuthToken.user_id == user.id,
+                                AuthToken.used_at.is_(None),
+                            ).update(
+                                {"used_at": _dt.now(timezone.utc)}, synchronize_session=False
+                            )
+                            other.commit()
+                        finally:
+                            other.close()
+                    return _dt.now(tz)
+
+            import app.services.auth_token_service as mod
+
+            original = mod.datetime
+            mod.datetime = _BurnOnFirstNow
+            try:
+                result = auth_token_service.consume(
+                    db, raw, auth_token_service.PURPOSE_RESET_PASSWORD
+                )
+            finally:
+                mod.datetime = original
+
+            assert burned["done"], "注入点没生效，这条测试在空转"
+            assert result is None, "同一个一次性令牌被消费了两次"
+        finally:
+            db.query(AuthToken).filter(AuthToken.user_id == user.id).delete(
+                synchronize_session=False
+            )
+            db.query(User).filter(User.id == user.id).delete()
+            db.commit()
+
+
 class TestResendReportsRealOutcome:
     """用户亲手点「重新发送」时，发信失败必须如实回报。
 

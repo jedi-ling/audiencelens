@@ -380,6 +380,32 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
     # credits 模式没有"每日限额"概念——额度就是 CDK 余额本身
     plan_limits_apply = quota_enabled and mode != "credits"
 
+    # ---- 游客体验额度 + "还能发起几次" ----
+    #
+    # 为什么这三个字段必须由服务端算：前端此前拿 bonus_credits（CDK 余额）当
+    # "还能不能发起评审"用，而刚铸造的游客 CDK 余额恒为 0——于是 credits 模式下
+    # 新游客打开页面就看到"额度已用完 / 去兑换"，而后端其实还会痛快接下 3 次。
+    # 前端没有能力算准这个数（要同时看 quota_mode、游客额度、日限、CDK 余额），
+    # 它每重算一次就会跟 402 分岔一次。所以给一个权威数字，前端只负责显示。
+    from app.services import cdk_service as _cdk
+    from app.services.guest_service import GUEST_FREE_REVIEWS
+
+    trial_remaining = (
+        db.query(User.guest_review_credits).filter(User.id == user_id).scalar()
+    )
+    bonus_credits = _cdk.credit_balance(db, user_id)
+
+    if not quota_enabled:
+        # 配额整体关闭：不是"0 次"，是"不设限"。两者必须能被前端区分开，
+        # 所以用 None 而不是一个大数字。
+        reviews_remaining = None
+    else:
+        remaining = int(trial_remaining or 0) + int(bonus_credits or 0)
+        if plan_limits_apply:
+            _limit = effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
+            remaining += max(0, int(_limit) - int(count or 0))
+        reviews_remaining = remaining
+
     return {
         "quota_enabled": quota_enabled,
         "quota_mode": mode,
@@ -405,7 +431,18 @@ def usage_summary(db: Session, user_id: str, plan: str = "free") -> dict:
         "cost_usd_limit": plan_info["cost_usd_per_day"] if plan_limits_apply else None,
         # CDK 次数余额：credits 模式下这就是全部额度（每次评审 -1，用完即止）；
         # plan 模式下是日限用完后的加量
-        "bonus_credits": cdk_service.credit_balance(db, user_id),
+        "bonus_credits": bonus_credits,
+        # 游客一次性体验额度。非游客账号为 None（"不适用"），不是 0——
+        # 0 的语义是"用完了"，两者混用正是 guest_needs_credit_gate 踩过的坑。
+        "trial_credits_remaining": (
+            int(trial_remaining) if trial_remaining is not None else None
+        ),
+        "trial_credits_total": (
+            GUEST_FREE_REVIEWS if trial_remaining is not None else None
+        ),
+        # 前端唯一该拿来判断"还能不能发起评审"的字段。None = 不设限。
+        # 它把体验额度、CDK 余额、日限剩余合成一个数，口径与 check_quota 一致。
+        "reviews_remaining": reviews_remaining,
         # 终身 token 额度。与上面几项不同，它不随 quota_mode 变化，也不按 24h 滚动，
         # 所以 quota_enabled=false 时同样如实回报"已用了多少"（只是不拦）——
         # 让用户和运营都能看见真实消耗，而不是等撞上限才第一次知道有这回事。
@@ -465,6 +502,80 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     if key_source != "server":
         return
 
+    # 与 CDK 余额无关的那几道闸单独抽了出去（见 check_abuse_ceilings）：
+    # 游客体验额度那条路要跳过的**只有** CDK 余额检查，钱包上限必须照跑。
+    # 这里的调用顺序与拆分前逐条一致：终身 token 闸 → 24h 成本硬闸 →
+    # 日次数闸 → CDK 垫付，对非游客路径没有任何行为变化。
+    check_abuse_ceilings(db, user_id, key_source=key_source, plan=plan)
+
+    if not _quota_enabled(db):
+        return
+
+    from app.services import cdk_service
+
+    mode = admin_settings_service.get(db, "quota_mode", settings.quota_mode)
+    if mode == "credits":
+        # 查余额和扣减是同一条原子语句——并发请求不可能把余额扣成负数
+        if not cdk_service.try_consume_credit(db, user_id):
+            raise QuotaExceeded(
+                "评审次数已用完。请兑换 CDK 获得次数，"
+                "或填写自己的 API Key（BYOK）以不受限制使用。"
+            )
+        return
+
+    plan_info = plan_service.get_plan(plan, db)
+    reviews_limit = effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
+    since = _day_ago()
+
+    # 次数闸：查与占位必须是同一条语句，否则并发全部读到同一个旧计数一起放行
+    if _reserve_review_slot(db, user_id, reviews_limit, since):
+        return
+
+    # 日限满了：CDK 次数在这里垫一次。垫出来的这一次不占日名额（它本来就是
+    # "超出日限之后的加量"），所以不再插占位记录。
+    if cdk_service.try_consume_credit(db, user_id):
+        return
+    # 额度是被"未验证"压下来的时候，必须先说这件事：此时用户看到的
+    # "限 1 次"根本不是套餐的真实额度，让他去升级套餐或兑换 CDK 属于误导，
+    # 而他真正要做的（去邮箱点一下激活链接）是免费且立刻生效的。
+    if reviews_limit < plan_info["reviews_per_day"]:
+        raise QuotaExceeded(
+            f"24 小时内评审次数已用完（未验证邮箱的账号每天限 {reviews_limit} 次）。"
+            f"去邮箱点一下激活链接即可解锁 {plan_info['name']} 套餐的"
+            f"每天 {plan_info['reviews_per_day']} 次——没收到可在账户页重新发送。"
+            "也可以填写自己的 API Key（BYOK）以不受限制使用。"
+        )
+    raise QuotaExceeded(
+        f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
+        "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
+    )
+
+
+def check_abuse_ceilings(
+    db: Session, user_id: str, key_source: str = "server", plan: str = "free"
+) -> None:
+    """只跑**与 CDK 余额无关**的那几道全局止血闸，超限同样抛 QuotaExceeded。
+
+    为什么要从 check_quota 里把它们拆出来：游客体验额度（guest_service）那条路
+    需要"跳过 CDK 余额检查"——一个刚铸造的游客从没兑过码，余额恒为 0，
+    两道闸叠着走会让"赠 3 次"从第 1 次就被挡下（见 api/platform.create_review_v2）。
+    但此前的实现是把 **check_quota 整段** 跳掉，于是被一起跳掉的还有：
+      · 终身 token 额度（AL_QUOTA_TOKENS_TOTAL，运营者的钱包上限）；
+      · 24 小时成本硬闸（plan 模式的 cost_usd_per_day）。
+    这两道跟"有没有买过次数"毫无关系，它们保护的是**运营者的钱**，
+    对游客更应该生效——游客花的每一分钱都是平台垫的。
+    所以现在游客只跳过 CDK 余额那一项，止血闸原样跑。
+
+    这里刻意不包含日**次数**名额（_reserve_review_slot）：那是"免费档每天几次"
+    的额度分配，游客自己的 3 次体验额度就是它的替代品，两套叠加等于把赠额
+    再砍一刀；而且占位需要配对的释放路径，游客路径没有那套补偿代码。
+
+    credits 模式下这里只剩终身 token 闸：那个模式本来就没有成本闸
+    （总成本由发码量控制，见 check_quota 的文档）。
+    """
+    if key_source != "server":
+        return
+
     # 终身 token 闸的位置有两层讲究，两层都踩过：
     #   · 在 mode 分支**之前** —— credits 分支自己 return，放在它后面等于
     #     credits 模式完全绕过（而 credits 是推荐给生产的模式）；
@@ -492,31 +603,22 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
     if not _quota_enabled(db):
         return
 
-    from app.services import cdk_service
-
     mode = admin_settings_service.get(db, "quota_mode", settings.quota_mode)
     if mode == "credits":
-        # 查余额和扣减是同一条原子语句——并发请求不可能把余额扣成负数
-        if not cdk_service.try_consume_credit(db, user_id):
-            raise QuotaExceeded(
-                "评审次数已用完。请兑换 CDK 获得次数，"
-                "或填写自己的 API Key（BYOK）以不受限制使用。"
-            )
+        # credits 模式没有成本闸：总成本由发码量控制，唯一的闸就是 CDK 余额，
+        # 而那一项按定义不属于"与余额无关的止血闸"，留给 check_quota。
         return
 
     plan_info = plan_service.get_plan(plan, db)
-    reviews_limit = effective_reviews_limit(db, user_id, plan_info["reviews_per_day"])
     cost_limit = plan_info["cost_usd_per_day"]
 
-    since = _day_ago()
-
-    # 成本硬闸先行：无论有没有次数余额，钱包上限碰到就停
+    # 成本硬闸：无论有没有次数余额，钱包上限碰到就停
     cost = (
         db.query(func.coalesce(func.sum(UsageRecord.cost_usd), 0.0))
         .filter(
             UsageRecord.user_id == user_id,
             UsageRecord.key_source == "server",
-            UsageRecord.created_at >= since,
+            UsageRecord.created_at >= _day_ago(),
         )
         .scalar()
         or 0.0
@@ -527,28 +629,23 @@ def check_quota(db: Session, user_id: str, key_source: str = "byok", plan: str =
             "可升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
         )
 
-    # 次数闸：查与占位必须是同一条语句，否则并发全部读到同一个旧计数一起放行
-    if _reserve_review_slot(db, user_id, reviews_limit, since):
-        return
 
-    # 日限满了：CDK 次数在这里垫一次。垫出来的这一次不占日名额（它本来就是
-    # "超出日限之后的加量"），所以不再插占位记录。
-    if cdk_service.try_consume_credit(db, user_id):
-        return
-    # 额度是被"未验证"压下来的时候，必须先说这件事：此时用户看到的
-    # "限 1 次"根本不是套餐的真实额度，让他去升级套餐或兑换 CDK 属于误导，
-    # 而他真正要做的（去邮箱点一下激活链接）是免费且立刻生效的。
-    if reviews_limit < plan_info["reviews_per_day"]:
-        raise QuotaExceeded(
-            f"24 小时内评审次数已用完（未验证邮箱的账号每天限 {reviews_limit} 次）。"
-            f"去邮箱点一下激活链接即可解锁 {plan_info['name']} 套餐的"
-            f"每天 {plan_info['reviews_per_day']} 次——没收到可在账户页重新发送。"
-            "也可以填写自己的 API Key（BYOK）以不受限制使用。"
-        )
-    raise QuotaExceeded(
-        f"24 小时内评审次数已用完（{plan_info['name']} 套餐限 {reviews_limit} 次）。"
-        "可兑换 CDK 获得加量次数、升级套餐，或填写自己的 API Key（BYOK）以不受限制使用。"
-    )
+def has_spendable_credits(db: Session, user_id: str) -> bool:
+    """这个账号有没有"自己买来、且当前配额配置真的会去消耗"的评审次数。
+
+    只有一个调用方：游客试用额度用完之后，要不要把他放回正常配额链路
+    （见 api/platform.create_review_v2）。判定必须同时满足两件事：
+      · 配额开关是开的 —— quota_enabled=false 时 check_quota 直接放行，
+        无条件落回去就等于"试用用完 = 无限畅玩"，比它要修的那个 bug 更糟；
+      · CDK 余额 > 0 —— 这是他真金白银换来的次数，不让他花才是那个 bug
+        （游客兑了 10 次的码，用完赠送的 3 次后被永久挡住）。
+    """
+    if not _quota_enabled(db):
+        return False
+
+    from app.services import cdk_service
+
+    return cdk_service.credit_balance(db, user_id) > 0
 
 
 # ---------------------------------------------------------------------------

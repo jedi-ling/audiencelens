@@ -1,10 +1,18 @@
+# -*- coding: utf-8 -*-
+# 上面这行不是装饰：pip 读本文件时按 PEP 263 的编码声明解码，没有它的话
+# Windows 上会按系统代码页（中文机器是 GBK）读，遇到下面的中文注释直接
+# UnicodeDecodeError，pip install -r 整个失败。Linux 生产机 locale 是 UTF-8
+# 所以从没暴露过——这是开发机专属的坑。
 fastapi
 uvicorn[standard]
 sqlalchemy
 pyyaml
 pydantic
-anthropic
-httpx
+# 引擎 llm_client 的两个直接依赖，锁上界防止大版本升级悄悄改接口：
+#   anthropic 0.72 起在 3.8/3.11 两个环境都验证过 tool_choice 强制调用与
+#   system 块 cache_control（结构化输出 / Prompt Caching 都依赖它们）。
+anthropic>=0.72.0,<1.0
+httpx>=0.28.1,<1.0
 websockets
 python-multipart
 pypdf

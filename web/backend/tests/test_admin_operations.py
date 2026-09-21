@@ -260,6 +260,86 @@ class TestJobCancel:
         assert "job.cancel" in actions
 
 
+class TestCancelReachesTheBrowser:
+    """取消必须推一个终态 WS 事件出去。
+
+    前端把 review.cancelled 当终态处理（frontend/src/lib/ws.ts 的 TERMINAL），
+    而后端从来不发它：管理员取消一个评审任务后，订阅中的页面永远等不到终态，
+    一直转圈直到重连预算耗尽，然后静默退化成轮询——用户看到的是"卡住了"，
+    而它早就被取消了。这条盯住"事件真的发出去了"。
+    """
+
+    @pytest.fixture
+    def _captured(self, monkeypatch):
+        from app.websocket import manager
+
+        events = []
+        monkeypatch.setattr(
+            manager, "publish_threadsafe", lambda review_id, data: events.append((review_id, data))
+        )
+        return events
+
+    def test_cancelling_a_review_job_broadcasts_review_cancelled(
+        self, client, monkeypatch, db, _captured
+    ):
+        from app.models import Job
+
+        _enable_admin(monkeypatch)
+        j = Job(kind="review", ref_id="ops-cancel-ws", status="queued")
+        db.add(j)
+        db.commit()
+
+        assert client.post(f"/api/admin/jobs/{j.id}/cancel", headers=_headers()).status_code == 200
+
+        assert ("ops-cancel-ws", {"event": "review.cancelled", "data": {"review_id": "ops-cancel-ws"}}) in _captured, (
+            f"取消之后没有推终态事件，订阅中的浏览器会一直转圈：{_captured}"
+        )
+
+    def test_non_review_jobs_do_not_broadcast(self, client, monkeypatch, db, _captured):
+        """别的任务类型没有可订阅的 review_id，往那个频道推等于推给没人听的
+        （或更糟：撞上同名频道）。"""
+        from app.models import Job
+
+        _enable_admin(monkeypatch)
+        j = Job(kind="export", ref_id="ops-cancel-export", status="queued")
+        db.add(j)
+        db.commit()
+
+        client.post(f"/api/admin/jobs/{j.id}/cancel", headers=_headers())
+        assert _captured == []
+
+    def test_backend_level_cancel_also_broadcasts(self, _captured):
+        """另一条取消路径：任务已经进了线程池、但任务体一开始就看到取消标记，
+        由 job_service._finish_job 结算。两条路都必须发事件。"""
+        from app.models import Job
+        from app.services import job_service
+        from app.db import session_scope
+
+        s = session_scope()
+        try:
+            j = Job(kind="review", ref_id="ops-cancel-backend", status="queued")
+            s.add(j)
+            s.commit()
+            job_id = j.id
+        finally:
+            s.close()
+
+        job_service._finish_job(job_id, "cancelled")
+        assert [e for e in _captured if e[0] == "ops-cancel-backend"], (
+            "job_service 这条路径上的取消没有推事件"
+        )
+
+    def test_ws_event_contract_lists_what_the_backend_really_emits(self):
+        """WS_EVENTS 是给前端看的契约。它漏掉过 review.evaluation_completed
+        （后端真的在发）和 review.cancelled（前端真的在等），
+        一份没人维护的契约比没有更糟——它会让下一个人相信它。"""
+        from app.websocket import WS_EVENTS, WS_TERMINAL_EVENTS
+
+        assert "review.evaluation_completed" in WS_EVENTS
+        assert "review.cancelled" in WS_EVENTS
+        assert set(WS_TERMINAL_EVENTS) <= set(WS_EVENTS)
+
+
 class TestJobForceFail:
     def test_force_fail_running_job(self, client, monkeypatch, db):
         from app.models import Job

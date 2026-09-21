@@ -7,12 +7,11 @@ import ipaddress
 import os
 import re
 import socket
-import uuid
 from typing import List, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -21,12 +20,13 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from app.config import settings
-from app.core.errors import AppError, BadRequest, NotFound, Unauthorized
+from app.core.errors import AppError, BadRequest, NotFound, QuotaExceeded, Unauthorized
 from app.core.logging import logger
 from app.core.security import create_token, hash_password, verify_password
 from app.db import get_db
 from app.deps import (
     Identity,
+    current_identity,
     is_shared_anonymous,
     optional_identity,
     probe_identity,
@@ -39,12 +39,14 @@ from app.deps import (
 from app.models import Job, Review, User
 from app.services import (
     admin_settings_service,
+    guest_service,
     intent_service,
     job_service,
     key_service,
     ledger_service,
     plan_service,
     project_memory_service,
+    qq_auth_service,
     quota_service,
     report_gating,
     review_service,
@@ -207,6 +209,165 @@ async def me(identity: Identity = Depends(probe_identity)):
     别的接口遇到失效令牌一律 401，唯独这一条要返回 200 + session_expired=true，
     前端才有机会把烂 token 清掉并提示"登录已过期"（见 deps.probe_identity）。"""
     return identity.to_dict()
+
+
+# ============================== QQ 登录（QQ 互联 OAuth2.0）==============================
+#
+# 三个端点的分工：
+#   GET  /auth/qq/authorize  —— 302 去腾讯授权页（带防 CSRF 的 state）
+#   GET  /auth/qq/callback   —— 腾讯回调这里；换 token→openid→建号，
+#                               再 302 回前端并附一个**一次性交接码**
+#   POST /auth/qq/exchange   —— 前端拿交接码换真正的会话 JWT
+#
+# 为什么多一次 exchange 而不是把 JWT 直接拼进重定向 URL：JWT 有效期 7 天，
+# 拼进 URL 就会留在浏览器历史、Referer 和中间层日志里。交接码 30 秒过期、
+# 用一次即废，泄漏窗口小得多。
+
+
+@router.get("/auth/qq/authorize")
+async def qq_authorize():
+    """跳转到 QQ 授权页。前端只要 window.location = 这个地址。
+
+    同时种下一枚 HttpOnly 的 state nonce Cookie —— 回调时要拿它和 state 配对，
+    证明"完成这次授权的浏览器，就是发起这次授权的那个浏览器"。
+    少了这一步，state 只能证明"这串东西是我们签的"，而这个接口不需要登录，
+    任何人都能来要一个（登录态固定攻击的完整链路见 qq_auth_service 的注释）。
+    """
+    if not settings.qq_login_enabled:
+        raise BadRequest("QQ 登录未配置")
+    state, nonce = qq_auth_service.issue_state()
+    resp = RedirectResponse(qq_auth_service.build_authorize_url(state), status_code=302)
+    qq_auth_service.set_state_cookie(resp, nonce)
+    return resp
+
+
+async def _qq_profile_off_loop(code: str):
+    """三次腾讯 HTTP 调用全部丢到线程池，返回 (openid, nickname)。
+
+    qq_auth_service 里那三个函数用的是**同步** httpx.get，各带 10 秒超时。
+    在 async 路由里直接调，卡住的不是这一个请求，而是**整个事件循环**——
+    DEPLOY-BAREMETAL 规定单 uvicorn worker，于是最坏情况下一次回调能让全站
+    停 30 秒，而 /auth/qq/callback 是**不需要登录就能打**的接口：任何人拿一把
+    垃圾 code 循环打它就是一台拒绝服务开关。
+    这个坑在本仓库已经为 SMTP 修过一次（_send_mail_off_loop），照同一条路修。
+
+    三次调用打包成一个线程任务而不是三次 run_in_threadpool：它们本来就是
+    严格串行的（后一步要用前一步的返回值），分三次只是多两次线程调度。
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    def _blocking():
+        access_token = qq_auth_service.exchange_code_for_token(code)
+        openid = qq_auth_service.fetch_openid(access_token)
+        return openid, qq_auth_service.fetch_nickname(access_token, openid)
+
+    return await run_in_threadpool(_blocking)
+
+
+# 单独分桶（不与 /auth/login 共用 "auth"）：回调是腾讯替用户打过来的，
+# 被刷时不该把这个 IP 的正常登录也一起封掉——同 auth_register 那条的教训。
+@router.get(
+    "/auth/qq/callback",
+    dependencies=[Depends(rate_limit("auth_qq_callback", 20, 3600))],
+)
+async def qq_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    db: Session = Depends(get_db),
+):
+    """QQ 互联后台登记的回调地址就是这一条（.../api/auth/qq/callback）。
+
+    任何失败都 302 回前端并把原因带上——在这里返回 JSON 错误页的话，
+    用户看到的是一坨浏览器直出的机器文本，不知道该干什么。
+    """
+    from app.services import auth_token_service
+
+    front = settings.public_web_url.rstrip("/")
+
+    def _fail(reason: str):
+        from urllib.parse import quote as _q
+        resp = RedirectResponse(f"{front}/login?qq_error={_q(reason)}", status_code=302)
+        # 失败也要清 —— state 的"用一次即废"就是靠销毁 Cookie 这半边秘密实现的，
+        # 只在成功分支清等于给失败后的重放留了一个窗口。
+        qq_auth_service.clear_state_cookie(resp)
+        return resp
+
+    if not settings.qq_login_enabled:
+        return _fail("QQ 登录未配置")
+    # state 校验必须在用 code 之前：这是防 CSRF 的整个意义所在。
+    # 而且必须连 Cookie 一起校验——只验签名的 state 挡不住"攻击者拿自己的
+    # code+state 拼一个回调链接发给受害者"，那会让受害者登进攻击者的账号。
+    nonce = request.cookies.get(qq_auth_service.STATE_COOKIE_NAME, "")
+    if not qq_auth_service.verify_state(state, nonce):
+        return _fail("授权状态校验失败，请重新发起登录")
+    if not code:
+        return _fail("未收到 QQ 授权码（可能是你取消了授权）")
+
+    try:
+        openid, nickname = await _qq_profile_off_loop(code)
+        user, _created = qq_auth_service.find_or_create_user(db, openid, nickname)
+    except qq_auth_service.QQAuthError as exc:
+        logger.warning("QQ 登录失败 | %s", exc)
+        return _fail(str(exc))
+
+    handoff = auth_token_service.issue(
+        db, user.id, auth_token_service.PURPOSE_OAUTH_HANDOFF,
+        qq_auth_service.HANDOFF_TTL_SECONDS,
+    )
+    resp = RedirectResponse(f"{front}/auth/qq?code={handoff}", status_code=302)
+    qq_auth_service.clear_state_cookie(resp)
+    return resp
+
+
+class QQExchangeRequest(BaseModel):
+    code: str
+
+
+@router.post("/auth/qq/exchange", dependencies=[Depends(rate_limit("auth", 20, 3600))])
+async def qq_exchange(body: QQExchangeRequest, db: Session = Depends(get_db)):
+    """一次性交接码 → 会话 JWT。码用过即废（AuthToken.used_at）。"""
+    from app.services import auth_token_service
+
+    user_id = auth_token_service.consume(
+        db, body.code, auth_token_service.PURPOSE_OAUTH_HANDOFF
+    )
+    if not user_id:
+        raise Unauthorized("登录交接码无效或已过期，请重新用 QQ 登录")
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or not user.is_active:
+        raise Unauthorized("账号不存在或已停用")
+    return {
+        "token": issue_session_token(db, user.id),
+        "user": {"id": user.id, "email": user.email, "plan": user.plan},
+    }
+
+
+class BindEmailRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=8)
+
+
+@router.post("/auth/bind-email", dependencies=[Depends(rate_limit("auth", 20, 3600))])
+async def bind_email(
+    body: BindEmailRequest,
+    identity: Identity = Depends(current_identity),
+    db: Session = Depends(get_db),
+):
+    """游客账号原地转正：换真邮箱/真密码，user_id 不变，历史评审/次数原样带过去。
+
+    只对游客账号开放——已经是具名账号的人应该走「改邮箱」而不是这条（此仓库
+    目前没有改邮箱功能，这不在这次的范围内）。转正之后立刻发一封验证邮件，
+    走既有的 verify-email 流程，不另起一套。
+    """
+    try:
+        user = guest_service.bind_email(db, identity.user_id, body.email, body.password)
+    except guest_service.BindEmailError as exc:
+        raise BadRequest(str(exc))
+
+    await _send_verify_email(db, user)
+    token = issue_session_token(db, user.id)
+    return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
 
 # ---------- 邮箱验证 / 忘记密码 ----------
@@ -1275,31 +1436,23 @@ async def redeem_cdk(
     from app.services import cdk_service
 
     guest_token = None
-    guest_user = None
     user_id = identity.user_id
 
+    # 铸造游客身份这段与 create_review_v2 是同一个 guest_service.mint_guest——
+    # 此前这里自己内联了一份几乎一样的代码，两处各改各的迟早会漂移
+    # （比如这次新增的 guest_review_credits 赠额，旧代码就完全没有）。
     if settings.auth_enabled and identity.is_anonymous:
-        import secrets as _secrets
-
-        guest_user = User(
-            email=f"guest-{uuid.uuid4().hex[:12]}@guest.local",
-            password_hash=hash_password(_secrets.token_urlsafe(32)),  # 不可登录
-            display_name="游客",
-            is_guest=True,
-        )
-        db.add(guest_user)
-        db.commit()
-        db.refresh(guest_user)
-        user_id = guest_user.id
-        guest_token = issue_session_token(db, user_id)
+        user_id, guest_token = guest_service.mint_guest(db)
 
     try:
         result = cdk_service.redeem(db, body.code, user_id)
     except cdk_service.CdkError as exc:
         # 兑换失败时回滚刚创建的游客——不给枚举者留下批量制造空账号的口子
-        if guest_user is not None:
-            db.delete(guest_user)
-            db.commit()
+        if guest_token is not None:
+            guest_row = db.query(User).filter(User.id == user_id).first()
+            if guest_row is not None:
+                db.delete(guest_row)
+                db.commit()
         raise BadRequest(str(exc))
 
     resp = {**result, "user_id": user_id}
@@ -1462,6 +1615,7 @@ async def skill_quota(
 )
 async def create_review_v2(
     body: CreateReviewRequest,
+    request: Request,
     identity: Identity = Depends(optional_identity),
     resolved=Depends(resolve_llm_key),  # 无 key → 428，绝不返回模拟数据
     db: Session = Depends(get_db),
@@ -1483,9 +1637,71 @@ async def create_review_v2(
     if persona_pack not in _valid_persona_packs():
         raise BadRequest(f"未知人格包：{persona_pack}")
 
-    quota_service.check_quota(
-        db, identity.user_id, key_source=resolved.source, plan=identity.plan
+    # 共享匿名桶铸造成独立游客身份，赠 3 次体验额度——必须在 check_quota 之前，
+    # 后面所有落库/计费都要用这个真正的 user_id，不能继续算在匿名桶头上。
+    # 铸造本身有独立的每日闸（guest_service.GUEST_MINT_PER_DAY）：身份是免费的，
+    # 不限制铸造次数的话"每个游客 3 次"等于"每个人无限次"。超了直接 429，不铸造。
+    guest_token = None
+    if settings.auth_enabled:
+        identity.user_id, guest_token = guest_service.ensure_individual_identity(
+            db, identity, request
+        )
+
+    # 游客的一次性额度只挡"服务端垫付"的评审——BYOK 用户自己付钱不受限。
+    #
+    # 游客要跳过的**只有 CDK 余额检查**这一项：quota_service.check_quota 在
+    # quota_mode=credits 时会去查 CDK 兑换余额，而一个刚铸造的游客压根没兑换过
+    # CDK，余额恒为 0——两道闸叠在一起，"赠的 3 次"从第 1 次就会被一个完全
+    # 不知情的余额检查挡下，那句话就是空话。
+    # 但此前的写法是把 check_quota **整段**跳掉，于是被一起跳掉的还有终身
+    # token 额度和 24 小时成本硬闸——那两道保护的是运营者的钱包，与"有没有
+    # 买过次数"毫无关系，对平台垫付的游客评审更应该生效。现在拆成两半：
+    # 游客走 check_abuse_ceilings（止血闸照跑），只有 CDK 那一项被跳过。
+    guest_needs_gate = resolved.source == "server" and guest_service.guest_needs_credit_gate(
+        db, identity.user_id
     )
+    guest_gated = guest_needs_gate and guest_service.try_consume_guest_credit(
+        db, identity.user_id
+    )
+
+    if guest_gated:
+        try:
+            quota_service.check_abuse_ceilings(
+                db, identity.user_id, key_source=resolved.source, plan=identity.plan
+            )
+        except QuotaExceeded:
+            # 被止血闸挡下的请求不该白扣掉一次体验额度——"扣了不退"正是本仓库
+            # 反复出现的那类缺陷。顺带把 token 占位放掉：成本闸抛错时，
+            # check_abuse_ceilings 里前一道终身额度占位已经占上了。
+            guest_service.refund_guest_credit(db, identity.user_id)
+            quota_service.release_review_slot(
+                db, identity.user_id, key_source=resolved.source
+            )
+            raise
+    else:
+        # 体验额度用完的游客**不能**在这里直接 raise —— 那正是"兑了 10 次的码
+        # 却永远花不出去"的成因：guest_needs_credit_gate 对 credits=0 同样为真，
+        # 于是他的真实 CDK 余额连被查一眼的机会都没有，redeem_cdk 承诺的
+        # 「无需注册登录」是假的。正确做法是落回正常配额链路。
+        # 但落回去之前必须确认那条链路**真的会为他扣点什么**：quota_enabled=false
+        # 时 check_quota 直接放行，无条件落回等于"试用用完 = 无限畅玩"，
+        # 比它要修的那个 bug 更糟。所以判据是 has_spendable_credits。
+        if guest_needs_gate and not quota_service.has_spendable_credits(db, identity.user_id):
+            raise QuotaExceeded(
+                "游客体验额度（3 次）已用完，账号上也没有可用的评审次数。"
+                "绑定邮箱可继续正常使用并保住已有的评审记录，"
+                "兑换 CDK 可获得次数，或填写自己的 API Key（BYOK）不受此限制。"
+            )
+        try:
+            quota_service.check_quota(
+                db, identity.user_id, key_source=resolved.source, plan=identity.plan
+            )
+        except QuotaExceeded as exc:
+            if not guest_needs_gate:
+                raise
+            # 游客两头都空：试用额度用完了，余额也不够。文案必须把两件事都说到，
+            # 只说其中一件的话，用户会对着"去兑换 CDK"发呆（他刚兑过）。
+            raise QuotaExceeded(f"游客体验额度（3 次）已用完；{exc.message}")
 
     from app.services import apply_skill_hint, skill_quota_service
 
@@ -1539,6 +1755,10 @@ async def create_review_v2(
             provider=resolved.provider,
             model=resolved.model,
             api_base=resolved.api_base,
+            # 落进 job.payload：两条异步失败路径（review_service 的失败分支、
+            # db 的启动收尸）事后只能从这里判断"当初扣的是游客额度还是 CDK 次数"。
+            # 判断错的代价是给游客凭空发一次 CDK 余额，见 enqueue_review 的注释。
+            guest_gated=guest_gated,
         )
     except Exception as exc:
         # 落库与入队要么都成、要么都补偿：check_quota 已经扣过配额
@@ -1559,12 +1779,24 @@ async def create_review_v2(
             except Exception:
                 db.rollback()
         try:
-            quota_service.refund_review_credit(
-                db, identity.user_id, review.id, key_source=resolved.source
-            )
-            quota_service.release_review_slot(
-                db, identity.user_id, key_source=resolved.source
-            )
+            if guest_gated:
+                # CDK 余额那一项被跳过了（见上面的注释），没有 CDK 次数可退——
+                # refund_review_credit 是按 review_id 幂等地"写一条 +1"，
+                # 不是"撤销刚才那条 -1"：真调了它，等于凭空发一次从没被扣过的
+                # CDK 余额。只退我们自己扣的那份游客额度。
+                guest_service.refund_guest_credit(db, identity.user_id)
+                # 止血闸是照跑的（check_abuse_ceilings），终身 token 额度占了
+                # 一笔，这里要放掉，否则它在 TTL 内继续吃着这个身份的额度。
+                quota_service.release_review_slot(
+                    db, identity.user_id, key_source=resolved.source
+                )
+            else:
+                quota_service.refund_review_credit(
+                    db, identity.user_id, review.id, key_source=resolved.source
+                )
+                quota_service.release_review_slot(
+                    db, identity.user_id, key_source=resolved.source
+                )
         except Exception:
             db.rollback()
             logger.exception(
@@ -1584,6 +1816,10 @@ async def create_review_v2(
         # 能力，用户会以为产品本来就这样，这正是本仓库要根除的"静默降级"。
         "skill_degraded": degraded,
         "websocket": f"/ws/review/{review.id}",
+        # 只在这次请求新铸造了游客身份时非空。前端必须存下来（同 CDK 兑换的
+        # guest_token 处理方式）——不存的话下次请求又落回共享匿名桶，这条刚
+        # 发起的评审在用户自己眼里就凭空消失了。
+        "guest_token": guest_token,
     }
 
 
@@ -2117,7 +2353,15 @@ async def verify_judgment(
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
-    """回填真实结果 —— 闭环的另一半。真人测试回来后调这个。"""
+    """回填真实结果 —— 闭环的另一半。真人测试回来后调这个。
+
+    守卫与同一组的其他台账接口一致：共享匿名桶下 user_id 对所有未登录访客
+    相等，service 层那道"判断归属校验"（ledger_service.verify_judgment 里
+    `j.user_id != user_id` 就当不存在）对他们之间形同虚设——任何访客都能给
+    别人的预测盖上"成真了/没成真"的章，而命中率、校准曲线全都建立在这些
+    回填之上。service 层那道检查照旧保留，两层各管一件事。
+    """
+    require_isolated_identity(identity)
     return ledger_service.verify_judgment(
         db, judgment_id, body.verdict, identity.user_id, body.source, body.note
     )
@@ -2211,7 +2455,14 @@ async def record_review_feedback(
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
-    """回填报告是否真正影响决策；同一评审重复提交时更新。"""
+    """回填报告是否真正影响决策；同一评审重复提交时更新。
+
+    与 /validation/metrics 成对：那边读、这边写，读那边早就挂了隔离守卫，
+    写这边漏了。共享匿名桶下 upsert 的键是 (review_id, user_id)，而 user_id
+    对所有未登录访客相等——任何访客都能改写别人对某次评审的反馈，
+    而这些反馈正是 metrics 那些"采用率/付费意愿"数字的来源。
+    """
+    require_isolated_identity(identity)
     data = body.model_dump() if hasattr(body, "model_dump") else body.dict()
     return validation_service.upsert_feedback(db, review_id, identity.user_id, data)
 
