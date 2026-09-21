@@ -2,9 +2,14 @@ version: 0.1.0
 max_cost_per_run_usd: 2.0
 # 真实 Anthropic 模型 ID——早期版本这里写的是 "claude-sonnet" 这种占位别名，
 # 传给 Anthropic API 会直接 404。见 src/runner/llm_client.py 的调用点。
-default_model: claude-sonnet-4-20250514
+#
+# 2026-09-14 核对 platform.claude.com/docs/en/about-claude/pricing 与 models/overview：
+# Sonnet 4 / Opus 4 已在官方 API **退役**（只剩 Bedrock/Google Cloud 还挂着），
+# 继续写它们等于默认配置在官方端点上打不通。4.6 代起模型 ID 不带日期后缀，
+# 无日期 ID 本身就是固定快照。BYOK 用户填自己的 ID 即可覆盖这里的默认值。
+default_model: claude-sonnet-5
 fallback_model: claude-haiku-4-5-20251001
-premium_model: claude-opus-4-20250514
+premium_model: claude-opus-5
 # 不在下面 model_pricing 里的模型按这个价估（比如 BYOK 用户或后台配的第三方
 # OpenAI 兼容模型）。**不能留空或按 0 算**：成本恒 0 会让 quota_service 的
 # 24 小时成本硬闸永远不触发、后台成本面板恒显示 $0，且完全静默。
@@ -13,10 +18,31 @@ premium_model: claude-opus-4-20250514
 unknown_model_pricing:
   input_per_mtok: 15.0
   output_per_mtok: 75.0
+# 单价核对于 2026-09-14（官方定价页）。Sonnet 5 的 $2/$10 原是限时价，官方已
+# 宣布转为正式价，不再上调。缓存读写的倍率（写 1.25x / 读 0.1x）不在这里配——
+# 它是 persona_agent.CACHE_WRITE/READ_PRICE_MULTIPLIER 里的常量，只在算钱那一步
+# 生效。llm_client 返回的 input_tokens 是**真实 token 数**（落库当用量统计用），
+# 不要再把折扣折进 token 数里：那样缓存命中的 token 在用量面板上会凭空少 90%。
 model_pricing:
   claude-haiku-4-5-20251001:
     input_per_mtok: 1.0
     output_per_mtok: 5.0
+  claude-haiku-4-5:
+    input_per_mtok: 1.0
+    output_per_mtok: 5.0
+  claude-sonnet-5:
+    input_per_mtok: 2.0
+    output_per_mtok: 10.0
+  claude-opus-5:
+    input_per_mtok: 5.0
+    output_per_mtok: 25.0
+  # 上一代仍可能被 BYOK 用户手填（Bedrock/GCP 上还在），留着让成本算得准
+  claude-sonnet-4-6:
+    input_per_mtok: 3.0
+    output_per_mtok: 15.0
+  claude-sonnet-4-5-20250929:
+    input_per_mtok: 3.0
+    output_per_mtok: 15.0
   claude-sonnet-4-20250514:
     input_per_mtok: 3.0
     output_per_mtok: 15.0

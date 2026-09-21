@@ -16,6 +16,7 @@ from runner.cli import (
     run_single_persona,
     truncate_panel,
 )
+from runner.persona_agent import estimate_cost
 from src import cli as audiencelens_cli
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -183,7 +184,7 @@ class TestRunSinglePersona:
         )
         assert result["persona_id"] == "P01-indie-core-operator"
         assert result["prompt"] != ""
-        assert result["model"] == "claude-sonnet-4-20250514"
+        assert result["model"] == "claude-sonnet-5"
         assert result["cost"] == 0.0
         assert result["error"] is None
         assert result["output"] is not None
@@ -200,6 +201,77 @@ class TestRunSinglePersona:
         assert "P01-indie-core-operator" in result["prompt"]
         assert "concept_review" in result["prompt"]
 
+    def test_shared_material_is_sent_as_system_for_caching(self, sample_persona, budget_config, monkeypatch):
+        """本次改动的核心：run_single_persona 必须把同一评审所有人格共享的部分
+        通过 system= 传给 chat_completion，而不是拼进 prompt 里一起发——否则
+        llm_client 那边的 cache_control/前缀缓存就是接了根没插电的线。"""
+        captured = {}
+
+        def fake(**kwargs):
+            captured.update(kwargs)
+            return ("{}", 10, 5)
+
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+
+        run_single_persona(
+            persona=sample_persona,
+            task_type="concept_review",
+            artifact_summary="某独立游戏概念文档",
+            artifact_texts=["游戏核心循环是探索-战斗-成长"],
+            config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
+            api_key="sk-test-not-real",
+        )
+
+        assert captured.get("system"), "system 参数没传或传了空值"
+        assert "concept_review" in captured["system"]
+        # 人格身份必须留在 prompt 里，不能混进 system——混进去就不再是"所有人格
+        # 逐字相同"的共享前缀了，缓存直接失效
+        assert "P01-indie-core-operator" not in captured["system"]
+        assert "P01-indie-core-operator" in captured["prompt"]
+
+    def test_output_schema_is_forwarded_for_structured_output(self, sample_persona, budget_config, monkeypatch):
+        """有 schema 时必须把它原样传给 chat_completion 的 json_schema，
+        否则 llm_client 那边的强制工具调用/json_object 根本不会启用，
+        解析失败整次重发的老问题原封不动。"""
+        captured = {}
+
+        def fake(**kwargs):
+            captured.update(kwargs)
+            return ("{}", 10, 5)
+
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+        schema = {"type": "object", "required": ["primary_stance"], "properties": {}}
+
+        run_single_persona(
+            persona=sample_persona,
+            task_type="concept_review",
+            artifact_summary="某独立游戏概念文档",
+            artifact_texts=["游戏核心循环是探索-战斗-成长"],
+            config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
+            api_key="sk-test-not-real",
+            output_schema=schema,
+        )
+
+        assert captured["json_schema"] is schema
+
+    def test_no_schema_means_no_structured_output_request(self, sample_persona, budget_config, monkeypatch):
+        captured = {}
+
+        def fake(**kwargs):
+            captured.update(kwargs)
+            return ("{}", 10, 5)
+
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+        run_single_persona(
+            persona=sample_persona,
+            task_type="concept_review",
+            artifact_summary="某独立游戏概念文档",
+            artifact_texts=["游戏核心循环是探索-战斗-成长"],
+            config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
+            api_key="sk-test-not-real",
+        )
+        assert captured["json_schema"] is None
+
     def test_model_selection(self, sample_persona, budget_config):
         os.environ.pop("ANTHROPIC_API_KEY", None)
         result = run_single_persona(
@@ -209,7 +281,7 @@ class TestRunSinglePersona:
             artifact_texts=["游戏核心循环是探索-战斗-成长"],
             config={"budget": budget_config, "persona_prompt_path": PERSONA_PROMPT_PATH},
         )
-        assert result["model"] == "claude-sonnet-4-20250514"
+        assert result["model"] == "claude-sonnet-5"
 
     def test_model_selection_haiku(self, budget_config):
         os.environ.pop("ANTHROPIC_API_KEY", None)
@@ -877,6 +949,68 @@ def _panel(**overrides):
     )
     kwargs.update(overrides)
     return run_panel(**kwargs)
+
+
+class TestTriageIsBilled:
+    """L1 初筛的钱必须进 total_cost。
+
+    它的 token 一直记在 cost_summary.triage_*，但**成本**以前一分钱都没加进
+    total_cost，而 web 后端只按 total_cost 计费——开着 wide_screen 就等于
+    白送一整轮全包调用。本文件 run_cross_exam_stage 的注释把这类问题叫计费漏洞。
+    """
+
+    @staticmethod
+    def _persona_reply() -> str:
+        # 去掉身份字段，让 run_single_persona 用真实人格回填（本测试不关心是谁）
+        payload = json.loads(_llm_json("PLACEHOLDER"))
+        payload.pop("persona_id")
+        payload.pop("persona_name")
+        return json.dumps(payload, ensure_ascii=False)
+
+    def test_wide_screen_triage_cost_is_added_to_total_cost(self, monkeypatch):
+        triage_calls = []
+
+        def fake(**kwargs):
+            prompt = kwargs["prompt"]
+            if "这是**初筛**" in prompt:
+                triage_calls.append(prompt)
+                # 初筛答案：立场轮换制造分歧，门禁才有东西可排
+                stance = "看好" if len(triage_calls) % 2 else "不看好"
+                return (
+                    json.dumps({"stance": stance, "severity": "high", "top_concern": "上手门槛"},
+                               ensure_ascii=False),
+                    1000, 100,
+                )
+            # 深评一律记 0 token：这样 total_cost 里剩下的就只有初筛那一笔，
+            # 可以硬断言"初筛的钱确实被算进去了"，而不是"总额看起来大一点"。
+            return (self._persona_reply(), 0, 0)
+
+        monkeypatch.setattr(runner_cli, "chat_completion", fake)
+        result = _panel(
+            artifact_bundle=_rich_bundle(),
+            api_key="sk-test-not-real",
+            mode="quick",
+            wide_screen=True,
+            enable_cross_exam=False,
+        )
+
+        assert triage_calls, "wide_screen 开着却一次初筛调用都没发"
+        cs = result["cost_summary"]
+        budget = yaml.safe_load(open(BUDGET_PATH, encoding="utf-8"))
+        expected = estimate_cost(
+            cs["triage_input_tokens"], cs["triage_output_tokens"],
+            budget["fallback_model"], budget,
+        )
+        assert expected > 0
+        assert cs["triage_cost"] == pytest.approx(expected)
+        # 深评 0 token、交叉质询关着 —— 总额就该等于初筛这一笔
+        assert cs["total_cost"] == pytest.approx(expected)
+
+    def test_simulated_triage_costs_nothing(self):
+        """没有 key 的模拟模式一次调用都不发，初筛成本必须是 0，不能凭空记账。"""
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        result = _panel(artifact_bundle=_rich_bundle(), mode="quick", wide_screen=True)
+        assert result["cost_summary"]["triage_cost"] == 0.0
 
 
 class TestPanelFailureIsNeverSilent:
@@ -1579,3 +1713,56 @@ class TestMain:
                 main()
         finally:
             sys.argv = original_argv
+
+
+class TestPanelFillsToModeCapacity:
+    """档位承诺的人数必须真的兑现，兜底选人必须如实披露。
+
+    上线后才发现的结构性缺陷：预设的 default_personas 写的全是 game-core 的
+    人格 id，另外 10 个包一个都匹配不上 → 亲和度兜底只填到 min_panel_size(4)
+    就收手（min 是"下限"，被当成"填充目标"用了）。于是"标准档最多 6 位人格"
+    这句话对 10/11 的人格包从来没兑现过，恒定只有 4 位，且没有任何提示。
+
+    这里用 game-core + product_feedback_review 这组来验证：它的预设名单同样
+    在 game-core 里一个都命中不了（走 affinity_fallback），但人格本身能通过
+    模拟模式的校验——把"选人逻辑"与"模拟输出能否过校验"这两件事分开测。
+    各人格包 × 各档位的人数矩阵在 tests/test_panel_selector.py 里逐个钉住——
+    这里不重复断言人数：report 里的 persona_notes 数的是"通过校验的人格"，
+    模拟模式下占位输出会被 role_drift/hallucination 规则拦掉大半，
+    拿它当"选了几个人"来断言是在测验证器而不是测选人。
+    """
+
+    FALLBACK_TASK = "product_feedback_review"
+
+    def _run(self, bundle, task_type, mode):
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        return run_panel(
+            task_type=task_type,
+            artifact_bundle=bundle,
+            personas_path=PERSONAS_PATH,
+            presets_path=PRESETS_PATH,
+            rules_path=RULES_PATH,
+            budget_path=BUDGET_PATH,
+            output_schema_path=OUTPUT_SCHEMA_PATH,
+            report_schema_path=REPORT_SCHEMA_PATH,
+            persona_prompt_path=PERSONA_PROMPT_PATH,
+            cross_exam_prompt_path=CROSS_EXAM_PROMPT_PATH,
+            report_template_path=REPORT_TEMPLATE_PATH,
+            mode=mode,
+        )
+
+    def test_affinity_fallback_is_disclosed(self, sample_artifact_bundle):
+        """兜底选出来的面板和策展过的面板是两种可信度，报告必须说出来。"""
+        result = self._run(sample_artifact_bundle, self.FALLBACK_TASK, "standard")
+        panel_selection = result["report"].get("panel_selection") or {}
+        assert panel_selection.get("selection_method") == "affinity_fallback"
+        assert "亲和度" in (panel_selection.get("notice") or ""), (
+            "按亲和度现凑的面板必须在报告里如实说明，不能让用户以为是策展过的"
+        )
+
+    def test_curated_panel_does_not_emit_fallback_notice(self, sample_artifact_bundle):
+        """concept_review 的预设在 game-core 里是真命中的，不该被误标成兜底。"""
+        result = self._run(sample_artifact_bundle, "concept_review", "standard")
+        panel_selection = result["report"].get("panel_selection") or {}
+        assert panel_selection.get("selection_method") != "affinity_fallback"
+        assert "亲和度" not in (panel_selection.get("notice") or "")

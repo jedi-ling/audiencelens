@@ -682,3 +682,61 @@ class TestPackDetection:
 
         card = _minify_persona(_real_pack("game-core")[0])
         assert "_pack" not in card
+
+
+class TestFillTowardModeTarget:
+    """档位的人数上限必须真的能凑满——这是一个上线后才发现的结构性缺陷。
+
+    病灶：预设的 default_personas 写的全是 game-core 的人格 id（P01/P02/P04…），
+    而另外 10 个包的 id 完全是另一批（P46…/P54…/P21…）。于是除 game-core 外的
+    每一个包，预设名单一个都匹配不上 → 全数 skip → 亲和度兜底只填到
+    min_panel_size(4) 就收手（min 的语义是"下限"，被当成"填充目标"用了）。
+    结果：界面上写着"标准档最多 6 位人格"，实际恒定 4 位；full 档承诺 8 位，
+    同样只有 4 位——档位这个付费旋钮对 10/11 的人格包完全失效，且毫无提示。
+    """
+
+    # (包名, 池子人数)。只取池子 >= 6 的包：小包凑不满是如实结果，不是缺陷。
+    BIG_PACKS = [("game-core", 17), ("general-consumer", 8), ("startup-panel", 8), ("mobile-f2p", 7)]
+
+    @pytest.mark.parametrize("pack_name,pool_size", BIG_PACKS)
+    def test_fills_toward_target_on_every_pack(self, pack_name, pool_size):
+        personas = _real_pack(pack_name)
+        for target in (6, 8):
+            result = select_panel(
+                "concept_review", personas, REAL_PRESETS, pack=pack_name, target_size=target
+            )
+            expected = min(target, pool_size)
+            assert len(result["selected"]) == expected, (
+                f"{pack_name} 池子 {pool_size} 人、目标 {target} 人，"
+                f"应凑到 {expected} 人，实际只有 {len(result['selected'])} 人"
+            )
+
+    def test_target_never_exceeds_preset_max_panel_size(self):
+        """档位允许 8 人 ≠ 任何任务类型都该硬凑到 8 人。
+        max_panel_size 是这个任务类型的策展判断，必须压过档位。"""
+        preset = REAL_PRESETS["looking_for_party_post"]
+        max_size = preset["max_panel_size"]
+        result = select_panel(
+            "looking_for_party_post",
+            _real_pack("game-core"),
+            REAL_PRESETS,
+            pack="game-core",
+            target_size=99,
+        )
+        assert len(result["selected"]) <= max_size
+
+    def test_target_never_drops_below_min_panel_size(self):
+        """quick 档（3 人）不该把面板压到预设下限以下——档位截断是 cli
+        truncate_panel 的职责，选人阶段先按下限凑齐，保证截断有得可截。"""
+        result = select_panel(
+            "concept_review", _real_pack("general-consumer"), REAL_PRESETS,
+            pack="general-consumer", target_size=1,
+        )
+        assert len(result["selected"]) >= REAL_PRESETS["concept_review"]["min_panel_size"]
+
+    def test_omitting_target_keeps_legacy_floor_behaviour(self):
+        """不传 target_size 的老调用方行为不变（凑到 min_panel_size 即止）。"""
+        result = select_panel(
+            "concept_review", _real_pack("general-consumer"), REAL_PRESETS, pack="general-consumer"
+        )
+        assert len(result["selected"]) == REAL_PRESETS["concept_review"]["min_panel_size"]

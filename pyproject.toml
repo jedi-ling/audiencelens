@@ -7,7 +7,11 @@ name = "audiencelens"
 version = "0.3.0"
 description = "Multi-Agent Cross-Examination Framework for Synthetic Audience Review"
 readme = "README.md"
-requires-python = ">=3.8"
+# 与生产一致（web/backend/Dockerfile: python:3.11-slim；DEPLOY-BAREMETAL.md 装 python3.11）。
+# 此前写 >=3.8 只是因为某台开发机上装的是 3.8——3.8 在 2024-10 已 EOL，cryptography
+# 等依赖正在陆续放弃它，而 src/runner/llm_client.py 头部记载的"因为 3.8 装不上
+# litellm 才手搓客户端"也是这个约束绑架架构决策的例子。开发机请用 3.11（.claude/launch.json 已切）。
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "熵呓工作室"}
@@ -18,6 +22,10 @@ dependencies = [
     "jinja2>=3.1",
     "rich>=13.0",
     "click>=8.1",
+    # 引擎的模型出口 src/runner/llm_client.py 直接依赖这两个；以前只写在
+    # requirements.txt 里，pip install . 装出来的包缺它们、一跑评审就 ImportError。
+    "anthropic>=0.72.0,<1.0",
+    "httpx>=0.28.1,<1.0",
 ]
 
 [project.scripts]
@@ -41,4 +49,17 @@ where = ["."]
 include = ["src*"]
 
 [tool.setuptools.package-data]
-src = ["templates/*", "schemas/*", "config/*", "presets/*", "personas/*"]
+# 必须用 ** 递归通配：setuptools 的 glob **不递归**，"templates/*" 匹配不到
+# templates/assets/logo.png（aggregator._logo_data_uri 要读它），"personas/*"
+# 匹配不到 personas/en-US/ 下的英文人格包，两者都会在 wheel 里凭空消失——
+# 装出来的包跑起来才发现报告没有 logo、英文包一个人格都选不出来。
+# harness/thresholds.yaml 则是从头到尾没被任何一条模式覆盖过（harness 是代码
+# 目录，.py 由 packages.find 收，但 .yaml 不是 Python 文件，得单独点名）。
+src = [
+    "templates/**/*",
+    "schemas/**/*",
+    "config/**/*",
+    "presets/**/*",
+    "personas/**/*",
+    "harness/*.yaml",
+]

@@ -364,6 +364,80 @@ def render_prompt(
     return content
 
 
+def render_prompt_split(
+    persona: dict,
+    task_type: str,
+    artifact_summary: str,
+    template_dir: str,
+    artifact_bundle: dict = None,
+):
+    """render_prompt 的可缓存版本：拆成 (shared, user) 两段而不是拼成一个整体。
+
+    shared —— 同一次评审里对**所有人格逐字相同**的固定前缀（任务类型/评审材料/
+    评分口径/输出骨架等，唯一变量只有 task_type 和材料，跟具体哪位人格无关）。
+    调用方把它整段传给 llm_client.chat_completion 的 system 参数：Anthropic 路径
+    打 cache_control 走 Prompt Caching（第 2 次起命中缓存只按 10% 计费），OpenAI
+    兼容路径放进消息列表最前面吃第三方的隐式前缀缓存折扣——一次 full 评审 6-8
+    位人格重复发送同一份材料，这是目前最大的一笔重复计费。
+
+    user —— 人格专属部分（persona 卡 + 这位人格必答的问题），永远跟着变，不进
+    共享块。返回值同 render_prompt：纯字符串，除非带图片材料则是内容块列表——
+    图片必须留在这一段，Anthropic 的 system 参数只接受纯文本块，不能带图片。
+
+    绝不能把任何 persona 相关字段（persona_id/persona_name/persona_yaml 等）
+    混进 shared 的渲染变量里：混进去一个字，每位人格的 shared 文本就不再逐字
+    相同，缓存永远 miss，白白多算一次"可能命中"的期望而已。
+
+    与 render_prompt（未拆分版）相比：两者共享同一套 Jinja2/Handlebars 渲染
+    逻辑与模板变量语义，只是从两个不同的模板文件里各读各的一半。render_prompt
+    本身保持不变，供 src/cli.py 等历史调用方继续使用。
+    """
+    shared_path = os.path.join(template_dir, "persona-prompt-shared.md")
+    user_path = os.path.join(template_dir, "persona-prompt-user.md")
+
+    with open(shared_path, "r", encoding="utf-8") as f:
+        shared_template_str = _convert_handlebars_to_jinja2(f.read())
+    with open(user_path, "r", encoding="utf-8") as f:
+        user_template_str = _convert_handlebars_to_jinja2(f.read())
+
+    mbti = persona.get("mbti", "")
+    persona_name = persona.get("name", "")
+    must_comment_on_items = persona.get("review_output", {}).get("must_comment_on", [])
+    decision_rules = persona.get("decision_rules", [])
+    primary_decision_rule = decision_rules[0] if decision_rules else ""
+
+    all_materials = []
+    if artifact_bundle:
+        all_materials = artifact_bundle.get("materials", [])
+    artifact_materials = [m for m in all_materials if m.get("type") != "image"]
+    image_materials = [m for m in all_materials if m.get("type") == "image" and m.get("image_data")]
+
+    shared_prompt = Template(shared_template_str).render(
+        task_type=task_type,
+        artifact_summary=artifact_summary,
+        artifact_materials=artifact_materials,
+        stance_enum_line=_render_stance_line(task_type),
+        score_rubric_block=_render_score_rubric(task_type),
+        scores_skeleton=_render_scores_skeleton(task_type),
+    )
+
+    user_text = Template(user_template_str).render(
+        persona_yaml_minified=_minify_persona(persona),
+        mbti=mbti,
+        persona_name=persona_name,
+        must_comment_on_items=must_comment_on_items,
+        primary_decision_rule=primary_decision_rule,
+    )
+
+    if not image_materials:
+        return shared_prompt, user_text
+
+    user_content = [{"type": "text", "text": user_text}]
+    for m in image_materials:
+        user_content.append({"type": "image_url", "image_url": {"url": m["image_data"]}})
+    return shared_prompt, user_content
+
+
 def parse_persona_output(raw_output: str) -> dict:
     json_match = re.search(r"```json\s*(.*?)\s*```", raw_output, re.DOTALL)
     if json_match:
@@ -856,12 +930,52 @@ def resolve_model_pricing(model: str, budget_config: dict):
     )
 
 
+# Anthropic Prompt Caching 的**计费**倍率（官方 5 分钟 TTL）：首次写入按 1.25 倍
+# 全价、命中读取按 0.1 倍全价。
+#
+# 不变式：倍率只在这一层（算钱）生效。llm_client 返回的 input_tokens 必须保持
+# "真实 token 数"——那个数字会被 web 后端原样落库，终身 token 上限和后台用量面板
+# 都读它；把折扣折进 token 数会让命中缓存的 1000 个 token 在用量统计里变成 100 个。
+# 反过来，算钱时若忽略折扣，缓存省下的钱在账单上就体现不出来。两头都要对。
+CACHE_WRITE_PRICE_MULTIPLIER = 1.25
+CACHE_READ_PRICE_MULTIPLIER = 0.1
+
+
+def billable_input_tokens(input_tokens: int, cache_breakdown: dict = None) -> float:
+    """把真实 input token 数折算成**计费等价** token 数。
+
+    cache_breakdown 就是 llm_client.chat_completion 的 usage_details 出参
+    （uncached_input_tokens / cache_creation_input_tokens / cache_read_input_tokens）。
+    为空（非 Anthropic 路径、没开缓存、或从数据库读历史用量重算）时原样返回，
+    等于按满价算——宁可高估，不会让成本闸失灵。
+    """
+    if not cache_breakdown:
+        return float(input_tokens)
+    creation = float(cache_breakdown.get("cache_creation_input_tokens") or 0)
+    read = float(cache_breakdown.get("cache_read_input_tokens") or 0)
+    uncached = cache_breakdown.get("uncached_input_tokens")
+    if uncached is None:
+        uncached = float(input_tokens) - creation - read
+    uncached = max(0.0, float(uncached))
+    return (
+        uncached
+        + creation * CACHE_WRITE_PRICE_MULTIPLIER
+        + read * CACHE_READ_PRICE_MULTIPLIER
+    )
+
+
 def estimate_cost_detailed(
-    input_tokens: int, output_tokens: int, model: str, budget_config: dict = None
+    input_tokens: int,
+    output_tokens: int,
+    model: str,
+    budget_config: dict = None,
+    cache_breakdown: dict = None,
 ):
     """同 estimate_cost，但一并返回「这个价格是查表查到的还是估的」。
 
     需要如实标注成本可信度的地方（后台面板、成本闸的告警文案）用这个。
+
+    cache_breakdown：见 billable_input_tokens。不传 = 按满价算。
     """
     if budget_config is None:
         # 相对路径 "src/config/budget.yaml" 只对"恰好在仓库根目录启动"的进程有效——
@@ -872,16 +986,23 @@ def estimate_cost_detailed(
             budget_config = yaml.safe_load(f)
 
     input_price, output_price, priced = resolve_model_pricing(model, budget_config)
-    cost = (input_tokens / 1_000_000) * input_price + (
+    billable_in = billable_input_tokens(input_tokens, cache_breakdown)
+    cost = (billable_in / 1_000_000) * input_price + (
         output_tokens / 1_000_000
     ) * output_price
     return cost, priced
 
 
 def estimate_cost(
-    input_tokens: int, output_tokens: int, model: str, budget_config: dict = None
+    input_tokens: int,
+    output_tokens: int,
+    model: str,
+    budget_config: dict = None,
+    cache_breakdown: dict = None,
 ) -> float:
-    cost, _priced = estimate_cost_detailed(input_tokens, output_tokens, model, budget_config)
+    cost, _priced = estimate_cost_detailed(
+        input_tokens, output_tokens, model, budget_config, cache_breakdown
+    )
     return cost
 
 
@@ -890,10 +1011,13 @@ def select_model(persona: dict, budget_config: dict) -> str:
     那种字符串传给 Anthropic API 会直接 404，见 budget.yaml 历史遗留的写法）。"""
     model_hint = persona.get("model_hint")
     if model_hint:
+        # 字面量兜底与 budget.yaml 保持一致（Sonnet 4 / Opus 4 已在官方 API 退役，
+        # 见该文件头部注释）。正常情况下 budget.yaml 一定有这三个键，兜底只防
+        # 调用方传了个残缺的 budget_config。
         model_map = {
             "haiku": budget_config.get("fallback_model", "claude-haiku-4-5-20251001"),
-            "sonnet": budget_config.get("default_model", "claude-sonnet-4-20250514"),
-            "opus": budget_config.get("premium_model", "claude-opus-4-20250514"),
+            "sonnet": budget_config.get("default_model", "claude-sonnet-5"),
+            "opus": budget_config.get("premium_model", "claude-opus-5"),
         }
         return model_map.get(model_hint, f"claude-{model_hint}")
-    return budget_config.get("default_model", "claude-sonnet-4-20250514")
+    return budget_config.get("default_model", "claude-sonnet-5")

@@ -1,3 +1,4 @@
+import base64
 import math
 import os
 import re
@@ -9,6 +10,25 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from runner.validator import MAX_INFERRED_RATIO, check_identity_behavior_decoupling
+
+# 导出件（HTML/Markdown）里的 logo，读一次缓存住——每次渲染都重新读文件+base64
+# 编码是纯浪费，这张图片在进程生命周期里不会变。用 data URI 而不是外链路径，
+# 是因为导出件要脱离本站单独存在（下载后发给同事、离线打开），链接到本站资源
+# 在那种场景下就是死链。
+_LOGO_DATA_URI: Optional[str] = None
+
+
+def _logo_data_uri() -> str:
+    global _LOGO_DATA_URI
+    if _LOGO_DATA_URI is None:
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "templates", "assets", "logo.png")
+        try:
+            with open(logo_path, "rb") as f:
+                _LOGO_DATA_URI = "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
+        except OSError:
+            # 图片没打包进来也不该让整份报告渲染失败——退回空串，模板按空值不出图。
+            _LOGO_DATA_URI = ""
+    return _LOGO_DATA_URI
 
 try:
     from .similarity import get_issue_similarity
@@ -733,6 +753,10 @@ def render_markdown_report(report: dict, template_path: str) -> str:
         "triage": report.get("triage"),
         "predictions": report.get("predictions", []),
         "project_memory": report.get("project_memory"),
+        # logo **只给 HTML**，不进 Markdown：这张图是 ~21KB 的 base64 data URI，
+        # 塞进 .md 等于给每一行 reviews.report_markdown 和每一次导出都加 21KB
+        # 死重量；而 Markdown 渲染器（GitHub、多数编辑器）出于安全普遍拒绝
+        # data: 图片，加了也是个破图。HTML 导出件要脱站离线打开，那里才需要它。
     }
 
     return template.render(**context)
@@ -848,6 +872,7 @@ def render_html_report(report: dict, template_path: str) -> str:
         "triage": report.get("triage"),
         "predictions": report.get("predictions", []),
         "project_memory": report.get("project_memory"),
+        "logo_data_uri": _logo_data_uri(),
     }
 
     return template.render(**context)

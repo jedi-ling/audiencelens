@@ -15,6 +15,7 @@
   .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--border)}
   .brand{display:flex;align-items:center;gap:10px}
   .brand-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--magenta));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:14px;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.3)}
+  .brand-icon-img{background:none;object-fit:contain;padding:2px}
   .brand-text{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:1px;color:var(--text)}
   .brand-text span{color:var(--accent)}
   .synthetic-chip{font-family:var(--font-mono);font-size:14px;color:var(--red);border:1px solid rgba(255,71,87,0.3);padding:3px 10px;border-radius:20px;background:rgba(255,71,87,0.06);letter-spacing:0.5px}
@@ -233,6 +234,22 @@
   .compliance-ai-notice{margin-top:16px;padding:12px 18px;background:rgba(255,71,87,0.05);border:1px solid rgba(255,71,87,0.15);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--red);display:flex;align-items:center;gap:8px}
   .compliance-ai-notice::before{content:'\26A0';font-size:14px}
   @media(max-width:640px){.container{padding:20px 12px 60px}.post-header{padding:24px 18px 20px}.post-title{font-size:22px}.summary-hud{grid-template-columns:1fr}.comment-top{flex-wrap:wrap}.scores-grid{grid-template-columns:1fr 1fr}.fix-table{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}.fix-table th,.fix-table td{padding:8px}.triggers-row{flex-direction:column}.debate-sides{grid-template-columns:1fr}.debate-side.pro{border-right:none;border-bottom:1px solid var(--border)}.compliance-body{grid-template-columns:1fr}.round-indicator{flex-wrap:wrap}.round-step{min-width:calc(50% - 2px)}.round-connector{display:none}.vote-change-item{flex-wrap:wrap}}
+  /* 「浏览器打印生成 PDF」的专用样式。原页面是深色主题——原样打印会整页黑底
+     铺满，要么被浏览器默认策略吞掉背景色变成白底白字看不见，要么真按深色印
+     出来废掉一墨盒。打印场景要的是"能读、省墨"，不是还原网页视觉效果。 */
+  @media print{
+    body::before,body::after{display:none}
+    body{background:#fff;color:#1a1a1a}
+    .container{max-width:100%;padding:16px 8px}
+    .post-header,.hud-card,.section-card,.compliance-steps-block{background:#fff;border-color:#ccc;box-shadow:none}
+    .post-header::before,.post-header::after{display:none}
+    .post-title,.section-title,.brand-text,.hud-value.rec{color:#1a1a1a}
+    .post-meta,.hud-label,.compliance-steps-label,.point-list li{color:#444}
+    .post-badge::before{animation:none}
+    .hud-value.risk-critical{animation:none}
+    .section-card,.post-header,.hud-card{break-inside:avoid}
+    a{color:#1a1a1a;text-decoration:underline}
+  }
 </style>
 </head>
 <body>
@@ -241,7 +258,11 @@
   <!-- Top Bar -->
   <div class="top-bar">
     <div class="brand">
+      {% if logo_data_uri %}
+      <img class="brand-icon brand-icon-img" src="{{logo_data_uri}}" alt="AudienceLens">
+      {% else %}
       <div class="brand-icon">AL</div>
+      {% endif %}
       <div class="brand-text">Audience<span>Lens</span></div>
     </div>
     <div class="synthetic-chip">AI 模拟评审 · 非真人数据</div>

@@ -26,7 +26,9 @@
    ——用模型选人等于把"选谁"也变成不可复现的黑箱。
 """
 
+import concurrent.futures
 import json
+import os
 import re
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -201,34 +203,70 @@ def run_triage(
     task_type: str,
     artifact_bundle: dict,
     call_llm: Optional[Callable[[str], Tuple[str, int, int]]] = None,
+    max_concurrency: Optional[int] = None,
 ) -> dict:
     """跑全包初筛。call_llm=None 即模拟模式（与主流程的 simulation 判定一致，
     由调用方决定）。call_llm 接收 prompt，返回 (文本, input_tokens, output_tokens)
     ——模型选择、key、provider 全部由调用方闭包掉，本模块不碰凭据。
+
+    max_concurrency：并发上限，与人格深评共用同一个旋钮（cli.run_panel 传进来，
+    默认读 AUDIENCELENS_MAX_CONCURRENCY）。
     """
     results: List[dict] = []
     failures: List[dict] = []
     truncated_any = False
     total_in = total_out = 0
 
-    for i, persona in enumerate(personas):
-        if call_llm is None:
-            results.append(simulated_triage(persona, i))
-            continue
+    # 模拟模式没有任何 I/O，原地串行生成，不为了对称白开线程池
+    if call_llm is None:
+        return {
+            "results": [simulated_triage(p, i) for i, p in enumerate(personas)],
+            "failures": failures,
+            "materials_truncated": False,
+            "material_char_limit": TRIAGE_MATERIAL_CHARS,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        }
+
+    prompts = []
+    for persona in personas:
         prompt, truncated = build_triage_prompt(persona, task_type, artifact_bundle)
         truncated_any = truncated_any or truncated
+        prompts.append(prompt)
+
+    def _screen_one(persona: dict, prompt: str) -> dict:
+        """单人初筛。**不碰任何共享状态**——token 数和成败都放进返回值，
+        由主线程汇总。这样并发路径一把锁都不需要，也就不存在 `+=` 丢计数的问题。"""
         try:
             raw, tin, tout = call_llm(prompt)
-            total_in += tin
-            total_out += tout
         except Exception as e:  # 单个人格初筛失败不拖垮整层——如实记失败
-            failures.append({"persona_id": persona.get("id", ""), "error": str(e)[:200]})
-            continue
+            return {"ok": False, "error": str(e)[:200], "in": 0, "out": 0}
         parsed = parse_triage_output(raw, persona)
         if parsed is None:
-            failures.append({"persona_id": persona.get("id", ""), "error": "unparseable_output"})
-            continue
-        results.append(parsed)
+            # token 照记：解析失败的这次调用钱是真花了
+            return {"ok": False, "error": "unparseable_output", "in": tin, "out": tout}
+        return {"ok": True, "parsed": parsed, "in": tin, "out": tout}
+
+    # 初筛是每人一次独立的 I/O 等待型调用，串行跑等于 17 个人格排队等 17 次往返，
+    # L2 深评要等到最后一个回来才能开始。与 cli._run_batch 同样用线程池并发，
+    # 并**按提交顺序**收 future 结果——晋级排序虽然是确定性的，但输入顺序变了
+    # 同分时的字典序兜底就未必稳定，报告里"谁晋级"这种事不能随线程调度漂。
+    workers = max(1, min(int(max_concurrency or os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6")),
+                         len(personas))) if personas else 1
+    if workers <= 1 or len(personas) <= 1:
+        outcomes = [_screen_one(p, pr) for p, pr in zip(personas, prompts)]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_screen_one, p, pr) for p, pr in zip(personas, prompts)]
+            outcomes = [f.result() for f in futures]
+
+    for persona, outcome in zip(personas, outcomes):
+        total_in += outcome["in"]
+        total_out += outcome["out"]
+        if outcome["ok"]:
+            results.append(outcome["parsed"])
+        else:
+            failures.append({"persona_id": persona.get("id", ""), "error": outcome["error"]})
 
     return {
         "results": results,

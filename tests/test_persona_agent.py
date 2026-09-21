@@ -146,6 +146,94 @@ class TestRenderPrompt:
         assert "P01-indie-core-operator" in result
 
 
+class TestRenderPromptSplit:
+    """render_prompt_split 是 render_prompt 的可缓存版本（见该函数头部注释）：
+    拆成 (shared, user) 两段而不是拼成一份。这里验证的核心不变量只有一条——
+    shared 段绝不能混入任何 persona 相关字段，否则每位人格的 shared 文本就不再
+    逐字相同，Prompt Caching 永远 miss，整项优化白做。"""
+
+    TEMPLATE_DIR = os.path.dirname(TEMPLATE_PATH)
+
+    def test_shared_is_byte_identical_across_different_personas(self, sample_persona):
+        """这是缓存能命中的唯一前提：换一个人格，shared 文本必须一字不差。"""
+        from runner.persona_agent import render_prompt_split
+
+        other_persona = {**sample_persona, "id": "P02-other", "name": "阿宁", "mbti": "ENFP"}
+
+        shared_a, user_a = render_prompt_split(
+            sample_persona, "steam_page_review", "某独立游戏Steam页面", self.TEMPLATE_DIR
+        )
+        shared_b, user_b = render_prompt_split(
+            other_persona, "steam_page_review", "某独立游戏Steam页面", self.TEMPLATE_DIR
+        )
+
+        assert shared_a == shared_b
+        assert user_a != user_b
+
+    def test_shared_carries_task_and_artifact_not_persona_identity(self, sample_persona):
+        from runner.persona_agent import render_prompt_split
+
+        bundle = {"materials": [{"type": "text", "description": "核心玩法说明"}]}
+        shared, user = render_prompt_split(
+            sample_persona, "demo_first_play", "某独立游戏Demo", self.TEMPLATE_DIR, bundle
+        )
+
+        assert "demo_first_play" in shared
+        assert "核心玩法说明" in shared
+        # 身份字段一个都不该漏进 shared——漏一个就是缓存 miss 的根因
+        assert "P01-indie-core-operator" not in shared
+        assert "林岚" not in shared
+        assert "INTJ" not in shared
+
+    def test_user_carries_persona_identity_and_questions(self, sample_persona):
+        from runner.persona_agent import render_prompt_split
+
+        shared, user = render_prompt_split(
+            sample_persona, "steam_page_review", "某独立游戏Steam页面", self.TEMPLATE_DIR
+        )
+
+        assert "P01-indie-core-operator" in user
+        assert "林岚" in user
+        assert "INTJ" in user
+        assert "独特性" in user  # must_comment_on 项
+        assert "若15秒内看不到核心钩子，不加愿望单" in user  # primary_decision_rule
+
+    def test_combining_both_parts_still_covers_everything_render_prompt_covers(self, sample_persona):
+        """拆分不能丢内容：把两段拼起来，该有的东西一件不少。"""
+        from runner.persona_agent import render_prompt_split
+
+        shared, user = render_prompt_split(
+            sample_persona, "steam_page_review", "某独立游戏Steam页面", self.TEMPLATE_DIR
+        )
+        combined = shared + "\n\n" + user
+
+        for expected in (
+            "P01-indie-core-operator", "林岚", "核心独立探索者", "INTJ",
+            "作为林岚", "独特性", "核心循环证据",
+            "若15秒内看不到核心钩子，不加愿望单", "steam_page_review", "某独立游戏Steam页面",
+        ):
+            assert expected in combined
+
+    def test_image_materials_stay_out_of_shared_go_into_user_content_blocks(self, sample_persona):
+        """Anthropic 的 system 参数只接受纯文本块，图片必须留在 user 内容里。"""
+        from runner.persona_agent import render_prompt_split
+
+        bundle = {
+            "materials": [
+                {"type": "text", "description": "文字材料"},
+                {"type": "image", "image_data": "data:image/png;base64,QUJD"},
+            ]
+        }
+        shared, user = render_prompt_split(
+            sample_persona, "steam_page_review", "某独立游戏Steam页面", self.TEMPLATE_DIR, bundle
+        )
+
+        assert isinstance(shared, str)
+        assert isinstance(user, list)
+        assert user[0]["type"] == "text"
+        assert user[1] == {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}}
+
+
 def _backend_task_types() -> dict:
     """读后端 services 的 TASK_TYPES 字面量，但**不 import 它**。
 
@@ -375,12 +463,12 @@ class TestSelectModel:
     def test_persona_with_model_hint(self, budget_config):
         persona = {"model_hint": "opus"}
         result = select_model(persona, budget_config)
-        assert result == "claude-opus-4-20250514"
+        assert result == "claude-opus-5"
 
     def test_persona_with_sonnet_hint(self, budget_config):
         persona = {"model_hint": "sonnet"}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet-4-20250514"
+        assert result == "claude-sonnet-5"
 
     def test_persona_with_haiku_hint(self, budget_config):
         persona = {"model_hint": "haiku"}
@@ -390,12 +478,12 @@ class TestSelectModel:
     def test_persona_without_model_hint_uses_default(self, budget_config):
         persona = {}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet-4-20250514"
+        assert result == "claude-sonnet-5"
 
     def test_persona_with_none_model_hint_uses_default(self, budget_config):
         persona = {"model_hint": None}
         result = select_model(persona, budget_config)
-        assert result == "claude-sonnet-4-20250514"
+        assert result == "claude-sonnet-5"
 
 
 class TestNormalizePersonaOutput:

@@ -14,10 +14,12 @@
 并在 limitation 里写明原因 —— 绝不允许"跑失败了还说辩论过了"。
 """
 
+import concurrent.futures
 import inspect
 import json
 import os
 import re
+import threading
 from typing import Callable, List, Optional
 
 import yaml
@@ -30,6 +32,13 @@ except ImportError:
 
 
 SEVERITY_MAP = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+# multi_agent 反驳阶段的并发上限**默认值**。与 cli.py 人格评审阶段共用同一个
+# 环境变量，避免同一次评审里两段并发逻辑各配一套上限、互相打架。
+# 注意这是导入时读一次的默认值，只在调用方没传 max_concurrency 时生效——
+# 后台面板改的运行时并发值必须由 run_cross_exam_protocol(max_concurrency=...)
+# 显式传进来，否则进程启动后就再也改不动了。
+_MULTI_AGENT_MAX_CONCURRENCY = int(os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6"))
 
 # ---------------------------------------------------------------------------
 # 模式常量与 limitation 文案
@@ -729,19 +738,43 @@ def _normalize_llm_result(result):
     return _coerce_str(result), 0, 0, False
 
 
-def _invoke_llm(llm_call: Callable, prompt: str, usage: dict, persona_id: str = ""):
-    """发一次调用并把用量计进 usage。异常原样抛给调用方，由它记成失败。"""
-    usage["calls"] += 1
+def _invoke_llm(llm_call: Callable, prompt: str, usage: dict, persona_id: str = "", usage_lock=None):
+    """发一次调用并把用量计进 usage。异常原样抛给调用方，由它记成失败。
+
+    usage_lock: 多个调用并发跑在不同线程时（multi_agent 反驳）传进来，只锁 usage
+    字典的读改写这几行，不锁网络请求本身——否则"并发"就是摆设。
+    """
+    # calls 按**尝试**计，而且必须在发请求**之前**加：调用抛异常时这一次照样
+    # 花了钱（或至少真的发出去过），只在成功后才 +1 会让失败的反驳从这本账上
+    # 凭空消失。cli.py 注入的 llm_call 闭包同样是发请求前 +1（见那里的注释），
+    # 两本账口径必须一致——否则同一次失败的反驳在一边有、在另一边没有。
+    def _count_attempt():
+        usage["calls"] += 1
+
+    if usage_lock is not None:
+        with usage_lock:
+            _count_attempt()
+    else:
+        _count_attempt()
+
     if persona_id and _accepts_persona_id(llm_call):
         result = llm_call(prompt, persona_id=persona_id)
     else:
         result = llm_call(prompt)
     text, in_tok, out_tok, tokens_known = _normalize_llm_result(result)
-    usage["input_tokens"] += in_tok
-    usage["output_tokens"] += out_tok
-    if not tokens_known:
-        # 有一次调用拿不到 token 数，整份用量就不能当成完整的账
-        usage["token_counts_available"] = False
+
+    def _account():
+        usage["input_tokens"] += in_tok
+        usage["output_tokens"] += out_tok
+        if not tokens_known:
+            # 有一次调用拿不到 token 数，整份用量就不能当成完整的账
+            usage["token_counts_available"] = False
+
+    if usage_lock is not None:
+        with usage_lock:
+            _account()
+    else:
+        _account()
     return text
 
 
@@ -844,6 +877,7 @@ def run_cross_exam_protocol(
     rules_path: Optional[str] = None,
     similarity=None,
     num_rounds: int = 1,
+    max_concurrency: Optional[int] = None,
 ) -> dict:
     """执行交叉质询，返回可直接进报告的 cross_examination 区块。
 
@@ -854,6 +888,10 @@ def run_cross_exam_protocol(
                 / multi_agent_rebuttal。
       num_rounds: 保留参数，今天只执行 1 轮反驳；返回的 rounds 反映**实际**执行的轮次，
                 不按这个参数虚构轮数。
+      max_concurrency: multi_agent 反驳阶段的并发上限。由调用方传进来（cli.py 传
+                它给人格评审用的同一个值），不传才回落模块级的环境变量默认值——
+                以前只认导入时读到的环境变量，后台面板改的运行时并发值根本管不到
+                这一段。
 
     失败处理：反驳全部失败 → mode 回落 derived_summary，limitation 写明原因，
     failures 列出每次失败；报告其余部分照出。绝不静默吞掉，也绝不谎称辩论过。
@@ -913,33 +951,56 @@ def run_cross_exam_protocol(
             # 反驳失败不吞：记进 failures，下面会据此回落 mode 并写进 limitation
             failures.append({"stage": "moderated_rebuttal", "error": f"{type(e).__name__}: {e}"})
     elif requested_mode == MODE_MULTI_AGENT:
-        for d in debatable:
-            for side in d["sides"]:
-                try:
-                    prompt = render_rebuttal_prompt(d, side, template_path)
-                    raw = _invoke_llm(llm_call, prompt, usage, persona_id=side["persona_id"])
-                    parsed = parse_cross_exam_output(raw)
-                    if not parsed:
-                        raise ValueError("模型输出无法解析为 JSON")
-                    # 单人格调用只该谈自己那条论据：解析不到编号时按当前论据兜底
-                    single = _normalize_rebuttal_items(parsed, [{"sides": [side]}])
-                    if side["argument_id"] not in single:
-                        first = next((p for p in parsed if isinstance(p, dict)), None)
-                        if first is None:
-                            raise ValueError("模型输出里没有对象结构")
-                        single = {side["argument_id"]: {
-                            "rebuttal": _coerce_str(_pick(first, _REBUTTAL_TEXT_KEYS) or ""),
-                            "stance_after_raw": _coerce_str(_pick(first, _STANCE_KEYS) or ""),
-                            "confidence_after": _coerce_confidence(_pick(first, _CONF_KEYS)),
-                        }}
+        # 每位涉事人格的反驳彼此独立、互不依赖对方结果——是 I/O 密集的等待型任务，
+        # 串行发一个等一个纯属浪费墙钟时间。并发数与 cli.py 人格评审阶段保持同一个
+        # 环境变量口径，避免这里单开一套配置。usage/failures/updates 是共享可变对象，
+        # 各自配一把锁只保护"写"这一下，不锁调用本身。
+        tasks = [(d, side) for d in debatable for side in d["sides"]]
+
+        def _run_one(d, side):
+            try:
+                prompt = render_rebuttal_prompt(d, side, template_path)
+                raw = _invoke_llm(
+                    llm_call, prompt, usage, persona_id=side["persona_id"], usage_lock=usage_lock,
+                )
+                parsed = parse_cross_exam_output(raw)
+                if not parsed:
+                    raise ValueError("模型输出无法解析为 JSON")
+                # 单人格调用只该谈自己那条论据：解析不到编号时按当前论据兜底
+                single = _normalize_rebuttal_items(parsed, [{"sides": [side]}])
+                if side["argument_id"] not in single:
+                    first = next((p for p in parsed if isinstance(p, dict)), None)
+                    if first is None:
+                        raise ValueError("模型输出里没有对象结构")
+                    single = {side["argument_id"]: {
+                        "rebuttal": _coerce_str(_pick(first, _REBUTTAL_TEXT_KEYS) or ""),
+                        "stance_after_raw": _coerce_str(_pick(first, _STANCE_KEYS) or ""),
+                        "confidence_after": _coerce_confidence(_pick(first, _CONF_KEYS)),
+                    }}
+                return single, None
+            except Exception as e:
+                return None, {
+                    "stage": "multi_agent_rebuttal",
+                    "point_id": d["point_id"],
+                    "argument_id": side["argument_id"],
+                    "error": f"{type(e).__name__}: {e}",
+                }
+
+        if tasks:
+            usage_lock = threading.Lock()
+            effective_concurrency = max_concurrency or _MULTI_AGENT_MAX_CONCURRENCY
+            max_workers = max(1, min(int(effective_concurrency), len(tasks)))
+            if max_workers == 1:
+                results = [_run_one(d, side) for d, side in tasks]
+            else:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+                    futures = [ex.submit(_run_one, d, side) for d, side in tasks]
+                    results = [f.result() for f in futures]
+            for single, failure in results:
+                if failure is not None:
+                    failures.append(failure)
+                else:
                     updates.update(single)
-                except Exception as e:
-                    failures.append({
-                        "stage": "multi_agent_rebuttal",
-                        "point_id": d["point_id"],
-                        "argument_id": side["argument_id"],
-                        "error": f"{type(e).__name__}: {e}",
-                    })
 
     # ---- 按实际结果定 mode，绝不无条件置 True ----
     live_ran = bool(updates)

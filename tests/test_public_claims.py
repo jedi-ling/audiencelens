@@ -9,12 +9,18 @@
 对外材料里的数字用正则捞出来逐个比对，对不上就红。落地页正文写着
 「每一项都能在开源仓库里核对」——那这条核对就该是自动的。
 
-五类检查，缺一不可：
+七类检查，缺一不可：
   1. test_public_materials_counts_match_repo —— 材料里的数字 == 仓库现算出来的数字
   2. test_key_materials_still_state_the_counts —— 防"正则一条都没匹配上却全绿"（改写措辞就静默失效）
   3. test_landing_avatar_overflow_matches_persona_count —— 落地页头像行的「+N」这种**隐式**人格计数
   4. test_test_counts_are_stated_once_and_dated —— 测试数不许写死、不许同页两个值打架
-  5. test_maintenance_env_table_is_complete —— MAINTENANCE.md 自称「全表」就得是全表
+  5. test_deprecated_files_declare_errata —— 带"本文件已作废"横幅的稿子必须同时列出勘误
+  6. test_maintenance_env_table_is_complete —— MAINTENANCE.md 自称「全表」就得是全表
+  7. test_compose_env_matches_config —— docker-compose.yml 的 environment 白名单 == config.py 读的变量
+
+  注：3、4、5 三条在这份文件里被引用了很久（docstring、`_scan` 的注释、README 与
+  AGENTS.md 都写着"有测试卡着"），但函数体一直不存在——也就是说那三条承诺在
+  过去的每一次全绿里都是空的。现已补上实现。
 
 新增一份对外材料时不需要改这个文件：GLOB 会自动扫到。
 新增一种数字写法（比如"共 72 名评审员"）时，需要往下面的 PATTERNS 里补一条正则——
@@ -38,6 +44,12 @@ BACKEND_API_DIR = os.path.join(REPO_ROOT, "web", "backend", "app", "api")
 BACKEND_SERVICES_DIR = os.path.join(REPO_ROOT, "web", "backend", "app", "services")
 BACKEND_WS_INIT = os.path.join(REPO_ROOT, "web", "backend", "app", "websocket", "__init__.py")
 FRONTEND_PAGES_DIR = os.path.join(REPO_ROOT, "web", "frontend", "src", "pages")
+FRONTEND_COMPONENTS_DIR = os.path.join(REPO_ROOT, "web", "frontend", "src", "components")
+BACKEND_CONFIG = os.path.join(REPO_ROOT, "web", "backend", "app", "config.py")
+COMPOSE_FILE = os.path.join(REPO_ROOT, "web", "docker-compose.yml")
+LANDING_BODY = os.path.join(
+    REPO_ROOT, "web", "frontend", "src", "pages", "landing", "landing-body.html"
+)
 STEREOTYPE_CASES = os.path.join(REPO_ROOT, "tools", "stereotype_eval_cases.yaml")
 
 
@@ -91,6 +103,18 @@ def _count_page_components():
     return len(glob.glob(os.path.join(FRONTEND_PAGES_DIR, "**", "*.tsx"), recursive=True))
 
 
+def _count_ui_components():
+    """共享组件 = components/ 下（含子目录）所有 .tsx。
+
+    与 `_count_page_components` 是两个目录、两个口径：pages/ 下是路由页面，
+    components/ 下是被页面复用的部件。README 前端那一格把两个数并排写
+    （"24 个页面组件、16 个组件"），口径不说死就会互相串。
+    """
+    if not os.path.isdir(FRONTEND_COMPONENTS_DIR):
+        return None
+    return len(glob.glob(os.path.join(FRONTEND_COMPONENTS_DIR, "**", "*.tsx"), recursive=True))
+
+
 def _count_service_modules():
     """services/ 下除 __init__.py 外的所有 .py。
 
@@ -128,6 +152,7 @@ def repo_truth():
         "ws_event": _count_ws_events(),
         "page": _count_page_components(),
         "service": _count_service_modules(),
+        "component": _count_ui_components(),
         "stereotype_case": _count_stereotype_cases(),
     }
 
@@ -304,12 +329,52 @@ PATTERNS = {
         r'data-target="(\d+)">\d+</div><div class="lbl">任务类型',
         r"\|\s*\*\*(?:Total|合计)\*\*\s*\|\s*\*\*\d+\*\*\s*\|\s*\*\*\d+\*\*\s*\|\s*\*\*(\d+)\*\*",
     ],
+    # ----------------------------------------------------------------------
+    # Web 层的四个数。repo_truth() 早就把它们现算出来了，PATTERNS 里却一条正则
+    # 都没有 —— 于是"现算"的结果谁都没用上，README 里的 85 / 19 / 20 / 7
+    # 一直错着（真值 121 / 28 / 24 / 16），四个数全错，没有任何东西会红。
+    # 这几条正则中英各一套，写法照 README 现有句式来。
+    # ----------------------------------------------------------------------
+    "route": [
+        r"(\d+)\s*个路由处理函数",
+        r"(\d+)\s+route\s+handlers",
+    ],
+    "service": [
+        r"(\d+)\s*个服务模块",
+        r"`app/services/`\s*下\s*(\d+)\s*个模块",
+        r"(\d+)\s+service\s+modules",
+        r"(\d+)\s+modules\s+in\s+`app/services/`",
+    ],
+    "page": [
+        r"(\d+)\s*个页面组件",
+        r"(\d+)\s+page\s+components",
+    ],
+    "ws_event": [
+        # WS_EVENTS 早就被现算出来了，却同样没有正则接上——README 四处写 5，
+        # 常量表里实有 7（多出 review.evaluation_completed 与 review.cancelled）。
+        r"(\d+)\s*种(?:实际发出的)?\s*WebSocket\s*事件",
+        r"(\d+)\s*种WebSocket事件",
+        r"WebSocket（实际发出\s*(\d+)\s*种事件）",
+        r"(\d+)\s+(?:emitted\s+)?WebSocket\s+event\s+types",
+        r"WebSocket\s*\((\d+)\s+event\s+types\s+emitted\)",
+    ],
+    "component": [
+        # 只认「N 个组件 / N components」，且不能是"页面组件 / page components"
+        # （那是 page 那一格的口径，两者差着一个目录）。
+        r"(?<!页面)(\d+)\s*个组件",
+        r"(?<!page\s)(?<!页面)(\d+)\s+components\b",
+    ],
 }
 
 # 哪些材料该声明哪些数字。这里列出来的文件，如果某个 metric 一条都匹配不到，
 # 就说明措辞被改写、正则失效了 —— 那属于"检查悄悄停止工作"，必须让它红。
 MUST_STATE = {
-    "README.md": ("persona", "pack", "task_type"),
+    # README 的 Web 层四个数（路由/服务/页面/组件）此前无人核对，四个全错过
+    # （85/19/20/7，真值 121/28/24/16）。列进来之后，措辞一旦被改写到正则
+    # 捞不到，这条会先红——比数字错更早暴露"检查悄悄停止工作"。
+    "README.md": (
+        "persona", "pack", "task_type", "route", "service", "page", "component", "ws_event",
+    ),
     "web/frontend/src/pages/landing/landing-body.html": ("persona", "pack", "task_type"),
     "docs/business-plan.md": ("persona", "pack"),
     "docs/paper/arxiv-paper.md": ("persona", "pack", "task_type"),
@@ -379,6 +444,223 @@ def test_key_materials_still_state_the_counts(rel, metrics):
             "要么换了种写法（那就往 PATTERNS 里补一条正则）——"
             "放着不管等于这份材料从此不再被核对。"
         )
+
+
+# --------------------------------------------------------------------------
+# 隐式人格计数：落地页头像行的「+N」
+# --------------------------------------------------------------------------
+
+
+def test_landing_avatar_overflow_matches_persona_count():
+    """头像行写的是「画出来的几个 + 剩下多少个」，而不是一个总数。
+
+    所以 PATTERNS 里任何"捞数字"的正则都捞不到它：`+69` 看起来只是个装饰。
+    72 人格上线前它一直停在 `+63`（3 + 63 = 66），没人发现。
+    对付隐式计数只能按它的构成算回去：画出来的头像数 + 溢出数 == 人格总数。
+    """
+    truth = repo_truth()
+    expected = truth["persona"]
+
+    html = _read(LANDING_BODY)
+    block = re.search(r'<div class="avatars">(.*?)</div>', html, re.S)
+    assert block, (
+        "落地页找不到 `<div class=\"avatars\">` 这个块——头像行被改写或换了类名。"
+        "换写法可以，但要同步改这条测试，别让隐式计数重新失去核对。"
+    )
+    inner = block.group(1)
+
+    # 头像本体：`<span style="...">P1</span>`；溢出格：`<span style="...">+69</span>`
+    labels = re.findall(r"<span[^>]*>([^<]+)</span>", inner)
+    drawn = [t.strip() for t in labels if not t.strip().startswith("+")]
+    overflow = [t.strip() for t in labels if t.strip().startswith("+")]
+
+    assert len(overflow) == 1, (
+        f"头像行里应当只有一个「+N」溢出格，实际找到 {len(overflow)} 个：{overflow}。"
+        "两个溢出格意味着总数被拆成了两处，改一处漏一处必然发生。"
+    )
+    overflow_n = int(overflow[0].lstrip("+"))
+    claimed = len(drawn) + overflow_n
+
+    assert claimed == expected, (
+        f"落地页头像行声称的人格总数是 {len(drawn)}（画出来的头像）+ {overflow_n}"
+        f"（溢出数）= {claimed}，仓库真实是 {expected}。\n"
+        f"把溢出格改成 +{expected - len(drawn)}。这是个隐式计数，"
+        "别的正则都捞不到它，只有这条测试看得见。"
+    )
+
+
+# --------------------------------------------------------------------------
+# 测试数：每份材料最多写一处，且必须带统计日期
+# --------------------------------------------------------------------------
+
+# 一个"测试数声明"长什么样。只收**跟测试绑在一起**的数字，不收裸数字。
+TEST_COUNT_PATTERNS = (
+    r"\d{2,5}\s*passed",
+    r"\d{2,5}\s*(?:项|条|个)?\s*(?:自动化)?测试(?:全绿|通过|覆盖|全部通过)",
+    r"(?:自动化)?测试\s*(?:数|状态|总数)?\s*[:：]?\s*\*{0,2}\d{2,5}",
+    r"引擎测试\s*\d{2,5}",
+    r"\d{2,5}\s+tests?\s+(?:passed|pass|green)",
+)
+
+# 统计日期：2026-07 / 2026-07-27 / 2026 年 7 月 都算。
+DATE_RE = re.compile(r"20\d{2}\s*[-/年]\s*\d{1,2}")
+
+# 这些行里的数字不是"我们现在有多少测试"。
+EXEMPT_TEST_COUNT_SUBSTRINGS = (
+    # MAINTENANCE.md 用它举反例（「曾经写过「核心引擎 1648 passed」」），
+    # 整句话的意思恰恰是"不要在这里写数"。
+    "曾经写过",
+    # 同理，业务计划书里那句自带告诫的说明
+    "引用时请注明统计日期",
+)
+
+
+def _strip_html_comments(text):
+    """HTML 注释里解释"为什么写这个数"时会复述数字，那不是对外声明。
+
+    index.html 的 STATS 区就是这样：注释里写着换算过程（1684 + 448），
+    真正对外的只有下面那一行 `<span class="lbl">`。不剥掉注释，
+    "一份材料只许写一处"这条会把解释性注释当成第二处。
+    """
+    return re.sub(r"<!--.*?-->", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+
+
+def test_test_counts_are_stated_once_and_dated():
+    """测试数是全仓最容易过期的数字，而且没有任何自动核对能替它兜底。
+
+    人格数可以从 `src/personas/` 现算，测试数不行——真要现算就得把整套测试
+    收集一遍，而收集本身依赖装了哪些可选依赖。所以这里守的是**写法**而不是值：
+
+      · 一份材料里最多出现一处（同一页两个数打架时，读者无从判断信哪个；
+        仓库里真实发生过：hero 区写引擎单套件的收集数、STATS 区写全仓合计，
+        两处都自称"测试数"）
+      · 那一处必须带统计日期（没有日期的数字没法判断它有多旧，
+        而它每次提交都在变）
+
+    不参与检查的：带"本文件已作废"横幅的稿子（正文按发出时冻结，勘误行里
+    引用的历史错值也是证据的一部分）。
+    """
+    bad = []
+    for path in material_files():
+        rel = rel_path(path)
+        text = _read(path)
+        if DEPRECATED_MARKER in text:
+            continue
+
+        hits = {}
+        for lineno, line in enumerate(_strip_html_comments(text).splitlines(), 1):
+            if any(sub in line for sub in EXEMPT_TEST_COUNT_SUBSTRINGS):
+                continue
+            if any(re.search(p, line) for p in TEST_COUNT_PATTERNS):
+                hits[lineno] = line.strip()
+
+        if len(hits) > 1:
+            where = "、".join(f"{rel}:{n}" for n in sorted(hits))
+            bad.append(
+                f"  {rel} 写了 {len(hits)} 处测试数（{where}）——"
+                "同一份材料里两个数必然互相打架，只留一处。"
+            )
+            continue
+
+        for lineno, line in hits.items():
+            if not DATE_RE.search(line):
+                bad.append(
+                    f"  {rel}:{lineno} 的测试数没带统计日期\n    {line[:160]}"
+                )
+
+    assert not bad, (
+        "测试数的写法不合规。规则只有两条：每份材料最多写一处，且必须带统计日期"
+        "（见 AGENTS.md「变更校验」）。\n"
+        "这个数每次提交都在变，没有日期的版本读者无法判断它有多旧；"
+        "同一页两个值则连写的人自己都说不清该信哪个。\n"
+        + "\n".join(bad)
+    )
+
+
+# --------------------------------------------------------------------------
+# 作废横幅必须配勘误
+# --------------------------------------------------------------------------
+
+ERRATA_MARKERS = ("实际为", "勘误")
+
+
+def test_deprecated_files_declare_errata():
+    """只挂"请勿引用"横幅、不说错在哪，等于把文件留成一个没人敢读也没人会改的死角。
+
+    这些稿子是有用的（已经发出去的东西的存档），所以正文冻结、不跟着仓库走
+    （见 FROZEN_BODY_FILES 与 `_scan` 对"实际为"的处理）。代价是正文里的数字
+    永远是错的——那就必须有一份勘误说明现状，否则下一个人照着正文引用。
+
+    `_scan` 只把"实际为"后面那半句纳入现状核对，所以勘误本身也是受检查的：
+    横幅 + 勘误两件事凑齐，这类文件才是安全的。
+    """
+    bad = []
+    for path in material_files():
+        text = _read(path)
+        if DEPRECATED_MARKER not in text:
+            continue
+        if not any(marker in text for marker in ERRATA_MARKERS):
+            bad.append(rel_path(path))
+
+    assert not bad, (
+        "下列文件挂了「本文件已作废」横幅，却没有任何勘误说明"
+        f"（需要出现 {' 或 '.join(ERRATA_MARKERS)}）：\n"
+        + "\n".join("  " + p for p in bad)
+        + "\n横幅只说'别引用'，不说'错在哪'——读者仍会照着正文里的旧数字引用。"
+    )
+
+
+# --------------------------------------------------------------------------
+# docker-compose.yml 的 environment 白名单得覆盖 config.py 读的每一个变量
+# --------------------------------------------------------------------------
+
+
+def test_compose_env_matches_config():
+    """漏一项的表现不是报错，而是 Docker 下**静默用默认值**。
+
+    compose 用的是显式 environment 白名单，没有 env_file；镜像里也不存在
+    /app/web/.env（build context 是 ./backend），所以 config.py 那条 dotenv
+    回落救不了场。运维照 `.env.production.example` 填好一切，容器里读到的
+    却是默认值——最贵的一例是 QQ 登录：三个变量一个都传不进去，
+    `qq_login_enabled` 永远为 false，后台怎么配都不出按钮，而
+    docs/MAINTENANCE.md 把它写成已交付功能。
+
+    compose 文件自己的注释就写着「新增任何 AL_* 配置项时，必须同步加到这里」——
+    那这条同步就该由测试来盯，而不是靠记性。
+    """
+    if not (os.path.isfile(BACKEND_CONFIG) and os.path.isfile(COMPOSE_FILE)):
+        pytest.skip("这份检出里没有 web/backend/app/config.py 或 web/docker-compose.yml")
+
+    config_src = _read(BACKEND_CONFIG)
+    compose_src = _read(COMPOSE_FILE)
+
+    names = sorted(set(re.findall(
+        r"[\"']((?:AL_|ANTHROPIC_|AUDIENCELENS_)[A-Z0-9_]+)[\"']", config_src
+    )))
+    assert names, "没从 config.py 里解析出任何环境变量名，先确认正则还对得上文件"
+
+    declared = set(re.findall(r"^\s*-\s+([A-Z][A-Z0-9_]*)=", compose_src, re.M))
+    assert declared, "没从 docker-compose.yml 的 environment 段解析出任何变量名"
+
+    missing = [n for n in names if n not in declared]
+    assert not missing, (
+        "web/docker-compose.yml 的 environment 白名单漏了下列变量——"
+        "config.py 会读它们，但 Docker 部署下传不进去，静默走默认值：\n"
+        + "\n".join("  " + n for n in missing)
+        + "\n补的时候注意：`${VAR:-}` 会把变量设成**空串**而不是「未设置」，"
+        "凡是空串会改变行为的项（布尔、路径、白名单）都要写死真实默认值。"
+    )
+
+    # 反向也钉住：compose 里列了 config.py 根本不读的 AL_* 变量，
+    # 说明其中一边改了名，运维照着改另一边等于白改。
+    stale = sorted(
+        n for n in declared
+        if n.startswith(("AL_", "ANTHROPIC_", "AUDIENCELENS_")) and n not in names
+    )
+    assert not stale, (
+        "docker-compose.yml 里列了 config.py 不再读取的变量（多半是改名后漏删）：\n"
+        + "\n".join("  " + n for n in stale)
+    )
 
 
 # --------------------------------------------------------------------------

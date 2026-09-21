@@ -43,6 +43,7 @@ try:
         normalize_persona_output,
         parse_persona_output,
         render_prompt,
+        render_prompt_split,
         select_model,
     )
     from .llm_client import is_retryable_error
@@ -75,6 +76,7 @@ except ImportError:
         normalize_persona_output,
         parse_persona_output,
         render_prompt,
+        render_prompt_split,
         select_model,
     )
     from runner.llm_client import is_retryable_error
@@ -403,6 +405,7 @@ def run_cross_exam_stage(
     provider: str = "anthropic",
     model_override: Optional[str] = None,
     api_base: Optional[str] = None,
+    max_concurrency: Optional[int] = None,
 ) -> dict:
     """把交叉质询真的接到 LLM 上——以前这里只把提示词渲染出来，然后原地丢掉。
 
@@ -430,6 +433,13 @@ def run_cross_exam_stage(
     # （select_model 对空人格就是返回 default_model，不另写一套选型规则）。
     moderator_model = model_override or select_model({}, budget_config)
 
+    # usage 的累加必须加锁：multi_agent 反驳档会把下面这个闭包丢进 ThreadPoolExecutor
+    # 并发调用（见 cross_exam.run_cross_exam_protocol），而 `usage["calls"] += 1`
+    # 这种读-改-写在多线程下不是原子操作——两个线程同时读到 3、各自写回 4，
+    # 就丢了一次调用和它对应的成本（正是本文件反复强调的那种"账上看不到的钱"）。
+    # 锁只圈住累加这几行，**绝不覆盖网络调用本身**，否则并发就退化成串行。
+    usage_lock = threading.Lock()
+
     def llm_call(prompt, persona_id: str = ""):
         """交叉质询的模型出口，走仓库统一的 llm_client.chat_completion。
 
@@ -438,7 +448,8 @@ def run_cross_exam_stage(
         """
         # 先记一次尝试：失败的调用也要在账面上看得见"发过、没成"，否则计费和重试
         # 都成了黑箱。协议核心的 usage.calls 同样按尝试计，两边口径保持一致。
-        usage["calls"] += 1
+        with usage_lock:
+            usage["calls"] += 1
         model = moderator_model
         if persona_id:
             persona = personas_by_id.get(persona_id)
@@ -456,16 +467,23 @@ def run_cross_exam_stage(
             )
             model = model_override or select_model(persona, budget_config)
 
+        cache_usage: dict = {}
         text, input_tokens, output_tokens = chat_completion(
             model=model,
             prompt=prompt,
             api_key=api_key,
             provider=provider,
             api_base=api_base,
+            usage_details=cache_usage,
         )
-        usage["input_tokens"] += input_tokens
-        usage["output_tokens"] += output_tokens
-        usage["cost"] += estimate_cost(input_tokens, output_tokens, model, budget_config)
+        # 成本在锁外先算好（纯 CPU、不碰 usage），锁内只做累加，临界区尽量短
+        call_cost = estimate_cost(
+            input_tokens, output_tokens, model, budget_config, cache_breakdown=cache_usage
+        )
+        with usage_lock:
+            usage["input_tokens"] += input_tokens
+            usage["output_tokens"] += output_tokens
+            usage["cost"] += call_cost
         return text, input_tokens, output_tokens
 
     return run_cross_exam_protocol(
@@ -475,6 +493,7 @@ def run_cross_exam_stage(
         mode=requested_mode,
         template_path=template_path,
         rules=rules,
+        max_concurrency=max_concurrency,
     )
 
 
@@ -582,7 +601,17 @@ def run_single_persona(
 
     model = model_override or select_model(persona, budget_config)
 
-    prompt = render_prompt(persona, task_type, artifact_summary, persona_prompt_path, artifact_bundle)
+    # 拆成 (shared, user) 两段而不是拼成一份 prompt：shared 对本次评审的每一位
+    # 人格逐字相同，作为 system 传给 chat_completion 后能被服务商缓存/折扣——
+    # 见 persona_agent.py::render_prompt_split 头部注释，那是本次改动的核心。
+    # prompt/system 两个变量名对齐 chat_completion 的形参名，别改混。
+    template_dir = os.path.dirname(persona_prompt_path)
+    system, prompt = render_prompt_split(persona, task_type, artifact_summary, template_dir, artifact_bundle)
+    # 仅用于返回值里的 "prompt" 调试字段（日志/测试断言用），从不发给模型：
+    # 真正发给模型的是 system + prompt 两个独立字段，拼接只是为了这里的可读性。
+    prompt_for_log = system + "\n\n" + (
+        prompt if isinstance(prompt, str) else "\n".join(b.get("text", "") for b in prompt if b.get("type") == "text")
+    )
 
     if api_key is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -592,7 +621,7 @@ def run_single_persona(
         return {
             "persona_id": persona["id"],
             "output": output,
-            "prompt": prompt,
+            "prompt": prompt_for_log,
             "model": model,
             "cost": 0.0,
             "input_tokens": 0,
@@ -621,14 +650,25 @@ def run_single_persona(
 
     for attempt in range(max_attempts):
         try:
+            # 缓存明细走出参：返回的 input_tokens 是真实 token 数（落库/配额用），
+            # 缓存折扣只在 estimate_cost 那一步生效，见 persona_agent 的不变式注释。
+            cache_usage: dict = {}
             raw_output, input_tokens, output_tokens = chat_completion(
                 model=model,
                 prompt=prompt,
                 api_key=api_key,
                 provider=provider,
                 api_base=api_base,
+                usage_details=cache_usage,
+                system=system,
+                # 有 schema 就要求模型结构化交卷（Anthropic 强制工具调用 / OpenAI
+                # 兼容开 json_object），schema_failure 这类"整次重发"的重试从源头消掉。
+                # 没传 schema（run_panel 的旧统一校验路径）就保持老行为。
+                json_schema=output_schema,
             )
-            cost = estimate_cost(input_tokens, output_tokens, model, budget_config)
+            cost = estimate_cost(
+                input_tokens, output_tokens, model, budget_config, cache_breakdown=cache_usage
+            )
             total_cost += cost
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
@@ -655,7 +695,7 @@ def run_single_persona(
                 return {
                     "persona_id": persona["id"],
                     "output": None,
-                    "prompt": prompt,
+                    "prompt": prompt_for_log,
                     "model": model,
                     # 成本照记：这次调用的钱是真花掉了，失败不等于免费
                     "cost": total_cost,
@@ -689,7 +729,7 @@ def run_single_persona(
             return {
                 "persona_id": persona["id"],
                 "output": output,
-                "prompt": prompt,
+                "prompt": prompt_for_log,
                 "model": model,
                 "cost": total_cost,
                 # 真实 token 计数（来自各 provider 的 usage 字段），供上层汇总/落库
@@ -712,7 +752,7 @@ def run_single_persona(
             return {
                 "persona_id": persona["id"],
                 "output": None,
-                "prompt": prompt,
+                "prompt": prompt_for_log,
                 "model": model,
                 "cost": total_cost,
                 "input_tokens": total_input_tokens,
@@ -850,6 +890,10 @@ def run_panel(
 
     panel_selected = None
     panel_skipped = []
+    # 面板是怎么选出来的：preset（任务类型预设名单）/ pack_preset（该人格包的
+    # 专属名单）/ affinity_fallback（预设名单在这个包里一个都没命中，按任务亲和度
+    # 现凑）。显式点名人格时保持 None——那种情况面板是用户自己定的，没有"选法"。
+    panel_selection_method = None
     # 显式点名的人格里哪些没匹配上，必须留痕。以前是纯静默回落：对话里"呼叫某某角色"
     # 时 id 拼错或串了人格包，引擎不报错、直接换成 task_type 预设面板跑完，报告里
     # 一个字都不提——用户会以为自己点的角色发过言了。部分匹配更隐蔽（指定 3 个命中
@@ -864,18 +908,30 @@ def run_panel(
         if not panel_selected:
             panel_selected = None  # 一个都没匹配上——回落自动选人，别跑空面板
 
+    # mode_config 必须在选人**之前**取到：档位的 max_personas 既是截断上限，
+    # 也是自动选人的凑人目标（select_panel 的 target_size）。以前它在选人之后
+    # 才算，于是选人阶段完全不知道这次要几个人，只能凑到预设的 min_panel_size
+    # 就收手——档位承诺的 6/8 人对绝大多数人格包从来没有兑现过。
+    mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
+
     if panel_selected is None:
         fell_back_to_auto = bool(requested_personas)
         matched_persona_ids = []
-        panel = select_panel(task_type, personas, presets)
+        panel = select_panel(
+            task_type,
+            personas,
+            presets,
+            # mode 为 None 是 CLI/MCP 等旧调用方，历史行为是"不截人数"——
+            # 那就按预设自己的上限凑满，不再受 min_panel_size 压着。
+            target_size=mode_config["max_personas"] if mode_config else None,
+        )
         panel_selected = panel["selected"]
         panel_skipped = panel["skipped"]
+        panel_selection_method = panel["selection_method"]
 
     # 点名的 id 在人格包里根本不存在的那部分，单独记下来：它和"存在但被截断/预检
     # 跳过"是两种不同的缺席原因，notice 里要分开说。
     unknown_persona_ids = [pid for pid in requested_personas if pid not in matched_persona_ids]
-
-    mode_config = REVIEW_MODE_CONFIG.get(mode) if mode else None
 
     # ——— 两层评审：全包初筛（L1）→ 门禁 → 深评（L2） ———
     #
@@ -887,6 +943,11 @@ def run_panel(
     # 显式点名人格时不做初筛：用户指定的角色一个都不能被门禁筛掉，
     # 这与 adaptive_panel 对点名的让位是同一条纪律。
     triage_block = None
+    # 并发上限在这里就定下来（以前在人格评审那一段才解析）：L1 初筛同样要用它，
+    # 而初筛发生在更早。全引擎共用这一个旋钮——后台面板改的运行时并发值就是
+    # 通过 run_panel(max_concurrency=...) 传进来的这个参数。
+    if max_concurrency is None:
+        max_concurrency = int(os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6"))
     wide_screen_active = bool(wide_screen) and not requested_personas and mode_config is not None
     if wide_screen_active:
         # 初筛的对象是**整个人格包**（personas），不是预设面板子集——
@@ -896,6 +957,7 @@ def run_panel(
         valid_personas = precheck["valid_personas"]
         max_advance = mode_config["max_personas"]
         if len(valid_personas) > max_advance:
+            triage_model = None
             if simulated:
                 triage_call = None
             else:
@@ -907,12 +969,27 @@ def run_panel(
                 )
 
                 def triage_call(prompt, _m=triage_model):
+                    # 不传 temperature：初筛可能跑在 model_override 指定的任意模型上，
+                    # 而 Sonnet 5 / Opus 5 这代移除了采样参数，传非默认值直接 400
+                    # （见 llm_client.chat_completion 的形参注释）。
                     return chat_completion(
                         model=_m, prompt=prompt, api_key=effective_api_key,
                         provider=provider, api_base=api_base,
-                        max_tokens=300, temperature=0.3,
+                        max_tokens=300,
                     )
-            triage_out = run_triage(valid_personas, task_type, artifact_bundle, call_llm=triage_call)
+            triage_out = run_triage(
+                valid_personas, task_type, artifact_bundle,
+                call_llm=triage_call, max_concurrency=max_concurrency,
+            )
+            # 初筛是**真实付费调用**：token 记了、钱不记，就是本文件
+            # run_cross_exam_stage 注释里说的那种计费漏洞——开了 wide_screen
+            # 等于白送一整轮调用。模拟模式（triage_call 为 None）一分钱没花，记 0。
+            triage_cost = 0.0
+            if triage_call is not None:
+                triage_cost = estimate_cost(
+                    triage_out["input_tokens"], triage_out["output_tokens"],
+                    triage_model, budget_config,
+                )
             pack_name = valid_personas[0].get("_pack") if valid_personas else None
             dissenter_id = None
             for _p in valid_personas:
@@ -935,6 +1012,7 @@ def run_panel(
                 "material_char_limit": triage_out["material_char_limit"],
                 "input_tokens": triage_out["input_tokens"],
                 "output_tokens": triage_out["output_tokens"],
+                "cost": triage_cost,
                 "simulated": simulated,
             }
         else:
@@ -994,8 +1072,7 @@ def run_panel(
 
     # 人格评审彼此独立，是 I/O 密集（等 LLM 返回）任务，用线程池并发。
     # run_single_persona 内部已兜住异常并返回 error 字段，故 future 不会抛。
-    if max_concurrency is None:
-        max_concurrency = int(os.environ.get("AUDIENCELENS_MAX_CONCURRENCY", "6"))
+    # max_concurrency 已在 L1 初筛之前解析好（初筛也要用同一个旋钮）。
     workers = max(1, min(max_concurrency, len(valid_personas))) if valid_personas else 1
 
     # 实时进度：线程安全计数器，每个人格完成后在 worker 线程内回调
@@ -1027,6 +1104,12 @@ def run_panel(
     def _run_batch(batch):
         if workers <= 1 or len(batch) <= 1:
             return [_run(p) for p in batch]
+        # 已知局限：这里是真并发（不是"提交后一个个等"），N 个人格几乎同时把
+        # 请求发出去。Anthropic 的 Prompt Caching 要求缓存先被写入才能被读到，
+        # 真同时到达的请求有可能全部撞上"缓存还没写完"，全部 miss 一次——
+        # 不算错，只是那一轮吃不到折扣。刻意不为了"保证吃满缓存"改成先发一个
+        # 探路再并发剩下的：那样多绕一轮网络往返换来的延迟，比偶尔一轮 miss
+        # 贵得多，尤其是本来就没几个人格的 quick/standard 档。
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(workers, len(batch))) as ex:
             # 按提交顺序收集 future 结果，保证与输入人格顺序一致（确定性）
             futures = [ex.submit(_run, p) for p in batch]
@@ -1191,6 +1274,9 @@ def run_panel(
                 provider=provider,
                 model_override=model_override,
                 api_base=api_base,
+                # 反驳阶段与人格评审共用同一个并发上限：后台面板改的运行时值
+                # 必须真的管到这一段，而不是只管得到人格评审那一段。
+                max_concurrency=max_concurrency,
             )
             # 反驳失败/只完成一半不会让整场评审失败，但必须在渲染产物里留痕——
             # 只躺在 JSON 的 limitation 里，读报告的人不会发现这场"辩论"其实没跑成。
@@ -1304,27 +1390,39 @@ def run_panel(
     # 显式点名人格的匹配结果进 report 本体（与 degradation / budget 同一个理由：
     # 只放返回值顶层的话，重新打开历史报告就看不见"你点的角色其实没参与"）。
     # 没有显式点名时整键不写，免得给报告塞一堆恒为空的字段。
-    if requested_personas:
-        # notice 按缺席原因分开说：id 不存在（unknown）和被评审模式人数上限截掉
-        # （truncated_by_mode）是两回事，混在一句"不存在"里会让用户去查一个
-        # 明明存在的 id。missing 仍是"点名了但没参与"的总集，供程序方消费。
-        notice_parts = []
-        if unknown_persona_ids:
-            notice_parts.append(
-                "你指定的人格 " + "、".join(unknown_persona_ids) + " 在本次人格包中不存在，"
-                + ("已改用任务类型的预设面板。" if fell_back_to_auto else "未参与本次评审。")
-            )
-        if truncated_by_mode_ids:
-            notice_parts.append(
-                "你指定的人格 " + "、".join(truncated_by_mode_ids)
-                + " 因评审模式的人数上限被截断，未参与本次评审。"
-            )
+    # notice 按缺席原因分开说：id 不存在（unknown）和被评审模式人数上限截掉
+    # （truncated_by_mode）是两回事，混在一句"不存在"里会让用户去查一个
+    # 明明存在的 id。missing 仍是"点名了但没参与"的总集，供程序方消费。
+    notice_parts = []
+    if unknown_persona_ids:
+        notice_parts.append(
+            "你指定的人格 " + "、".join(unknown_persona_ids) + " 在本次人格包中不存在，"
+            + ("已改用任务类型的预设面板。" if fell_back_to_auto else "未参与本次评审。")
+        )
+    if truncated_by_mode_ids:
+        notice_parts.append(
+            "你指定的人格 " + "、".join(truncated_by_mode_ids)
+            + " 因评审模式的人数上限被截断，未参与本次评审。"
+        )
+    # 兜底选人必须说出来。14 个任务类型预设里，default_personas 写的都是
+    # game-core 的人格 id，只有 11 组 (任务类型 × 人格包) 配了专属 by_pack 名单；
+    # 其余组合——包括 general-consumer / startup-panel / mobile-f2p 等 6 个包的
+    # **全部**任务类型——预设名单一个都命中不了，面板实际是按任务亲和度现凑的。
+    # 这跟"策展过的面板"是两种可信度，用户有权知道自己拿到的是哪一种。
+    if panel_selection_method == "affinity_fallback":
+        notice_parts.append(
+            "本次人格包没有为该任务类型配置专属面板名单，参与评审的人格是按任务亲和度"
+            "从包内自动挑选的（不是策展过的面板）。"
+        )
+    if requested_personas or notice_parts:
         report["panel_selection"] = {
             "requested": requested_personas,
             "matched": matched_persona_ids,
             "missing": missing_persona_ids,
             "truncated_by_mode": truncated_by_mode_ids,
             "fell_back_to_auto": fell_back_to_auto,
+            # preset / pack_preset / affinity_fallback；显式点名时为 None
+            "selection_method": panel_selection_method,
             "notice": "".join(notice_parts),
         }
 
@@ -1404,9 +1502,16 @@ def run_panel(
             )
     del report["_persona_outputs"]
 
-    # 交叉质询的用量必须一起计进总账：它是人格评审之外真实发生的付费调用，
-    # 漏掉就是"花了钱但账上看不到"——本仓库刚修过一批这类问题。
-    total_cost = sum(r["cost"] for r in persona_results) + cross_exam_usage["cost"]
+    # 交叉质询与 L1 初筛的用量必须一起计进总账：它们都是人格评审之外真实发生的
+    # 付费调用，漏掉就是"花了钱但账上看不到"——本仓库刚修过一批这类问题。
+    # （初筛的钱以前完全没进 total_cost，开着 wide_screen 就等于白送一整轮调用；
+    #   web 后端只按 total_cost 计费。）
+    triage_cost_total = float((triage_block or {}).get("cost") or 0.0)
+    total_cost = (
+        sum(r["cost"] for r in persona_results)
+        + cross_exam_usage["cost"]
+        + triage_cost_total
+    )
     total_input_tokens = (
         sum(r.get("input_tokens", 0) for r in persona_results) + cross_exam_usage["input_tokens"]
     )
@@ -1444,6 +1549,9 @@ def run_panel(
             # 用量会让单价估算失真
             "triage_input_tokens": (triage_block or {}).get("input_tokens", 0),
             "triage_output_tokens": (triage_block or {}).get("output_tokens", 0),
+            # 初筛的钱**已经算进上面的 total_cost 了**，这里单列只为对账，别再加一遍
+            # （与 cross_exam.cost 同一口径）。模拟模式恒为 0.0。
+            "triage_cost": triage_cost_total,
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
             # 交叉质询单列一份便于对账（已包含在上面的 total_* 里，不要再加一遍）

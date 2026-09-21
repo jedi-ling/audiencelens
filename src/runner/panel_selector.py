@@ -254,11 +254,29 @@ def select_panel(
     presets: dict,
     artifact_evidence_types: Optional[List[str]] = None,
     pack: Optional[str] = None,
+    target_size: Optional[int] = None,
 ) -> dict:
     """按 (task_type, pack) 选面板。
 
     pack 不传时从 personas 自带的 _pack 推断（load_personas 会盖上）；两者都没有时
     只用 presets 里的全局 default_personas，行为与旧版一致。
+
+    target_size：**希望凑到几个人**。调用方（cli.run_panel）传档位的 max_personas。
+    不传时退回 min_panel_size，即旧行为。
+
+    为什么需要这个参数——这是一个真实存在过的结构性缺陷：
+      预设的 default_personas 写的是 game-core 的人格 id（P01/P02/P04…），
+      而 general-consumer / startup-panel / mobile-f2p 等 10 个包的 id 完全是
+      另一批（P46…/P54…/P21…）。于是除 game-core 外的**每一个包**，预设名单
+      一个都匹配不上 → 全数 skip → 亲和度兜底填到 min_panel_size(4) 就收手。
+      而 min_panel_size 的语义是"下限"，被当成"填充目标"用了。
+      结果：standard 档界面上写着"最多 6 位人格"，实际恒定只有 4 位；
+      full 档承诺 8 位，同样只有 4 位——档位这个付费旋钮对 10/11 的人格包
+      完全失效，且没有任何提示。实测见 tests/test_panel_selector.py 的
+      test_fills_toward_target_on_every_pack。
+
+    填充目标 = clamp(target_size, 下限 min_panel_size, 上限 max_panel_size)，
+    再受候选池实际人数限制——凑不满就是凑不满，不会去别的包借人。
 
     返回：
         selected            最终面板（唱反调的人排在第一位，见下）
@@ -288,6 +306,14 @@ def select_panel(
 
     min_size = int(preset.get("min_panel_size", DEFAULT_MIN_PANEL_SIZE) or DEFAULT_MIN_PANEL_SIZE)
     max_size = int(preset.get("max_panel_size", 0) or 0)
+
+    # 凑人目标：调用方要几个就凑几个，但不低于预设下限、不高于预设上限。
+    # 上限之所以仍然生效：max_panel_size 是这个任务类型的策展判断（"这类评审
+    # 超过 N 个人视角就开始重复了"），档位是钱的旋钮，两者都该被尊重——
+    # 档位允许 8 人不等于任何任务类型都该硬凑到 8 人。
+    fill_target = min_size if target_size is None else max(min_size, int(target_size))
+    if max_size:
+        fill_target = min(fill_target, max_size)
 
     selected: List[dict] = []
     skipped: List[dict] = []
@@ -325,7 +351,7 @@ def select_panel(
 
     # 补 optional 名单（预设里写了却一直没人读的那个字段，现在真的用上）
     for ref in optional:
-        if len(selected) >= min_size:
+        if len(selected) >= fill_target:
             break
         persona = _match_persona(ref, personas)
         if persona is None or persona["id"] in seen_ids:
@@ -335,9 +361,10 @@ def select_panel(
         selected.append(persona)
         seen_ids.add(persona["id"])
 
-    # 仍然不够就按任务亲和度从本包里补
-    if len(selected) < min_size:
-        while len(selected) < min_size:
+    # 仍然不够就按任务亲和度从本包里补。凑到 fill_target 为止——池子空了就停，
+    # 凑不满是如实的结果（小包本来就只有 4 个人），不是失败。
+    if len(selected) < fill_target:
+        while len(selected) < fill_target:
             pick = _pick_by_affinity(_pool(), task_type, selected)
             if pick is None:
                 break
