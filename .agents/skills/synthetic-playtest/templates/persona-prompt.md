@@ -14,6 +14,11 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
 任务类型：{{task_type}}
 评审对象：{{artifact_summary}}
 
+[ARTIFACT MATERIALS - 评审材料详情]
+{{#each artifact_materials}}
+**{{type}}**: {{description}}
+{{/each}}
+
 作为{{persona_name}}，你必须回答以下问题：
 {{#each must_comment_on_items}}
 {{@index}}. 关于"{{this}}"，你的判断和证据是什么？

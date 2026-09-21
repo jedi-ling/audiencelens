@@ -102,7 +102,7 @@ personas:
       localization_review: 0.4
     evidence_types_needed: [交互深度说明, 手部追踪演示, 物理系统展示, 空间设计说明]
     model_hint: opus
-    motivations: [临场感, 交互深度, 物理可信度, '我真的在那里的瞬间', 手部交互自然度]
+    motivations: [临场感, 交互深度, 物理可信度, '"我真的在那里"的瞬间', 手部交互自然度]
     likes: [手部追踪精准, 物理交互丰富, 空间设计有尺度感, 环境细节可触摸, 声音空间化, 重量/阻力反馈]
     dislikes: [交互只有点按, 物理是假的, 空间感扁平, 手穿墙, 环境不可交互, 声音无空间感]
     decision_rules:

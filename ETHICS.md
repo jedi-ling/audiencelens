@@ -66,7 +66,21 @@ LLM 在模拟特定群体时，输出方差通常低于真实人群——即"过
 
 ### Demographic 偏见
 
-Demographic 信息（性别、年龄、地域）本身不能作为偏好的因果解释。AudienceLens 的每个 persona 定义中都明确标注了 demographic 字段的用途限定，prompt 中也有强制约束。
+Demographic 信息（性别、年龄、地域）本身不能作为偏好的因果解释。约束**不在 persona 定义里**——
+`src/personas/*.yaml` 的 `gender` / `age_range` / `region` 就是三个裸字段，没有逐条标注用途限定。
+真正起作用的是下面两道，写在代码和提示词里：
+
+1. **字段白名单**：`src/runner/persona_agent.py` 的 `CORE_FIELDS` 决定哪些字段会被渲染进提示词。
+   `gender` / `age_range` / `region` **不在这张白名单上**——`_minify_persona` 只挑白名单里的字段，
+   所以人格卡里根本不出现这三项，模型看不到也就无从据此推断。
+   （`mbti` 同理不在白名单里，它由提示词另行给出并附带使用边界。）
+2. **提示词里的显式约束**：`src/templates/persona-prompt-user.md` 的
+   `[IDENTITY-BEHAVIOR DECOUPLING]` 段要求判断必须来自 `behavior_profile`，
+   禁止把 `gender/age_range/region` 当作偏好的直接因果解释，也禁止"作为[性别/年龄/地域]玩家"
+   这类表述；`[MBTI USAGE BOUNDARY]` 段把 MBTI 限定为表达风格，与 `behavior_profile` 冲突时以后者为准。
+
+这样写而不是"每个 persona 各自标注"的理由：白名单是一处集中的、可测试的判据，
+加新人格不会漏；靠每份 YAML 自己写注释则是加一个包就多一次漏的机会，而且注释对模型没有强制力。
 
 ### 反馈循环风险
 

@@ -1,0 +1,25 @@
+# 为什么需要这个文件：开发机上 core.autocrlf=true，签出时 git 会把这些文件的
+# 换行改成 CRLF（工作区里 web/deploy/backup.sh 现在就有 198 行 CRLF）。
+# 而它们最终是在 Linux 上执行的：
+#   · `#!/usr/bin/env bash\r` —— 内核把 `\r` 当成解释器路径的一部分，
+#     报的是 "bad interpreter: No such file or directory"，看起来像 bash 没装；
+#   · Dockerfile 里 RUN 行尾的 `\r` 会被带进 shell 命令；
+#   · cron 装的 backup.sh 会在服务器上每天失败一次，且只有日志里看得到。
+# 部署包（scripts/make_deploy_package.py）直接从工作区打包，所以一个 Windows
+# 检出就足以发出一个跑不起来的 tarball。
+#
+# 只钉真正要在 Linux 上执行的文件，不写 `* text=auto`：全仓重规范化会产生一次
+# 覆盖上千文件的提交，掩盖真实改动。
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+web/deploy/Caddyfile text eol=lf
+
+# 三份技能目录必须逐字一致（CI 的 skill-consistency 作业做整目录递归比对，
+# 本地用 scripts/sync_skill_mirrors.py 同步）。core.autocrlf=true 下，
+# 已跟踪的文件签出成 CRLF、新加的文件还是 LF，两边就只因为换行不同而"漂移"——
+# 一个纯换行的假阳性会让人怀疑这个检查本身，进而把它调松。钉成 LF。
+.agents/skills/** text eol=lf
+.claude/skills/** text eol=lf
+.trae/skills/** text eol=lf

@@ -42,7 +42,7 @@ personas:
     model_hint: sonnet
     motivations: [unique mechanics, authorial voice, internally-consistent worldbuilding, choices worth replaying]
     likes: [high-info-density store pages, video/GIF that proves the pitch, tight small-scope system loops, treating players as smart]
-    dislikes: [vague selling points, "like X but bigger" copy, over-handholding tutorials, cookie-cutter indie aesthetics]
+    dislikes: [vague selling points, '"like X but bigger" copy', over-handholding tutorials, cookie-cutter indie aesthetics]
     decision_rules:
       - If the core hook isn't visible within 15 seconds, no wishlist
       - If there is evidence of one "only this game can do it" mechanic, even rough, will keep following
@@ -117,7 +117,7 @@ personas:
     language: [en-US, ja-JP]
     mbti: ISTP
     archetype: Challenge Action Purist
-    identity_summary: Only wants to know one thing: does the combat feel right?
+    identity_summary: "Only wants to know one thing: does the combat feel right?"
     gaming_profile:
       experience: core
       platforms: [PC, PS5]
@@ -436,7 +436,7 @@ personas:
     language: [en-US]
     mbti: ENFP
     archetype: Cozy Social Sharer
-    identity_summary: One key test of fun: "do I want to send this to a friend or jump in together?"
+    identity_summary: "One key test of fun: \"do I want to send this to a friend or jump in together?\""
     gaming_profile:
       experience: midcore
       platforms: [PC, Switch]
@@ -808,7 +808,7 @@ personas:
     language: [en-US]
     mbti: ESTJ
     archetype: Competitor-Loyal Veteran
-    identity_summary: Keeps asking: why wouldn't I just keep playing the more mature thing I'm already invested in?
+    identity_summary: "Keeps asking: why wouldn't I just keep playing the more mature thing I'm already invested in?"
     gaming_profile:
       experience: core-veteran
       platforms: [PC, Console]

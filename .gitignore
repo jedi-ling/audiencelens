@@ -25,7 +25,17 @@ web/admin/dist/
 # 本地 AI 工具产物（Qoder 分析报告等，机器专属）
 .qoder/
 .impeccable/
-.trae/
+
+# .trae/ 下混着两类东西，整目录忽略会让 CI 依赖的文件处在「被忽略却被跟踪」的
+# 矛盾状态：git ls-files 里有 45 个 .trae/ 文件，`.github/workflows/ci.yml` 的
+# skill-consistency 作业直接读 .trae/skills/synthetic-playtest/，README 也把
+# .trae/skills/ 列为随仓库分发的路径。而 `.trae/` 一行让任何新增的技能文件
+# （比如同步镜像时补进去的 en-SKILL.md）默认不可见——修完镜像也提交不上去。
+# 所以只放行这两个已入库的子树，其余（.trae/specs/ 等 Trae 本地生成的规格草稿）
+# 照旧忽略。
+.trae/*
+!.trae/documents/
+!.trae/skills/
 
 # HyperFrames 宣传片工程的生成产物：预览缩略图、快照、渲染输出、工具缓存。
 # 共同点是**都能从源文件（index.html + hyperframes.json）重新生成**，
@@ -33,8 +43,10 @@ web/admin/dist/
 # 进了 git 就是每改一次动画多压几 MB 进历史，而历史里的大文件删不干净。
 # 源文件本身是提交的，clone 下来重跑一次就有。
 audiencelens-*/.thumbnails/
+# snapshots* 带星号：验证轮次会生成 snapshots-verify/、snapshots-verify2/……
+# 原来的 `snapshots/` 只挡得住第一个目录，后面每验证一次就多一批未跟踪文件。
 audiencelens-*/.hyperframes/
-audiencelens-*/snapshots/
+audiencelens-*/snapshots*/
 audiencelens-*/renders/
 
 # 一次性生成的评审/审计报告。它们是某次跑出来的快照，不是仓库的一部分——
@@ -129,3 +141,22 @@ backups/
 *.db.gz
 *.sql.gz
 *.dump
+
+# 部署包产物（scripts/make_deploy_package.py 的输出，不进版本库）
+dist-package/
+
+# 软件著作权登记材料：从仓库现状一次性生成的申报件（源码打印稿、说明书），
+# 里面带申请人身份信息，且每次申报都重新生成。不进版本库。
+软著登记材料/
+
+# docs/ 下的 PDF 是 scripts/md_to_pdf.py 从同目录 .md 渲染出来的产物，
+# 每导出一次就多几 MB 二进制进历史，而历史里的大文件删不干净。
+# 下面三份是例外：它们在加这条规则之前就已入库（其中两份在 archive/，
+# 按发布当时的口径留档），忽略它们只会让已跟踪文件与 .gitignore 互相矛盾。
+docs/**/*.pdf
+!REMOVED/business-plan/AudienceLens-BP-2026-07-27.pdf
+!REMOVED/business-plan/archive/AudienceLens-BP.pdf
+!REMOVED/business-plan/archive/_bp_new.pdf
+
+# mcp-admin-server 的本地 venv（见 docs/MAINTENANCE.md §9）
+mcp-admin-server/venv/

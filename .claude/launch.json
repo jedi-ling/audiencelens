@@ -6,7 +6,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "C:\\pilotos\\python\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001"
+        "py -3.11 -m uvicorn app.main:app --host 127.0.0.1 --port 8001"
       ],
       "cwd": "web/backend",
       "port": 8001

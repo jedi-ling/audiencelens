@@ -1,10 +1,15 @@
-# 一页纸部署手册（v1.0 · 国内服务器 + 已备案域名 + hybrid 形态）
+# 一页纸部署手册（v0.3 · 国内服务器 + 已备案域名 + hybrid 形态）
 
 前提：服务器装好 Docker（含 compose 插件），域名 A 记录已指向服务器 IP。
 
 > **不想装 Docker？** 看 [`DEPLOY-BAREMETAL.md`](DEPLOY-BAREMETAL.md)——
 > systemd + nginx + certbot 的裸机部署方案，适合机器上已经有 nginx、
-> 或者不打算引入容器运行时的情况。两份手册的配置项（`web/.env`）完全通用。
+> 或者不打算引入容器运行时的情况。两份手册读的是同一份 `web/.env`，
+> 但**能生效的项不完全相同**：裸机是 systemd 把整个 `.env` 交给进程，
+> config.py 读得到里面的每一项；Docker 只透传 `docker-compose.yml`
+> `environment:` 段里显式列出的变量（那一段现已与 config.py 对齐，
+> 由 `tests/test_public_claims.py::test_compose_env_matches_config` 守着）。
+> 加新配置项时两边都要动。
 
 ## 首次部署
 
@@ -25,7 +30,7 @@ cp .env.production.example .env
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # 3. 冒烟
-curl -s https://你的域名/api/health   # 应返回 JSON 且 env=production
+curl -s https://你的域名/api/health   # 应返回 {"status":"ok","config":{...}}，config 里有 auth_enabled / key_mode / server_key_present / quota_enabled / qq_login_enabled
 
 # 4. 装自动备份（这一步之前只是文档里提一句"建议挂 cron"，没人真的装——
 #    数据库单点无备份。跑一次即可，幂等，改 schedule 重跑会覆盖旧的）
@@ -128,7 +133,7 @@ crontab -l | grep -E 'audiencelens-backup|audiencelens-restore-drill'
 
 | 端点 | 查什么 | 用在哪 |
 |---|---|---|
-| `GET /api/health` | 只回写死的 `ok` + 配置快照，**不碰数据库** | 容器 healthcheck（"进程还在不在"） |
+| `GET /api/health` | 回 `ok` + 配置快照。**不做依赖探测**（库挂了照样 200），但确实读一次库取 `key_mode` 与平台 key 的运行时覆盖值，读失败就回落 env 快照 | 容器 healthcheck（"进程还在不在"） |
 | `GET /api/health/ready` | 真打一次 `SELECT 1`，库不可用时返 **503** | 外部监控（UptimeRobot 等） |
 
 拿 `/api/health` 接 UptimeRobot 是个常见错误：数据库挂了它照样 200，

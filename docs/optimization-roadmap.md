@@ -1,13 +1,24 @@
 # AudienceLens 优化方向交接文档
 
+> ## ⚠ 本文档已部分过期（2026-09-20 复核）
+>
+> 它是 commit `9a90599` 那一轮的交接稿，多数条目已经完成或前提已变。下面用
+> ~~删除线~~ 标出**已完成/已失效**的条目并注明现状，未划掉的仍然有效。
+> 新接手请先读 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) 与 [`AGENTS.md`](../AGENTS.md)，
+> 本文只当作"还剩哪些方向没做"的清单。
+>
+> 原基线里那个写死的测试数已删除而不是更新：测试数
+> 每次提交都在变，写死一个就等着它再过期一次（仓库规则见 AGENTS.md「变更校验」，
+> 由 `tests/test_public_claims.py::test_test_counts_are_stated_once_and_dated` 卡着）。
+> 判据只有一条：`python -m pytest tests/ -q` 退出码为 0。
+
 > 写给接手的开发者/AI（GLM 等）。本文档假设你没有任何上下文，按优先级列出具体任务、涉及文件、验收标准。
-> 基线：commit `9a90599`，测试状态 **208 passed, 2 skipped**（2 个 skip 是语义模型未安装，正常）。
 
 ## 接手前先做的三件事
 
 ```bash
-# 1. 确认测试基线没有退化
-python -m pytest tests/ -q          # 期望 208 passed, 2 skipped
+# 1. 确认测试基线没有退化（判据是退出码 0，这里不写期望条数——写死必过期）
+python -m pytest tests/ -q
 
 # 2. 跑离线刻板印象评测，记录正则层基线数字（准确率/精确率/召回率）
 python -m src.cli stereotype-eval
@@ -38,7 +49,7 @@ python -m src.cli ablation concept_review examples/steam-page-sample/artifact.js
 
 `src/runner/similarity.py` 已实现语义/词法双档（bge-small-zh-v1.5，无依赖时回退 SequenceMatcher），但目前只接入了一个调用点。
 
-1. **`src/runner/cross_exam.py:128` 附近**：`find_opposing_stances` 里还在用旧的 `_similarity(...) > 0.5` 词法匹配找正反方论据，应改为复用传入的比较器（注意该处阈值是故意放宽的 0.5，语义档对应阈值需要单独标定，建议 0.6 起试）
+1. ~~**`src/runner/cross_exam.py:128` 附近**：`find_opposing_stances` 里还在用旧的 `_similarity(...) > 0.5` 词法匹配~~ ✅ 已完成：`cross_exam.py` 现在三处（181 / 245 / 348 行）统一走 `similarity if similarity is not None else get_issue_similarity()`，文中那行 `_similarity(...) > 0.5` 已不存在
 2. **`src/runner/aggregator.py:56-70`**：`compute_disagreements` 用议题 title **精确相等**分组（`issue_map[title]`），比 cross_exam 还原始——同一问题换措辞就分不到一组。改成与 cross_exam 相同的相似度合并逻辑，并复用同一个 `IssueSimilarity` 实例（embedding 有缓存，复用才省算力）
 3. **`src/harness/evaluator.py` 的 persona_differentiation 维度**：现在用 Jaccard ≥ 0.3，可加语义档算分化度，与 ablation 的 `issue_divergence` 指标统一口径
 4. **贪心合并改聚类**：`extract_controversy_points` 目前是"遍历时贪心合并到第一个相似项"，结果依赖输入顺序。改成简单的层次聚类（每轮合并相似度最高的一对，低于阈值停止）
@@ -50,16 +61,16 @@ python -m src.cli ablation concept_review examples/steam-page-sample/artifact.js
 
 1. **逐段调用太贵**：`detect_stereotypes` 对每段文本单独调一次 Haiku。改成按 persona 批量：一次请求带多段文本，返回 JSON 数组。注意保持 `llm_detect` 的单段接口兼容（有测试依赖）
 2. **judge prompt 没有 few-shot**：把 `tools/stereotype_eval_cases.yaml` 里挑 4 条典型（2 违规 2 合规，注意从评测集里**移除**被用作示例的条目，否则数据泄漏）放进 prompt，预期精确率提升
-3. **评测集扩容**：现在 30 条（14 违规 16 合规），扩到 50+，重点补：地域刻板印象的隐式表达、"数据显示某群体如何"的伪证据句式、行为向量与身份混写的边界用例
+3. **评测集扩容**（部分完成）：`tools/stereotype_eval_cases.yaml` 已扩到 50 条（写这行时的实测值，条数以 `test_public_claims.py` 的现算为准）。仍值得继续补的方向：地域刻板印象的隐式表达、"数据显示某群体如何"的伪证据句式、行为向量与身份混写的边界用例
 4. **失败静默问题**：`llm_detect` 所有异常都返回 None（按跳过处理）。加一个可选的 verbose/日志通道，否则线上 key 失效时检测会无声降级为纯正则——`detection_method` 字段虽然会如实记录，但没人主动看
 
 ## P3：工程收尾（1 天，无 API key 也能做）
 
 1. ~~**仓库根目录清理**~~ ✅ 已完成（2026-07-19）：一次性脚本已移入 `scripts/archive/`（含 README 声明其为非标准流水线的一次性会话脚本，禁止静默复用）；`audiencelens-landing-page.zip`/根目录 `index.html`/`docs/landing-page.html` 在此前会话中已删除；`tools/parity-check.py` 死代码副本已删除（保留 `tools/parity_check.py`，并同步修正了各文档引用）；重复的 `arxiv-paper*.md` 已统一到 `docs/paper/`；`docs/project-guide.md`/`docs/operation-guide.html` 顶层副本已删除（保留 `docs/project/` 下的版本）；`demo-report.html`/`demo-summary.md`/`CODE_WIKI.md` 孤立文件已删除。三个 harness 关系已在 [ARCHITECTURE.md](ARCHITECTURE.md) 补充说明：`src/harness/` 是内置引擎，`audiencelens-v0.2-harness/` 是后端运行时依赖（已修复其双重嵌套的目录结构问题），`audiencelens-harness/` 是完全独立的开源发行仓库（有自己的 `.git`，不做迁移——其 `.git/config` 里曾发现疑似明文 GitHub PAT，已于 2026-07-22 轮换并移除）
    - **保留原因**: `scripts/archive/` 保留作为历史参考，防止未来会话误用同名脚本；如需彻底清理可直接删除
-2. **CLI 入口统一**：`pyproject.toml` 已提交但内容未审查过，把 `python -m src.cli` 注册为 console_script（如 `audiencelens` 命令），README 全部命令示例随之更新；`src/runner/cli.py` 的 `main()` 保留但在 README 里不再作为首选入口
-3. **`VALID_TASK_TYPES` 不一致**：`src/runner/cli.py:40` 只列了 6 种任务类型，README 宣传 10 种（缺 devlog_review、kickstarter_review、localization_review、discord_community_review）。补齐或改 README，二选一
-4. **Python 版本确认**：环境里 pytest 跑在 Python 3.8（`AppData\Roaming\Python\Python38`），但 README 徽章写 3.11+。统一口径，并确认 `sentence-transformers` 在目标版本可装
+2. ~~**CLI 入口统一**~~ ✅ 已完成：`pyproject.toml` 的 `[project.scripts]` 已注册 `audiencelens = "src.cli:main"` 与 `audiencelens-mcp = "src.mcp_server:main"`；`src/runner/cli.py` 的 `main()` 保留但不再是首选入口
+3. ~~**`VALID_TASK_TYPES` 不一致**~~ ✅ 已完成：任务类型已从 `cli.py` 搬到唯一事实源 `src/runner/task_types.py::VALID_TASK_TYPES`，两边同源不再可能不一致；条数由 `tests/test_public_claims.py` 现算并与 README 比对（所以这里也不写死条数）
+4. ~~**Python 版本确认**~~ ✅ 2026-09-14 已统一到 3.11：pyproject `requires-python>=3.11`、`.claude/launch.json` 后端改用 `py -3.11`、README 徽章同步；引擎/后端两套测试在 3.11 下全绿。顺带修了 `web/backend/requirements.txt` 在中文 Windows 上被 pip 按 GBK 解码报错的问题（PEP 263 编码声明）并补上漏列的 `click`。`sentence-transformers` 仍是可选项，未在 3.11 验证安装
 
 ## 不要做的事
 
@@ -78,5 +89,5 @@ python -m src.cli ablation concept_review examples/steam-page-sample/artifact.js
 | `src/harness/ablation.py` | 消融实验（条件构造 + 三个分化度指标，指标是纯函数） |
 | `src/harness/evaluator.py` | 8 维质量评估（stereotype_check 已接两层检测） |
 | `src/cli.py` | 统一 CLI：run / personas-validate / harness-evaluate / parity-check / stereotype-eval / ablation |
-| `tools/stereotype_eval.py` + `_cases.yaml` | 检测评测脚本 + 30 条标注集 |
+| `tools/stereotype_eval.py` + `_cases.yaml` | 检测评测脚本 + 标注集（条数现算，见 `test_public_claims.py` 的 `stereotype_case` 指标） |
 | `tests/test_similarity.py` `test_stereotype_judge.py` `test_ablation.py` | 本轮新增测试，全部离线可跑 |

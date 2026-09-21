@@ -42,7 +42,7 @@
                     │  core/  errors / logging / security / ratelimit               │
                     │  db.py  models/  config.py（所有开关的唯一来源）              │
                     └───────────────┬──────────────────────────────────────────────┘
-                                    │  复用（引擎测试 394 项，2026-07 实测）
+                                    │  复用（同一套 src/runner 被 CLI 与 Web 共用）
                     ┌───────────────┴──────────────────────────────────────────────┐
                     │  src/runner/   面板选择 → 证据预检 → 人格并发评审 → 三层校验  │
                     │                → 争议点提取/派生摘要 → 聚合 → 校准            │
@@ -58,7 +58,7 @@
 
 **根目录下两个 `audiencelens-*-harness/` 与 `src/harness/` 的关系**（三者容易被误认为同一样东西，注意区分）：
 - `src/harness/`——本项目内置的质量评估引擎（8 维评分、刻板印象检测、消融实验），是 `src/runner/` 评审流水线的一部分，随主仓库一起维护。
-- `audiencelens-v0.2-harness/`——`web/backend` 运行时依赖的评委规则集/评分标准来源（`ethics_service.py`、`evaluation_service.py` 在启动时从这里读取 evaluators/rubrics/刻板印象模式；缺失时优雅降级为内置规则）。已在本仓库 `.gitignore`，只存在于本地磁盘，不随 git 历史分发。
+- `audiencelens-v0.2-harness/`——`web/backend` 运行时依赖的评委规则集/评分标准来源（`ethics_service.py`、`evaluation_service.py` 在启动时从这里读取 evaluators/rubrics/刻板印象模式；缺失时优雅降级为内置规则）。**已转正入库**：`.gitignore` 里那条忽略已删除并写明原因，`git ls-files audiencelens-v0.2-harness` 下有 33 个文件，`docker-compose.yml` 也把它挂进后端容器。转正的理由是「缺了它会静默降级」——降级这件事不报错，fresh clone 出来的站点看起来一切正常，只是评分口径悄悄换成了内置的那套。
 - `audiencelens-harness/`——完全独立的开源发行仓库，自带 `.git`（指向 `github.com/jedilpf/audiencelens-harness`），是面向 Claude Code / Cursor 的 Skill 包分发版本，与本仓库的 `src/`、`web/` 代码无任何导入/调用关系，只是恰好放在同一层目录下。同样已 `.gitignore`。
 
 ---
@@ -147,8 +147,11 @@ WS 连不上时自动回落轮询 `GET /api/v2/reviews/{id}`。
 | **LLM 服务商** | 启用 | 双路径出口 `runner/llm_client.py`：Anthropic 原生 SDK + 任意 OpenAI 兼容 HTTP（DeepSeek/Kimi/通义千问/智谱GLM/Ollama），不依赖 litellm | BYOK/平台 key 各自存 `provider/model/api_base`；`/api/keys/test`、`/api/admin/server-key/test` 走同一条真实链路，不是摆设 |
 | **多模态** | 启用 | 图片走独立上传白名单转 `data:` URI；内部统一用 OpenAI Vision 内容块，按 provider 转换（Anthropic）或原样透传；非视觉模型静默降级为纯文字，不中断评审 | `/api/uploads` 图片扩展名默认 `.png,.jpg,.jpeg,.webp,.gif`；`VISION_CAPABLE_PREFIXES` 控制哪些模型真正"看" |
 | **判断复利** | 启用 | 可证伪干预假设留档、回填验证、命中率、Brier/ECE 校准、人格排行 | 默认即用 |
-| **CDK 兑换码** | 启用 | 后台批量生成、免登录兑换（匿名自动签发游客身份）、防枚举限流；两种配额模式：`plan`（日限用完后垫）/ `credits`（纯次数制，每次评审 -1，用完即止） | CDK 发码运营：`AL_AUTH_ENABLED=true` + `AL_QUOTA_ENABLED=true` + `AL_QUOTA_MODE=credits`（次数只对服务端垫付 key 生效） |
-| **结构化错误** | 启用 | 9 种错误码、统一 `{error:{code,message}}` | 新错误继承 `AppError` |
+| **CDK 兑换码** | 启用 | 后台批量生成、免登录兑换（匿名兑换时自动签发游客身份）、防枚举限流；两种配额模式：`plan`（日限用完后垫）/ `credits`（纯次数制，每次评审 -1，用完即止） | CDK 发码运营：`AL_AUTH_ENABLED=true` + `AL_QUOTA_ENABLED=true` + `AL_QUOTA_MODE=credits`（次数只对服务端垫付 key 生效） |
+| **游客试用** | 启用 | 匿名用户**第一次发起评审**时自动签发一个独立游客身份并附赠几次体验额度，不需要注册也不需要 CDK。签发有每日上限，防止有人循环刷身份把垫付额度当无限用；试用完可以在原地绑定邮箱把身份升级成正式账号，历史评审不丢 | 额度与签发上限都在 `web/backend/app/services/guest_service.py` 顶部的常量里，这里不重复写数字 |
+| **QQ 互联登录** | 可选 | `AL_QQ_APP_ID` / `AL_QQ_APP_KEY` / `AL_QQ_REDIRECT_URI` 三项配齐才启用；`/api/health` 的 `qq_login_enabled` 决定前端画不画那个按钮 | 三项少配一项 = 按钮不出现且无报错。Docker 下还要确认 compose 透传了这三个变量（有 `test_compose_env_matches_config` 守着） |
+| **分享页 / 项目 / 对话** | 启用 | 评审可生成只读分享页（可撤销）；评审按 `project_key` 归入项目，同项目历史判断进下一次评审（见 §4.4）；发起评审前的澄清对话落库，可重命名/删除 | 见 §5 的 `/v2/reviews/{id}/share`、`/v2/projects`、`/v2/conversations` 三组 |
+| **结构化错误** | 启用 | 统一 `{error:{code,message}}`，错误码清单见 §5（唯一事实源是 `web/backend/app/core/errors.py`，这里不再写条数——曾经写 9、实际 10） | 新错误继承 `AppError` |
 | **可观测性** | 启用 | 请求 ID、耗时日志、`X-Request-Id` 回传 | 接 Sentry：改 `core/logging.py` |
 
 ---
@@ -195,6 +198,24 @@ UI 必须显示。绝不用 3 个样本吹准确率。
 某个人格历史上准就自动多选它或给它加权，要不要更信某个人格由用户自己判断。
 留档、回填、命中率、Brier Score、ECE、可靠性分箱、`low_confidence` 标注、
 leaderboard 都已实现，但"按历史表现自动调权"是路线图不是现状。
+
+**「你 vs 评审团」——留档从"只评工具"变成"两边都记"**
+
+留档层原先只记评审团的预测，所以回填之后系统只能回答一个问题："这个工具准不准"。
+而用户真正关心的是另一个："我自己在变准吗"。现在两边都记：
+
+- `POST /api/ledger/reviews/{id}/my-judgment` —— 用户在看完报告后写下**自己的**判断
+  （claim / stance / confidence / rationale），可以用 `based_on_judgment_id` 挂在
+  评审团的某条预测上表示"我不同意这条"。它和评审团的预测进同一张表、用同一套
+  回填与校准算法，日后才可比。
+- `GET /api/ledger/scoreboard` —— 同一批回填结果下两个来源各自的命中率。
+  **双方都有已定论样本时才给对比结论**：任一方为空就如实说明，不拿 0/0 拼一个
+  "你 100% 领先"出来（`comparable=false` + `note`）。这是 §4.3 开头那条诚实原则
+  在对比场景下的同一条规则。
+
+为什么这算护城河而不是功能：工具的命中率是工具的资产，用户自己的命中率是
+**用户的**资产——后者会让人不舍得换工具。但它成立的前提是回填，所以产品上
+一切设计都围绕"让回填这件事足够轻"。
 
 另注：v1 链路目前不记 judgment，两条链路的口径尚未统一。
 
@@ -284,6 +305,12 @@ L2 深评       胜出者走完整评审 + 交叉质询（人数上限仍是档�
 | GET | `/api/ledger/hit-rate` | 命中率（带 `low_confidence` 诚实标注） |
 | GET | `/api/ledger/calibration` | 置信度可靠性（Brier Score、ECE、五档分箱；小样本警告） |
 | GET | `/api/ledger/leaderboard` | 人格命中率排行 |
+| POST | `/api/ledger/reviews/{id}/my-judgment` | 记下**用户自己的**判断，与评审团预测并列留档（见 §4.3） |
+| GET | `/api/ledger/scoreboard` | 你 vs 评审团：同一批回填下两边各自的命中率；双方都有已定论样本才给结论 |
+| POST/GET/DELETE | `/api/v2/reviews/{id}/share` | 生成 / 读取 / 撤销只读分享页 |
+| GET/PATCH/DELETE | `/api/v2/projects[/{id}]` | 项目列表与改名/删除（`project_key` 是项目记忆的分组键，见 §4.4） |
+| GET/PATCH/DELETE | `/api/v2/conversations[/{id}]` | 发起评审前的澄清对话：列表、详情、改名、删除（删号时一并删除，见隐私政策） |
+| GET | `/api/auth/qq/authorize` · POST `/api/auth/qq/exchange` | QQ 互联登录：取授权地址 / 用 code 换本站会话（三项配置齐备时才可用） |
 | WS | `/ws/review/{id}` | 进度推送 |
 | GET | `/api/admin/overview` | 跨用户系统概览（需 `X-Admin-Token`，见 §8） |
 | GET | `/api/admin/timeseries` | 近 N 天评审量/成本趋势（可视化图表用） |
@@ -301,11 +328,14 @@ L2 深评       胜出者走完整评审 + 交叉质询（人数上限仍是档�
 | DELETE | `/api/admin/reviews/{id}` | 删除评审（级联判断留档；UsageRecord 计费事实源不删） |
 
 **错误契约**：一律 `{"error": {"code", "message", "detail?"}}`。
-错误码：`bad_request` `unauthorized` `forbidden` `not_found` `rate_limited`
+错误码（10 个，唯一事实源是 `web/backend/app/core/errors.py` 里各 `AppError` 子类的
+`code`）：`bad_request` `unauthorized` `forbidden` `not_found` `rate_limited`
 `quota_exceeded` `llm_key_missing` `upstream_error` `internal_error` `admin_disabled`。
 
-**WS 事件**：`review.started` `review.progress` `review.persona_completed`
-`review.completed` `review.failed`。
+**WS 事件**（唯一事实源是 `web/backend/app/websocket/__init__.py::WS_EVENTS`）：
+`review.started` `review.progress` `review.persona_completed`
+`review.evaluation_completed` `review.completed` `review.failed` `review.cancelled`。
+后三个是终态（`WS_TERMINAL_EVENTS`），前端收到任意一个就停止等待。
 
 ---
 
@@ -360,10 +390,15 @@ L2 深评       胜出者走完整评审 + 交叉质询（人数上限仍是档�
 
 ## 7. 测试
 
-| 范围 | 位置 | 数量 |
+| 范围 | 位置 | 覆盖什么 |
 |---|---|---|
-| 核心引擎 | `tests/` | 267（含 `test_llm_client.py` 多服务商/多模态出口 16 项） |
-| 平台链路 | `web/backend/tests/` | 173（含后台管理 54 项、渐进式认证与报告分级 10 项、通用产品任务类型/人格包 12 项、创业评审团 7 项、多服务商 BYOK/图片上传/测试连接 18 项、CDK 兑换码与两种配额模式 20 项） |
+| 核心引擎 | `tests/` | 流水线各阶段、争议提取、聚合、校准、伦理、消融、benchmark，以及 `test_llm_client.py` 的多服务商/多模态出口 |
+| 平台链路 | `web/backend/tests/` | 认证与会话、配额与计费、CDK 与两种配额模式、后台管理、报告分级、多服务商 BYOK、图片上传、判断留档、E2E 冒烟 |
+
+**这里刻意不写条数。** 本文件一度在三处各写一个互相矛盾的数字（分层总览里 394、
+本节两行里 267 与 173），任何人按其中一个去核对都会以为项目在虚报。
+判据只有一条：`python -m pytest tests/ -q` 与
+`(cd web/backend && python -m pytest tests/ -q)` 各自退出码为 0。
 
 平台链路里包含一组 **E2E 冒烟测试**（`test_e2e_chain.py`）：用假引擎替换 LLM，
 证明"发起 → 队列 → 报告落库 → 判断留档 → 记账"整条链真的闭环，

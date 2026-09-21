@@ -356,7 +356,7 @@ cd /opt/audiencelens && BACKUP_DIR=/var/backups/audiencelens bash web/deploy/res
 
 ```bash
 bash web/deploy/restore.sh --to-production /var/backups/audiencelens/reviews-YYYYmmdd-HHMMSS.db.gz
-sudo systemctl restart audiencelens-backend   # 恢复后必须重启，让连接池重连
+sudo systemctl restart audiencelens   # 恢复后必须重启，让连接池重连
 ```
 
 > ⚠️ 演练失败时 cron 只会写进日志，不会主动通知你。接了监控之后，
@@ -366,7 +366,7 @@ sudo systemctl restart audiencelens-backend   # 恢复后必须重启，让连�
 
 | 端点 | 查什么 | 用在哪 |
 |---|---|---|
-| `GET /api/health` | 只回写死的 `ok`，**不碰数据库** | systemd / 本地存活探测 |
+| `GET /api/health` | 回 `ok` + 配置快照。**不做依赖探测**（库挂了照样 200），但确实读一次库取 `key_mode` 与平台 key 的运行时覆盖值，读失败就回落 env 快照 | systemd / 本地存活探测 |
 | `GET /api/health/ready` | 真打一次 `SELECT 1`，库不可用时返 **503** | 外部监控（UptimeRobot 等） |
 
 拿 `/api/health` 接外部监控是个常见错误：数据库挂了它照样 200，

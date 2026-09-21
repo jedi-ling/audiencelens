@@ -10,43 +10,110 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check SKILL.md canonical consistency
+
+      # 技能目录一式三份：`.agents/` 是权威源，`.claude/` 与 `.trae/` 是镜像。
+      #
+      # 这一步以前只比 SKILL.md 的 frontmatter `name` 和 `## Phase` 条数——
+      # 恰好是整棵树里最不会变的两项。于是 `.trae/` 在全绿的情况下漂掉了 7 个
+      # 同名文件（两份 persona 包的 YAML 引号修法不同、mobile-f2p 多出两个 id
+      # 与 family-casual 撞号、persona-prompt.md 少一整段 ARTIFACT MATERIALS），
+      # 外加几个权威源里没有的文件。镜像漂了 = 同一个技能在不同工具里跑出不同结果。
+      #
+      # 现在改成整目录递归比对：文件集合必须一致，每个文件的内容也必须一致，
+      # 唯一允许的差异是镜像横幅那两行（外加它们带来的空行，所以用 diff -B）。
+      # 本地重新同步：`py -3.11 scripts/sync_skill_mirrors.py`
+      - name: Skill mirrors must match canonical (recursive)
         run: |
-          CANONICAL=".agents/skills/synthetic-playtest/SKILL.md"
-          MIRRORS=(".claude/skills/synthetic-playtest/SKILL.md" ".trae/skills/synthetic-playtest/SKILL.md")
-          
-          # Extract frontmatter name from canonical
-          CANONICAL_NAME=$(grep -m1 '^name:' "$CANONICAL" | sed 's/name: *//')
-          CANONICAL_PHASES=$(grep -c '^## Phase' "$CANONICAL" || true)
-          
+          CANON=".agents/skills/synthetic-playtest"
+          MIRRORS=(".claude/skills/synthetic-playtest" ".trae/skills/synthetic-playtest")
+          BANNER='<!-- mirror of .agents/skills/synthetic-playtest/SKILL.md; do not edit here -->'
+          BANNER_RE='^<!-- mirror of \.agents/skills/synthetic-playtest/SKILL\.md; do not edit here -->$|^> \*\*Mirror Notice\*\*'
+          fail=0
+
           for mirror in "${MIRRORS[@]}"; do
-            if [ ! -f "$mirror" ]; then
-              echo "::error::Mirror file missing: $mirror"
-              exit 1
+            if [ ! -d "$mirror" ]; then
+              echo "::error::Mirror directory missing: $mirror"
+              fail=1
+              continue
             fi
-            
-            # Check mirror banner exists
-            if ! grep -q '<!-- mirror of .agents/skills/synthetic-playtest/SKILL.md; do not edit here -->' "$mirror"; then
-              echo "::error::Mirror banner missing in $mirror"
-              exit 1
+
+            if ! grep -qF "$BANNER" "$mirror/SKILL.md"; then
+              echo "::error::Mirror banner missing in $mirror/SKILL.md"
+              fail=1
             fi
-            
-            # Check frontmatter name matches
-            MIRROR_NAME=$(grep -m1 '^name:' "$mirror" | sed 's/name: *//')
-            if [ "$CANONICAL_NAME" != "$MIRROR_NAME" ]; then
-              echo "::error::Frontmatter name diverged: canonical=$CANONICAL_NAME, mirror=$MIRROR_NAME in $mirror"
-              exit 1
+
+            # 1) 文件集合：多一个文件和少一个文件都算漂移
+            if ! diff <(cd "$CANON" && find . -type f | sort) \
+                      <(cd "$mirror" && find . -type f | sort) > /tmp/fileset.diff; then
+              echo "::error::File set diverged in $mirror (< canonical only, > mirror only)"
+              cat /tmp/fileset.diff
+              fail=1
             fi
-            
-            # Check Phase count matches
-            MIRROR_PHASES=$(grep -c '^## Phase' "$mirror" || true)
-            if [ "$CANONICAL_PHASES" != "$MIRROR_PHASES" ]; then
-              echo "::error::Phase count diverged: canonical=$CANONICAL_PHASES, mirror=$MIRROR_PHASES in $mirror"
-              exit 1
-            fi
+
+            # 2) 逐文件内容比对
+            while IFS= read -r rel; do
+              [ -f "$mirror/$rel" ] || continue
+              if ! diff -B <(grep -vE "$BANNER_RE" "$CANON/$rel") \
+                           <(grep -vE "$BANNER_RE" "$mirror/$rel") > /tmp/content.diff; then
+                echo "::error::Content diverged: $mirror/$rel"
+                head -40 /tmp/content.diff
+                fail=1
+              fi
+            done < <(cd "$CANON" && find . -type f | sed 's|^\./||' | sort)
           done
-          
-          echo "SKILL.md consistency check passed"
+
+          if [ "$fail" != 0 ]; then
+            echo "镜像已漂移。改权威源 .agents/skills/synthetic-playtest/，然后跑 scripts/sync_skill_mirrors.py 重新同步。"
+            exit 1
+          fi
+          echo "Skill mirrors match canonical"
+
+  # 技能包里的 persona YAML 一度有 7 份 `yaml.safe_load` 直接抛异常——
+  # 原因是流式序列里塞了以 `"` 开头的非引号项（`"色弱不影响体验"的假设`）。
+  # 没有任何东西加载过这些文件，所以坏了半年没人知道；而它们正是技能运行时
+  # 要读的人格定义。这一步把"能不能解析"变成红线。
+  skill-yaml-parses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - name: Every persona/config YAML must parse
+        run: |
+          python - <<'PY'
+          import glob, sys, yaml
+
+          ROOTS = (
+              ".agents/skills",
+              ".claude/skills",
+              ".trae/skills",
+              "src/personas",
+          )
+          # `*/templates/*` 下的是 Mustache 模板（`{{persona_id}}:` 之类），
+          # 本来就不是合法 YAML，不参与解析检查。
+          files = sorted(
+              f
+              for root in ROOTS
+              for f in glob.glob(root + "/**/*.yaml", recursive=True)
+              if "/templates/" not in f.replace("\\", "/")
+          )
+          assert files, "一个 YAML 都没扫到，先确认路径对不对"
+
+          bad = []
+          for path in files:
+              try:
+                  with open(path, encoding="utf-8") as fh:
+                      yaml.safe_load(fh)
+              except Exception as exc:
+                  bad.append(f"{path}: {str(exc).splitlines()[0]}")
+
+          print(f"checked {len(files)} YAML files, {len(bad)} failed")
+          for line in bad:
+              print("::error::" + line)
+          sys.exit(1 if bad else 0)
+          PY
 
   core-engine:
     runs-on: ubuntu-latest
@@ -55,8 +122,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      # 为什么这里连后端依赖也装：tests/test_public_claims.py 里的
+      # test_cli_skill_hints_match_backend 要同时 import `src/cli.py` 与
+      # `web/backend` 的 PersonaService，比对两边的 --skill 提示语。
+      # 它在导入失败时 pytest.skip —— 而根 requirements.txt 没有 fastapi，
+      # backend 作业又只跑 web/backend/tests/。结果这条跨链路守卫在 CI 里
+      # 从来没真正执行过：CLI 与 Web 的提示语可以随便漂，全绿。
+      # 装上后端依赖是让它真的跑起来最省事的办法（核心引擎的发布物不受影响，
+      # src/ 仍然不 import 任何后端模块，这一点由该测试本身保证）。
       - name: Install deps
-        run: pip install -r requirements.txt pytest pytest-asyncio
+        run: pip install -r requirements.txt -r web/backend/requirements.txt pytest pytest-asyncio
       # 步骤名不写条数：写死的数字每加一条测试就过期一次，而且没人会因此变红。
       # 仓库里同一个数字一度有四个互相矛盾的版本（这里、README 徽章、
       # MAINTENANCE.md、落地页），任何人按其中一个去核对都会以为项目在虚报。

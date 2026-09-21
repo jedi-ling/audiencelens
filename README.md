@@ -5,7 +5,7 @@
 **Multi-Agent Synthetic Audience Review System with Cross-Examination**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg)](requirements.txt)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](web/backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
 [![Tests](https://img.shields.io/badge/Tests-passing-success.svg)](tests/)
@@ -42,9 +42,9 @@ The core execution engine is a 7-stage pipeline in `src/runner/`:
 
 | Stage | Module | Function |
 |---|---|---|
-| **Panel Selection** | `panel_selector.py` | Select personas by task type; guarantee dissenter inclusion (auto-append P15 if missing) |
+| **Panel Selection** | `panel_selector.py` | Select personas by task type; guarantee dissenter inclusion. `DISSENTER_PREFIXES = ("P15", "P16")` covers game-core only; every other pack has its own entry in `PACK_DISSENTERS` (full ids, because bare numbers collide across packs), and the chosen dissenter is moved to the front of the panel so depth-based truncation cannot drop it |
 | **Evidence Pre-check** | `evidence_precheck.py` | Filter out personas with <30% evidence coverage for required evidence types |
-| **Persona Execution** | `persona_agent.py` | Render 5-segment prompt (Persona Card → MBTI Boundary → Identity-Behavior Decoupling → Task → Evidence Rules); parse structured output |
+| **Persona Execution** | `persona_agent.py` | `render_prompt_split` renders two segments: a **shared** one that is byte-identical for every persona in the run (TASK / ARTIFACT MATERIALS / EVIDENCE RULES / SCORING RUBRIC / OUTPUT RULES / OUTPUT SKELETON — sent as the cacheable system prefix) and a **per-persona** one (PERSONA CARD / MBTI BOUNDARY / IDENTITY-BEHAVIOR DECOUPLING, plus any image materials). The older single-template `render_prompt` is kept for `src/cli.py` and `src/harness/ablation.py`. Parses structured output |
 | **3-Layer Validation** | `validator.py` | Schema validation (Draft7Validator) → Role consistency (must_comment_on ≥80%, inferred ≤40%) → Evidence grounding (hallucination <30%) |
 | **Cross-Examination** | `cross_exam.py` | Extract top-3 controversies (by severity variance, semantic dedup with lexical fallback); pair the most opposed personas and run **one rebuttal round** against the model. `mode` is one of `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal`, and `is_live_debate` is true only for the latter two — see §3 |
 | **Rule-Driven Aggregation** | `aggregator.py` | Compute consensus, disagreements, priority fixes (severity × persona weight × affected count); release risk assessment |
@@ -114,6 +114,8 @@ Traditional "let the most disagreeing personas argue" often produces unproductiv
 > **What now exists is the instrument, not the answer.** `audiencelens cross-exam-ablation` (`src/harness/cross_exam_ablation.py`) runs the panel **once** and forks that single set of persona outputs into `none` / `moderated` / `multi_agent`, so cross-examination is the only variable — deliberately *not* `run_panel(mode=...)`, which would also change panel size (3/6/8) and confound the result. It reports what the rebuttal added, dropped, and reordered in the final report, plus the `vote_changes` / `suppressed_changes` ratio that θ would have to be calibrated against. Read its verdict precisely: **it can falsify** (if nothing changes, the round is pure cost — a conclusion that needs no external ground truth) but **it cannot confirm** (change ≠ improvement; that requires adoption rates or human-cohort references, see [product-validation](docs/product-validation.md)). No result is published here yet.
 >
 > **One precise exception, so this stays honest in the other direction.** The above describes the **Python engine** — the path behind the CLI, the Python package, the MCP server, and the hosted Web app, i.e. everything most users touch. The **skill packs** (`.claude/skills/`, `.trae/skills/`) are a different path: there, an LLM coding agent reads `SKILL.md` and performs Phase 5 itself, including the persuasion scoring and the θ=0.15 stance update. So the skill path may do more than the engine does — but it is an agent following Markdown instructions, with **no code enforcing it, no schema validating it, and no test covering it**. It is not deterministic and it is not a guarantee. Do not cite the skill path as evidence for the engine, or vice versa.
+>
+> **The skill packs are also frozen at v0.2 content.** They are kept in sync with each other (`.agents/skills/synthetic-playtest/` is canonical, `.claude/` and `.trae/` are byte-identical mirrors apart from the mirror banner, enforced by a recursive diff in CI), but they are *not* kept in sync with `src/`. Two concrete differences: their `config/budget.yaml` still names the placeholder model aliases `claude-sonnet` / `claude-haiku` / `claude-opus`, which `src/config/budget.yaml` warns will 404 against the real API; and their persona set is a stale subset of `src/personas/` — 8 Chinese packs plus one English `en-game-core`, against 11 Chinese packs and 11 English ones under `src/personas/en-US/`; general-consumer, startup-panel and launch-compliance are absent entirely, and game-core and mobile-f2p are each short a few personas. Treat them as a v0.2 demonstration of the protocol, not as the shipping persona library.
 
 ### 4. Task Types — 14 Review Scenarios
 
@@ -140,13 +142,13 @@ The single source of truth is `src/runner/task_types.py::VALID_TASK_TYPES`; anyt
 
 | Layer | Tech Stack | Key Features |
 |---|---|---|
-| **Backend** | FastAPI + SQLite + WebSocket | 85 route handlers (`grep -c '^@router\.' app/api/*.py`), 5 emitted WebSocket event types, 19 service modules |
-| **Frontend** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 20 page components (landing page included), 7 components, 3 Zustand stores |
-| **Services** | 19 modules in `app/services/` (key / quota / job / intent / ledger / CDK / chat / mail / plan / admin-settings / audit-log / auth-token / ethics / evaluation / report-gating / review / user-data / validation / json-safe), plus `PersonaService` / `ReviewService` / `MaterialExtractor` defined in `services/__init__.py` | Anthropic native SDK + OpenAI-compatible HTTP (OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama presets), stereotype detection, ethics compliance |
-| **Real-time** | WebSocket (5 event types emitted) | Live review progress, persona-by-persona results |
+| **Backend** | FastAPI + SQLite + WebSocket | 121 route handlers (`grep -c '^@router\.' app/api/*.py`), 7 emitted WebSocket event types, 28 service modules |
+| **Frontend** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 24 page components (landing page included), 16 components, 3 Zustand stores |
+| **Services** | 28 modules in `app/services/` (key / quota / skill-quota / job / intent / ledger / CDK / chat / conversation / project / project-memory / share / guest / file-store / mail / plan / admin-settings / admin-auth / audit-log / auth-token / qq-auth / ethics / evaluation / report-gating / review / user-data / validation / json-safe), plus `PersonaService` / `ReviewService` / `MaterialExtractor` defined in `services/__init__.py` | Anthropic native SDK + OpenAI-compatible HTTP (OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama presets), stereotype detection, ethics compliance |
+| **Real-time** | WebSocket (7 event types emitted) | Live review progress, persona-by-persona results |
 | **Deployment** | Docker Compose | Frontend (Nginx) + Backend (Uvicorn) |
 
-**3 Review Modes** (`MODE_CONFIG` in `src/runner/cli.py`):
+**3 Review Modes** (`REVIEW_MODE_CONFIG` in `src/runner/cli.py`):
 
 | Mode | Personas | Cross-Exam | Calibration | Use Case |
 |---|---|---|---|---|
@@ -154,9 +156,44 @@ The single source of truth is `src/runner/task_types.py::VALID_TASK_TYPES`; anyt
 | Standard | up to 6 | 1 arbitrated rebuttal call | No | Balanced review |
 | Full | up to 8 | 1 call per involved persona | Yes | Complete analysis |
 
+**Two-Tier Review** (`wide_screen=true`, off by default). Normally the panel is picked
+and then truncated to the mode's persona cap, so most of a pack never speaks. With
+two-tier on, **every** persona in the selected packs first gets one cheap short call
+(fallback model, material truncated and the truncation recorded) that returns only a
+stance, a severity and a one-line concern. A deterministic gate — severity descending,
+minority stance weighted up, dissenter guaranteed, ties broken by id — picks who
+advances to the full review plus cross-examination, still within the mode's cap.
+The gate is deliberately *not* another model call: which personas advance has to be
+reproducible and explainable per persona. Triage output is used **only for selection**
+and never merged into the conclusions — it lives in its own `report["triage"]` block
+with its provenance stated, and its tokens are billed into the review's cost total.
+Explicitly named personas bypass the gate entirely. See
+[`docs/ARCHITECTURE.md` §4.5](docs/ARCHITECTURE.md).
+
+**Judgment Loop — "you vs. the panel"** (`POST /api/ledger/reviews/{id}/my-judgment`,
+`GET /api/ledger/scoreboard`). Priority fixes are logged as falsifiable intervention
+hypotheses with a verification window, and the user can log **their own** call on the
+same review — optionally attached to a specific panel prediction to say "I disagree
+with this one". Both go into the same table and through the same backfill and
+calibration path, so once real results are filled in the scoreboard can show each
+side's hit rate on the same set of outcomes. It only reports a comparison when **both**
+sides have settled samples; otherwise it says so rather than turning 0/0 into a lead.
+Historical hit rate still does **not** feed panel selection or aggregation weights —
+"gets better the more you use it" is roadmap, not current behaviour.
+
+**Guest trial.** An anonymous visitor's first review mints an isolated guest identity
+with a few free reviews attached — no signup, no CDK. Minting is rate-limited per day
+so nobody can farm identities for free platform-key reviews, and the guest can bind an
+email later to keep the history. **QQ login** is available when
+`AL_QQ_APP_ID` / `AL_QQ_APP_KEY` / `AL_QQ_REDIRECT_URI` are all set; `/api/health`
+reports `qq_login_enabled` so the frontend only draws the button when it will work.
+Reviews can be published as a revocable read-only **share page**, grouped into
+**projects** (the key that project memory uses), and the clarifying **conversation**
+that precedes a review is persisted, renameable and deletable.
+
 ### 6. Quality Harness — 8-Dimension Scorecard
 
-> **Read this before citing it.** The harness is a **post-hoc scorecard**, not a gate. On the web path `enable_evaluation` defaults to **false**, and when enabled it runs *after* the review is finished: it scores the report, it never blocks, filters, or re-runs a persona output. The eight thresholds live in `src/harness/thresholds.yaml` and the code ships them with `"threshold_note": "原型阈值，未经实证验证"` (prototype thresholds, not empirically validated).
+> **Read this before citing it.** The harness is a **post-hoc scorecard**, not a gate. On the web path `enable_evaluation` defaults to **false**, and when enabled it runs *after* the review is finished: it scores the report, it never blocks, filters, or re-runs a persona output. The eight thresholds that actually apply are the `DEFAULT_THRESHOLDS` constant in `src/harness/evaluator.py`; `src/harness/thresholds.yaml` is a sample override file that nothing loads unless you pass it explicitly to `src/cli.py --threshold-file`. Either way the code ships the scores with `"threshold_note": "原型阈值，未经实证验证"` (prototype thresholds, not empirically validated).
 
 | # | Dimension | What It Checks |
 |---|---|---|
@@ -295,8 +332,17 @@ npm run dev
 
 ```bash
 cd web
-docker-compose up
+cp .env.production.example .env   # required: see below
+# edit .env — at minimum AL_CORS_ORIGINS and AL_JWT_SECRET
+docker compose up
 ```
+
+`docker-compose.yml` declares `AL_CORS_ORIGINS` and `AL_JWT_SECRET` with `${VAR:?...}`,
+so without a `.env` compose aborts at parse time instead of starting a stack with no
+CORS restriction and a guessable session secret. That is deliberate — but it also means
+`docker compose up` on a fresh clone fails until you copy the template. Use
+`docker compose` (v2, a Docker CLI plugin), not the standalone `docker-compose` v1
+binary, which is end-of-life.
 
 ### Programmatic API
 
@@ -337,15 +383,15 @@ audiencelens/
 ├── web/
 │   ├── backend/                       # FastAPI backend
 │   │   └── app/
-│   │       ├── api/                   #   85 route handlers (v1 + platform + admin)
-│   │       ├── services/              #   19 service modules
+│   │       ├── api/                   #   121 route handlers (v1 + platform + admin)
+│   │       ├── services/              #   28 service modules
 │   │       ├── models/                #   SQLAlchemy models
 │   │       ├── schemas/               #   Pydantic schemas
-│   │       └── websocket/             #   5 WebSocket event types
+│   │       └── websocket/             #   7 WebSocket event types
 │   └── frontend/                      # React frontend
 │       └── src/
-│           ├── pages/                 #   20 page components (landing page included)
-│           ├── components/            #   7 components
+│           ├── pages/                 #   24 page components (landing page included)
+│           ├── components/            #   16 components
 │           └── store/                 #   3 Zustand stores
 ├── tests/                             # Engine test suite (see Testing)
 ├── examples/                          # 7 sample artifacts
@@ -435,9 +481,9 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 
 | 阶段 | 模块 | 功能 |
 |---|---|---|
-| **面板选择** | `panel_selector.py` | 按任务类型选择人格；保证反对者存在（缺P15自动追加） |
+| **面板选择** | `panel_selector.py` | 按任务类型选择人格；保证反对者存在。`DISSENTER_PREFIXES = ("P15", "P16")` 只覆盖 game-core，其余每个包各自在 `PACK_DISSENTERS` 里登记（用全 id，裸号跨包会撞车），选中的反对者被排到面板最前面，按档位截断时切不掉 |
 | **证据预检** | `evidence_precheck.py` | 过滤证据覆盖度 <30% 的人格 |
-| **人格执行** | `persona_agent.py` | 渲染五段式 Prompt（人格卡→MBTI边界→身份-行为解耦→任务→证据规则）；解析结构化输出 |
+| **人格执行** | `persona_agent.py` | `render_prompt_split` 渲染两段：**共享段**在同一次评审里对所有人格逐字相同（TASK / ARTIFACT MATERIALS / EVIDENCE RULES / SCORING RUBRIC / OUTPUT RULES / OUTPUT SKELETON，作为可缓存的 system 前缀发送），**人格段**随人格变化（PERSONA CARD / MBTI 边界 / 身份-行为解耦，图片材料也只能放这一段）。未拆分的旧模板 `render_prompt` 保留给 `src/cli.py` 与 `src/harness/ablation.py`；解析结构化输出 |
 | **三层校验** | `validator.py` | Schema校验(Draft7Validator) → 角色一致性(must_comment_on≥80%, inferred≤40%) → 证据接地(幻觉<30%) |
 | **交叉质询** | `cross_exam.py` | 提取 top-3 争议点（按 severity 方差排序，语义去重 + SequenceMatcher 回退）；配对立场最对立的人格，对模型跑**一轮反驳**。`mode` 取 `derived_summary` / `moderated_rebuttal` / `multi_agent_rebuttal` 三者之一，只有后两种时 `is_live_debate` 才为真——见 §3 |
 | **规则聚合** | `aggregator.py` | 计算共识、分歧、优先修复项（severity×人格权重×影响人数）；发布风险评估 |
@@ -507,6 +553,8 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 > **现在有的是量具，不是答案。** `audiencelens cross-exam-ablation`（`src/harness/cross_exam_ablation.py`）把人格评审**只跑一次**，再从这一批人格输出上分叉出 `none` / `moderated` / `multi_agent` 三个条件，因此交叉质询是唯一变量——**刻意不走** `run_panel(mode=...)`，因为那条路径会连人数一起改（3/6/8），两个变量混在一起结论就作废。它报告反驳在最终报告里**新增了什么、删掉了什么、只是重排了什么**，以及校准 θ 唯一能依据的 `vote_changes` / `suppressed_changes` 比值。它的结论要按字面读：**能证伪**（若什么都没变，这一轮就是纯成本——这个结论不需要外部真值即可成立），**但不能证实**（变了 ≠ 变好了，后者需要建议采纳率或真人对照，见 [产品验证](docs/product-validation.md)）。此处尚未发布任何实验结果。
 >
 > **一个必须说清的例外，免得反过来也失真。** 上面说的是 **Python 引擎**——也就是 CLI、Python 包、MCP Server、托管 Web 应用背后的那条链路，绝大多数用户碰到的就是它。**技能包**（`.claude/skills/`、`.trae/skills/`）是另一条链路：在那里由 LLM 编码代理读取 `SKILL.md` 并**自己执行** Phase 5，包括说服力评分和 θ=0.15 的立场更新。所以技能链路可能比引擎做得更多——但那是一个代理在遵循 Markdown 指令，**没有任何代码强制它、没有 schema 校验它、也没有测试覆盖它**，不确定、不可保证。请勿拿技能链路给引擎背书，反之亦然。
+>
+> **技能包的内容还冻结在 v0.2。** 三份技能目录彼此保持一致（`.agents/skills/synthetic-playtest/` 是权威源，`.claude/` 与 `.trae/` 是除镜像横幅外逐字相同的镜像，由 CI 的整目录递归比对卡着），但它们**不跟 `src/` 同步**。两处具体差异：技能包里的 `config/budget.yaml` 仍然写着占位模型别名 `claude-sonnet` / `claude-haiku` / `claude-opus`，而 `src/config/budget.yaml` 明确警告这些名字对真实 API 会 404；技能包的人格集是 `src/personas/` 的过期子集——8 个中文包加一个英文 `en-game-core`，而 `src/personas/` 有 11 个中文包、`src/personas/en-US/` 另有 11 个英文包；general-consumer、startup-panel、launch-compliance 三个包完全没有，game-core 与 mobile-f2p 也各少几位人格。把它们当作 v0.2 协议的演示件，而不是随产品发布的人格库。
 
 ### 4. 任务类型 — 14 种评审场景
 
@@ -533,13 +581,13 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 
 | 层 | 技术栈 | 核心功能 |
 |---|---|---|
-| **后端** | FastAPI + SQLite + WebSocket | 85 个路由处理函数（`grep -c '^@router\.' app/api/*.py`）、5 种实际发出的 WebSocket 事件、19 个服务模块 |
-| **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 20 个页面组件（含落地页）、7 个组件、3 个 Zustand Store |
-| **服务** | `app/services/` 下 19 个模块（密钥 / 配额 / 任务 / 意图 / 留档 / CDK / 对话 / 邮件 / 套餐 / 后台设置 / 审计日志 / 认证令牌 / 伦理 / 评估 / 报告门禁 / 评审 / 用户数据 / 校验 / JSON 安全序列化），外加定义在 `services/__init__.py` 里的 `PersonaService` / `ReviewService` / `MaterialExtractor` | Anthropic 原生 SDK + OpenAI 兼容 HTTP（OpenAI / DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 预设）、刻板印象检测、伦理合规 |
-| **实时** | WebSocket（实际发出 5 种事件） | 实时评审进度、逐人格结果展示 |
+| **后端** | FastAPI + SQLite + WebSocket | 121 个路由处理函数（`grep -c '^@router\.' app/api/*.py`）、7 种实际发出的 WebSocket 事件、28 个服务模块 |
+| **前端** | React 19 + TypeScript + Tailwind + shadcn/ui + Recharts | 24 个页面组件（含落地页）、16 个组件、3 个 Zustand Store |
+| **服务** | `app/services/` 下 28 个模块（密钥 / 配额 / 技能配额 / 任务 / 意图 / 留档 / CDK / 对话 / 会话持久化 / 项目 / 项目记忆 / 分享 / 访客 / 文件存储 / 邮件 / 套餐 / 后台设置 / 后台账号 / 审计日志 / 认证令牌 / QQ 登录 / 伦理 / 评估 / 报告门禁 / 评审 / 用户数据 / 校验 / JSON 安全序列化），外加定义在 `services/__init__.py` 里的 `PersonaService` / `ReviewService` / `MaterialExtractor` | Anthropic 原生 SDK + OpenAI 兼容 HTTP（OpenAI / DeepSeek / Kimi / 通义千问 / 智谱 GLM / Ollama 预设）、刻板印象检测、伦理合规 |
+| **实时** | WebSocket（实际发出 7 种事件） | 实时评审进度、逐人格结果展示 |
 | **部署** | Docker Compose（[`web/DEPLOY.md`](web/DEPLOY.md)）或 systemd + nginx 裸机（[`web/DEPLOY-BAREMETAL.md`](web/DEPLOY-BAREMETAL.md)） | 前端(Nginx) + 后端(Uvicorn，**必须单进程**：队列/WS/限流都在进程内存里) |
 
-**3 种评审模式**（`src/runner/cli.py` 的 `MODE_CONFIG`）：
+**3 种评审模式**（`src/runner/cli.py` 的 `REVIEW_MODE_CONFIG`）：
 
 | 模式 | 人格数 | 交叉质询 | 校准 | 适用场景 |
 |---|---|---|---|---|
@@ -547,9 +595,35 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 | 标准 | 最多 6 | 1 次仲裁式反驳调用 | 否 | 均衡评审 |
 | 完整 | 最多 8 | 每位涉事人格各 1 次 | 是 | 完整分析 |
 
+**两层评审**（`wide_screen=true`，默认关）。平时是"选完人再按档位截断"，
+所以一个包里大多数人格从来没开过口。打开两层评审后，所选人格包里的**每一位**
+先跑一次廉价短调用（fallback 档模型，材料截断并留痕），只出立场、严重度和
+一句话关切；然后由**确定性门禁**（严重度降序 → 少数派立场加权 → 异见者保底 →
+同分按 id 字典序）决定谁进入完整评审 + 交叉质询，人数上限仍是档位的那个数。
+门禁刻意不是又一次模型调用：选谁进深评必须可复现、逐人可解释。初筛结论
+**只用于选人，绝不混进正式结论**——它单独放在 `report["triage"]` 块里并标明口径，
+它消耗的 token 计入本次评审的总成本。显式点名的人格直接跳过门禁。
+详见 [`docs/ARCHITECTURE.md` §4.5](docs/ARCHITECTURE.md)。
+
+**判断闭环——「你 vs 评审团」**（`POST /api/ledger/reviews/{id}/my-judgment`、
+`GET /api/ledger/scoreboard`）。优先修复项会被转成带验证窗口的可证伪干预假设留档；
+在此之上，用户可以就同一次评审记下**自己的**判断，还能挂在评审团的某条预测上
+表示"我不同意这条"。两边进同一张表、走同一套回填与校准算法，所以真人结果回填
+之后，记分板能在**同一批结论**上给出双方各自的命中率。只有**双方都有已定论样本**
+时才给对比结论，否则如实说明，而不是把 0/0 说成"你领先"。历史命中率**仍然没有**
+接回面板选择或聚合权重——"越用越准"是路线图，不是现状。
+
+**游客试用。** 匿名访客第一次发起评审时会自动签发一个独立的游客身份并附赠
+几次体验额度，不需要注册也不需要 CDK；签发有每日上限，防止有人循环刷身份把
+垫付额度当无限用，试用完可以绑定邮箱把身份升级成正式账号、历史不丢。
+**QQ 登录**在 `AL_QQ_APP_ID` / `AL_QQ_APP_KEY` / `AL_QQ_REDIRECT_URI` 三项配齐时可用，
+`/api/health` 回的 `qq_login_enabled` 决定前端画不画那个按钮（配不全就不画，
+免得点进去必然失败）。评审可以发布成可撤销的只读**分享页**，可以按**项目**归组
+（项目记忆用的就是这个键），发起评审前的澄清**对话**也会落库，可改名、可删除。
+
 ### 6. 质量 Harness — 8 维打分卡
 
-> **引用它之前请先读这段。** Harness 是**事后打分卡，不是门控**。Web 链路上 `enable_evaluation` 默认为 **false**，即便开启也是在评审**跑完之后**运行：它给报告打分，从不拦截、过滤或重跑任何人格输出。八个阈值在 `src/harness/thresholds.yaml`，代码里随分数一起下发 `"threshold_note": "原型阈值，未经实证验证"`。
+> **引用它之前请先读这段。** Harness 是**事后打分卡，不是门控**。Web 链路上 `enable_evaluation` 默认为 **false**，即便开启也是在评审**跑完之后**运行：它给报告打分，从不拦截、过滤或重跑任何人格输出。真正生效的八个阈值是 `src/harness/evaluator.py` 里的 `DEFAULT_THRESHOLDS` 常量；`src/harness/thresholds.yaml` 是一份示例覆盖文件，只有显式传 `src/cli.py --threshold-file` 时才会被读取，默认路径上没有任何代码加载它。两种情况下代码都随分数一起下发 `"threshold_note": "原型阈值，未经实证验证"`。
 
 | # | 维度 | 检查内容 |
 |---|---|---|
@@ -666,8 +740,16 @@ npm run dev
 
 ```bash
 cd web
-docker-compose up
+cp .env.production.example .env   # 这一步不能省，理由见下
+# 编辑 .env：至少要填 AL_CORS_ORIGINS 与 AL_JWT_SECRET
+docker compose up
 ```
+
+`docker-compose.yml` 用 `${VAR:?...}` 把 `AL_CORS_ORIGINS` 与 `AL_JWT_SECRET` 声明成必填，
+没有 `.env` 时 compose 在解析阶段就直接报错退出——这是刻意的，免得起一个不限 CORS、
+会话密钥可猜的栈。但代价是 fresh clone 直接 `docker compose up` 必然失败，
+所以那行 `cp` 不能省。命令用 `docker compose`（v2，Docker CLI 插件），
+不要用已停止维护的独立二进制 `docker-compose`（v1）。
 
 ### 程序化调用
 
@@ -708,15 +790,15 @@ audiencelens/
 ├── web/
 │   ├── backend/                       # FastAPI 后端
 │   │   └── app/
-│   │       ├── api/                   #   85个路由处理函数（v1 + 平台 + 后台）
-│   │       ├── services/              #   19个服务模块
+│   │       ├── api/                   #   121个路由处理函数（v1 + 平台 + 后台）
+│   │       ├── services/              #   28个服务模块
 │   │       ├── models/                #   SQLAlchemy模型
 │   │       ├── schemas/               #   Pydantic模型
-│   │       └── websocket/             #   5种WebSocket事件
+│   │       └── websocket/             #   7种WebSocket事件
 │   └── frontend/                      # React 前端
 │       └── src/
-│           ├── pages/                 #   20个页面组件（含落地页）
-│           ├── components/            #   7个组件
+│           ├── pages/                 #   24个页面组件（含落地页）
+│           ├── components/            #   16个组件
 │           └── store/                 #   3个Zustand Store
 ├── tests/                             # 引擎测试套件（见「测试」一节）
 ├── examples/                          # 7个示例素材

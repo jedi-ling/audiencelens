@@ -12,20 +12,26 @@
 6. [数据库迁移](#6-数据库迁移)
 7. [故障排查](#7-故障排查)
 8. [安全清单](#8-安全清单)
+9. [`mcp-admin-server/`](#9-mcp-admin-server本地运维用的-mcp-工具不随产品部署)
 
 ---
 
 ## 1. 本地起服务
 
-> **后端推荐用 supervisor 脚本起**：`bash logs/backend-supervisor.sh`。
-> 崩溃自动重启、日志统一写到 `logs/backend.log`，排查时直接 grep 即可。
+> **后端推荐用 supervisor 脚本起**：`bash scripts/backend-supervisor.sh`。
+> 崩溃自动重启、日志统一写到 `logs/backend.log`（目录不存在会自动建），排查时直接 grep 即可。
+>
+> 脚本此前放在 `logs/` 下，而 `/logs/` 整个目录在 `.gitignore` 里——
+> 也就是说 fresh clone 里根本没有这个文件，照文档敲那行命令只会得到
+> "No such file or directory"。脚本是源码（该入库），日志是产物（该忽略），
+> 两者混在一个目录里必然出这种事，所以脚本移到了 `scripts/`。
 >
 > ⚠️ 这是**开发辅助脚本**，**不是**部署入口——生产部署看 §5（`web/docker-compose.prod.yml`），
 > 不要把 supervisor 搬到容器里，更不要拿它代替进程管理器。
 
 ```bash
 # 后端（推荐：supervisor 脚本，自动重启 + 日志落到 logs/backend.log）
-bash logs/backend-supervisor.sh
+bash scripts/backend-supervisor.sh
 
 # 后端（手动：需要看前台输出或自己接进程管理器时）
 cd web/backend
@@ -95,13 +101,20 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `AL_AUTH_ENABLED` | `false` | false = `/auth/register`\`/login` 关闭；true = 开放注册登录 |
-| `AL_JWT_SECRET` | `dev-insecure-...` | **生产必须改**；同时用于加密用户 key |
+| `AL_JWT_SECRET` | `dev-insecure-...` | **生产必须改**；只用于签发登录态，**不参与任何加密** |
 | `AL_JWT_TTL_SECONDS` | `604800`（7天） | 令牌有效期 |
-| `AL_ENCRYPTION_KEY` | 空 → 回落 `AL_JWT_SECRET` | **落库 API Key 的加密主密钥**；类生产下未设会告警 |
+| `AL_ENCRYPTION_KEY` | 空 → 回落 `DEV_ENCRYPTION_KEY`（一个**独立的**开发默认值） | **落库 API Key 的加密主密钥**；类生产下仍是默认值会**拒绝启动** |
 
-> ⚠️ 不设 `AL_ENCRYPTION_KEY` 时，落库加密密钥回落到 `AL_JWT_SECRET`——此后轮换 JWT 密钥
-> 会让所有已存的用户 API Key 解不开（系统当作"无 key"让用户重填，不会崩，但用户要重配）。
-> 把两者**分开设置**，轮换登录态才不会牵连密钥库。
+> ⚠️ 这两个密钥**从来不共用**。不设 `AL_ENCRYPTION_KEY` 时回落的是 `config.py` 里
+> 那个独立的 `DEV_ENCRYPTION_KEY` 常量（`config.py:162`），**不是** `AL_JWT_SECRET`——
+> JWT 密钥不参与加密，所以轮换登录态不会牵连密钥库。
+>
+> 而且在类生产环境（`AL_ENV=production`，或 CORS / 站点地址指向公网）下，
+> 加密密钥仍是开发默认值时 `_validate_startup` 会**直接抛错拒绝启动**
+> （`config.py:375`），不会悄悄裸奔着跑起来。
+>
+> 真正要小心的是：一旦有用户存过 key，就不要再改 `AL_ENCRYPTION_KEY`——
+> 改了等于所有已存密文解不开（系统当作"无 key"让用户重填，不会崩，但用户要重配）。
 
 **这不是"全匿名 vs 强制登录"的二选一开关**——打开 `AL_AUTH_ENABLED` 只是让注册/登录
 接口可用，评审、Key 管理、意图解析这些路由用的是 `optional_identity`（`app/deps.py`），
@@ -119,7 +132,7 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 **多服务商**：BYOK/平台 key 都不再限定 Anthropic——`provider` 可选 `anthropic` 或
 `openai_compatible`（DeepSeek/Kimi/通义千问/智谱GLM/Ollama 等任意兼容 `/chat/completions`
 协议的服务），后者需额外填 `model` 和 `api_base`。出口统一走 `src/runner/llm_client.py`：
-不依赖 litellm（本仓库 Python 3.8 环境装不上，见模块 docstring），Anthropic 走官方 SDK，
+不依赖 litellm（历史上是 3.8 装不上才手搓的；现已统一 3.11，但两条路径各几十行、且 Prompt Caching / 强制工具调用都直接对着官方参数写，没有理由再垫一层，见模块 docstring），Anthropic 走官方 SDK，
 其余走裸 `httpx.post`。`/api/keys/test`、`/api/admin/server-key/test` 测的就是这条真实链路。
 
 **多模态**：`/api/uploads` 对图片扩展名（`.png/.jpg/.jpeg/.webp/.gif`）走独立分支，
@@ -199,6 +212,23 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 | `AL_EMAIL_TOKEN_TTL_SECONDS` | `86400`（24h） | 邮箱验证令牌有效期 |
 | `AL_RESET_TOKEN_TTL_SECONDS` | `3600`（1h） | 密码重置令牌有效期 |
 
+#### QQ 登录（QQ 互联 OAuth2.0）
+
+三项**必须配齐**才会启用；缺任何一项 `qq_login_enabled` 为 false，前端连按钮都不画
+（不做"按钮在但点了必然失败"）。
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `AL_QQ_APP_ID` | 空（功能关闭） | QQ 互联后台的 APP ID |
+| `AL_QQ_APP_KEY` | 空（功能关闭） | QQ 互联后台的 APP KEY。**密钥，只走环境变量，不要写进任何配置文件或仓库** |
+| `AL_QQ_REDIRECT_URI` | 空（功能关闭） | 回调地址，必须与 QQ 互联后台登记的**逐字符一致** |
+
+回调地址填 `https://<你的域名>/api/auth/qq/callback` —— 必须走 `/api/` 前缀（nginx 只把
+这个前缀转发给后端），且必须具体到路径。腾讯自 2015 年起不接受只填根域名的回调，
+填错的表现是授权时报 `redirect uri is illegal(100010)`；差一个尾斜杠、协议不同都算错。
+主域与 www 两个版本都要用的话，在后台用分号隔开填两条。
+
+
 ### 危险默认值的逃生舱
 
 两个都是"明知故犯"开关：类生产环境下不设就**拒绝启动**，设了则放行并持续告警。
@@ -213,11 +243,24 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AL_UPLOAD_DIR` | `{backend_dir}/data/uploads` | 上传图片的落盘目录。**Docker 下必须在挂载卷内**，否则容器一重建，用户对话里的图全变 404（数据库记录还在，字节没了）。清理孤儿文件：`python scripts/cleanup_orphan_uploads.py`（默认只报告，加 `--apply` 才删） |
+| `AL_UPLOAD_DIR` | `{backend_dir}/data/uploads` | 上传图片的落盘目录。**Docker 下必须在挂载卷内**，否则容器一重建，用户对话里的图全变 404（数据库记录还在，字节没了）。清理孤儿文件见下方说明 |
 | `AL_UPLOAD_MAX_BYTES` | `10485760`（10MB） | 文本类材料上限 |
 | `AL_UPLOAD_ALLOWED_EXT` | `.txt,.md,.json,.yaml,.yml` | 这是"抽取成文字材料"的格式白名单 |
 | `AL_UPLOAD_ALLOWED_IMAGE_EXT` | `.png,.jpg,.jpeg,.webp,.gif` | 图片走独立分支：原样转 data URI 进多模态请求，不抽文字 |
 | `AL_UPLOAD_MAX_IMAGE_BYTES` | `8388608`（8MB） | 图片单独的大小上限 |
+
+> **清理孤儿上传文件**：`web/backend/scripts/cleanup_orphan_uploads.py`，
+> 默认只报告，加 `--apply` 才真删。
+>
+> Docker 下直接在容器里跑（镜像已 `COPY scripts/ ./scripts/`）：
+>
+> ```bash
+> docker compose exec backend python scripts/cleanup_orphan_uploads.py          # 先看报告
+> docker compose exec backend python scripts/cleanup_orphan_uploads.py --apply  # 确认后再删
+> ```
+>
+> 裸机部署（DEPLOY-BAREMETAL.md）仓库整棵树都在机器上，直接
+> `cd /opt/audiencelens/web/backend && .venv/bin/python scripts/cleanup_orphan_uploads.py`。
 | `AL_INTENT_LLM_ENABLED` | `true` | 关掉则意图解析只用启发式（零成本） |
 | `AL_INTENT_MODEL` | `claude-haiku-4-5-20251001` | 意图解析用的模型 |
 | `AL_LEDGER_ENABLED` | `true` | 关掉则不记录判断（不建议——这是护城河） |
@@ -257,8 +300,19 @@ npm run dev          # http://localhost:5200
      停用/启用——停用立即生效（登录被拒、已有 token 失效），全部写入审计日志
    - **统计分析**：任务类型分布（完成/失败分段条形图）、人格包使用量、
      成本构成（BYOK vs 平台垫付占比 + 消耗 Top 用户）
-   - **操作审计**：谁在何时改了哪个配置/套餐/平台 Key/用户（`admin_audit_log` 表，只增不改；
-     当前只有单一共享令牌，不区分具体管理员身份，多管理员场景需要先接入独立身份体系）
+   - **操作审计**：谁在何时改了哪个配置/套餐/平台 Key/用户（`admin_audit_log` 表，只增不改）。
+     **具名账号已经可用**，审计行里记的是真实用户名而不再只是"某个拿着令牌的人"：
+     - 账号管理走 `/api/admin/auth/users`（列表 / 新建 / 停用），登录后签发一个
+       12 小时的会话令牌，前端之后用它代替静态令牌。会话令牌用 `AL_ADMIN_TOKEN`
+       **本身**做签名密钥（不是 `AL_JWT_SECRET`）——后台与产品侧用户会话是两个
+       完全独立的信任根，令牌互相不能串用；轮换或清空 `AL_ADMIN_TOKEN` 会让所有
+       已登录的具名会话一起失效，这是期望行为。
+     - `AL_ADMIN_TOKEN` 静态主密钥**仍然有效**，但它现在的定位是
+       **bootstrap 与逃生舱**：第一个管理员账号得靠它建出来，账号体系出问题时
+       也得靠它进去修。用主密钥操作时审计行的 actor 记成 `static-token`——
+       那本身就是一条要记下来的事实（这次操作没有具名账号可追责），不是"未知"。
+     - 因此运营上的建议是：上线后立刻用主密钥建具名账号，此后日常操作一律用账号登录，
+       主密钥收进密钥管理服务（见 §8 清单）。新建/停用管理员账号本身也写审计日志。
    - **任务 / 评审巡检**：支持按 `status`/`user_id`/时间范围过滤 + 分页的列表，
      点击一行可下钻查看完整详情（含 `payload`/`report_json` 等原始数据）；
      评审可从详情抽屉删除（二次确认 + 审计，计费流水不随评审删除）
@@ -327,13 +381,18 @@ export AL_QUEUE_WORKERS=4
 
 ### 4.1 加一个新的评审任务类型
 
-1. `src/runner/cli.py` → `VALID_TASK_TYPES` 加一项
+1. `src/runner/task_types.py` → `VALID_TASK_TYPES` 加一项。**这是唯一事实源**：
+   `src/runner/cli.py` 和后端的 `intent_service` 都从这里导入，不再各存一份
+   （以前各存一份的直接后果是 CLI 认 6 种、README 说 10 种，谁都没错谁都对不上）
 2. `src/presets/panel-presets.yaml` → 加对应的人格面板预设
-3. `web/backend/app/services/intent_service.py` → `VALID_TASK_TYPES` + `TASK_KEYWORDS`（让对话入口认得它）
+3. `web/backend/app/services/intent_service.py` → 只需要补 `TASK_KEYWORDS`
+   （`VALID_TASK_TYPES` 是 `from runner.task_types import ...` 来的，不用动）；
+   关键词是人工维护的，不补就是对话入口永远识别不出这个任务类型
 4. `web/frontend/src/lib/types.ts` → `TaskType` 联合类型
-5. `web/frontend/src/pages/AskPage.tsx` → `TASK_LABELS` 加中文名
+5. `web/frontend/src/pages/AskPage.tsx` → `TASK_LABELS_ZH_FOR_ENGINE` 加一项
+   （这张表是**给引擎看的中文名**，不是 UI 文案；用户看到的标签在 i18n 资源里）
 
-> 这 5 处不同步会导致：CLI 能跑但 Web 报"未知任务类型"，或对话入口永远识别不出它。
+> 这几处不同步会导致：CLI 能跑但 Web 报"未知任务类型"，或对话入口永远识别不出它。
 
 ### 4.2 加一个新的人格包
 
@@ -342,21 +401,27 @@ export AL_QUEUE_WORKERS=4
 3. `web/frontend/src/lib/types.ts` → `PersonaPack` 联合类型
 4. `src/mcp_tools.py` → `PERSONA_PACKS`（让 AI 助手也能用）
 
-### 4.3 换加密实现（生产建议）
+### 4.3 落库加密：已是标准 AEAD（✅ 已完成，此处只记迁移口径）
 
-`core/security.py` 的 `encrypt_secret`/`decrypt_secret` 是 HMAC 派生 + XOR 的简化实现，
-足以避免"数据库被看一眼就泄露明文"，但**不是标准 AEAD**。生产环境请换：
+`core/security.py` 的 `encrypt_secret` 现在写的是 **v2 格式：`cryptography.fernet`**
+（AES-128-CBC + HMAC-SHA256 认证加密），密钥用 PBKDF2-HMAC-SHA256（10 万轮，
+盐 `audiencelens-key-encryption-v2`）从 `AL_ENCRYPTION_KEY` 派生。
+密文带 `v2$` 前缀。自研密码学已经不在写入路径上。
 
-```python
-pip install cryptography
+**v1 → v2 的迁移是惰性的，不需要停机批处理：**
 
-from cryptography.fernet import Fernet
-def encrypt_secret(plaintext: str, secret: str) -> str:
-    return Fernet(derive_fernet_key(secret)).encrypt(plaintext.encode()).decode()
-```
+- v1（HMAC 派生密钥流 XOR 的自实现封装）**只读保留**。`decrypt_secret` 认前缀，
+  没有 `v2$` 的按 v1 解——存量用户完全无感，不会因为换算法就要重填 key。
+- 升级发生在"用一次"的时候：`key_service.resolve_key` 解开一条 v1 密文后，
+  用 `is_legacy_ciphertext` 判断并就地用 v2 重新写回（`key_service.py:166-170`）。
+  也就是说每个用户下次真正发起评审时，他那条 key 自动升级一条。
+- 所以**不存在**"迁移脚本跑完之前系统不可用"的窗口，也不存在只跑了一半的中间态。
 
-只需替换这两个函数，**调用方（key_service）无感**。
-换之前存量密文需要迁移（读旧格式 → 写新格式的一次性脚本）。
+为什么当初非换不可：v1 的问题不是"能被直接解开"，而是自研密码学本身不该出现在
+生产路径上——分组模式、填充、侧信道都没有人审过。
+
+> 还想再进一步的话，下一步是把密钥交给 KMS/密钥管理服务而不是 `.env`（见 §8 清单），
+> 那是密钥**保管**问题，与这里的加密算法是两件事。
 
 ### 4.3.5 服务商预设保鲜（定期做）
 
@@ -416,8 +481,17 @@ def encrypt_secret(plaintext: str, secret: str) -> str:
 
 ```bash
 cd web
-docker-compose up -d          # 前端 Nginx + 后端 Uvicorn
+cp .env.production.example .env   # 不能省：compose 里两个必填项用了 ${VAR:?}
+# 编辑 .env：至少填 AL_CORS_ORIGINS 与 AL_JWT_SECRET
+docker compose up -d              # 前端 Nginx + 后端 Uvicorn + 后台面板
 ```
+
+`docker-compose.yml` 把 `AL_CORS_ORIGINS` 与 `AL_JWT_SECRET` 声明成
+`${VAR:?...}`，没有 `.env` 时 compose 在**解析阶段**就报错退出——刻意如此，
+免得起一个不限 CORS、会话密钥可猜的栈。代价是 fresh clone 直接 `up` 必然失败，
+所以那行 `cp` 是步骤的一部分，不是可选项。
+命令一律用 `docker compose`（v2，Docker CLI 插件）；独立二进制 `docker-compose`（v1）
+已停止维护，两者对 `${VAR:?}` 与 profiles 的行为并不一致。
 
 **生产检查清单**：
 
@@ -463,7 +537,7 @@ alembic upgrade head
 | WS 连不上，进度不动 | origin 不在白名单 | 配 `AL_CORS_ORIGINS`。前端会自动回落轮询，不影响拿结果 |
 | 429 太频繁 | 限流 | 调 `AL_RATELIMIT_*`；多副本部署请换 Redis |
 | 402 配额超限 | 走服务端 key 且超额 | 让用户填自己的 key（BYOK 不受配额约束） |
-| 用户 key 突然失效 | `AL_JWT_SECRET` 被改过 | 密文解不开会当"无 key"，让用户重填即可 |
+| 用户 key 突然失效 | **`AL_ENCRYPTION_KEY`** 被改过（不是 `AL_JWT_SECRET`——它不参与加密） | 密文解不开会当"无 key"，让用户重填即可。换回原值即可恢复；换不回就只能让用户重填 |
 | 评审很慢 | 并发度太低 | 调 `AUDIENCELENS_MAX_CONCURRENCY`（默认 6） |
 | 进度条不动但评审能完成 | WS 被拦（origin 不在白名单） | 检查 `AL_CORS_ORIGINS`；前端会自动回落 2s 轮询，功能不受影响 |
 | 402 提示"XX 套餐限 N 次" | 套餐限额（走服务端 key） | 升级 `users.plan` 或让用户填 BYOK key（不受限）；档位定义见 §4.7 |
@@ -490,8 +564,33 @@ alembic upgrade head
 
 上生产前还要做的：
 
-- [ ] 换标准 AEAD 加密（§4.3）
+- [x] 换标准 AEAD 加密（§4.3）—— 已完成：写入走 Fernet（v2），v1 存量密文只读兼容并在下次使用时自动升级
 - [ ] `AL_JWT_SECRET` 用密钥管理服务，别写进 `.env` 提交
 - [ ] HTTPS（WS 会自动跟着升级为 wss）
 - [ ] 接入 Sentry 或等价物（`core/logging.py` 已留好接入点）
 - [ ] `AL_ADMIN_TOKEN` 同样用密钥管理服务；后台面板建议只对内网/VPN 开放
+
+---
+
+## 9. `mcp-admin-server/`（本地运维用的 MCP 工具，不随产品部署）
+
+仓库根目录下有一个 `mcp-admin-server/`，此前任何文档都没提过它——于是它既
+没人维护，也没人知道能不能删。写在这里备案：
+
+**它是什么**：一个本地 MCP server（`mcp-admin-server/server.py`），把
+`/api/admin/*` 的常用操作包装成 MCP 工具，让 Claude Code / Cursor 这类客户端
+能直接查概览、发 CDK、看审计日志，不用手工 curl 拼 `X-Admin-Token`。
+
+**它不是什么**：不是产品的一部分。源码（`server.py` / `README.md` /
+`requirements.txt`）已入库，这样换台机器还能拿到；但它**不参与 CI**，
+**不进部署包**（`scripts/make_deploy_package.py` 的 INCLUDE 里没有它），
+`docker-compose.yml` 也不认识它。`venv/` 仍然忽略，每台机器自己建。
+
+**安全边界**：它拿着 `AL_ADMIN_TOKEN`，等于后台的全部权限。所以：
+
+- 只在本机跑，不要监听外部地址；
+- `mcp-admin-server/venv/` 已加进 `.gitignore`；
+- 里面的 `admin_request` 是个"任意后台路径"逃生舱，路径前缀校验已收紧为
+  只接受 `/admin` 或 `/admin/...`（此前 `startswith("/admin")` 会连
+  `/administrator-elsewhere` 一起放行），并且会拒绝含 `..` 的路径。
+  即便如此，它仍是权限最大的一个工具——不要把它暴露给不受信的会话。

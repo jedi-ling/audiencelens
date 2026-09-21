@@ -1,0 +1,217 @@
+common_sections:
+  - Disclaimer
+  - Executive Verdict
+  - Assumption Summary
+  - Persona Panel
+  - Persona Reviews
+  - Consensus Findings
+  - Segment Disagreements
+  - Top Blockers
+  - Top Opportunities
+  - Priority Actions
+  - Real Validation Questions
+  - Harness Self-Check
+
+critical_requirements:
+  - "不得声称预测真实趣味或市场成功"
+  - "必须包含P0/P1/P2优先行动项"
+  - "必须包含人格间差异"
+  - "人口统计和MBTI字段仅作为弱修饰"
+
+task_types:
+  steam_page_review:
+    display_name: "Steam页评审"
+    assumption_summary_key: "Game Assumption Summary"
+    task_specific_sections:
+      - Capsule & First Impression Analysis
+      - Tag & Category Assessment
+      - Screenshot Narrative Audit
+      - Wishlist Conversion Analysis
+    persona_review_subsections:
+      - first_scan_reaction
+      - capsule_verdict
+      - screenshot_story
+      - trust_signals
+      - wishlist_decision
+
+  demo_first_play:
+    display_name: "Demo首玩"
+    assumption_summary_key: "Game Assumption Summary"
+    task_specific_sections:
+      - First 15 Seconds Experience
+      - Onboarding Friction Map
+      - Moment-to-Moment Feel
+      - Retention Hook Assessment
+    persona_review_subsections:
+      - first_impression
+      - onboarding_experience
+      - control_feel
+      - continue_or_quit
+
+  concept_review:
+    display_name: "概念评审"
+    assumption_summary_key: "Game Assumption Summary"
+    task_specific_sections:
+      - Core Loop Clarity
+      - Differentiation Analysis
+      - Feasibility Assessment
+      - Target Audience Match
+    persona_review_subsections:
+      - core_loop_understanding
+      - uniqueness_perception
+      - willingness_to_try
+      - deal_breakers
+
+  monetization_review:
+    display_name: "商业化评审"
+    assumption_summary_key: "Game Assumption Summary"
+    task_specific_sections:
+      - Pricing Perception
+      - Pay Boundary Analysis
+      - Value-for-Money Assessment
+      - Fairness & Transparency Check
+    persona_review_subsections:
+      - price_reaction
+      - paywall_feel
+      - value_perception
+      - spending_willingness
+
+  looking_for_party_post:
+    display_name: "找搭子帖"
+    assumption_summary_key: "Content Assumption Summary"
+    task_specific_sections:
+      - Social Appeal Analysis
+      - Friction-to-Join Assessment
+      - Shareability Check
+      - Community Tone Match
+    persona_review_subsections:
+      - first_reaction
+      - join_willingness
+      - share_impulse
+      - tone_perception
+
+  update_announcement_review:
+    display_name: "更新公告"
+    assumption_summary_key: "Content Assumption Summary"
+    task_specific_sections:
+      - Communication Clarity
+      - Trust Reinforcement Check
+      - Retention Signal Analysis
+      - Community Expectation Match
+    persona_review_subsections:
+      - message_clarity
+      - trust_impact
+      - return_motivation
+      - expectation_alignment
+
+  app_store_review:
+    display_name: "应用商店评审"
+    assumption_summary_key: "App Assumption Summary"
+    task_specific_sections:
+      - ASO Effectiveness
+      - Icon & Screenshot Audit
+      - Conversion Funnel Analysis
+      - Trust Signal Assessment
+    persona_review_subsections:
+      - store_impression
+      - icon_reaction
+      - description_clarity
+      - download_decision
+
+  social_media_post:
+    display_name: "社媒帖评审"
+    assumption_summary_key: "Content Assumption Summary"
+    task_specific_sections:
+      - Hook Strength Analysis
+      - Engagement Potential
+      - Brand Alignment Check
+      - Shareability Assessment
+    persona_review_subsections:
+      - scroll_stop_reaction
+      - engagement_impulse
+      - brand_perception
+      - share_willingness
+
+  video_ad_review:
+    display_name: "视频广告评审"
+    assumption_summary_key: "Content Assumption Summary"
+    task_specific_sections:
+      - First 3 Seconds Hook
+      - Message Density Analysis
+      - CTA Effectiveness
+      - Skip Impulse Assessment
+    persona_review_subsections:
+      - hook_reaction
+      - message_retention
+      - cta_response
+      - watch_or_skip
+
+  landing_page_review:
+    display_name: "落地页评审"
+    assumption_summary_key: "Product Assumption Summary"
+    task_specific_sections:
+      - First Screen Hook Analysis
+      - Conversion Path Audit
+      - Trust Building Assessment
+      - CTA Clarity Check
+    persona_review_subsections:
+      - first_impression
+      - value_proposition_clarity
+      - trust_level
+      - conversion_decision
+
+  kickstarter_review:
+    display_name: "众筹页评审"
+    assumption_summary_key: "Project Assumption Summary"
+    task_specific_sections:
+      - Narrative Strength Analysis
+      - Reward Tier Assessment
+      - Trust Signal Audit
+      - Backer Motivation Mapping
+    persona_review_subsections:
+      - story_engagement
+      - reward_appeal
+      - trust_level
+      - pledge_decision
+
+  discord_community_review:
+    display_name: "社区运营评审"
+    assumption_summary_key: "Community Assumption Summary"
+    task_specific_sections:
+      - Community Vibe Assessment
+      - Engagement Design Analysis
+      - Retention Signal Check
+      - Moderation Tone Audit
+    persona_review_subsections:
+      - vibe_reaction
+      - engagement_willingness
+      - stay_motivation
+      - moderation_perception
+
+  devlog_review:
+    display_name: "开发日志评审"
+    assumption_summary_key: "Content Assumption Summary"
+    task_specific_sections:
+      - Narrative Rhythm Analysis
+      - Transparency Assessment
+      - Community Feedback Integration
+      - Expectation Management Check
+    persona_review_subsections:
+      - reading_engagement
+      - transparency_perception
+      - feedback_presence
+      - anticipation_level
+
+  localization_review:
+    display_name: "本地化评审"
+    assumption_summary_key: "Localization Assumption Summary"
+    task_specific_sections:
+      - Cultural Adaptation Analysis
+      - Language Quality Assessment
+      - UI/Layout Adaptation Check
+      - Market-Specific Sensitivity Audit
+    persona_review_subsections:
+      - cultural_naturalness
+      - language_fluency
+      - ui_adaptation
+      - market_fit

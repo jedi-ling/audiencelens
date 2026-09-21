@@ -1,4 +1,11 @@
-anthropic>=0.40.0
+# -*- coding: utf-8 -*-
+# 首行编码声明的理由见 web/backend/requirements.txt 头部（Windows GBK 坑）
+anthropic>=0.72.0,<1.0
+# src/runner/llm_client.py 直接 import httpx（OpenAI 兼容路径），不是只靠 anthropic 间接带入
+httpx>=0.28.1,<1.0
+# src/cli.py 的命令行入口。此前漏列——3.8 开发环境恰好装过，换到 3.11 干净环境
+# 后 tests/test_cli.py 在收集阶段就 ModuleNotFoundError。
+click>=8.1
 pyyaml>=6.0
 jsonschema>=4.21.0
 rich>=13.7.0

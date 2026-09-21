@@ -32,8 +32,12 @@ services:
     environment:
       - AL_ENV=${AL_ENV:-production}
       - AL_CORS_ORIGINS=${AL_CORS_ORIGINS:?必须设置正式域名（逗号分隔），例：AL_CORS_ORIGINS=https://example.com。见 .env.production.example}
-      - AL_JWT_SECRET=${AL_JWT_SECRET:?必须设置强随机 JWT 密钥：openssl rand -hex 32。它同时守着登录态和落库 API Key 的加密}
-      # 不设时回落 AL_JWT_SECRET（兼容存量密文），后端会在启动日志里告警。
+      - AL_JWT_SECRET=${AL_JWT_SECRET:?必须设置强随机 JWT 密钥：openssl rand -hex 32。它只签登录态，不参与任何加密}
+      # 落库 API Key 的加密密钥，**与 AL_JWT_SECRET 完全独立**：
+      # 不设时回落的是 config.py 里的 DEV_ENCRYPTION_KEY（一个开发默认值），
+      # 不是 AL_JWT_SECRET——JWT 密钥从来不用来加密 key。而且在类生产环境
+      # （AL_ENV=production 或 CORS/站点地址指向公网）下，仍是开发默认值时
+      # `_validate_startup` 会**直接拒绝启动**，不会悄悄裸奔（config.py:162 / :375）。
       # 一旦有用户存过 key 就不要再改这个值——改了 = 所有已存 key 解不开。
       - AL_ENCRYPTION_KEY=${AL_ENCRYPTION_KEY:-}
       - AL_ADMIN_TOKEN=${AL_ADMIN_TOKEN:-}
@@ -47,8 +51,8 @@ services:
       # 没有 env_file，而容器里也不存在 /app/web/.env（build context 是 ./backend），
       # 所以 config.py 那条 dotenv 回落救不了场——运维照 .env.production.example
       # 填了 AL_QUOTA_TOKENS_TOTAL=3000000，容器里读到的却是默认值 0 = 不限制，
-      # 整条钱包闸静默关着。这与 AL_SMTP_TIMEOUT_SECONDS 是同一个失效模式
-      # （那一项模板里已诚实标注不生效），只是这几项没人发现。
+      # 整条钱包闸静默关着。AL_SMTP_TIMEOUT_SECONDS 曾是同一个失效模式
+      # （模板里诚实标注过"不生效"），现已一并补齐，见文件下半段。
       # 新增任何 AL_* 配置项时，必须同步加到这里，否则 Docker 下等于没加。
       - AL_QUOTA_TOKENS_TOTAL=${AL_QUOTA_TOKENS_TOTAL:-0}
       - AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE=${AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE:-150000}
@@ -79,6 +83,46 @@ services:
       # 危险默认值的逃生舱（只在确实要这么跑时才设 true）
       - AL_ALLOW_SHARED_ANONYMOUS=${AL_ALLOW_SHARED_ANONYMOUS:-false}
       - AL_ALLOW_CONSOLE_MAIL=${AL_ALLOW_CONSOLE_MAIL:-false}
+      # ---------------------------------------------------------------
+      # 下面这一整段是补齐上面那条「新增任何 AL_* 配置项时必须同步加到这里」
+      # 长期没被执行的欠账：config.py 一共读 52 个变量，这里曾经只列出 35 个。
+      # 漏项在 Docker 下的表现不是报错，而是**静默用默认值**——最贵的一例是
+      # QQ 登录：三个变量一个都传不进去，config.py 的 qq_login_enabled 永远为
+      # false，后台怎么配都不出按钮，而 MAINTENANCE.md 把它写成已交付功能。
+      #
+      # 写默认值而不是一律 `:-` 留空：compose 的 `${VAR:-}` 会把变量设成**空串**，
+      # 空串不是「未设置」。`_bool("AL_LEDGER_ENABLED", True)` 收到空串返回
+      # False（判断留档整个关掉）、`os.environ.get("AL_UPLOAD_DIR", 默认)` 收到
+      # 空串就真的用空路径。所以凡是「空串会改变行为」的项，这里都写死真实默认值，
+      # 与 config.py 逐项对齐，由 tests/test_public_claims.py::test_compose_env_matches_config
+      # 守着不再漏。
+      # ---------------------------------------------------------------
+      # 运行期开关
+      - AL_DEBUG=${AL_DEBUG:-false}
+      # 镜像里没有 /app/web/.env（build context 是 ./backend），dotenv 回落本来就
+      # 加载不到任何东西；列在这里只是为了让「compose 与 config.py 逐项对齐」成立。
+      - AL_SKIP_DOTENV=${AL_SKIP_DOTENV:-}
+      - AL_LEDGER_ENABLED=${AL_LEDGER_ENABLED:-true}
+      - AL_QUEUE_BACKEND=${AL_QUEUE_BACKEND:-inprocess}
+      # 令牌有效期（秒）：登录态 7 天、邮箱验证 24 小时、密码重置 1 小时
+      - AL_JWT_TTL_SECONDS=${AL_JWT_TTL_SECONDS:-604800}
+      - AL_EMAIL_TOKEN_TTL_SECONDS=${AL_EMAIL_TOKEN_TTL_SECONDS:-86400}
+      - AL_RESET_TOKEN_TTL_SECONDS=${AL_RESET_TOKEN_TTL_SECONDS:-3600}
+      # 邮件：outbox 档把信写成文件而不发出去（留空 = 不启用）；SMTP 超时秒数
+      - AL_MAIL_OUTBOX_DIR=${AL_MAIL_OUTBOX_DIR:-}
+      - AL_SMTP_TIMEOUT_SECONDS=${AL_SMTP_TIMEOUT_SECONDS:-15}
+      # QQ 互联登录。三项配齐 qq_login_enabled 才为真，前端才画那个按钮。
+      # 回调地址要与 QQ 互联后台登记的完全一致，例：https://你的域名/api/auth/qq/callback
+      - AL_QQ_APP_ID=${AL_QQ_APP_ID:-}
+      - AL_QQ_APP_KEY=${AL_QQ_APP_KEY:-}
+      - AL_QQ_REDIRECT_URI=${AL_QQ_REDIRECT_URI:-}
+      # 上传：默认目录落在 backend-data 卷里（/app/web/backend/data），不写死
+      # 的话容器重建会丢文件。大小单位是字节（10 MiB / 8 MiB）。
+      - AL_UPLOAD_DIR=${AL_UPLOAD_DIR:-/app/web/backend/data/uploads}
+      - AL_UPLOAD_MAX_BYTES=${AL_UPLOAD_MAX_BYTES:-10485760}
+      - AL_UPLOAD_ALLOWED_EXT=${AL_UPLOAD_ALLOWED_EXT:-.txt,.md,.json,.yaml,.yml}
+      - AL_UPLOAD_ALLOWED_IMAGE_EXT=${AL_UPLOAD_ALLOWED_IMAGE_EXT:-.png,.jpg,.jpeg,.webp,.gif}
+      - AL_UPLOAD_MAX_IMAGE_BYTES=${AL_UPLOAD_MAX_IMAGE_BYTES:-8388608}
     # 指向 /api/health/ready 而不是 /api/health：后者返回的 "ok" 是写死的字符串，
     # 数据库挂掉、磁盘满、连接池耗尽时它照样 200，容器会一直被判定为 healthy
     # ——编排器不会有任何反应，而用户那边每个页面都在报错。
