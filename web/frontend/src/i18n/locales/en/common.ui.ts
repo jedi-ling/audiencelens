@@ -20,6 +20,9 @@ export default {
   optional_mark: 'Optional',
   not_recorded: 'Not recorded',
 
+  // 见 zh 侧：中英列表分隔符不同形，不能在 tsx 里 join 死。
+  list_separator: ', ',
+
   language: 'Language',
   language_aria: 'Change interface language',
   language_hint: 'Changes the interface only — reports keep the language they were generated in',

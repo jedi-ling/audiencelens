@@ -257,6 +257,7 @@ export type MessageKey =
   | 'common.action.submit'
   | 'common.action.upload'
   | 'common.action.view_details'
+  | 'common.calibration_gauge.gauge.aria'
   | 'common.calibration_gauge.missing.hint'
   | 'common.calibration_gauge.no_pass_line.hint'
   | 'common.calibration_gauge.pass_line.value'
@@ -266,6 +267,10 @@ export type MessageKey =
   | 'common.persona_card.confidence.value'
   | 'common.persona_radar.series_a.label'
   | 'common.persona_radar.series_b.label'
+  | 'common.report_charts.scorecard_bars.aria'
+  | 'common.report_charts.scorecard_bars_item.value'
+  | 'common.report_charts.stance_pie.aria'
+  | 'common.report_charts.stance_pie_item.value'
   | 'common.ui.copied'
   | 'common.ui.copy_failed'
   | 'common.ui.deleting'
@@ -274,6 +279,7 @@ export type MessageKey =
   | 'common.ui.language'
   | 'common.ui.language_aria'
   | 'common.ui.language_hint'
+  | 'common.ui.list_separator'
   | 'common.ui.loading'
   | 'common.ui.not_recorded'
   | 'common.ui.optional_mark'
@@ -402,6 +408,8 @@ export type MessageKey =
   | 'nav.account.login'
   | 'nav.account.logout'
   | 'nav.account.menu_aria'
+  | 'nav.account.provider_email.badge'
+  | 'nav.account.provider_qq.badge'
   | 'nav.account.settings'
   | 'nav.footer.icp_aria'
   | 'nav.footer.privacy'
@@ -450,6 +458,7 @@ export type MessageKey =
   | 'page.ask.conversation_move.error'
   | 'page.ask.conversation_untitled.label'
   | 'page.ask.cost.value'
+  | 'page.ask.count.credits_remaining'
   | 'page.ask.count.disagreements'
   | 'page.ask.count.fixes'
   | 'page.ask.count.information_gaps'
@@ -458,6 +467,8 @@ export type MessageKey =
   | 'page.ask.count.personas'
   | 'page.ask.count.priority_fixes'
   | 'page.ask.create.error'
+  | 'page.ask.credits.cta'
+  | 'page.ask.credits_zero.hint'
   | 'page.ask.disagreement.hint'
   | 'page.ask.disagreement_evidence.value'
   | 'page.ask.disagreement_stance.value'
@@ -545,6 +556,7 @@ export type MessageKey =
   | 'page.ask.report_card.empty'
   | 'page.ask.report_card.loading'
   | 'page.ask.report_card.title'
+  | 'page.ask.report_modal.link'
   | 'page.ask.report_modal.subtitle'
   | 'page.ask.restored_review.label'
   | 'page.ask.review_delete.aria'
@@ -615,6 +627,8 @@ export type MessageKey =
   | 'page.create.confirm_task_type.title'
   | 'page.create.cost.desc'
   | 'page.create.cost.title'
+  | 'page.create.count.mode_calls'
+  | 'page.create.count.mode_calls_variable'
   | 'page.create.dropped_skill.desc'
   | 'page.create.dropped_skill.title'
   | 'page.create.dropzone.cta'
@@ -647,6 +661,10 @@ export type MessageKey =
   | 'page.create.meta.title'
   | 'page.create.mode.title'
   | 'page.create.mode_card.unit'
+  | 'page.create.mode_cost.desc'
+  | 'page.create.mode_cost.hint'
+  | 'page.create.mode_cost.title'
+  | 'page.create.mode_cost.unit'
   | 'page.create.mode_name.value'
   | 'page.create.mode_summary.title'
   | 'page.create.mode_summary.unit'
@@ -711,8 +729,10 @@ export type MessageKey =
   | 'page.evaluation.overall.desc'
   | 'page.evaluation.overall.hint'
   | 'page.evaluation.overall.title'
+  | 'page.evaluation.radar.aria'
   | 'page.evaluation.radar.label'
   | 'page.evaluation.radar.title'
+  | 'page.evaluation.radar_item.value'
   | 'page.evaluation.score.label'
   | 'page.evaluation.score.value'
   | 'page.evaluation.skill.label'
@@ -830,11 +850,17 @@ export type MessageKey =
   | 'page.login.email.label'
   | 'page.login.email.placeholder'
   | 'page.login.forgot.link'
+  | 'page.login.guest_notice.desc'
+  | 'page.login.guest_notice.title'
   | 'page.login.header.desc'
   | 'page.login.header.title'
   | 'page.login.meta.title'
+  | 'page.login.oauth_divider.label'
   | 'page.login.password.label'
   | 'page.login.password.placeholder'
+  | 'page.login.qq.cta'
+  | 'page.login.qq_error.error'
+  | 'page.login.qq_error.hint'
   | 'page.login.signup.hint'
   | 'page.login.submit.cta'
   | 'page.login.submit.error'
@@ -1015,8 +1041,16 @@ export type MessageKey =
   | 'page.progress.status.label'
   | 'page.progress.ws_reconnect.hint'
   | 'page.progress.ws_unavailable.hint'
+  | 'page.qq_callback.failed.error'
+  | 'page.qq_callback.failed.title'
+  | 'page.qq_callback.meta.title'
+  | 'page.qq_callback.missing.error'
+  | 'page.qq_callback.pending.label'
+  | 'page.qq_callback.retry.cta'
   | 'page.register.email.label'
   | 'page.register.email.placeholder'
+  | 'page.register.guest_notice.desc'
+  | 'page.register.guest_notice.title'
   | 'page.register.header.desc'
   | 'page.register.header.title'
   | 'page.register.meta.title'
@@ -1047,6 +1081,16 @@ export type MessageKey =
   | 'page.report.argument.label'
   | 'page.report.argument_con.label'
   | 'page.report.argument_pro.label'
+  | 'page.report.bind_email.cta'
+  | 'page.report.bind_email.desc'
+  | 'page.report.bind_email.error'
+  | 'page.report.bind_email.success'
+  | 'page.report.bind_email.title'
+  | 'page.report.bind_email_email.placeholder'
+  | 'page.report.bind_email_password.placeholder'
+  | 'page.report.bind_email_qq.desc'
+  | 'page.report.bind_email_qq.title'
+  | 'page.report.bind_email_submit.cta'
   | 'page.report.body.loading'
   | 'page.report.budget.desc'
   | 'page.report.budget.hint'
@@ -1175,6 +1219,13 @@ export type MessageKey =
   | 'page.report.link_new_review.cta'
   | 'page.report.load_error.desc'
   | 'page.report.load_error.title'
+  | 'page.report.matrix.aria'
+  | 'page.report.matrix.title'
+  | 'page.report.matrix_cell.tooltip'
+  | 'page.report.matrix_cell_unmentioned.tooltip'
+  | 'page.report.matrix_topic.empty'
+  | 'page.report.matrix_topic.label'
+  | 'page.report.matrix_unmentioned.label'
   | 'page.report.md_banner.desc'
   | 'page.report.md_budget.hint'
   | 'page.report.md_cross_exam.empty'
@@ -1241,6 +1292,7 @@ export type MessageKey =
   | 'page.report.predictions.desc'
   | 'page.report.predictions.hint'
   | 'page.report.predictions.title'
+  | 'page.report.print_blocked.error'
   | 'page.report.project_memory.desc'
   | 'page.report.project_memory.hint'
   | 'page.report.project_memory.meta'
@@ -1353,6 +1405,7 @@ export type MessageKey =
   | 'page.settings.group_account.label'
   | 'page.settings.group_data.label'
   | 'page.settings.group_model.label'
+  | 'page.settings.group_overview.label'
   | 'page.settings.group_usage.label'
   | 'page.settings.guest_card.cta'
   | 'page.settings.guest_card.desc'
@@ -1377,6 +1430,19 @@ export type MessageKey =
   | 'page.settings.name.label'
   | 'page.settings.name.placeholder'
   | 'page.settings.name.success'
+  | 'page.settings.overview_links.title'
+  | 'page.settings.overview_pending'
+  | 'page.settings.overview_plan.value'
+  | 'page.settings.overview_recent.cta'
+  | 'page.settings.overview_recent.title'
+  | 'page.settings.overview_recent_empty.desc'
+  | 'page.settings.overview_recent_empty.title'
+  | 'page.settings.overview_sample.value'
+  | 'page.settings.overview_scoreboard.cta'
+  | 'page.settings.overview_scoreboard.title'
+  | 'page.settings.overview_side_panel.label'
+  | 'page.settings.overview_side_user.label'
+  | 'page.settings.overview_usage.cta'
   | 'page.settings.password.cta'
   | 'page.settings.password.error'
   | 'page.settings.password.hint'
@@ -1418,6 +1484,9 @@ export type MessageKey =
   | 'page.settings.section_model.desc'
   | 'page.settings.section_model.tab'
   | 'page.settings.section_model.title'
+  | 'page.settings.section_overview.desc'
+  | 'page.settings.section_overview.tab'
+  | 'page.settings.section_overview.title'
   | 'page.settings.section_usage.desc'
   | 'page.settings.section_usage.tab'
   | 'page.settings.section_usage.title'
@@ -1607,6 +1676,23 @@ export type MessageKey =
   | 'page.tutorial.method_manual.title'
   | 'page.tutorial.method_manual_fields.hint'
   | 'page.tutorial.method_manual_when.hint'
+  | 'page.tutorial.modes.desc'
+  | 'page.tutorial.modes.title'
+  | 'page.tutorial.modes_calibration.label'
+  | 'page.tutorial.modes_cross_exam.label'
+  | 'page.tutorial.modes_no.value'
+  | 'page.tutorial.modes_personas.label'
+  | 'page.tutorial.modes_yes.value'
+  | 'page.tutorial.more.desc'
+  | 'page.tutorial.more.title'
+  | 'page.tutorial.more_byok.desc'
+  | 'page.tutorial.more_byok.title'
+  | 'page.tutorial.more_cdk.desc'
+  | 'page.tutorial.more_cdk.title'
+  | 'page.tutorial.more_ledger.desc'
+  | 'page.tutorial.more_ledger.title'
+  | 'page.tutorial.more_overview.desc'
+  | 'page.tutorial.more_overview.title'
   | 'page.tutorial.result_calibration.desc'
   | 'page.tutorial.result_calibration.label'
   | 'page.tutorial.result_issues.desc'
@@ -1908,6 +1994,7 @@ export type PlainMessageKey =
   | 'common.ui.language'
   | 'common.ui.language_aria'
   | 'common.ui.language_hint'
+  | 'common.ui.list_separator'
   | 'common.ui.loading'
   | 'common.ui.not_recorded'
   | 'common.ui.optional_mark'
@@ -2029,6 +2116,8 @@ export type PlainMessageKey =
   | 'nav.account.login'
   | 'nav.account.logout'
   | 'nav.account.menu_aria'
+  | 'nav.account.provider_email.badge'
+  | 'nav.account.provider_qq.badge'
   | 'nav.account.settings'
   | 'nav.footer.icp_aria'
   | 'nav.footer.privacy'
@@ -2070,6 +2159,8 @@ export type PlainMessageKey =
   | 'page.ask.conversation_move.error'
   | 'page.ask.conversation_untitled.label'
   | 'page.ask.create.error'
+  | 'page.ask.credits.cta'
+  | 'page.ask.credits_zero.hint'
   | 'page.ask.drop.hint'
   | 'page.ask.example_onboarding.value'
   | 'page.ask.example_pitch.value'
@@ -2134,6 +2225,7 @@ export type PlainMessageKey =
   | 'page.ask.report_card.empty'
   | 'page.ask.report_card.loading'
   | 'page.ask.report_card.title'
+  | 'page.ask.report_modal.link'
   | 'page.ask.report_modal.subtitle'
   | 'page.ask.restored_review.label'
   | 'page.ask.review_delete.tooltip'
@@ -2210,6 +2302,10 @@ export type PlainMessageKey =
   | 'page.create.material.title'
   | 'page.create.meta.title'
   | 'page.create.mode.title'
+  | 'page.create.mode_cost.desc'
+  | 'page.create.mode_cost.hint'
+  | 'page.create.mode_cost.title'
+  | 'page.create.mode_cost.unit'
   | 'page.create.mode_summary.title'
   | 'page.create.option.desc'
   | 'page.create.option.title'
@@ -2352,11 +2448,16 @@ export type PlainMessageKey =
   | 'page.login.email.label'
   | 'page.login.email.placeholder'
   | 'page.login.forgot.link'
+  | 'page.login.guest_notice.desc'
+  | 'page.login.guest_notice.title'
   | 'page.login.header.desc'
   | 'page.login.header.title'
   | 'page.login.meta.title'
+  | 'page.login.oauth_divider.label'
   | 'page.login.password.label'
   | 'page.login.password.placeholder'
+  | 'page.login.qq.cta'
+  | 'page.login.qq_error.error'
   | 'page.login.signup.hint'
   | 'page.login.submit.cta'
   | 'page.login.submit.error'
@@ -2525,8 +2626,16 @@ export type PlainMessageKey =
   | 'page.progress.stage.waiting'
   | 'page.progress.status.label'
   | 'page.progress.ws_reconnect.hint'
+  | 'page.qq_callback.failed.error'
+  | 'page.qq_callback.failed.title'
+  | 'page.qq_callback.meta.title'
+  | 'page.qq_callback.missing.error'
+  | 'page.qq_callback.pending.label'
+  | 'page.qq_callback.retry.cta'
   | 'page.register.email.label'
   | 'page.register.email.placeholder'
+  | 'page.register.guest_notice.desc'
+  | 'page.register.guest_notice.title'
   | 'page.register.header.desc'
   | 'page.register.header.title'
   | 'page.register.meta.title'
@@ -2552,6 +2661,16 @@ export type PlainMessageKey =
   | 'page.report.argument.label'
   | 'page.report.argument_con.label'
   | 'page.report.argument_pro.label'
+  | 'page.report.bind_email.cta'
+  | 'page.report.bind_email.desc'
+  | 'page.report.bind_email.error'
+  | 'page.report.bind_email.success'
+  | 'page.report.bind_email.title'
+  | 'page.report.bind_email_email.placeholder'
+  | 'page.report.bind_email_password.placeholder'
+  | 'page.report.bind_email_qq.desc'
+  | 'page.report.bind_email_qq.title'
+  | 'page.report.bind_email_submit.cta'
   | 'page.report.body.loading'
   | 'page.report.budget.hint'
   | 'page.report.budget.title'
@@ -2641,6 +2760,10 @@ export type PlainMessageKey =
   | 'page.report.link_new_review.cta'
   | 'page.report.load_error.desc'
   | 'page.report.load_error.title'
+  | 'page.report.matrix.title'
+  | 'page.report.matrix_topic.empty'
+  | 'page.report.matrix_topic.label'
+  | 'page.report.matrix_unmentioned.label'
   | 'page.report.md_banner.desc'
   | 'page.report.md_budget.hint'
   | 'page.report.md_cross_exam.empty'
@@ -2690,6 +2813,7 @@ export type PlainMessageKey =
   | 'page.report.prediction_window.label'
   | 'page.report.predictions.desc'
   | 'page.report.predictions.title'
+  | 'page.report.print_blocked.error'
   | 'page.report.project_memory.hint'
   | 'page.report.project_memory.title'
   | 'page.report.project_memory_none.title'
@@ -2782,6 +2906,7 @@ export type PlainMessageKey =
   | 'page.settings.group_account.label'
   | 'page.settings.group_data.label'
   | 'page.settings.group_model.label'
+  | 'page.settings.group_overview.label'
   | 'page.settings.group_usage.label'
   | 'page.settings.guest_card.cta'
   | 'page.settings.guest_card.desc'
@@ -2805,6 +2930,16 @@ export type PlainMessageKey =
   | 'page.settings.name.label'
   | 'page.settings.name.placeholder'
   | 'page.settings.name.success'
+  | 'page.settings.overview_links.title'
+  | 'page.settings.overview_recent.cta'
+  | 'page.settings.overview_recent.title'
+  | 'page.settings.overview_recent_empty.desc'
+  | 'page.settings.overview_recent_empty.title'
+  | 'page.settings.overview_scoreboard.cta'
+  | 'page.settings.overview_scoreboard.title'
+  | 'page.settings.overview_side_panel.label'
+  | 'page.settings.overview_side_user.label'
+  | 'page.settings.overview_usage.cta'
   | 'page.settings.password.cta'
   | 'page.settings.password.error'
   | 'page.settings.password.hint'
@@ -2846,6 +2981,9 @@ export type PlainMessageKey =
   | 'page.settings.section_model.desc'
   | 'page.settings.section_model.tab'
   | 'page.settings.section_model.title'
+  | 'page.settings.section_overview.desc'
+  | 'page.settings.section_overview.tab'
+  | 'page.settings.section_overview.title'
   | 'page.settings.section_usage.desc'
   | 'page.settings.section_usage.tab'
   | 'page.settings.section_usage.title'
@@ -3018,6 +3156,23 @@ export type PlainMessageKey =
   | 'page.tutorial.method_manual.title'
   | 'page.tutorial.method_manual_fields.hint'
   | 'page.tutorial.method_manual_when.hint'
+  | 'page.tutorial.modes.desc'
+  | 'page.tutorial.modes.title'
+  | 'page.tutorial.modes_calibration.label'
+  | 'page.tutorial.modes_cross_exam.label'
+  | 'page.tutorial.modes_no.value'
+  | 'page.tutorial.modes_personas.label'
+  | 'page.tutorial.modes_yes.value'
+  | 'page.tutorial.more.desc'
+  | 'page.tutorial.more.title'
+  | 'page.tutorial.more_byok.desc'
+  | 'page.tutorial.more_byok.title'
+  | 'page.tutorial.more_cdk.desc'
+  | 'page.tutorial.more_cdk.title'
+  | 'page.tutorial.more_ledger.desc'
+  | 'page.tutorial.more_ledger.title'
+  | 'page.tutorial.more_overview.desc'
+  | 'page.tutorial.more_overview.title'
   | 'page.tutorial.result_calibration.desc'
   | 'page.tutorial.result_calibration.label'
   | 'page.tutorial.result_issues.desc'
@@ -3061,6 +3216,7 @@ export type RichMessageKey =
   | 'page.create.pack_intro.desc'
   | 'page.forgot.signin.hint'
   | 'page.history.confirm_dialog.desc'
+  | 'page.login.guest_notice.desc'
   | 'page.login.signup.hint'
   | 'page.plans.anon.hint'
   | 'page.plans.banner_byok'
@@ -3069,6 +3225,7 @@ export type RichMessageKey =
   | 'page.plans.credits.value'
   | 'page.plans.feature_reviews'
   | 'page.plans.request.hint'
+  | 'page.register.guest_notice.desc'
   | 'page.register.signin.hint'
   | 'page.register.terms.consent'
   | 'page.report.predictions.hint'
@@ -3340,6 +3497,7 @@ export interface MessageVars {
   'common.action.submit': Record<string, never>
   'common.action.upload': Record<string, never>
   'common.action.view_details': Record<string, never>
+  'common.calibration_gauge.gauge.aria': { label: string | number; value: string | number }
   'common.calibration_gauge.missing.hint': Record<string, never>
   'common.calibration_gauge.no_pass_line.hint': Record<string, never>
   'common.calibration_gauge.pass_line.value': { value: string | number }
@@ -3349,6 +3507,10 @@ export interface MessageVars {
   'common.persona_card.confidence.value': { value: string | number }
   'common.persona_radar.series_a.label': Record<string, never>
   'common.persona_radar.series_b.label': Record<string, never>
+  'common.report_charts.scorecard_bars.aria': { items: string | number }
+  'common.report_charts.scorecard_bars_item.value': { max: string | number; name: string | number; score: string | number }
+  'common.report_charts.stance_pie.aria': { items: string | number }
+  'common.report_charts.stance_pie_item.value': { count: number; name: string | number }
   'common.ui.copied': Record<string, never>
   'common.ui.copy_failed': Record<string, never>
   'common.ui.deleting': Record<string, never>
@@ -3357,6 +3519,7 @@ export interface MessageVars {
   'common.ui.language': Record<string, never>
   'common.ui.language_aria': Record<string, never>
   'common.ui.language_hint': Record<string, never>
+  'common.ui.list_separator': Record<string, never>
   'common.ui.loading': Record<string, never>
   'common.ui.not_recorded': Record<string, never>
   'common.ui.optional_mark': Record<string, never>
@@ -3485,6 +3648,8 @@ export interface MessageVars {
   'nav.account.login': Record<string, never>
   'nav.account.logout': Record<string, never>
   'nav.account.menu_aria': Record<string, never>
+  'nav.account.provider_email.badge': Record<string, never>
+  'nav.account.provider_qq.badge': Record<string, never>
   'nav.account.settings': Record<string, never>
   'nav.footer.icp_aria': Record<string, never>
   'nav.footer.privacy': Record<string, never>
@@ -3533,6 +3698,7 @@ export interface MessageVars {
   'page.ask.conversation_move.error': Record<string, never>
   'page.ask.conversation_untitled.label': Record<string, never>
   'page.ask.cost.value': { amount: string | number }
+  'page.ask.count.credits_remaining': { count: number }
   'page.ask.count.disagreements': { count: number }
   'page.ask.count.fixes': { count: number }
   'page.ask.count.information_gaps': { count: number }
@@ -3541,6 +3707,8 @@ export interface MessageVars {
   'page.ask.count.personas': { count: number }
   'page.ask.count.priority_fixes': { count: number }
   'page.ask.create.error': Record<string, never>
+  'page.ask.credits.cta': Record<string, never>
+  'page.ask.credits_zero.hint': Record<string, never>
   'page.ask.disagreement.hint': { text: string | number }
   'page.ask.disagreement_evidence.value': { evidence: string | number }
   'page.ask.disagreement_stance.value': { persona: string | number; stance: string | number }
@@ -3628,6 +3796,7 @@ export interface MessageVars {
   'page.ask.report_card.empty': Record<string, never>
   'page.ask.report_card.loading': Record<string, never>
   'page.ask.report_card.title': Record<string, never>
+  'page.ask.report_modal.link': Record<string, never>
   'page.ask.report_modal.subtitle': Record<string, never>
   'page.ask.restored_review.label': Record<string, never>
   'page.ask.review_delete.aria': { title: string | number }
@@ -3698,6 +3867,8 @@ export interface MessageVars {
   'page.create.confirm_task_type.title': Record<string, never>
   'page.create.cost.desc': Record<string, never>
   'page.create.cost.title': Record<string, never>
+  'page.create.count.mode_calls': { count: number }
+  'page.create.count.mode_calls_variable': { count: number }
   'page.create.dropped_skill.desc': Record<string, never>
   'page.create.dropped_skill.title': { skill: string | number }
   'page.create.dropzone.cta': Record<string, never>
@@ -3730,6 +3901,10 @@ export interface MessageVars {
   'page.create.meta.title': Record<string, never>
   'page.create.mode.title': Record<string, never>
   'page.create.mode_card.unit': { range: string | number }
+  'page.create.mode_cost.desc': Record<string, never>
+  'page.create.mode_cost.hint': Record<string, never>
+  'page.create.mode_cost.title': Record<string, never>
+  'page.create.mode_cost.unit': Record<string, never>
   'page.create.mode_name.value': { mode: string | number }
   'page.create.mode_summary.title': Record<string, never>
   'page.create.mode_summary.unit': { range: string | number }
@@ -3794,8 +3969,10 @@ export interface MessageVars {
   'page.evaluation.overall.desc': { count: number; passed: string | number }
   'page.evaluation.overall.hint': Record<string, never>
   'page.evaluation.overall.title': Record<string, never>
+  'page.evaluation.radar.aria': { items: string | number }
   'page.evaluation.radar.label': Record<string, never>
   'page.evaluation.radar.title': Record<string, never>
+  'page.evaluation.radar_item.value': { dimension: string | number; max: string | number; score: string | number }
   'page.evaluation.score.label': Record<string, never>
   'page.evaluation.score.value': { max: string | number; score: string | number }
   'page.evaluation.skill.label': Record<string, never>
@@ -3913,11 +4090,17 @@ export interface MessageVars {
   'page.login.email.label': Record<string, never>
   'page.login.email.placeholder': Record<string, never>
   'page.login.forgot.link': Record<string, never>
+  'page.login.guest_notice.desc': Record<string, never>
+  'page.login.guest_notice.title': Record<string, never>
   'page.login.header.desc': Record<string, never>
   'page.login.header.title': Record<string, never>
   'page.login.meta.title': Record<string, never>
+  'page.login.oauth_divider.label': Record<string, never>
   'page.login.password.label': Record<string, never>
   'page.login.password.placeholder': Record<string, never>
+  'page.login.qq.cta': Record<string, never>
+  'page.login.qq_error.error': Record<string, never>
+  'page.login.qq_error.hint': { reason: string | number }
   'page.login.signup.hint': Record<string, never>
   'page.login.submit.cta': Record<string, never>
   'page.login.submit.error': Record<string, never>
@@ -4098,8 +4281,16 @@ export interface MessageVars {
   'page.progress.status.label': Record<string, never>
   'page.progress.ws_reconnect.hint': Record<string, never>
   'page.progress.ws_unavailable.hint': { count: number }
+  'page.qq_callback.failed.error': Record<string, never>
+  'page.qq_callback.failed.title': Record<string, never>
+  'page.qq_callback.meta.title': Record<string, never>
+  'page.qq_callback.missing.error': Record<string, never>
+  'page.qq_callback.pending.label': Record<string, never>
+  'page.qq_callback.retry.cta': Record<string, never>
   'page.register.email.label': Record<string, never>
   'page.register.email.placeholder': Record<string, never>
+  'page.register.guest_notice.desc': Record<string, never>
+  'page.register.guest_notice.title': Record<string, never>
   'page.register.header.desc': Record<string, never>
   'page.register.header.title': Record<string, never>
   'page.register.meta.title': Record<string, never>
@@ -4130,6 +4321,16 @@ export interface MessageVars {
   'page.report.argument.label': Record<string, never>
   'page.report.argument_con.label': Record<string, never>
   'page.report.argument_pro.label': Record<string, never>
+  'page.report.bind_email.cta': Record<string, never>
+  'page.report.bind_email.desc': Record<string, never>
+  'page.report.bind_email.error': Record<string, never>
+  'page.report.bind_email.success': Record<string, never>
+  'page.report.bind_email.title': Record<string, never>
+  'page.report.bind_email_email.placeholder': Record<string, never>
+  'page.report.bind_email_password.placeholder': Record<string, never>
+  'page.report.bind_email_qq.desc': Record<string, never>
+  'page.report.bind_email_qq.title': Record<string, never>
+  'page.report.bind_email_submit.cta': Record<string, never>
   'page.report.body.loading': Record<string, never>
   'page.report.budget.desc': { cap: string | number; spent: string | number }
   'page.report.budget.hint': Record<string, never>
@@ -4258,6 +4459,13 @@ export interface MessageVars {
   'page.report.link_new_review.cta': Record<string, never>
   'page.report.load_error.desc': Record<string, never>
   'page.report.load_error.title': Record<string, never>
+  'page.report.matrix.aria': { count: number; personas: string | number }
+  'page.report.matrix.title': Record<string, never>
+  'page.report.matrix_cell.tooltip': { persona: string | number; stance: string | number }
+  'page.report.matrix_cell_unmentioned.tooltip': { persona: string | number }
+  'page.report.matrix_topic.empty': Record<string, never>
+  'page.report.matrix_topic.label': Record<string, never>
+  'page.report.matrix_unmentioned.label': Record<string, never>
   'page.report.md_banner.desc': Record<string, never>
   'page.report.md_budget.hint': Record<string, never>
   'page.report.md_cross_exam.empty': Record<string, never>
@@ -4324,6 +4532,7 @@ export interface MessageVars {
   'page.report.predictions.desc': Record<string, never>
   'page.report.predictions.hint': { pct: string | number }
   'page.report.predictions.title': Record<string, never>
+  'page.report.print_blocked.error': Record<string, never>
   'page.report.project_memory.desc': { count: number; project: string | number; reviews: string | number }
   'page.report.project_memory.hint': Record<string, never>
   'page.report.project_memory.meta': { cap: string | number }
@@ -4436,6 +4645,7 @@ export interface MessageVars {
   'page.settings.group_account.label': Record<string, never>
   'page.settings.group_data.label': Record<string, never>
   'page.settings.group_model.label': Record<string, never>
+  'page.settings.group_overview.label': Record<string, never>
   'page.settings.group_usage.label': Record<string, never>
   'page.settings.guest_card.cta': Record<string, never>
   'page.settings.guest_card.desc': Record<string, never>
@@ -4460,6 +4670,19 @@ export interface MessageVars {
   'page.settings.name.label': Record<string, never>
   'page.settings.name.placeholder': Record<string, never>
   'page.settings.name.success': Record<string, never>
+  'page.settings.overview_links.title': Record<string, never>
+  'page.settings.overview_pending': { count: number }
+  'page.settings.overview_plan.value': { plan: string | number }
+  'page.settings.overview_recent.cta': Record<string, never>
+  'page.settings.overview_recent.title': Record<string, never>
+  'page.settings.overview_recent_empty.desc': Record<string, never>
+  'page.settings.overview_recent_empty.title': Record<string, never>
+  'page.settings.overview_sample.value': { count: number }
+  'page.settings.overview_scoreboard.cta': Record<string, never>
+  'page.settings.overview_scoreboard.title': Record<string, never>
+  'page.settings.overview_side_panel.label': Record<string, never>
+  'page.settings.overview_side_user.label': Record<string, never>
+  'page.settings.overview_usage.cta': Record<string, never>
   'page.settings.password.cta': Record<string, never>
   'page.settings.password.error': Record<string, never>
   'page.settings.password.hint': Record<string, never>
@@ -4501,6 +4724,9 @@ export interface MessageVars {
   'page.settings.section_model.desc': Record<string, never>
   'page.settings.section_model.tab': Record<string, never>
   'page.settings.section_model.title': Record<string, never>
+  'page.settings.section_overview.desc': Record<string, never>
+  'page.settings.section_overview.tab': Record<string, never>
+  'page.settings.section_overview.title': Record<string, never>
   'page.settings.section_usage.desc': Record<string, never>
   'page.settings.section_usage.tab': Record<string, never>
   'page.settings.section_usage.title': Record<string, never>
@@ -4690,6 +4916,23 @@ export interface MessageVars {
   'page.tutorial.method_manual.title': Record<string, never>
   'page.tutorial.method_manual_fields.hint': Record<string, never>
   'page.tutorial.method_manual_when.hint': Record<string, never>
+  'page.tutorial.modes.desc': Record<string, never>
+  'page.tutorial.modes.title': Record<string, never>
+  'page.tutorial.modes_calibration.label': Record<string, never>
+  'page.tutorial.modes_cross_exam.label': Record<string, never>
+  'page.tutorial.modes_no.value': Record<string, never>
+  'page.tutorial.modes_personas.label': Record<string, never>
+  'page.tutorial.modes_yes.value': Record<string, never>
+  'page.tutorial.more.desc': Record<string, never>
+  'page.tutorial.more.title': Record<string, never>
+  'page.tutorial.more_byok.desc': Record<string, never>
+  'page.tutorial.more_byok.title': Record<string, never>
+  'page.tutorial.more_cdk.desc': Record<string, never>
+  'page.tutorial.more_cdk.title': Record<string, never>
+  'page.tutorial.more_ledger.desc': Record<string, never>
+  'page.tutorial.more_ledger.title': Record<string, never>
+  'page.tutorial.more_overview.desc': Record<string, never>
+  'page.tutorial.more_overview.title': Record<string, never>
   'page.tutorial.result_calibration.desc': Record<string, never>
   'page.tutorial.result_calibration.label': Record<string, never>
   'page.tutorial.result_issues.desc': Record<string, never>
@@ -4734,6 +4977,7 @@ export interface MessageSlots {
   'page.create.pack_intro.desc': 'name'
   'page.forgot.signin.hint': 'link'
   'page.history.confirm_dialog.desc': 'name' | 'note'
+  'page.login.guest_notice.desc': 'link'
   'page.login.signup.hint': 'link'
   'page.plans.anon.hint': 'register'
   'page.plans.banner_byok': 'mode'
@@ -4742,6 +4986,7 @@ export interface MessageSlots {
   'page.plans.credits.value': 'unit'
   'page.plans.feature_reviews': 'n'
   'page.plans.request.hint': 'mail'
+  'page.register.guest_notice.desc': 'link'
   'page.register.signin.hint': 'link'
   'page.register.terms.consent': 'privacy' | 'terms'
   'page.report.predictions.hint': 'emph'
@@ -4769,6 +5014,7 @@ export const RESOURCE_FILES = [
   'common.meta.ts',
   'common.persona_card.ts',
   'common.persona_radar.ts',
+  'common.report_charts.ts',
   'common.ui.ts',
   'common.validate.ts',
   'enum.behavior_axis.ts',
@@ -4811,6 +5057,7 @@ export const RESOURCE_FILES = [
   'page.plans.ts',
   'page.privacy.ts',
   'page.progress.ts',
+  'page.qq_callback.ts',
   'page.register.ts',
   'page.report.ts',
   'page.reset.ts',

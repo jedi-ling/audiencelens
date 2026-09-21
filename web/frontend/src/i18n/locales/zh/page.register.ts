@@ -31,5 +31,13 @@ export default {
 
   'terms.consent': '注册即表示你同意<terms>服务条款</terms>与<privacy>隐私政策</privacy>',
 
+  /* ---------------- 游客提醒 ----------------
+     同 page.login：游客现在够得着这一页了。注册的是**另一个**账号，
+     不是把当前游客转正——这两件事的区别必须写在注册按钮旁边，
+     否则用户会以为注册就等于保住了手上这份东西。 */
+  'guest_notice.title': '你现在是这台浏览器上的游客',
+  'guest_notice.desc':
+    '在这里注册的是一个新账号，不会把当前游客身份转正：这台浏览器上的游客评审与剩余次数不会跟过去。想保住它们，请改去<link>设置里绑定邮箱</link>——那条路 user_id 不变，历史与额度都留在原地。',
+
   'signin.hint': '已经有账号？<link>直接登录</link>',
 } satisfies Messages

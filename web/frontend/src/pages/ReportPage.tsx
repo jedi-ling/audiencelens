@@ -47,6 +47,7 @@ import {
 import type { EthicsSeverity, RebuttalStatus, StereotypeRisk } from '@/lib/mock-data'
 import PersonaAvatar from '@/components/PersonaAvatar'
 import MyJudgmentPanel from '@/components/MyJudgmentPanel'
+import BindEmailBanner from '@/components/BindEmailBanner'
 import { REVIEW_MODE_BOUNDARIES } from '@/lib/mock-data'
 import { t, Trans, missingMarker } from '@/i18n/runtime'
 import { getLocale } from '@/i18n/locale'
@@ -55,6 +56,7 @@ import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
 import { tApiError, tApiErrorParts } from '@/i18n/api-error'
 import { localizePersona } from '@/i18n/catalog'
 import { usePersonaStore } from '@/store/persona-store'
+import { LOGO_DATA_URI } from '@/lib/logo-data-uri'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import SeverityBadge from '@/components/SeverityBadge'
 import CalibrationGauge from '@/components/CalibrationGauge'
@@ -62,7 +64,8 @@ import CalibrationGauge from '@/components/CalibrationGauge'
 // 两张图各自 lazy 补上。抽出的组件只收算好的数据，见 ReportCharts.tsx 头注释。
 const StancePie = lazy(() => import('@/components/ReportCharts').then((m) => ({ default: m.StancePie })))
 const ScorecardBars = lazy(() => import('@/components/ReportCharts').then((m) => ({ default: m.ScorecardBars })))
-import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy, Target, Layers } from 'lucide-react'
+import type { StanceDatum } from '@/components/ReportCharts'
+import { ArrowLeft, ChevronDown, ChevronUp, AlertTriangle, Loader2, File, FileText, Globe, Shield, FlaskConical, AlertOctagon, Lock, Users, HelpCircle, Scale, Zap, ListChecks, Microscope, CheckCircle2, XCircle, Bot, Info, Swords, MessageSquareQuote, ArrowRightLeft, MinusCircle, TrendingUp, TrendingDown, Minus, RefreshCw, Share2, Copy, Target, Layers, Printer } from 'lucide-react'
 
 // ---------- 真实报告 schema（aggregator.py 输出的镜像；字段全部可选，缺了不崩） ----------
 
@@ -136,6 +139,17 @@ interface RealPanelSelection {
   matched?: string[]
   missing?: string[]
   fell_back_to_auto?: boolean
+  /** 面板是怎么选出来的：preset（任务类型预设名单）/ pack_preset（该人格包的
+   *  专属名单）/ affinity_fallback（预设名单在这个包里一个都没命中，按任务
+   *  亲和度现凑）。显式点名人格时为 null——那种情况面板是用户自己定的。
+   *
+   *  为什么要透出来：14 个任务类型的预设里 default_personas 写的都是 game-core
+   *  的人格 id，只有 11 组 (任务类型 × 人格包) 配了专属 by_pack 名单。其余组合
+   *  ——包括 general-consumer / startup-panel / mobile-f2p 等 6 个包的**全部**
+   *  任务类型——面板实际是算法现凑的。这跟"策展过的面板"是两种可信度。
+   *  展示不靠这个字段（notice 里已经把话说全了，UI 原样透出引擎的陈述），
+   *  它是给程序方筛选/统计用的。 */
+  selection_method?: 'preset' | 'pack_preset' | 'affinity_fallback' | null
   notice?: string
 }
 
@@ -346,7 +360,27 @@ function evidenceQualityLabel(raw?: string): string {
 }
 
 // 立场是各任务类型自己的枚举（"加愿望单"/"值得推进"/"观望"…），无法穷举——按出现顺序配色
-const STANCE_PALETTE = ['#0071e3', '#ff9f0a', '#ff6b35', '#ff3355', '#32ade6', '#a78bfa']
+/** 图表分类色板（深色底 #1c1c1e 专用，经 dataviz 验证器实测通过）。
+ *
+ *  换掉的旧板 ['#0071e3','#ff9f0a','#ff6b35','#ff3355','#32ade6','#a78bfa'] 是
+ *  凭手感挑的，五项检查挂了三项：
+ *    · 明度带：6 个里 4 个越界（深浅不齐，视觉重量互相打架）
+ *    · 色盲区分：紫 #a78bfa ↔ 浅蓝 #32ade6 ΔE 3.1（红绿色盲完全分不出）
+ *    · 正常视力区分：#ff3355 ↔ #ff6b35 ΔE 10.1，低于硬底线 15
+ *      —— 那两个红橙**连正常视力的人都分不清**，这就是"看起来很乱"的来源。
+ *
+ *  现在这一组的槽位顺序本身就是色盲安全机制，不是审美排序，**不要重排、
+ *  不要插色、不要循环取模生成第 7 个颜色**（超出就该归并成"其他"或分面）。
+ *  相邻对（柱状/环形相邻段）：最差 CVD ΔE 8.4、正常视力 ΔE 19.3，全项通过。
+ *
+ *  ⚠️ 全对比场景（任意两段互相比对，如环形图配图例）只有**前 3 槽**能过闸
+ *  （实测第 4 槽起 #d55181↔#199e70 ΔE 1.6）。所以超过 3 段的图**必须**带
+ *  直接标签当第二重编码，不能让颜色独自承担身份——StancePie 已按此加标签。
+ *
+ *  改动前先跑验证器，别用眼睛判断：
+ *    node <dataviz-skill>/scripts/validate_palette.js "<hex,...>" --mode dark --surface "#1c1c1e"
+ */
+const STANCE_PALETTE = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300']
 
 const MODE_BADGE: Record<ReviewMode, { labelKey: PlainMessageKey; color: string; bg: string; Icon: typeof Zap }> = {
   quick: { labelKey: 'enum.mode_badge.quick', color: 'text-cyan', bg: 'bg-cyan/10', Icon: Zap },
@@ -600,7 +634,7 @@ export function EvidenceProfileSection({
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0)
 
   return (
-    <div id="sec-evidence" className="scroll-mt-14 mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+    <div id="sec-evidence" className="scroll-mt-14 mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
       <div className="mb-1 flex items-center gap-2">
         <Scale className="h-4 w-4 text-cyan" strokeWidth={1.25} />
         <h3 className="text-sm font-semibold text-text-primary">{t('page.report.evidence_profile.title')}</h3>
@@ -741,7 +775,7 @@ function PredictionsSection({ predictions }: { predictions?: RealPrediction[] })
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
       <div className="mb-1 flex items-center gap-2">
         <Target className="w-4 h-4 text-cyan" strokeWidth={1.25} />
         <h3 className="text-sm font-semibold text-text-primary">{t('page.report.predictions.title')}</h3>
@@ -853,7 +887,7 @@ function AdaptivePanelSection({ adaptive }: { adaptive?: RealAdaptivePanel | nul
   const disabledReasonKey = adaptive.disabled_reason ? DISABLED_REASON_KEYS[adaptive.disabled_reason] : undefined
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+    <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
       <div className="mb-3 flex items-center gap-2">
         <Layers className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
         <h3 className="text-sm font-semibold text-text-primary">{t('page.report.adaptive.title')}</h3>
@@ -1024,7 +1058,7 @@ function ProjectMemoryNotice({ meta }: { meta?: ProjectMemoryMeta | null }) {
   const reasonKey = `page.report.reason.project_memory_${reason}` as const
 
   return (
-    <div className="mb-4 rounded-xl border border-border bg-bg-card p-4">
+    <div className="mb-4 rounded-xl border border-border bg-bg-card p-4 report-panel">
       <div className="flex items-start gap-3">
         <Layers className="mt-0.5 h-5 w-5 shrink-0 text-text-muted" strokeWidth={1.75} />
         <div className="min-w-0">
@@ -1483,7 +1517,7 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
           <Swords className="h-5 w-5 text-text-muted" strokeWidth={1.25} />
           <h3 className="text-lg font-semibold text-text-primary">{t('page.report.cross_exam.title')}</h3>
         </div>
-        <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
+        <div className="rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5 report-panel">
           {t('page.report.cross_exam_legacy.desc', { count: view.legacy_entry_count })}
         </div>
       </div>
@@ -1597,7 +1631,7 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
       {view.disputes.length > 0 ? (
         <div className="mb-3 flex flex-col gap-3">
           {view.disputes.map((d, i) => (
-            <div key={d.point_id || i} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div key={d.point_id || i} className="rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 {d.point_id && (
                   <span className="rounded bg-bg-secondary px-1.5 font-mono text-xs text-text-muted">{d.point_id}</span>
@@ -1629,7 +1663,7 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
         // 空争议点不留白：说清楚是"没找到分歧"还是"这一步没跑成"。
         // 上面已经把引擎给的具体原因摆出来了，就不要在这里另编一个原因——
         // "没有可反驳的论据正文"和"大家意见一致"是两回事。
-        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5">
+        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 text-sm text-text-secondary md:p-5 report-panel">
           {limitationTone === 'muted'
             ? t('page.report.dispute_empty.desc')
             : t('page.report.dispute_empty.hint')}
@@ -1637,7 +1671,7 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
       )}
 
       {/* 改票记录。"没有人改票"是正常结果，必须写出来而不是留空白。 */}
-      <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+      <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
           <h4 className="text-sm font-semibold text-text-primary">{t('page.report.vote.title')}</h4>
@@ -1698,7 +1732,7 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
       {/* 逐人格置信度变化：只在真跑过反驳时有意义（派生摘要档 delta 恒为 0，
           画出来只会让人以为发生过一场辩论） */}
       {live && view.confidence_changes.length > 0 && (
-        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="mb-3 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
           <h4 className="mb-3 text-sm font-semibold text-text-primary">{t('page.report.confidence.title')}</h4>
           <ul className="flex flex-col gap-2">
             {view.confidence_changes.map((cc, i) => {
@@ -1754,6 +1788,101 @@ export function CrossExamSection({ view }: { view: CrossExamView }) {
   )
 }
 
+/**
+ * 议题 × 人格立场矩阵——热力图形式展示"谁对哪个议题持什么立场"。
+ *
+ * 行 = 议题（来自 major_disagreements 的 topic）
+ * 列 = 人格（来自 persona_notes）
+ * 单元格颜色 = 该人格对该议题的立场（用 stanceColor，空单元格 = 未提及）
+ *
+ * 一眼能看出：哪些议题是分裂点（整列颜色混杂）、哪些是共识（整列同色）、
+ * 哪些人格是"边缘异议者"（整行颜色与众不同）。
+ */
+function DisagreementMatrix({
+  disagreements,
+  personaNotes,
+  stanceData,
+}: {
+  disagreements: RealDisagreement[]
+  personaNotes: RealPersonaNote[]
+  stanceData: StanceDatum[]
+}) {
+  const allPersonaIds = personaNotes.map((n) => n.persona_id)
+  const stanceColorMap = new Map(stanceData.map((s) => [s.name, s.color]))
+
+  // 每个人格在每个议题上的立场：从 disagreements.persona_stances 反查
+  const matrix = disagreements.map((d) => {
+    const topic = d.topic ?? t('page.report.matrix_topic.empty')
+    const cells = allPersonaIds.map((pid) => {
+      const ps = d.persona_stances?.find((p) => p.persona_id === pid)
+      if (!ps) return { personaId: pid, stance: null, color: null }
+      const color = stanceColorMap.get(ps.stance ?? '') ?? null
+      return { personaId: pid, stance: ps.stance ?? null, color }
+    })
+    return { topic, cells }
+  })
+
+  return (
+    <div id="sec-matrix" className="scroll-mt-14 mb-6">
+      <div className="mb-4 flex items-center gap-2">
+        <Layers className="w-5 h-5 text-cyan" strokeWidth={1.25} />
+        <h3 className="text-lg font-semibold text-text-primary">{t('page.report.matrix.title')}</h3>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel" role="img" aria-label={t('page.report.matrix.aria', { count: disagreements.length, personas: personaNotes.length })}>
+        <table className="w-full text-xs">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 bg-bg-card px-2 py-1.5 text-left font-medium text-text-muted min-w-[140px]">{t('page.report.matrix_topic.label')}</th>
+              {allPersonaIds.map((pid) => (
+                <th key={pid} className="px-1 py-1.5 text-center font-mono text-[10px] text-text-muted max-w-[48px] truncate" title={pid}>
+                  {pid.slice(0, 6)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, ri) => (
+              <tr key={ri} className="border-t border-border/50">
+                <td className="sticky left-0 z-10 bg-bg-card px-2 py-1.5 text-text-primary font-medium max-w-[200px] truncate" title={row.topic}>
+                  {row.topic}
+                </td>
+                {row.cells.map((cell, ci) => (
+                  <td key={ci} className="px-0.5 py-1 text-center">
+                    {cell.color ? (
+                      <span
+                        className="inline-block h-4 w-4 rounded-sm"
+                        style={{ backgroundColor: cell.color, opacity: 0.85 }}
+                        title={t('page.report.matrix_cell.tooltip', { persona: cell.personaId, stance: cell.stance ?? '' })}
+                      />
+                    ) : (
+                      <span
+                        className="inline-block h-4 w-4 rounded-sm bg-bg-secondary"
+                        title={t('page.report.matrix_cell_unmentioned.tooltip', { persona: cell.personaId })}
+                      />
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3 flex flex-wrap gap-3 font-mono text-[10px] text-text-muted">
+          {stanceData.map((d) => (
+            <span key={d.name} className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: d.color }} />
+              {d.name}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-sm bg-bg-secondary" />
+            {t('page.report.matrix_unmentioned.label')}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ReportPage() {
   // 顶层调用一次：它内部 useLocale()，所以本页也顺带订阅了 ui_lang，
   // 切语言时整页重渲染、t() 的结果跟着变（契约 6.3）。
@@ -1775,6 +1904,9 @@ export default function ReportPage() {
    *  照样亮着，点下去下载一张只写着「HTML报告尚未生成」的白页——用户会以为
    *  自己的报告内容丢了。现在原因如实留着，按钮也不再假装可用。 */
   const [htmlUnavailable, setHtmlUnavailable] = useState<string | null>(null)
+  /** 打印弹窗被浏览器拦下。单独一个状态而不是塞进 htmlUnavailable：
+   *  那个讲的是"这份报告没有 HTML 版"，和"有 HTML 但窗口被拦了"是两件事。 */
+  const [printBlocked, setPrintBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
   // 加载失败必须留痕：以前 catch 里什么都不存，网络错误/403/500 全落到
   // "报告尚未生成"那一句上，用户既不知道原因也没法重试。
@@ -2059,6 +2191,43 @@ export default function ReportPage() {
     URL.revokeObjectURL(url)
   }
 
+  // PDF 走"浏览器打印"而不是引入 html2pdf 之类的库现生成文件：报告页已经有
+  // 一份带 logo、排过版的 HTML（reportHtml），复用它 + 一份打印专用样式
+  // （见 report-template.html 里的 @media print），交给浏览器自带的
+  // 「打印 → 另存为 PDF」，不用为这一个按钮多引入一个前端依赖。
+  // 只在 reportHtml 存在时可用——和 HTML 导出按钮共享同一个前提条件。
+  const handlePrintPdf = () => {
+    if (!reportHtml) return
+    const win = window.open('', '_blank')
+    if (!win) {
+      // 弹窗被拦截。此前这里直接 return：点 PDF 毫无反应、没有任何报错，
+      // 表现和"按钮坏了"完全一样，而真正的原因（浏览器拦了弹窗）只有
+      // 地址栏角落里一个小图标在说——用户不会去看。必须当场说出来。
+      setPrintBlocked(true)
+      return
+    }
+    setPrintBlocked(false)
+    win.document.open()
+    win.document.write(reportHtml)
+    // onload 必须在 document.close() **之前**挂：close() 会立刻触发文档
+    // 加载完成，Firefox 上对 document.write 填充的窗口尤其如此——先 close
+    // 再赋 onload，那个回调可能永远不会被调用，于是打印对话框不弹、
+    // 又开出来一个空白标签页（同样是"点了没反应"）。
+    win.onload = () => {
+      win.focus()
+      win.print()
+    }
+    win.document.close()
+    // 兜底：某些浏览器对 document.write 出来的文档根本不派发 load 事件。
+    // 上面的 onload 先到就先打印，这条定时器只在它没来时补一次；
+    // 重复调用 print() 无害（第二次会被同一个已打开的对话框吞掉）。
+    window.setTimeout(() => {
+      if (win.closed) return
+      win.focus()
+      win.print()
+    }, 1200)
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 animate-fade-in">
       {/* 三条诚实信号一律置顶，不滚动就能看到：合成声明（ETHICS.md 强制）、
@@ -2085,6 +2254,7 @@ export default function ReportPage() {
         }
       />
       <ModeBoundaryNote mode={review?.mode} />
+      <BindEmailBanner />
       </div>
 
       {/* 页面头部独立成全宽一行：标题 + 操作组，和下面收窄的正文阅读列分层。
@@ -2105,7 +2275,7 @@ export default function ReportPage() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 rounded-xl border border-border bg-bg-card p-1">
+        <div className="flex items-center gap-1.5 shrink-0 rounded-xl border border-border bg-bg-card p-1 report-panel">
           <button
             onClick={() => setSharePanelOpen((v) => !v)}
             className={cn(
@@ -2148,6 +2318,20 @@ export default function ReportPage() {
             <Globe className="w-3.5 h-3.5" strokeWidth={1.25} />
             <span className="hidden sm:inline">HTML</span>
           </button>
+          <button
+            onClick={handlePrintPdf}
+            disabled={!reportHtml}
+            title={reportHtml ? undefined : htmlUnavailable ?? t('page.report.html.tooltip')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm transition-all',
+              reportHtml
+                ? 'text-text-secondary hover:bg-bg-card-hover hover:text-status-completed'
+                : 'text-text-muted cursor-not-allowed'
+            )}
+          >
+            <Printer className="w-3.5 h-3.5" strokeWidth={1.25} />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
         </div>
       </div>
 
@@ -2161,7 +2345,7 @@ export default function ReportPage() {
           知道自己在公开什么。两栏内容与后端白名单（share_service.to_public_dict）
           一一对应，改后端就要改这里，否则这段说明会变成一句谎话。 */}
       {sharePanelOpen && (
-        <div className="mb-6 rounded-xl border border-border bg-bg-card p-5">
+        <div className="mb-6 rounded-xl border border-border bg-bg-card p-5 report-panel">
           <div className="flex items-start gap-2.5">
             <Share2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" strokeWidth={1.5} />
             <div className="min-w-0 flex-1">
@@ -2249,6 +2433,19 @@ export default function ReportPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 打印弹窗被拦。role=alert：用户刚点了按钮、正在等，这条必须立刻被念出来。 */}
+      {printBlocked && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-2.5 rounded-xl border border-warm-orange/40 bg-warm-orange/10 p-3"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warm-orange" strokeWidth={1.75} />
+          <p className="text-xs leading-relaxed text-text-secondary">
+            {t('page.report.print_blocked.error')}
+          </p>
         </div>
       )}
 
@@ -2391,7 +2588,7 @@ export default function ReportPage() {
 
       {/* ---------- 立场分布 + 校准指标 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
           <h3 className="text-sm font-medium text-text-muted mb-4">
             {t('page.report.stance.title', { count: personaNotes.length })}
           </h3>
@@ -2418,7 +2615,7 @@ export default function ReportPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 overflow-x-auto">
+        <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 overflow-x-auto report-panel">
           <h3 className="mb-4 text-base font-semibold text-text-primary">{t('page.report.calibration.title')}</h3>
           {calibration ? (
             <>
@@ -2484,7 +2681,7 @@ export default function ReportPage() {
                 ? (fix.severity as Severity)
                 : 'medium'
               return (
-                <div key={index} className="rounded-xl border border-border bg-bg-card overflow-hidden">
+                <div key={index} className="rounded-xl border border-border bg-bg-card overflow-hidden report-panel">
                   <button
                     onClick={() => toggleIssue(index)}
                     className="w-full flex items-center gap-3 px-4 md:px-5 py-4 text-left hover:bg-bg-card-hover transition-colors"
@@ -2566,7 +2763,7 @@ export default function ReportPage() {
               const stanceColor = STANCE_PALETTE[Math.max(stanceIndex, 0) % STANCE_PALETTE.length]
               const displayName = personaDisplayName(personaCatalog, note.persona_id, note.persona_name)
               return (
-                <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+                <div key={note.persona_id} className="rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
                   <div className="flex items-center gap-2.5 mb-3">
                     {/* 人格头像：真实头像叠在字母圈上。PersonaAvatar 404 时自隐，
                         字母圈从底下露出来兜底——不出现破图，也不空一块。 */}
@@ -2669,7 +2866,7 @@ export default function ReportPage() {
           全包每人一次廉价短调用的粗筛信号。只用于解释"深评面板怎么选出来的"，
           初筛意见不是正式评审结论——所以放在圆桌之后、用弱化样式渲染。 */}
       {report.triage?.enabled && (
-        <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
           <div className="mb-1 flex items-center gap-2">
             <Microscope className="h-4 w-4 text-cyan" strokeWidth={1.25} />
             <h3 className="text-sm font-semibold text-text-primary">{t('page.report.triage.title')}</h3>
@@ -2720,7 +2917,7 @@ export default function ReportPage() {
           </div>
           <div className="flex flex-col gap-2">
             {report.consensus!.shared_concerns!.map((c, i) => (
-              <div key={i} className="rounded-xl border border-border bg-bg-card p-3 md:p-4">
+              <div key={i} className="rounded-xl border border-border bg-bg-card p-3 md:p-4 report-panel">
                 <div className="flex items-start gap-2">
                   <span
                     className={cn(
@@ -2761,6 +2958,15 @@ export default function ReportPage() {
         </div>
       )}
 
+      {/* ---------- 议题 × 人格立场矩阵（新增可视化） ---------- */}
+      {disagreements.length > 0 && personaNotes.length > 0 && (
+        <DisagreementMatrix
+          disagreements={disagreements}
+          personaNotes={personaNotes}
+          stanceData={stanceData}
+        />
+      )}
+
       {/* ---------- 主要分歧 ---------- */}
       {disagreements.length > 0 && (
         <div id="sec-disagreements" className="scroll-mt-14 mb-6">
@@ -2770,7 +2976,7 @@ export default function ReportPage() {
           </div>
           <div className="flex flex-col gap-3">
             {disagreements.map((d, i) => (
-              <div key={i} className="overflow-x-auto rounded-xl border border-warm-orange/20 bg-bg-card p-4 md:p-5">
+              <div key={i} className="overflow-x-auto rounded-xl border border-warm-orange/20 bg-bg-card p-4 md:p-5 report-panel">
                 <p className="text-sm font-medium text-text-primary mb-2">{d.topic}</p>
                 {(d.persona_stances?.length ?? 0) > 0 && (
                   <ul className="space-y-1.5 mb-2">
@@ -2802,7 +3008,7 @@ export default function ReportPage() {
       {/* ---------- 信息缺口 + 建议的下一步真人测试 ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {informationGaps.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
             <div className="mb-4 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-warm-orange" strokeWidth={1.25} />
               <h3 className="text-sm font-semibold text-text-primary">{t('page.report.gaps.title')}</h3>
@@ -2819,7 +3025,7 @@ export default function ReportPage() {
         )}
 
         {report.next_human_test && (
-          <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5">
+          <div className="rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
             <h3 className="text-sm font-semibold text-text-primary mb-4">{t('page.report.next_test.title')}</h3>
             <dl className="space-y-3 text-sm">
               <div>
@@ -2875,7 +3081,7 @@ export default function ReportPage() {
 
       {/* ---------- 伦理合规 ---------- */}
       {report.compliance && (
-        <div className="mb-6 overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+        <div className="mb-6 overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="w-4 h-4 text-purple-400" strokeWidth={1.25} />
             <h3 className="text-sm font-semibold text-text-primary">{t('page.report.compliance.title')}</h3>
@@ -2933,7 +3139,7 @@ export default function ReportPage() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
-            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
               {/* 标出满分：右边那块维度分是 0–3，不写清楚两个数看起来是同一把尺子 */}
               <h4 className="text-sm font-medium text-text-muted mb-4">{t('page.report.evaluation_overall.label')}</h4>
               <div className="flex items-center gap-4">
@@ -2977,7 +3183,7 @@ export default function ReportPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5">
+            <div className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 md:p-5 report-panel">
               <h4 className="text-sm font-medium text-text-muted mb-4">{t('page.report.evaluation_dimension.label')}</h4>
               <Suspense fallback={<div className="h-[200px]" />}>
                 <ScorecardBars
@@ -3000,7 +3206,7 @@ export default function ReportPage() {
               const dim = EVALUATION_DIMENSIONS.find((d) => d.id === result.dimension)
               const expanded = expandedDimensions.has(result.dimension)
               return (
-                <div key={result.dimension} className="rounded-xl border border-border bg-bg-card overflow-hidden">
+                <div key={result.dimension} className="rounded-xl border border-border bg-bg-card overflow-hidden report-panel">
                   <button
                     onClick={() => {
                       setExpandedDimensions((prev) => {
@@ -3059,7 +3265,7 @@ export default function ReportPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {ethicsReports.map((er) => (
-              <div key={er.persona_id} className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4">
+              <div key={er.persona_id} className="overflow-x-auto rounded-xl border border-border bg-bg-card p-4 report-panel">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-text-primary">{er.persona_id}</span>
                   <span className={cn(
@@ -3144,7 +3350,7 @@ export default function ReportPage() {
 
       {/* ---------- 评估操作区：运行评估 / 查看完整评估 / 失败说明收成一组，
           错误说明换行独占一行，不再和按钮挤在同一行里换行错位 ---------- */}
-      <div className="mb-6 rounded-xl border border-border bg-bg-card p-4">
+      <div className="mb-6 rounded-xl border border-border bg-bg-card p-4 report-panel">
         <div className="flex flex-wrap items-center gap-3">
           <button
           onClick={async () => {
@@ -3304,7 +3510,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
       </div>
 
       {summary && (
-        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
+        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4 report-panel">
           <h2 className="text-sm font-medium text-text-muted mb-3">{t('page.report.gated_summary.title')}</h2>
           <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
             <div>
@@ -3334,7 +3540,7 @@ function GatedReportTeaser({ review, gated }: { review: Review | null; gated: Re
       )}
 
       {fix && (
-        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4">
+        <div className="rounded-xl border border-border bg-bg-card p-5 mb-4 report-panel">
           <h2 className="text-sm font-medium text-text-muted mb-3">{t('page.report.gated_fix.title')}</h2>
           <p className="font-medium text-text-primary">{fix.issue}</p>
           {fix.why_it_matters && <p className="mt-1 text-sm text-text-secondary">{fix.why_it_matters}</p>}
@@ -3393,6 +3599,10 @@ function reportLanguageLine(language?: string): string {
 function generateMarkdown(report: RealReport): string {
   const lines: string[] = []
   const summary = report.executive_summary
+  // 服务端的 report-template.md 也在标题前放了同一张 logo（同一张缩略图，
+  // 两边各自内嵌见 lib/logo-data-uri.ts 的注释）——这条兜底路径不能漏掉。
+  lines.push(`![AudienceLens](${LOGO_DATA_URI})`)
+  lines.push('')
   lines.push(`# ${t('page.report.header.title')}`)
   lines.push('')
   // 服务端的 markdown 走 src/templates/report-template.md，顶部自带 Synthetic Banner。

@@ -1,8 +1,11 @@
 /**
  * 后台管理 API 客户端。
  *
- * 认证：X-Admin-Token 请求头，对应服务端 AL_ADMIN_TOKEN 环境变量。
- * 服务端未设置该变量时，所有请求返回 503（code: admin_disabled）。
+ * 认证：X-Admin-Token 请求头。两种取值都认：
+ *   1. 服务端 AL_ADMIN_TOKEN 环境变量原文（bootstrap/逃生舱）；
+ *   2. /api/admin/auth/login 用具名账号（用户名+密码）换回的会话令牌——
+ *      这是现在登录界面走的路径，能让审计日志落到具体人头上。
+ * 服务端未设置 AL_ADMIN_TOKEN 时，所有请求返回 503（code: admin_disabled）。
  * 令牌只存本项目自己的 localStorage，与用户产品前端的登录态完全独立
  * （两个应用甚至可以部署在不同域名下）。
  */
@@ -40,6 +43,11 @@ import {
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || ''
 const ADMIN_TOKEN_KEY = 'al_admin.token'
+/** 登录成功时记下的用户名。**不是凭据**（凭据只有上面那个令牌），只用来在界面上
+ *  回答一个问题："我正要停用的这个账号，是不是我自己？"没有它，管理员可以在
+ *  毫无提示的情况下把自己踢下线。用静态主密钥（AL_ADMIN_TOKEN 原文）进来时
+ *  没有用户名，此时返回 null，界面按"不知道是谁"处理、不硬猜。 */
+const ADMIN_USERNAME_KEY = 'al_admin.username'
 
 export function getAdminToken(): string | null {
   return localStorage.getItem(ADMIN_TOKEN_KEY)
@@ -47,7 +55,21 @@ export function getAdminToken(): string | null {
 
 export function setAdminToken(token: string | null): void {
   if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token)
-  else localStorage.removeItem(ADMIN_TOKEN_KEY)
+  else {
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
+    // 令牌没了，用户名也必须跟着没——留着的话下一个登进来的人会在
+    // "这是你当前登录的账号"提示里看到上一个人的名字。
+    localStorage.removeItem(ADMIN_USERNAME_KEY)
+  }
+}
+
+export function getAdminUsername(): string | null {
+  return localStorage.getItem(ADMIN_USERNAME_KEY)
+}
+
+export function setAdminUsername(username: string | null): void {
+  if (username) localStorage.setItem(ADMIN_USERNAME_KEY, username)
+  else localStorage.removeItem(ADMIN_USERNAME_KEY)
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -91,6 +113,26 @@ function listQuery(filters: ListFilters = {}): string {
 }
 
 export const adminApi = {
+  login: (username: string, password: string) =>
+    request<{ token: string; username: string }>('/api/admin/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
+  listAdminUsers: () =>
+    request<
+      { id: string; username: string; is_active: boolean; created_at: string; last_login_at: string | null }[]
+    >('/api/admin/auth/users'),
+
+  createAdminUser: (username: string, password: string) =>
+    request<{ id: string; username: string }>('/api/admin/auth/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
+  deactivateAdminUser: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/auth/users/${id}`, { method: 'DELETE' }),
+
   overview: () => request<AdminOverview>('/api/admin/overview'),
 
   timeseries: (days = 14) => request<AdminTimeseries>(`/api/admin/timeseries?days=${days}`),

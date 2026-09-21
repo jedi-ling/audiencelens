@@ -17,7 +17,7 @@ export default {
   // ---- 链接被撤销（404）。与"加载失败"分开说：前者是正常结果，后者是故障。 ----
   'revoked.title': '链接已失效',
   'revoked.desc': '这条分享链接不存在，或者已经被作者撤销了。如果你需要查看，请向分享给你的人重新索取。',
-  'revoked.cta': '了解 AudienceLens',
+  'revoked.cta': '了解千见 AudienceLens',
 
   // ---- 真的出故障了 ----
   // load_error.desc 同时兼两个用途：拿不到具体错误时的说明，
@@ -44,6 +44,6 @@ export default {
   'gaps.title': '信息缺口',
 
   // 访客大概率是第一次听说这个产品——给一条自然的了解入口，不做拦截层。
-  'footer.desc': '这份报告由 AudienceLens 的多角色评审团生成。',
+  'footer.desc': '这份报告由千见 AudienceLens 的多角色评审团生成。',
   'footer.cta': '给自己的东西也跑一轮',
 } satisfies Messages

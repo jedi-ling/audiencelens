@@ -1,13 +1,16 @@
 ﻿import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
-import { api, claimPendingReviews, setToken } from '@/lib/apiClient'
+import { api, claimPendingReviews, setToken, ApiError } from '@/lib/apiClient'
 import { useSessionStore } from '@/store/session-store'
+import { fetchReviewsPage } from '@/lib/api'
+import BindEmailBanner from '@/components/BindEmailBanner'
+import type { ReviewListItem } from '@/lib/mock-data'
 import type { KeyStatus, UsageSummary, TestConnectionResult } from '@/lib/types'
-import { OPENAI_COMPATIBLE_PRESETS } from '@/lib/types'
+import { OPENAI_COMPATIBLE_PRESETS, displayableEmail } from '@/lib/types'
 import { t, Trans } from '@/i18n/runtime'
 import { useDocumentTitle } from '@/i18n/head'
-import { formatDateTime, formatNumber, formatUsd } from '@/i18n/format'
+import { formatDateTime, formatNumber, formatPercent, formatUsd } from '@/i18n/format'
 import { tApiError } from '@/i18n/api-error'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import {
@@ -32,11 +35,21 @@ import {
   AlertTriangle,
   LogOut,
   User,
+  LayoutDashboard,
+  History,
+  ScrollText,
+  ArrowRight,
+  Sparkles,
+  ListChecks,
+  BookOpen,
+  Users,
 } from 'lucide-react'
 
 type Provider = 'anthropic' | 'openai_compatible'
 type TestStatus = 'idle' | 'testing' | 'success' | 'error'
-type SectionKey = 'account' | 'model' | 'usage' | 'data'
+type SectionKey = 'overview' | 'account' | 'model' | 'usage' | 'data'
+
+type Scoreboard = Awaited<ReturnType<typeof api.ledgerScoreboard>>
 
 // 参考 MiniMax 控制台那种「左侧分组导航 + 右侧单类目内容」的信息架构——
 // 之前是三个大 section 从上到下堆一整屏，用户想改密码得先划过整块 BYOK
@@ -48,6 +61,10 @@ const NAV_GROUPS: Array<{
   labelKey: PlainMessageKey
   items: Array<{ key: SectionKey; labelKey: PlainMessageKey; icon: React.ElementType }>
 }> = [
+  {
+    labelKey: 'page.settings.group_overview.label',
+    items: [{ key: 'overview', labelKey: 'page.settings.section_overview.tab', icon: LayoutDashboard }],
+  },
   {
     labelKey: 'page.settings.group_account.label',
     items: [{ key: 'account', labelKey: 'page.settings.section_account.tab', icon: User }],
@@ -109,9 +126,22 @@ const PRESET_ICONS: Record<string, React.ElementType> = {
 export default function SettingsPage() {
   // 顺带订阅 ui_lang：t() 是普通函数、不带响应性，切语言时要有人触发重渲染。
   useDocumentTitle('page.settings.meta.title')
-  const [activeSection, setActiveSection] = useState<SectionKey>('model')
+  const [activeSection, setActiveSection] = useState<SectionKey>('overview')
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
+
+  // ---------------- 总览：战绩摘要 + 最近评审 + 常用入口 ----------------
+  // 原本是独立的 /dashboard 页面，用户反馈这里和设置页的用量板块功能重叠、
+  // 职责分不清——两个页面都在讲"我的账号怎么样"。合并成设置页的第一个分区：
+  // 总览只做"概览 + 跳转"，具体的用量数字/密钥管理/数据管理仍归各自分区，
+  // 不在这里重复展示。
+  const [scoreboard, setScoreboard] = useState<Scoreboard | null>(null)
+  const [pendingJudgments, setPendingJudgments] = useState<number | null>(null)
+  const [recentReviews, setRecentReviews] = useState<ReviewListItem[] | null>(null)
+  const [overviewLoading, setOverviewLoading] = useState(true)
+  // 战绩接口对匿名共享身份返回 401——不是这块的错，静默降级成不渲染，
+  // 不是打一条吓人的错误横幅（同 LedgerPage 的判断）。
+  const [scoreboardUnavailable, setScoreboardUnavailable] = useState(false)
 
   const [byokProvider, setByokProvider] = useState<Provider>('anthropic')
   const [byokModel, setByokModel] = useState('')
@@ -134,6 +164,9 @@ export default function SettingsPage() {
 
   // ---------------- 数据自主权：导出 / 删号 ----------------
   const { identity, logout } = useSessionStore()
+  /** 只取 user_id 当依赖：bootstrap() 每次都换一个新的 identity 对象引用，
+   *  依赖整个对象会让按身份过滤的接口在每次刷新身份时都白跑一遍。 */
+  const identityUserId = identity?.user_id ?? null
   const [exporting, setExporting] = useState(false)
   const [dataError, setDataError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -286,6 +319,36 @@ export default function SettingsPage() {
     void refreshByok()
   }, [refreshByok])
 
+  const loadOverview = useCallback(async () => {
+    // 重跑时先把"不可用"清掉：否则匿名时那次 401 留下的状态会一直压着，
+    // 登录后即使这次真的拿到了记分牌，界面还是写着"不可用"。
+    setScoreboardUnavailable(false)
+    const [sbRes, hrRes, reviewsRes] = await Promise.allSettled([
+      api.ledgerScoreboard(),
+      api.hitRate(),
+      fetchReviewsPage(0, 5),
+    ])
+    if (sbRes.status === 'fulfilled') {
+      setScoreboard(sbRes.value)
+    } else if (sbRes.reason instanceof ApiError && (sbRes.reason.status === 401 || sbRes.reason.status === 403)) {
+      setScoreboardUnavailable(true)
+    }
+    if (hrRes.status === 'fulfilled') setPendingJudgments(hrRes.value.pending_verification)
+    setRecentReviews(reviewsRes.status === 'fulfilled' && !reviewsRes.value.requiresLogin ? reviewsRes.value.items : [])
+    setOverviewLoading(false)
+  }, [])
+
+  // 身份变了要重跑：这三个接口全都按身份过滤。此前依赖数组只有 loadOverview
+  // （而它自己的依赖是空的），于是同一次会话里登录 / 绑定邮箱之后，总览还停在
+  // 匿名时那次 401 的结果上——记分牌一直写着"不可用"，而用户明明已经登进去了。
+  useEffect(() => {
+    // identityUserId 只当触发器：函数体不需要它，但身份一换就必须重拉。
+    // 依赖 user_id 而不是整个 identity 对象——bootstrap() 每次都换新对象引用，
+    // 依赖对象会让这三个请求在每次刷新身份时都白跑一遍。
+    void identityUserId
+    void loadOverview()
+  }, [identityUserId, loadOverview])
+
   const applyPreset = (preset: (typeof OPENAI_COMPATIBLE_PRESETS)[number]) => {
     setByokProvider('openai_compatible')
     setByokModel(preset.model)
@@ -389,6 +452,10 @@ export default function SettingsPage() {
   // 这张表在组件体内求值，切语言时随重渲染重新 t()，所以这里可以直接放文案。
   // （模块级常量 NAV_GROUPS / PROVIDER_CONFIG 就不行——那两处必须存 key。）
   const SECTION_HEADERS: Record<SectionKey, { title: string; desc: string }> = {
+    overview: {
+      title: t('page.settings.section_overview.title'),
+      desc: t('page.settings.section_overview.desc'),
+    },
     account: {
       title: t('page.settings.section_account.title'),
       desc: identity?.is_anonymous
@@ -470,6 +537,142 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        {/* ---------------- 总览：战绩摘要 + 最近评审 + 常用入口 ---------------- */}
+        {activeSection === 'overview' && (
+          <div className="space-y-6">
+            {!identity?.is_anonymous && (
+              <div className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-display text-base font-semibold text-text-primary">
+                      {identity?.display_name || identity?.email}
+                    </p>
+                    <p className="mt-1 text-xs text-text-muted">
+                      {t('page.settings.overview_plan.value', { plan: identity?.plan ?? '—' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection('usage')}
+                    className="rounded-lg border border-border px-3 py-2 text-xs text-text-secondary hover:border-brand-primary/40 hover:text-text-primary transition-colors"
+                  >
+                    {t('page.settings.overview_usage.cta')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!scoreboardUnavailable && scoreboard && (scoreboard.panel.sample_size > 0 || scoreboard.user.sample_size > 0) && (
+              <div className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-display text-sm font-semibold text-text-primary">
+                    {t('page.settings.overview_scoreboard.title')}
+                  </h3>
+                  <Link
+                    to="/ledger"
+                    className="flex items-center gap-1 text-xs text-brand-primary hover:text-brand-primary-dim transition-colors"
+                  >
+                    {t('page.settings.overview_scoreboard.cta')}
+                    <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {([
+                    { key: 'panel', side: scoreboard.panel, label: t('page.settings.overview_side_panel.label'), tone: 'text-brand-primary' },
+                    { key: 'user', side: scoreboard.user, label: t('page.settings.overview_side_user.label'), tone: 'text-cyan' },
+                  ] as const).map(({ key, side, label, tone }) => (
+                    <div key={key} className="rounded-xl border border-border bg-bg-secondary p-4">
+                      <p className={`text-xs font-medium ${tone}`}>{label}</p>
+                      <p className="mt-1 font-display text-2xl font-semibold text-text-primary">
+                        {side.sample_size > 0 && side.hit_rate !== null ? formatPercent(side.hit_rate) : '—'}
+                      </p>
+                      <p className="mt-1 text-xs text-text-muted">
+                        {t('page.settings.overview_sample.value', { count: side.sample_size })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {pendingJudgments !== null && pendingJudgments > 0 && (
+                  <Link
+                    to="/ledger?pending=1"
+                    className="mt-4 flex items-center gap-1.5 border-t border-border pt-3 text-xs text-warm-orange hover:text-warm-orange/80 transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {t('page.settings.overview_pending', { count: pendingJudgments })}
+                  </Link>
+                )}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-border bg-bg-card p-0 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4 md:px-6">
+                <h3 className="font-display text-sm font-semibold text-text-primary">
+                  {t('page.settings.overview_recent.title')}
+                </h3>
+                <Link
+                  to="/history"
+                  className="flex items-center gap-1 text-xs text-brand-primary hover:text-brand-primary-dim transition-colors"
+                >
+                  {t('page.settings.overview_recent.cta')}
+                  <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
+                </Link>
+              </div>
+              {overviewLoading ? (
+                <p className="p-6 text-sm text-text-secondary">{t('common.ui.loading')}</p>
+              ) : !recentReviews || recentReviews.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 p-8 text-center">
+                  <History className="h-6 w-6 text-text-muted" strokeWidth={1.25} />
+                  <p className="text-sm text-text-primary">{t('page.settings.overview_recent_empty.title')}</p>
+                  <p className="text-xs text-text-muted">{t('page.settings.overview_recent_empty.desc')}</p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {recentReviews.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        to={`/review/${r.id}/report`}
+                        className="flex items-center justify-between gap-4 px-5 py-3 text-sm hover:bg-bg-card-hover transition-colors md:px-6"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-text-primary">{r.target_title}</span>
+                        <span className="shrink-0 font-mono text-xs text-text-muted">
+                          {formatDateTime(r.created_at)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-bg-card p-5 md:p-6">
+              <h3 className="mb-4 font-display text-sm font-semibold text-text-primary">
+                {t('page.settings.overview_links.title')}
+              </h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {([
+                  { to: '/history', icon: History, labelKey: 'nav.item.history' as PlainMessageKey },
+                  { to: '/ledger', icon: ScrollText, labelKey: 'nav.item.ledger' as PlainMessageKey },
+                  { to: '/tutorial', icon: BookOpen, labelKey: 'nav.item.tutorial' as PlainMessageKey },
+                  { to: '/personas', icon: Users, labelKey: 'nav.item.personas' as PlainMessageKey },
+                  { to: '/task-types', icon: ListChecks, labelKey: 'nav.item.task_types' as PlainMessageKey },
+                ]).map((f) => {
+                  const Icon = f.icon
+                  return (
+                    <Link
+                      key={f.to}
+                      to={f.to}
+                      className="flex items-center gap-3 rounded-xl border border-border bg-bg-secondary px-4 py-3 text-sm text-text-secondary hover:border-brand-primary/40 hover:text-text-primary transition-colors"
+                    >
+                      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                      <span className="truncate">{t(f.labelKey)}</span>
+                      <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-50" strokeWidth={1.5} />
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ---------------- 账户：个人信息 ---------------- */}
         {activeSection === 'account' && (
           identity?.is_anonymous ? (
@@ -501,15 +704,33 @@ export default function SettingsPage() {
                   <User className="h-5 w-5 text-brand-primary" strokeWidth={1.5} />
                 </div>
                 <div>
-                  <h3 className="text-base font-display font-semibold text-text-primary">
-                    {t('page.settings.account_card.title')}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-display font-semibold text-text-primary">
+                      {t('page.settings.account_card.title')}
+                    </h3>
+                    {/* QQ 登录的账号邮箱是合成占位串（qq-{openid}@qq.local），
+                        不该跟真实邮箱账号长得一样——贴一个来源徽标。 */}
+                    {identity?.login_provider === 'qq' && (
+                      <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                        {t('nav.account.provider_qq.badge')}
+                      </span>
+                    )}
+                    {identity?.login_provider === 'email' && (
+                      <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                        {t('nav.account.provider_email.badge')}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-text-muted">
-                    {/* email 在类型上是 string | null。原来直接渲染，null 会渲染成空字符串，
-                        句子变成"当前登录："后面什么都没有。这里用显式的"未记录"而不是空串，
-                        让"没有邮箱"和"邮箱没加载出来"在界面上长得不一样。 */}
+                    {/* 昵称优先——QQ 账号的"邮箱"是没有任何信息量的合成占位串，
+                        显示它不如显示真正的昵称。email 在类型上是 string | null，
+                        用显式的"未记录"而不是空字符串，让"没有邮箱"和
+                        "邮箱没加载出来"在界面上长得不一样。 */}
+                    {/* displayableEmail 而不是 identity.email：游客与 QQ 账号的
+                        邮箱是 guest-…@guest.local / qq-…@qq.local 这类合成占位串，
+                        显示它等于给用户看一串没有意义的乱码。 */}
                     {t('page.settings.account_card.desc', {
-                      email: identity?.email ?? t('common.ui.not_recorded'),
+                      email: identity?.display_name || displayableEmail(identity) || t('common.ui.not_recorded'),
                     })}
                   </p>
                 </div>
@@ -541,7 +762,15 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* 密码 */}
+              {/* 密码 —— 游客看不到这一块。
+                  游客账号的"当前密码"是后端随机生成的哈希，他自己从来没见过、
+                  也不可能猜到：把改密表单摆给他，是给他一个**填不出来的**表单，
+                  点提交必然报"当前密码错误"。他真正需要的是绑定邮箱（原地转正，
+                  user_id 不变、历史与额度留在原地），而这个入口此前只长在报告页上，
+                  设置页里一个都没有。复用 BindEmailBanner，不在这里另抄一份表单。 */}
+              {identity?.is_guest ? (
+                <BindEmailBanner className="mt-3" />
+              ) : (
               <div className="mt-3 rounded-lg border border-border bg-black/30 p-4">
                 <label className="block text-xs font-medium text-text-secondary">{t('page.settings.password.label')}</label>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -578,6 +807,7 @@ export default function SettingsPage() {
                   {t('page.settings.password.hint')}
                 </p>
               </div>
+              )}
 
               {/* 登出所有设备。
                   与改密码分开是有意的：怀疑账号被盗时第一反应是"把别人踢下线"，

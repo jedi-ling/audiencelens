@@ -32,6 +32,9 @@ export default {
 
   'radar.title': 'Dimension radar',
   'radar.label': 'Score',
+  // 见 zh 侧：整句 + 逐项两条 key，不在 tsx 里拼。
+  'radar.aria': 'Evaluation dimension radar chart: {{items}}',
+  'radar_item.value': '{{dimension}} {{score}}/{{max}}',
 
   'critical.title': 'Critical failures',
 

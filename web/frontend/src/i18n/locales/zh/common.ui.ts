@@ -30,6 +30,11 @@ export default {
   // 分支是两个分支，见契约 D7。
   not_recorded: '未记录',
 
+  /** 逐项文案连成一句时的分隔符。给 aria-label 里那种「A 3 人，B 2 人」用的。
+   *  单独成 key 是因为中英文的列表分隔符本来就不是同一个字符——
+   *  在 tsx 里 join(', ') 会让中文读屏念出一串半角逗号。 */
+  list_separator: '，',
+
   // ---- 语言切换器 ----
   language: '语言',
   language_aria: '切换界面语言',

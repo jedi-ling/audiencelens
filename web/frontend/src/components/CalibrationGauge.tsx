@@ -53,12 +53,22 @@ export default function CalibrationGauge({ label, value, max = 1, passLine, pass
   const passRad = passAngle === null ? 0 : (passAngle - 90) * (Math.PI / 180) - Math.PI
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width="140" height="80" viewBox="0 0 140 80">
+    <div
+      className="flex flex-col items-center gap-2"
+      role="img"
+      // 读数拿不到时复用 missing.hint（"这项没算出来"），不在这里写死一个
+      // 中文的"无数据"：英文界面上那个字面量会原样漏出去，而且它和脚注
+      // 里那句话会变成对同一件事的两种说法。
+      aria-label={t('common.calibration_gauge.gauge.aria', {
+        label,
+        value: missing ? t('common.calibration_gauge.missing.hint') : formatPercent(percentage / 100),
+      })}
+    >
+      <svg width="140" height="80" viewBox="0 0 140 80" aria-hidden="true">
         <path
           d="M 10 75 A 60 60 0 0 1 130 75"
           fill="none"
-          stroke="#e5e5ea"
+          stroke="var(--color-border, #38383a)"
           strokeWidth="10"
           strokeLinecap="round"
         />

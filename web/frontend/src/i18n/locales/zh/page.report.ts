@@ -171,6 +171,26 @@ export default {
   'my_confidence.label': '你的把握',
   /** 默认不预填数字：替用户填的把握度会污染校准曲线。 */
   'my_confidence.empty': '未填',
+
+  /* ---------------- 绑定邮箱（游客转正） ----------------
+     游客身份的邮箱是合成的、密码是随机的——真实风险是清缓存/换设备就找不回
+     这份报告和历史评审。文案要说的是这个真实风险，不是编一个"不绑就不给看"
+     的假门槛（报告内容照常渲染在这条提示条下面）。 */
+  'bind_email.title': '这份报告只存在这个浏览器里',
+  'bind_email.desc': '你还没绑定邮箱——清缓存、换设备或换浏览器，这份报告和你的评审记录会永久找不回来。绑定只需要一个邮箱和密码，历史记录原样保留。',
+  /* QQ 账号专用的两句。后端把 QQ 开的号也标成 is_guest=true，于是上面那两句
+     "只存在这个浏览器里 / 永久找不回来"对 QQ 用户是**假的**——他随时能再用
+     QQ 登回来。对用户说一句不成立的狠话，比不说更糟：下次他发现自己骗过一次，
+     整条提示以后都不会再被当真。这里换成对他真实成立的好处。 */
+  'bind_email_qq.title': '给账号加一个邮箱',
+  'bind_email_qq.desc': '你现在用 QQ 登录。绑定邮箱之后，不依赖 QQ 也能登进来，还能收到验证与找回密码的邮件。你的历史记录原样保留，user_id 不变。',
+
+  'bind_email.cta': '绑定邮箱',
+  'bind_email_email.placeholder': '邮箱',
+  'bind_email_password.placeholder': '设一个密码（至少 8 位）',
+  'bind_email_submit.cta': '确认绑定',
+  'bind_email.success': '绑定成功，这份报告和你的评审记录已经保住了。',
+  'bind_email.error': '绑定失败',
   /* 立场三选一 = 一个控件的多个状态，走 state 变体块；理由是枚举式原因，
      走 reason 块。两者都不自造新块（契约：块名闭集，加新块要 owner 裁决）。
      叶子带 stance_/rationale_ 前缀，避免与块内其他功能的枚举撞名。 */
@@ -393,6 +413,24 @@ export default {
   'consensus.desc': '合并的措辞：{{variants}}',
 
   /* ---------------- 主要分歧 ---------------- */
+  /* ---------------- 议题 × 人格立场矩阵 ----------------
+     这一块是本轮新加的，整块文案原先硬编码在 tsx 里（标题、表头、两条
+     title 提示、图例），英文界面上会直接漏出中文。aria 那条有两个计数，
+     按契约 §3.4 例 4 的口径：复数只挂一个（议题数），人格数当普通插值。 */
+  /** 打印弹窗被浏览器拦下时的提示。此前这里是 `if (!win) return`——
+   *  点 PDF 什么都不发生、也没有任何报错，用户只会以为按钮坏了。 */
+  'print_blocked.error': '浏览器拦下了打印窗口。请允许本站弹出窗口后再点一次 PDF；也可以先点 HTML 下载报告，再用浏览器打开并打印。',
+
+  'matrix.title': '议题 × 人格立场矩阵',
+  'matrix.aria': '议题人格立场矩阵：{{count}} 个议题 × {{personas}} 个人格',
+  'matrix_topic.label': '议题',
+  /** 后端没给 topic 时的占位。**不是**"无分歧"——是这条分歧没带标题。 */
+  'matrix_topic.empty': '未命名议题',
+  /** 格子的 title 提示。{{stance}} 是后端立场枚举原文（wire 值，永不翻译）。 */
+  'matrix_cell.tooltip': '{{persona}}：{{stance}}',
+  'matrix_cell_unmentioned.tooltip': '{{persona}}：未提及',
+  'matrix_unmentioned.label': '未提及',
+
   'disagreements.title': '主要分歧',
   'disagreement.hint': '建议：{{text}}',
 

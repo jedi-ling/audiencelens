@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Menu, X, User, LogOut, Settings, ChevronDown } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
+import { displayableEmail } from '@/lib/types'
 import { api } from '@/lib/apiClient'
 import { t } from '@/i18n/runtime'
 import { useLocale } from '@/i18n/locale'
@@ -80,7 +81,9 @@ export default function Layout() {
   // 订阅 ui_lang：t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
   // Layout 是根布局，订阅在这里就够全站顶栏/页脚跟着变；页面各自也要订阅
   // （或者用了 useDocumentTitle 就已经间接订阅了）。
-  useLocale()
+  // 这里额外拿返回值：中文品牌名"千见"只在 zh 界面显示，英文界面/域名/法律文档
+  // 仍然是 AudienceLens——两个名字并行，不是互相替换（2026-09 定名时的决定）。
+  const uiLang = useLocale()
   const isCreatePage = location.pathname === '/review/new'
   // 对话评审是全高聊天界面，footer 会把页面顶出视口、抢滚动条
   const isAskPage = location.pathname === '/ask'
@@ -92,6 +95,26 @@ export default function Layout() {
   // 内稳定，单独订阅不会触发重渲染；identity/usage/sessionExpired 各自独立订阅，
   // 任一变化只重渲染真正依赖它的子树。
   const identity = useSessionStore((s) => s.identity)
+  // 显示名：优先昵称，没有才退回邮箱（正常账号一定有昵称——register 端点
+  // 会用邮箱前缀兜底、QQ 登录会用 QQ 昵称兜底，见后端两处）。
+  // QQ 账号的 email 是 qq-{openid}@qq.local 这种合成占位串，直接显示等于
+  // 给用户看一串没有意义的乱码——所以这里过 displayableEmail 而不是读原字段。
+  // 最后那档 '游客' 不能省：铸造出来的游客没有昵称、邮箱又被挡掉，
+  // 不兜底的话账户按钮里就是一片空白（用户会以为自己掉线了）。
+  const identityLabel = identity?.display_name || displayableEmail(identity) || t('nav.account.guest')
+  /** 账户菜单里那行小字邮箱。此前的条件只有"它和主标签不一样"，于是 QQ 用户
+   *  看到 qq-{openid}@qq.local、铸造出来的游客看到 guest-…@guest.local——
+   *  与上面那段注释自己的说法正好相反。displayableEmail 同时管三件事：
+   *  身份形态（QQ / 游客一律不显示）、合成域名兜底、以及后端正在推进的
+   *  "/auth/me 不再下发这类地址"（那之后字段会是 null 或干脆不在，
+   *  三种形态在这里都落到同一个 null 分支）。 */
+  const secondaryEmail = displayableEmail(identity)
+  const providerBadgeKey: PlainMessageKey | null =
+    identity?.login_provider === 'qq'
+      ? 'nav.account.provider_qq.badge'
+      : identity?.login_provider === 'email'
+        ? 'nav.account.provider_email.badge'
+        : null // 游客身份还没绑定任何登录方式，不硬贴一个假来源
   const usage = useSessionStore((s) => s.usage)
   const sessionExpired = useSessionStore((s) => s.sessionExpired)
   const bootstrap = useSessionStore((s) => s.bootstrap)
@@ -205,10 +228,27 @@ export default function Layout() {
               />
               <span className="logo-shine-sweep pointer-events-none absolute inset-0" aria-hidden="true" />
             </span>
-            <span className="font-display font-semibold text-[17px] tracking-tight whitespace-nowrap">
-              <span className="text-text-primary">Audience</span>
-              <span className="text-brand-primary">Lens</span>
-            </span>
+            {uiLang === 'zh' ? (
+              // 中文界面是"千见 AudienceLens"双语连名，不是单独的中文昵称——
+              // 英文名摆成小字副标堆在下面，不占横向空间，顶栏本来就紧张
+              // （见下方 nav 的宽度注释）。
+              // 品牌名定名史：智评（2026-09-14）→ 撞了已上架的同名职业技能
+              // 鉴定考试 App，改名 → 千见（2026-09-18，网络查询未见同名产品）。
+              <span className="flex flex-col leading-none">
+                <span className="font-display font-semibold text-[17px] tracking-tight whitespace-nowrap">
+                  <span className="text-text-primary">千</span>
+                  <span className="text-brand-primary">见</span>
+                </span>
+                <span className="text-[10px] tracking-wide text-text-muted whitespace-nowrap">
+                  AudienceLens
+                </span>
+              </span>
+            ) : (
+              <span className="font-display font-semibold text-[17px] tracking-tight whitespace-nowrap">
+                <span className="text-text-primary">Audience</span>
+                <span className="text-brand-primary">Lens</span>
+              </span>
+            )}
           </Link>
 
           <div className="hidden md:flex items-center gap-2 min-w-0">
@@ -265,7 +305,7 @@ export default function Layout() {
                   aria-label={t('nav.account.menu_aria')}
                 >
                   <User className="w-4 h-4" strokeWidth={1.5} />
-                  <span className="max-w-[8rem] truncate">{identity?.email}</span>
+                  <span className="max-w-[8rem] truncate">{identityLabel}</span>
                   <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', accountOpen && 'rotate-180')} strokeWidth={1.5} />
                 </button>
                 {accountOpen && (
@@ -273,7 +313,21 @@ export default function Layout() {
                     {/* 点击空白处收起 */}
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
                     <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-black/[0.06] bg-bg-card p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
-                      <p className="truncate px-3 py-2 text-xs text-text-muted">{identity?.email}</p>
+                      <div className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-sm font-medium text-text-primary">{identityLabel}</p>
+                          {providerBadgeKey && (
+                            <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-text-muted">
+                              {t(providerBadgeKey)}
+                            </span>
+                          )}
+                        </div>
+                        {/* 昵称和邮箱不是同一个字符串时才补一行邮箱——QQ 登录的邮箱是
+                            合成占位串，对用户没有信息量，不重复展示。 */}
+                        {secondaryEmail && secondaryEmail !== identityLabel && (
+                          <p className="mt-0.5 truncate text-xs text-text-muted">{secondaryEmail}</p>
+                        )}
+                      </div>
                       <Link
                         to="/settings"
                         onClick={() => setAccountOpen(false)}
@@ -380,7 +434,12 @@ export default function Layout() {
               <div className="mt-2 border-t border-black/5 pt-2">
                 <p className="flex items-center gap-2 px-4 py-2 text-xs text-text-muted">
                   <User className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-                  <span className="truncate">{identity?.email}</span>
+                  <span className="truncate">{identityLabel}</span>
+                  {providerBadgeKey && (
+                    <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px]">
+                      {t(providerBadgeKey)}
+                    </span>
+                  )}
                 </p>
                 <button
                   onClick={handleLogout}

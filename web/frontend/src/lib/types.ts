@@ -107,6 +107,9 @@ export interface HealthConfig {
   key_mode: 'byok' | 'managed' | 'hybrid'
   server_key_present: boolean
   quota_enabled: boolean
+  /** QQ 登录是否已配齐（APP ID / APP KEY / 回调地址三项）。
+   *  为 false 时不画那个按钮——画了点进去必然失败。 */
+  qq_login_enabled: boolean
 }
 
 /** GET /api/v2/shared/{token} 的响应——公开只读视图。
@@ -142,6 +145,58 @@ export interface Identity {
   display_name: string | null
   plan: string
   is_anonymous: boolean
+  /** 游客账号（邮箱是合成的、随时可能清缓存丢失）——is_anonymous 分不出
+   *  "共享匿名桶"和"已铸造但没绑定的游客"，报告页的绑邮箱提示条要靠这个字段。 */
+  is_guest: boolean
+  /** 'qq' | 'email' | null —— 这个账号当初是怎么进来的，用来在昵称旁标一个
+   *  「QQ 登录」/「邮箱登录」。null = 游客身份还没绑定任何登录方式，
+   *  这时候不该硬贴"邮箱登录"（压根没有邮箱）。 */
+  login_provider: 'qq' | 'email' | null
+}
+
+/* ------------------------------------------------------------------ *
+ * 身份判定的三个谓词
+ *
+ * 为什么必须收在这里而不是各页面自己写 `identity.is_anonymous` / `is_guest`：
+ * 后端把 **QQ 开的号也标成 is_guest=true**（它确实没有密码、没有真邮箱），
+ * 于是两种最自然的写法都会出错：
+ *   - 只看 is_anonymous  → 铸造出来的游客被当成正式账号，登录页把他弹走，
+ *     他再也回不到登录页去登自己的真账号，唯一出路是登出——而登出会丢掉
+ *     游客 token，连带丢掉他的评审与剩余次数。
+ *   - 只看 is_guest      → QQ 用户被当成"清缓存就永久丢失"的临时身份，
+ *     界面会对他说一句不成立的狠话（他随时能再用 QQ 登回来）。
+ * 判据统一成"有没有一条能再登回来的路"，也就是 login_provider。
+ * ------------------------------------------------------------------ */
+
+/** 铸造出来的游客：有 user_id、有额度、有评审，但整条身份链只挂在这台浏览器的
+ *  token 上——清缓存 / 换设备就永久找不回来。QQ 账号**不算**：它能再登回来。 */
+export function isMintedGuest(identity: Identity | null | undefined): boolean {
+  if (!identity || identity.is_anonymous) return false
+  return identity.is_guest && identity.login_provider !== 'qq'
+}
+
+/** 真正的账号：不是共享匿名桶，也不是只活在本浏览器里的游客。 */
+export function isRealAccount(identity: Identity | null | undefined): boolean {
+  if (!identity || identity.is_anonymous) return false
+  return !isMintedGuest(identity)
+}
+
+/** 合成占位邮箱（qq-{openid}@qq.local / guest-…@guest.local）。
+ *  后端正在改成不再下发这类地址，所以这里按"可能是合成串、可能是 null、
+ *  也可能整个字段都没有"三种形态都成立来写——只靠其中一种判断都会有一天失效。 */
+export function isSyntheticEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return /@(qq|guest)\.local$/i.test(email.trim())
+}
+
+/** 可以展示给用户看的邮箱；拿不出真邮箱时返回 null（由调用方决定怎么留白）。 */
+export function displayableEmail(identity: Identity | null | undefined): string | null {
+  const email = identity?.email
+  if (!email) return null
+  // 身份形态优先：QQ 号与游客号的 email 在后端本来就是占位串，不管它长什么样。
+  if (identity.login_provider === 'qq' || identity.is_guest) return null
+  if (isSyntheticEmail(email)) return null
+  return email
 }
 
 export interface KeyInfo {
@@ -242,6 +297,10 @@ export interface CreateReviewResponse {
    *  必须显示给用户——不吭声地少给一层能力，用户会以为产品本来就这样。 */
   skill_degraded: string | null
   websocket: string
+  /** 首次匿名发起评审时，后端会铸造一个独立游客身份并把令牌带回来——
+   *  不存下来的话，下次请求又落回全站共享的 anonymous 桶，刚发起的这条
+   *  评审在用户自己眼里就凭空消失了。已经持有身份（游客或登录用户）时为 null。 */
+  guest_token: string | null
 }
 
 /** GET /api/skill-quota —— 高级技能还剩几次免费体验 */
@@ -348,8 +407,18 @@ export interface UsageSummary {
   cost_usd_total: number
   cost_usd_on_server_key: number
   cost_usd_limit: number | null
-  /** CDK 次数余额：credits 模式下这就是全部额度；plan 模式下是日限用完后的加量 */
+  /** CDK 次数余额：credits 模式下这就是全部额度；plan 模式下是日限用完后的加量。
+   *  ⚠️ 不要拿它判断"还能不能发起评审"——刚铸造的游客余额恒为 0，但他还有
+   *  trial_credits_remaining 次免费机会。判断一律用 reviews_remaining。 */
   bonus_credits: number
+  /** 游客一次性体验额度剩余；非游客账号为 null（"不适用"，不是 0） */
+  trial_credits_remaining: number | null
+  /** 体验额度初始值，用于显示 "2 / 3"；非游客为 null */
+  trial_credits_total: number | null
+  /** **唯一**该用来判断"还能不能发起评审"的字段：体验额度 + CDK 余额 + 日限剩余，
+   *  由后端与 check_quota 同源算出。null = 不设限（配额整体关闭）。
+   *  前端自己重算必然与 402 分岔——这正是它存在的原因。 */
+  reviews_remaining: number | null
   /** 累计烧掉的平台 token（输入+输出）。不按 24h 滚动，是终身量；只算平台垫付，不含 BYOK。
    *  配额关闭时也如实回报，方便用户随时知道自己用了多少。 */
   tokens_used: number
@@ -486,16 +555,24 @@ export interface ValidationMetrics {
 
 // ---------- WebSocket 事件 ----------
 
+/**
+ * v2 进度事件名。**这是后端 WS_EVENTS 元组的镜像，改一边就要改另一边。**
+ *
+ * 这里曾经列着 13 个名字，其中 6 个后端从未推送过：persona_started /
+ * persona_failed / cross_exam_started / cross_exam_completed /
+ * aggregation_started / aggregation_completed。它们不是"暂时没用上"——
+ * 是**没有任何后端代码路径会发出它们**，于是任何按这些名字写的分支都是
+ * 看起来活着的死代码，而读代码的人分不清哪几个是真契约。已全部删除
+ * （删前确认过：没有任何组件 switch 到它们；ReviewProgressPage 里同名的
+ * 'persona_started' 等 case 属于 v1 的 WSMessage，与这个联合无关）。
+ *
+ * 'review.cancelled' 保留：后端正在补这条广播，且 ws.ts 的 TERMINAL 已经
+ * 按终态处理它，行为是对的。
+ */
 export type WsEventName =
   | 'review.started'
   | 'review.progress'
-  | 'review.persona_started'
   | 'review.persona_completed'
-  | 'review.persona_failed'
-  | 'review.cross_exam_started'
-  | 'review.cross_exam_completed'
-  | 'review.aggregation_started'
-  | 'review.aggregation_completed'
   | 'review.evaluation_completed'
   | 'review.cancelled'
   | 'review.completed'

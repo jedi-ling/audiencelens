@@ -22,5 +22,9 @@ export default {
   'terms.consent':
     'By signing up you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>',
 
+  'guest_notice.title': 'You are a guest on this browser',
+  'guest_notice.desc':
+    'Signing up here creates a new account rather than promoting your current guest: the guest reviews and remaining credits on this browser will not come with you. To keep them, <link>bind an email in Settings</link> instead — that path keeps the same user_id, so your history and credits stay where they are.',
+
   'signin.hint': 'Already have an account? <link>Sign in</link>',
 } satisfies Messages

@@ -59,6 +59,11 @@ export default {
   'no_key.desc': 'A review calls a real model, so nothing can start until a key is configured.',
   'no_key.cta': 'Add one in Settings',
 
+  'count.credits_remaining_one': '{{count}} review credit left',
+  'count.credits_remaining_other': '{{count}} review credits left',
+  'credits_zero.hint': 'Out of review credits — redeem a CDK code or add your own API key to keep going',
+  'credits.cta': 'Redeem a code',
+
   // ---- 附件：拖拽、预览、随消息发送 ----
   'drop.hint': 'Drop to upload a screenshot or file',
   'attach.hint': 'Drag files into the chat, or paste a screenshot with Ctrl+V',
@@ -214,7 +219,7 @@ export default {
   'report_card.title': 'Review report',
   'report_card.loading': 'Loading the report…',
   'report_card.empty': 'The report is empty (no persona notes came back)',
-  'report_card.cta': 'Open the full report',
+  'report_card.cta': 'View summary',
   'count.fixes_one': '{{count}} fix',
   'count.fixes_other': '{{count}} fixes',
   'count.personas_one': '{{count}} persona',
@@ -224,7 +229,8 @@ export default {
   'cost.value': 'Spent {{amount}}',
 
   // ---- 报告弹窗 ----
-  'report_modal.subtitle': 'Full report',
+  'report_modal.subtitle': 'Quick summary',
+  'report_modal.link': 'Full report page',
   'conclusion.title': 'Verdict',
   'evidence.badge': 'Evidence · {{quality}}',
   'count.priority_fixes_one': 'Priority fix · {{count}}',

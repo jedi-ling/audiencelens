@@ -31,6 +31,16 @@ export default {
   'step_panel.label': '选择角色并启动',
   'step_panel.desc': '选择角色包，启动评审查看报告',
 
+  // ---- 评审模式怎么选。档位名读 enum.mode_badge.*，descriptions 读
+  //      i18n/catalog.ts::getReviewModes()，这里不重复维护第二份 ----
+  'modes.title': '评审模式怎么选',
+  'modes.desc': '三档只差在人格数量和有没有交叉质询/置信度校准，价格随之变化',
+  'modes_personas.label': '人格数量',
+  'modes_cross_exam.label': '交叉质询',
+  'modes_calibration.label': '置信度校准',
+  'modes_yes.value': '✓ 有',
+  'modes_no.value': '—',
+
   // ---- 上传文件，AI 自动提取 ----
   'upload.title': '上传文件，AI 自动提取',
   'upload.desc': '核心流程：上传文档 → AI 阅读提取 → 你来编辑确认',
@@ -103,4 +113,18 @@ export default {
   'result_calibration.desc': '一致性、覆盖率、幻觉率等质量指标',
 
   'start.cta': '开始创建评审',
+
+  // ---- 更多功能。这几个功能已经上线但没在任何教程性质的页面被提过 ----
+  'more.title': '更多功能',
+  'more.desc': '除了发起一次评审，这些功能也值得看看',
+  'more_ledger.title': '判断留档 · 预测复盘',
+  'more_ledger.desc': '把评审团的判断和你自己的判断都存下来，真实结果出来后回填，看谁更准',
+  /** 旧的 /dashboard 已经并进设置页的「战绩与入口」分区，路由只剩一条重定向。
+   *  key 跟着改名：留着 more_dashboard 会让下一个人以为还有那个独立页面。 */
+  'more_overview.title': '战绩与入口',
+  'more_overview.desc': '一眼看你的战绩摘要、最近评审和常用入口（在设置页的第一个分区）',
+  'more_byok.title': '自带密钥（BYOK）',
+  'more_byok.desc': '接入自己的 API Key，不受平台额度限制，账单直接算在你自己的账号上',
+  'more_cdk.title': '兑换码',
+  'more_cdk.desc': '有兑换码的话，在设置页里几秒钟就能加满次数',
 } satisfies Messages

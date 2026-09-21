@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins, LogIn } from 'lucide-react'
+import { Send, Sparkles, Paperclip, X, Image as ImageIcon, AlertTriangle, Lightbulb, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, Loader2, Trash2, Inbox, FolderOpen, Zap, Target, Search, ArrowRight, FileWarning, Coins, LogIn, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AmbientMotes from '@/components/AmbientMotes'
 import PendingVerificationCard, { PendingVerifyNudge } from '@/components/PendingVerificationCard'
@@ -170,7 +170,17 @@ export default function AskPage() {
   // 顺带订阅 ui_lang：t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
   // 本页所有子组件（侧栏 / 气泡 / 报告弹窗）都挂在这棵树下，这里订阅就够全页跟着变。
   useDocumentTitle('page.ask.meta.title')
-  const { config, bootstrap, canReview } = useSessionStore()
+  const { config, usage, keyStatus, bootstrap, canReview } = useSessionStore()
+  const hasOwnKey = (keyStatus?.keys?.length ?? 0) > 0
+  // credits 用完时 canReview() 依然可能是 true（hybrid 模式下只看"有没有 key
+  // 可用"，不看余额）——真正会被后端 402 拦下的场景是"额度归零 且 没有自己的
+  // key 可回落"，这里单独算一遍，不能复用 ready。
+  // 判据用后端算好的 reviews_remaining，不再自己拿 bonus_credits 重算：
+  // CDK 余额只是额度的一部分，刚铸造的游客余额恒为 0 但还有 3 次体验额度，
+  // 按余额判断会在界面上说"额度已用完"，而后端照样接单——界面和接口对不上。
+  // null = 不设限。
+  const creditsExhaustedWithNoFallback =
+    usage != null && usage.reviews_remaining === 0 && !hasOwnKey
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
@@ -1087,6 +1097,10 @@ export default function AskPage() {
         wide_screen: opts?.wide_screen,
         adaptive_panel: opts?.adaptive_panel,
       })
+      // 首次匿名发起评审时后端铸造的游客身份（setToken + 认领 + bootstrap）
+      // 已经由 api.createReview 内部的 adoptGuestToken 统一收下——这里曾经
+      // 抄过一份，而 Wizard 那条链路没抄，于是向导发起的评审对作者自己隐身。
+      // 收进唯一创建出口后不要再在调用方复制这段。
       // 高级技能次数用完被降级时，必须**在这里说出来**。后端已经把技能剥掉了，
       // 前端不吭声的话，用户看到的是一份悄悄少了一层的报告——他会以为产品
       // 本来就这样，而不知道自己刚用完免费次数。静默降级是这个仓库反复要根除的。
@@ -1235,7 +1249,44 @@ export default function AskPage() {
           <h1 className="text-lg font-semibold text-text-primary font-display">{t('page.ask.header.title')}</h1>
           <p className="text-xs text-text-muted">{t('page.ask.header.desc')}</p>
         </div>
+        {/* 次数制下，剩余额度是"能不能发起下一次评审"的直接答案——必须长在
+            发起评审的主路径上，而不是只有设置页才看得到（否则用户会重复
+            撞到"请先配置 API Key"，却不知道自己其实还有次数没用完/已经用完）。 */}
+        {usage?.quota_mode === 'credits' && (
+          <button
+            onClick={() => navigate('/plans')}
+            className={cn(
+              'ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              (usage.reviews_remaining ?? 1) > 0
+                ? 'border-cyan/30 bg-cyan/10 text-cyan hover:bg-cyan/15'
+                : 'border-warm-orange/40 bg-warm-orange/10 text-warm-orange hover:bg-warm-orange/15'
+            )}
+          >
+            {/* 显示的数字也换成 reviews_remaining：游客的 3 次体验额度不在
+                bonus_credits 里，按余额显示会写着"0 次"却还能正常发起。 */}
+            {(usage.reviews_remaining ?? 1) > 0
+              ? t('page.ask.count.credits_remaining', { count: usage.reviews_remaining ?? 0 })
+              : t('page.ask.credits.cta')}
+          </button>
+        )}
       </header>
+
+      {creditsExhaustedWithNoFallback && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warm-orange/40 bg-warm-orange/10 p-3 text-sm shrink-0">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warm-orange" strokeWidth={2} />
+          <div>
+            <p className="text-text-secondary">
+              {t('page.ask.credits_zero.hint')}
+              <button
+                className="ml-1 text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
+                onClick={() => navigate('/plans')}
+              >
+                {t('page.ask.credits.cta')}
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
 
       {config && !ready && (
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warm-orange/40 bg-warm-orange/10 p-3 text-sm shrink-0">
@@ -2597,6 +2648,7 @@ function ReportModal({
   onClose: () => void
   onStartFollowUp: (reviewId: string, personaId: string | null, label: string) => void
 }) {
+  const navigate = useNavigate()
   const summary = detail.report?.executive_summary
   const risk = RISK_BADGE[summary?.release_risk ?? '']
   const priorityFixes = detail.report?.priority_fixes ?? []
@@ -2628,13 +2680,29 @@ function ReportModal({
             </h2>
             <p className="text-xs text-text-muted">{t('page.ask.report_modal.subtitle')}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 rounded p-1.5 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
-            aria-label={t('common.action.close')}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+          {/* 这弹窗只是摘要（图表/角色详细对比留在独立报告页），但入口按钮此前叫
+              "查看完整报告"——名不副实，用户点进来发现是个阉割版，又找不到真正
+              的完整报告在哪，才会觉得"卡在里面不知道什么情况"。这个链接补上
+              这条路，而且放在头部，不用滚到底部才发现。 */}
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => {
+                onClose()
+                navigate(`/review/${detail.id}/report`)
+              }}
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-text-muted transition-colors hover:bg-bg-card hover:text-brand-primary"
+            >
+              {t('page.ask.report_modal.link')}
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+            <button
+              onClick={onClose}
+              className="shrink-0 rounded p-1.5 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+              aria-label={t('common.action.close')}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">

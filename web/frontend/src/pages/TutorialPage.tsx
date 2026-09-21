@@ -15,11 +15,17 @@ import {
   Eye,
   BarChart3,
   BrainCircuit,
+  Zap,
+  Microscope,
+  ScrollText,
+  LayoutDashboard,
+  KeyRound,
+  Ticket,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { PageShell, PageHeader, SectionCard, PRIMARY_BUTTON_CLASS } from '@/components/ui'
 import { t } from '@/i18n/runtime'
-import { getTaskTypes, getMaterialFields } from '@/i18n/catalog'
+import { getTaskTypes, getMaterialFields, getReviewModes } from '@/i18n/catalog'
 import { useDocumentTitle } from '@/i18n/head'
 import { formatBytes } from '@/i18n/format'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
@@ -118,6 +124,32 @@ const resultItems: { icon: LucideIcon; labelKey: PlainMessageKey; descKey: Plain
   { icon: BarChart3, labelKey: 'page.tutorial.result_calibration.label', descKey: 'page.tutorial.result_calibration.desc', color: 'text-text-secondary' },
 ]
 
+/** 档位名走 enum.mode_badge.*（同 ReviewHistoryPage 的 modeBadgeConfig），
+ * 不在这里另起一套——否则同一个模式在教程页和历史页会出现两种叫法（见
+ * i18n/catalog.ts::findReviewMode 头部注释）。图标只是这页自己的视觉选择。 */
+const MODE_ICONS: Record<string, LucideIcon> = {
+  quick: Zap,
+  standard: ListChecks,
+  full: Microscope,
+}
+const MODE_LABEL_KEYS: Record<string, PlainMessageKey> = {
+  quick: 'enum.mode_badge.quick',
+  standard: 'enum.mode_badge.standard',
+  full: 'enum.mode_badge.full',
+}
+
+/** "更多功能"——教程原本只讲怎么发起一次评审，判断留档/个人主页/BYOK/CDK
+ * 这几个已经上线的功能完全没在任何教程性质的页面里被提过，用户得自己在
+ * 导航栏里碰运气才会发现。这里补一份带链接的速览，不复述各自页面的完整逻辑。 */
+const moreFeatures: { icon: LucideIcon; titleKey: PlainMessageKey; descKey: PlainMessageKey; to: string }[] = [
+  { icon: ScrollText, titleKey: 'page.tutorial.more_ledger.title', descKey: 'page.tutorial.more_ledger.desc', to: '/ledger' },
+  // /dashboard 只是一条指向 /settings 的重定向（见 App.tsx）——教程直接指目的地，
+  // 不让用户白走一跳，也不让这条链接看起来像还存在一个独立的个人主页。
+  { icon: LayoutDashboard, titleKey: 'page.tutorial.more_overview.title', descKey: 'page.tutorial.more_overview.desc', to: '/settings' },
+  { icon: KeyRound, titleKey: 'page.tutorial.more_byok.title', descKey: 'page.tutorial.more_byok.desc', to: '/settings' },
+  { icon: Ticket, titleKey: 'page.tutorial.more_cdk.title', descKey: 'page.tutorial.more_cdk.desc', to: '/settings' },
+]
+
 export default function TutorialPage() {
   // useDocumentTitle 内部 useLocale()，本页借它一并订阅 ui_lang：
   // t() 是普通函数、不带响应性，切语言时必须有人触发重渲染。
@@ -190,6 +222,51 @@ export default function TutorialPage() {
                       <ArrowRight className="w-4 h-4 text-brand-primary/50" strokeWidth={1.25} />
                     </div>
                   )}
+                </div>
+              )
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
+            {t('page.tutorial.modes.title')}
+          </h2>
+          <p className="text-sm text-text-secondary mb-6">
+            {t('page.tutorial.modes.desc')}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {getReviewModes().map((rm) => {
+              const Icon = MODE_ICONS[rm.mode] ?? ListChecks
+              return (
+                <div key={rm.mode} className="rounded-lg bg-bg-secondary/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="w-4 h-4 text-brand-primary" strokeWidth={1.25} />
+                    <span className="text-sm font-medium text-text-primary">
+                      {t(MODE_LABEL_KEYS[rm.mode] ?? 'enum.mode_badge.standard')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary mb-3">{rm.description}</p>
+                  <div className="space-y-1 text-xs text-text-secondary">
+                    <div className="flex justify-between">
+                      <span>{t('page.tutorial.modes_personas.label')}</span>
+                      <span className="text-text-primary tabular-nums">
+                        {rm.persona_count_range[0]}–{rm.persona_count_range[1]}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t('page.tutorial.modes_cross_exam.label')}</span>
+                      <span className="text-text-primary">
+                        {rm.cross_examination ? t('page.tutorial.modes_yes.value') : t('page.tutorial.modes_no.value')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t('page.tutorial.modes_calibration.label')}</span>
+                      <span className="text-text-primary">
+                        {rm.calibration ? t('page.tutorial.modes_yes.value') : t('page.tutorial.modes_no.value')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )
             })}
@@ -343,6 +420,34 @@ export default function TutorialPage() {
                     <div className="text-xs text-text-secondary mt-0.5">{t(item.descKey)}</div>
                   </div>
                 </div>
+              )
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <h2 className="text-lg font-semibold text-text-primary mb-1">
+            {t('page.tutorial.more.title')}
+          </h2>
+          <p className="text-sm text-text-secondary mb-6">
+            {t('page.tutorial.more.desc')}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {moreFeatures.map((f) => {
+              const Icon = f.icon
+              return (
+                <Link
+                  key={f.to + f.titleKey}
+                  to={f.to}
+                  className="flex items-start gap-3 p-4 rounded-lg bg-bg-secondary/30 hover:bg-bg-secondary/50 transition-colors"
+                >
+                  <Icon className="w-5 h-5 text-brand-primary shrink-0 mt-0.5" strokeWidth={1.25} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-text-primary">{t(f.titleKey)}</div>
+                    <div className="text-xs text-text-secondary mt-0.5">{t(f.descKey)}</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-text-muted shrink-0 mt-0.5" strokeWidth={1.25} />
+                </Link>
               )
             })}
           </div>

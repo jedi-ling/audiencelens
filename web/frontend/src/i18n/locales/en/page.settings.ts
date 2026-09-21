@@ -20,16 +20,20 @@ export default {
   'header.title': 'Settings',
   'header.desc': 'Your account, model access, usage and data — all managed here.',
 
+  'group_overview.label': 'Overview',
   'group_account.label': 'Account',
   'group_model.label': 'Models',
   'group_usage.label': 'Usage & credits',
   'group_data.label': 'Data & privacy',
 
+  'section_overview.tab': 'Track record & shortcuts',
   'section_account.tab': 'Profile',
   'section_model.tab': 'API key (BYOK)',
   'section_usage.tab': 'Credits · usage',
   'section_data.tab': 'Export & delete',
 
+  'section_overview.title': 'Track record & shortcuts',
+  'section_overview.desc': 'Your judgment-ledger track record, recent reviews, and shortcuts — usage details live under "Usage & credits".',
   'section_account.title': 'Profile',
   'section_account.desc': 'Manage your account details and security settings.',
   'section_account_guest.desc':
@@ -93,7 +97,7 @@ export default {
 
   'model_id.label': 'Model ID',
   'model_id.hint': '(leave blank to pick a model per persona tier)',
-  'model_id.placeholder': 'claude-sonnet-4-5-20250929 (blank = pick automatically)',
+  'model_id.placeholder': 'claude-sonnet-5 (blank = pick automatically)',
   'model_id_compat.placeholder': 'deepseek-v4-pro',
   'model_id.error': 'OpenAI-compatible providers need a model name',
 
@@ -187,4 +191,24 @@ export default {
   'delete_password.label': 'Account password',
 
   'footer.link': 'Privacy Policy',
+
+  /* ---------------- Overview section ---------------- */
+  'overview_plan.value': 'Current plan: {{plan}}',
+  'overview_usage.cta': 'View usage details',
+
+  'overview_scoreboard.title': 'You vs. the panel',
+  'overview_scoreboard.cta': 'See full comparison →',
+  'overview_side_panel.label': 'Panel',
+  'overview_side_user.label': 'You',
+  'overview_sample.value_one': '{{count}} verified sample',
+  'overview_sample.value_other': '{{count}} verified samples',
+  'overview_pending_one': '{{count}} judgment awaiting verification',
+  'overview_pending_other': '{{count}} judgments awaiting verification',
+
+  'overview_recent.title': 'Recent reviews',
+  'overview_recent.cta': 'View all →',
+  'overview_recent_empty.title': 'No reviews yet',
+  'overview_recent_empty.desc': 'Once you run your first review, recent ones will show up here',
+
+  'overview_links.title': 'Shortcuts',
 } satisfies Messages

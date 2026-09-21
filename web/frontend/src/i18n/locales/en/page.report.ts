@@ -141,6 +141,19 @@ export default {
   'my_judgment.empty': '(agrees with the panel’s primary recommendation)',
   'my_confidence.label': 'Your confidence',
   'my_confidence.empty': 'not set',
+
+  'bind_email.title': 'This report only exists in this browser',
+  'bind_email.desc': "You haven't bound an email yet — clearing your cache, switching devices, or changing browsers will make this report and your review history permanently unrecoverable. Binding just takes an email and a password; your history stays exactly as it is.",
+  // 见 zh 侧注释：QQ 账号也被标成 is_guest，但"丢了就没了"对他不成立。
+  'bind_email_qq.title': 'Add an email to your account',
+  'bind_email_qq.desc': "You're signed in with QQ. Binding an email lets you sign in without QQ and receive verification and password-reset mail. Your history stays as it is and your user_id does not change.",
+
+  'bind_email.cta': 'Bind an email',
+  'bind_email_email.placeholder': 'Email',
+  'bind_email_password.placeholder': 'Set a password (8+ characters)',
+  'bind_email_submit.cta': 'Confirm',
+  'bind_email.success': "Bound. This report and your review history are safe now.",
+  'bind_email.error': 'Binding failed',
   /* 立场三选一 = 一个控件的多个状态，走 state 变体块；理由是枚举式原因，
      走 reason 块。两者都不自造新块（契约：块名闭集，加新块要 owner 裁决）。
      叶子带 stance_/rationale_ 前缀，避免与块内其他功能的枚举撞名。 */
@@ -364,6 +377,19 @@ export default {
   'consensus.desc': 'Merged wordings: {{variants}}',
 
   /* ---------------- 主要分歧 ---------------- */
+  // 见 zh 侧：aria 的复数挂在议题数上，人格数当普通插值（契约 §3.4 例 4）。
+  // 见 zh 侧：弹窗被拦下必须说出来，不能静默 return。
+  'print_blocked.error': 'Your browser blocked the print window. Allow pop-ups for this site and click PDF again, or download the HTML report and print it from there.',
+
+  'matrix.title': 'Topic x persona stance matrix',
+  'matrix.aria_one': 'Topic-by-persona stance matrix: {{count}} topic across {{personas}} personas',
+  'matrix.aria_other': 'Topic-by-persona stance matrix: {{count}} topics across {{personas}} personas',
+  'matrix_topic.label': 'Topic',
+  'matrix_topic.empty': 'Untitled topic',
+  'matrix_cell.tooltip': '{{persona}}: {{stance}}',
+  'matrix_cell_unmentioned.tooltip': '{{persona}}: not mentioned',
+  'matrix_unmentioned.label': 'Not mentioned',
+
   'disagreements.title': 'Major disagreements',
   'disagreement.hint': 'Suggested resolution: {{text}}',
 

@@ -14,7 +14,7 @@ import {
   toEthicsReportView,
 } from '@/lib/mock-data'
 import { ArrowLeft, ChevronDown, ChevronUp, AlertOctagon, AlertCircle, FlaskConical, Shield, Loader2, Clock, User } from 'lucide-react'
-import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Text } from 'recharts'
 import { PageShell, PageHeader, EmptyState, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '@/components/ui'
 import { t } from '@/i18n/runtime'
 import { useDocumentTitle } from '@/i18n/head'
@@ -69,6 +69,44 @@ function scoreText(score: number): string {
     score: formatNumber(score),
     max: formatNumber(DIMENSION_MAX_SCORE),
   })
+}
+
+/**
+ * 评估雷达图轴名截断。
+ *
+ * 与 PersonaRadarChart 的 AxisTick 是同一类问题，但这里只有 8 个维度、
+ * 容器固定 300px，预算比 12 人格轴宽松得多，不需要那套顶/底相邻约束。
+ * 只保留左右两侧看盒子边的截断逻辑，防止长维度名溢出。
+ */
+function EvalAxisTick({ x, y, textAnchor, payload }: {
+  x?: number | string
+  y?: number | string
+  textAnchor?: 'start' | 'middle' | 'end' | 'inherit'
+  payload?: { value?: unknown }
+}) {
+  const label = String(payload?.value ?? '')
+  const px = Number(x)
+  const anchor = textAnchor ?? 'middle'
+  const budget = anchor === 'start'
+    ? 300 - px - 4
+    : anchor === 'end'
+      ? px - 4
+      : Math.min(px, 300 - px) * 2 - 4
+
+  return (
+    <Text
+      x={x}
+      y={y}
+      textAnchor={anchor}
+      verticalAnchor="middle"
+      fill="#8e8e93"
+      style={{ fontSize: 11, fontFamily: 'Noto Sans SC' }}
+      width={Math.max(budget, 20)}
+      maxLines={1}
+    >
+      {label}
+    </Text>
+  )
 }
 
 export default function EvaluationPage() {
@@ -247,10 +285,26 @@ export default function EvaluationPage() {
         <div className="lg:col-span-2 rounded-xl border border-border bg-bg-card p-6">
           <h3 className="text-sm font-medium text-text-muted mb-4">{t('page.evaluation.radar.title')}</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={radarData}>
+            <RadarChart
+              data={radarData}
+              role="img"
+              // 逐项各走一条 key 再连起来：原来整句连同分隔符都是中文字面量，
+              // 英文界面上读屏会念出中文（契约 §6.9）。
+              aria-label={t('page.evaluation.radar.aria', {
+                items: radarData
+                  .map((d) =>
+                    t('page.evaluation.radar_item.value', {
+                      dimension: d.dimension,
+                      score: d.score,
+                      max: DIMENSION_MAX_SCORE,
+                    }),
+                  )
+                  .join(t('common.ui.list_separator')),
+              })}
+            >
               {/* 深色底上 #e5e5ea 网格会亮得刺眼；刻度/网格/雷达线统一用深色适配色 */}
               <PolarGrid stroke="#38383a" />
-              <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11, fill: '#8e8e93' }} />
+              <PolarAngleAxis dataKey="dimension" tick={<EvalAxisTick />} />
               {/* 轴上限 = 单维度满分 3，不是 0–100：按 100 画会把满分压成一个贴着
                   圆心的点，整张雷达图恒定塌陷成一团 */}
               <PolarRadiusAxis domain={[0, DIMENSION_MAX_SCORE]} tickCount={DIMENSION_MAX_SCORE + 1} tick={{ fontSize: 9, fill: '#636366' }} />

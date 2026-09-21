@@ -19,4 +19,15 @@ export default {
   'submit.error': 'Could not sign you in',
 
   'signup.hint': 'No account yet? <link>Create one</link>',
+
+  'qq_error.error': 'QQ sign-in did not complete',
+  // 原因串是后端中文原文，这里只说清楚它是什么，不假装它已经被翻译过。
+  'qq_error.hint': 'Reason reported by the server (in Chinese): {{reason}}',
+
+  'guest_notice.title': 'You are a guest on this browser',
+  'guest_notice.desc':
+    'Signing in to another account switches you over, and the guest reviews and remaining credits on this browser do not come with you. To keep them, first <link>bind an email in Settings</link> so this guest becomes a full account — binding keeps the same user_id, so your history and credits stay where they are.',
+
+  'oauth_divider.label': 'or',
+  'qq.cta': 'Sign in with QQ',
 } satisfies Messages

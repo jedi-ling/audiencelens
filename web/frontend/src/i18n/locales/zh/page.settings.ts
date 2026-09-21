@@ -29,17 +29,24 @@ export default {
   'header.desc': '账户、模型接入、用量与数据，都在这里管理。',
 
   /* ---------------- 左侧分组导航 ---------------- */
+  // 总览曾是独立的 /dashboard 页面，与本页用量板块职责重叠、令人困惑，
+  // 已合并成这里的第一个分区——总览只做"概览 + 跳转"，具体数字/管理操作
+  // 仍归各自分区，不在总览里重复展示（避免两处各存一份、改一处忘一处）。
+  'group_overview.label': '总览',
   'group_account.label': '账户',
   'group_model.label': '模型配置',
   'group_usage.label': '用量与兑换',
   'group_data.label': '数据与隐私',
 
+  'section_overview.tab': '战绩与入口',
   'section_account.tab': '个人信息',
   'section_model.tab': 'API Key（BYOK）',
   'section_usage.tab': '兑换码 · 用量统计',
   'section_data.tab': '导出与删除',
 
   /* ---------------- 右侧类目抬头 ---------------- */
+  'section_overview.title': '战绩与入口',
+  'section_overview.desc': '你的判断留档战绩、最近评审和常用入口，用量明细见「用量与兑换」。',
   'section_account.title': '个人信息',
   'section_account.desc': '管理你的账号信息与安全设置。',
   /** 游客态的抬头说明。与登录态是两个互斥分支，不是同一句话的变体。 */
@@ -100,7 +107,7 @@ export default {
 
   'model_id.label': '模型 ID',
   'model_id.hint': '（留空自动按人格分级选型）',
-  'model_id.placeholder': 'claude-sonnet-4-5-20250929（留空自动选）',
+  'model_id.placeholder': 'claude-sonnet-5（留空自动选）',
   'model_id_compat.placeholder': 'deepseek-v4-pro',
   'model_id.error': 'OpenAI 兼容格式需要填写模型名称',
 
@@ -188,4 +195,23 @@ export default {
   'delete_password.label': '账号密码',
 
   'footer.link': '隐私政策',
+
+  /* ---------------- 总览分区（见 group_overview 上方注释） ---------------- */
+  'overview_plan.value': '当前套餐：{{plan}}',
+  'overview_usage.cta': '查看用量明细',
+
+  'overview_scoreboard.title': '你 vs 评审团',
+  'overview_scoreboard.cta': '查看完整对比 →',
+  'overview_side_panel.label': '评审团',
+  'overview_side_user.label': '你',
+  'overview_sample.value_other': '{{count}} 个已验证样本',
+  'overview_pending_one': '还有 {{count}} 条判断待回填',
+  'overview_pending_other': '还有 {{count}} 条判断待回填',
+
+  'overview_recent.title': '最近评审',
+  'overview_recent.cta': '查看全部 →',
+  'overview_recent_empty.title': '还没有评审记录',
+  'overview_recent_empty.desc': '发起第一次评审后，最近的几条会出现在这里',
+
+  'overview_links.title': '常用入口',
 } satisfies Messages

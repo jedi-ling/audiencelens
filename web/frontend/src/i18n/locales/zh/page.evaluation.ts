@@ -44,6 +44,11 @@ export default {
   'radar.title': '维度雷达图',
   // recharts 的 series 名，会出现在 tooltip 里。
   'radar.label': '评分',
+  /** 雷达图的 aria-label。原先在 tsx 里拼字符串（'评估维度雷达图: ' + join），
+   *  英文界面上读屏会念出中文。{{items}} 是逐项文案用
+   *  common.ui.list_separator 连起来的结果（契约 §6.9）。 */
+  'radar.aria': '评估维度雷达图：{{items}}',
+  'radar_item.value': '{{dimension}} {{score}}/{{max}}',
 
   'critical.title': '关键失败项',
 

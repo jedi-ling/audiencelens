@@ -49,9 +49,15 @@
   --color-status-completed: #32d74b;
   --color-status-failed: #ff453a;
   --font-mono: "SF Mono", ui-monospace, "Cascadia Code", "Roboto Mono", "JetBrains Mono", monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
+  /* "SF Pro *" / "PingFang SC" 都是 Mac 专属，Windows 直接跳到 Microsoft
+     YaHei——它的西文笔画偏细，纯黑底上白字发虚的反馈基本都是这一段栈
+     在 Windows 上的表现。插入 "Segoe UI"（Windows 系统 UI 字体，笔画
+     比 YaHei 的西文粗、渲染更清晰）挡在 YaHei 前面：Windows 拉丁字符走
+     Segoe UI，中文字符 Segoe UI 里没有对应字形，照常回落到 YaHei——
+     两边互不影响，Mac/iOS 端 fallback 链不变。 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Segoe UI", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Segoe UI", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", sans-serif;
 
   /*
    * shadcn 风格语义别名 —— 全部映射到同一套深色调色板。
@@ -78,6 +84,16 @@
  */
 html, body {
   color: var(--color-text-primary);
+  /* 纯白文字压纯黑底是 Apple Dark 规格本身的选择（见上面 @theme 的说明），
+     不是配色错误——但 Windows 上常见反馈是"白字发虚/发淡"：字体栈里
+     -apple-system / SF Pro / PingFang SC 全是 Mac 专属，Windows 直接
+     落到 Microsoft YaHei，它的西文字形笔画偏细，在纯黑底上刷新率不高的
+     屏幕看确实发飘。font-smoothing 在 Mac/Linux 的 WebKit/Gecko 下能让
+     亮色文字的抗锯齿更接近系统原生渲染，抵消一部分"发虚"的观感——
+     它对 Windows Chrome/Edge 没有效果（这两家不认这两个属性），
+     Windows 端真正的修法是下面字体栈里插进的 Segoe UI。 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 全页背景图：position:fixed 铺满视口，滚动时纹丝不动。
@@ -155,6 +171,21 @@ html, body {
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in;
+}
+
+/* 报告页的信息面板此前只有 1px border，深色底上视觉上完全"贴地"——每个
+   区块（证据构成/优先修复/圆桌/分歧……）权重看起来一样重，读者翻十屏都在
+   看同一种扁平方块。这里延续上面 .glow-* 已经定下的"柔和浮起"配方
+   （近距小阴影 + 远距大阴影），只是去掉彩色光晕换成中性色——这些是内容
+   容器不是庆祝性强调，不需要彩色光晕，只需要一点从底色里"浮出来"的深度。 */
+.report-panel {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 10px 28px -8px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-panel:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28), 0 14px 32px -8px rgba(0, 0, 0, 0.55);
 }
 
 @keyframes fadeIn {

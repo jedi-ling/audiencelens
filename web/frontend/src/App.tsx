@@ -16,6 +16,7 @@ const TermsPage = lazy(() => import('@/pages/TermsPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 const VerifyEmailPage = lazy(() => import('@/pages/VerifyEmailPage'))
+const QQCallbackPage = lazy(() => import('@/pages/QQCallbackPage'))
 const SkillSelectPage = lazy(() => import('@/pages/SkillSelectPage'))
 const EvaluationPage = lazy(() => import('@/pages/EvaluationPage'))
 const AskPage = lazy(() => import('@/pages/AskPage'))
@@ -64,6 +65,10 @@ export default function App() {
             <Route path="/ask" element={<AskPage />} />
             {/* 判断复利闭环：预测留档 + 回填验证 + 命中率 */}
             <Route path="/ledger" element={<LedgerPage />} />
+            {/* /dashboard 曾是独立页面，与 /settings 的用量板块职责重叠、
+                令人困惑，已合并成 SettingsPage 的"总览"分区（见该文件同名注释）。
+                重定向而不是直接 404：旧链接/收藏夹仍应落地到有意义的地方。 */}
+            <Route path="/dashboard" element={<Navigate to="/settings" replace />} />
             {/* 评审历史列表——/api/reviews 现已按身份过滤，见后端 _check_review_owner */}
             <Route path="/history" element={<ReviewHistoryPage />} />
             <Route path="/review/new" element={<CreateReviewPage />} />
@@ -72,6 +77,9 @@ export default function App() {
             {/* 公开只读报告。全站唯一不需要身份的内容页——作者显式生成链接
                 才存在，撤销后这里就是"链接已失效"。路径刻意短（/s/），
                 因为它是要被复制粘贴到聊天窗口里的。 */}
+            {/* QQ 登录回调落地页。注意：QQ 互联后台登记的回调地址是**后端**的
+                /api/auth/qq/callback，不是这里；后端处理完才 302 到这一页。 */}
+            <Route path="/auth/qq" element={<QQCallbackPage />} />
             <Route path="/s/:token" element={<SharedReportPage />} />
             <Route path="/personas" element={<PersonasPage />} />
             <Route path="/task-types" element={<TaskTypesPage />} />

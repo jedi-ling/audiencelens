@@ -72,6 +72,18 @@ export default {
   'feature_calibration.badge': '校准检查',
   'feature_none.badge': '无额外步骤',
 
+  /* ---------------- 档位开销对比 ----------------
+     只说"模型调用次数"不说"多少钱/多少 token"：单次调用消耗多少 token 取决于
+     材料长度，事前不可知；而库里 full 档的真实样本只有 1 条，拿 n=1 算平均值
+     就是编数据。调用次数是结构性确定的，能诚实表达相对开销。
+     count 是普通插值不是复数分支——中文没有单复数，英文侧才拆 _one/_other。 */
+  'mode_cost.title': '这一档要发多少次模型调用',
+  'mode_cost.unit': '越少越省',
+  'mode_cost.desc': '人格每人一次调用，交叉质询另算。校准检查是本地计算，不发调用、不增加开销。',
+  'count.mode_calls': '{{count}} 次调用',
+  'count.mode_calls_variable': '{{count}} 次起，随分歧数增加',
+  'mode_cost.hint': '这里比的是调用次数，不是最终账单——单次调用消耗多少 token 取决于材料长度和模型返回长度，事前无法确定。',
+
   // ---- 第 2 步：材料 ----
   'material.title': '上传评审材料',
   'material.desc': '手动填写文本，或上传文件让 AI 自动提取材料',

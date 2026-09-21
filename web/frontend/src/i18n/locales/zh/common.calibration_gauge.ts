@@ -17,6 +17,11 @@ export default {
   // 它仍然要进 key 表：写死在 tsx 里的话，将来想改成 "N/A" 就得改代码。
   'readout.empty': '—',
 
+  /** 整个仪表盘的 aria-label。{{value}} 要么是 formatPercent 的结果，
+   *  要么就是下面那条 missing.hint ——刻意复用同一句话，读屏听到的
+   *  和眼睛看到的脚注是同一个说法，不另造一个「无数据」的第三种措辞。 */
+  'gauge.aria': '{{label}}：{{value}}',
+
   'missing.hint': '这项没算出来',
   'no_pass_line.hint': '无合格线',
   // {{value}} 是 formatPercent() 的产物，已含 % 号。

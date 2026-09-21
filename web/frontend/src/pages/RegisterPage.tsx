@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { UserPlus } from 'lucide-react'
+import { UserPlus, UserRound } from 'lucide-react'
 import { useSessionStore } from '@/store/session-store'
+import { isMintedGuest, isRealAccount } from '@/lib/types'
 import { t, Trans } from '@/i18n/runtime'
 import { useDocumentTitle } from '@/i18n/head'
 import { tApiError } from '@/i18n/api-error'
@@ -24,9 +25,12 @@ export default function RegisterPage() {
 
   const passwordTooShort = password.length > 0 && password.length < PASSWORD_MIN
 
-  // 已登录还停在注册页没有意义——直接送进应用
+  // 已登录还停在注册页没有意义——直接送进应用。
+  // 但**只弹真正的账号**：首次匿名评审会铸造一个游客身份，用 is_anonymous
+  // 判断的话，跑过一次评审的人从此进不来这一页（也进不来登录页），
+  // 唯一出路是登出，而登出会把游客 token 连同他的评审与剩余次数一起丢掉。
   useEffect(() => {
-    if (identity && !identity.is_anonymous) navigate('/ask', { replace: true })
+    if (isRealAccount(identity)) navigate('/ask', { replace: true })
   }, [identity, navigate])
 
   /** 走 form 的 onSubmit：回车、点按钮、密码管理器填充后提交，三条路径同一个出口。 */
@@ -56,6 +60,32 @@ export default function RegisterPage() {
         </h1>
         <p className="text-sm text-text-secondary">{t('page.register.header.desc')}</p>
       </div>
+
+      {/* 游客提醒。注册的是**另一个**账号，不是把当前游客转正——这两件事的
+          区别必须写在注册按钮旁边，否则用户会以为注册就等于保住了手上这份东西。 */}
+      {isMintedGuest(identity) && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warm-orange/30 bg-warm-orange/5 p-4">
+          <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-warm-orange" strokeWidth={1.5} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text-primary">{t('page.register.guest_notice.title')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+              <Trans
+                k="page.register.guest_notice.desc"
+                slots={{
+                  link: (s) => (
+                    <Link
+                      to="/settings"
+                      className="text-brand-primary underline underline-offset-2 hover:text-brand-primary-dim"
+                    >
+                      {s}
+                    </Link>
+                  ),
+                }}
+              />
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 同 LoginPage：必须是真的 <form>。这一页此前更明显——只有密码框挂了
           onKeyDown，在邮箱框按回车什么都不会发生，正是"靠每个框自己挂、漏一个就不灵"。

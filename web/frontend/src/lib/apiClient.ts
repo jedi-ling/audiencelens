@@ -96,6 +96,31 @@ export function setToken(token: string | null): void {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
+/**
+ * 后端铸造了游客身份时，把这把 token 收下并把会话状态刷新到位。
+ *
+ * **丢掉这把 token 的后果是"刚创建的评审对它自己的作者隐身"**：第一次匿名发起
+ * 评审时后端会铸造一个独立游客身份，那条评审直接落在**新的** user_id 名下并返回
+ * guest_token。前端不存下来的话，下一个请求仍然带着空 token 落回共享 anonymous
+ * 桶，于是刚跳过去的进度页归属校验 404、WebSocket 被拒——而免费次数已经扣掉了。
+ * 这条路径此前只有 AskPage 写对了，Wizard（review-store.createNewReview）整段没写，
+ * 所以现在收进唯一的创建出口，present/future 的调用方都不必再各自记得这件事。
+ *
+ * session-store 走动态 import：它在模块顶层 import 本文件，静态回引会成环。
+ * 这里只在真的铸造了身份时才加载它，正常已登录路径一次都不会触发。
+ */
+export async function adoptGuestToken(token: string | null | undefined): Promise<boolean> {
+  if (!token) return false
+  setToken(token)
+  // 认领失败不阻断：评审本身已经归属正确，认领只是把更早的匿名产物并过来。
+  await claimPendingReviews().catch(() => {})
+  // bootstrap() 顺带把 identity.is_guest / usage 刷新到 store——报告页的绑邮箱
+  // 提示条、顶栏的额度 chip 都读这些字段，不刷新的话它们会停在"匿名"状态。
+  const { useSessionStore } = await import('@/store/session-store')
+  await useSessionStore.getState().bootstrap()
+  return true
+}
+
 /* ------------------------------------------------------------------ *
  * 匿名评审的「待认领」清单
  *
@@ -366,6 +391,20 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ email, password }) },
     ),
 
+  /** QQ 登录的一次性交接码 → 会话 JWT。码 30 秒过期、用一次即废。 */
+  qqExchange: (code: string) =>
+    request<{ token: string; user: { id: string; email: string; plan: string } }>(
+      '/api/auth/qq/exchange',
+      { method: 'POST', body: JSON.stringify({ code }) },
+    ),
+
+  /** 游客账号原地转正：同一个 user_id，历史评审/额度不用迁移。 */
+  bindEmail: (email: string, password: string) =>
+    request<{ token: string; user: { id: string; email: string; plan: string } }>(
+      '/api/auth/bind-email',
+      { method: 'POST', body: JSON.stringify({ email, password }) },
+    ),
+
   // ---------------- 邮箱验证 / 忘记密码 ----------------
 
   /** 给当前登录用户重新发一封验证邮件 */
@@ -535,12 +574,16 @@ export const api = {
     request<CreateReviewResponse>('/api/v2/reviews', {
       method: 'POST',
       body: JSON.stringify({ mode: 'standard', persona_pack: 'game-core', ...params }),
-    }).then((res) => {
+    }).then(async (res) => {
       // 匿名跑的评审在这里记下 id，登录后才认领得回来。写在唯一的创建出口上，
       // 两个入口（AskPage / review-store）就不会有哪个漏记。
       rememberPendingReview(res.review_id)
       // job_id 同理只在这一处出现，记下来供进度页在 WS 断线时走 HTTP 轮询拿百分比
       rememberReviewJob(res.review_id, res.job_id)
+      // guest_token 同理收在这里而不是各调用方各写一遍。顺序不能换：
+      // rememberPendingReview 靠"当前还没有 token"判断这是匿名评审，
+      // 存 token 之后再记就记不上了。
+      await adoptGuestToken(res.guest_token)
       return res
     }),
 

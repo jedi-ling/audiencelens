@@ -46,6 +46,15 @@ export default {
   'feature_calibration.badge': 'Calibration check',
   'feature_none.badge': 'No extra steps',
 
+  'mode_cost.title': 'How many model calls this tier makes',
+  'mode_cost.unit': 'fewer is cheaper',
+  'mode_cost.desc': 'One call per persona, plus cross-examination. The calibration check runs locally — it makes no calls and adds no cost.',
+  'count.mode_calls_one': '{{count}} call',
+  'count.mode_calls_other': '{{count}} calls',
+  'count.mode_calls_variable_one': 'from {{count}} call, more as disagreements grow',
+  'count.mode_calls_variable_other': 'from {{count}} calls, more as disagreements grow',
+  'mode_cost.hint': "This compares call counts, not your final bill — how many tokens a call costs depends on how long your material and the model's reply are, which can't be known upfront.",
+
   // ---- Step 2: material ----
   'material.title': 'Add your material',
   'material.desc': 'Type it in, or upload a file and let AI pull the material out',

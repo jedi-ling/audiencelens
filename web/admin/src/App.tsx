@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Activity, Lock, LayoutDashboard, RefreshCw, ScrollText, Server, Settings2, Ticket, Users } from 'lucide-react'
-import { adminApi, getAdminToken, setAdminToken } from '@/lib/adminClient'
+import { adminApi, getAdminToken, setAdminToken, setAdminUsername } from '@/lib/adminClient'
 import { ApiError } from '@/lib/types'
 import type { AdminOverview } from '@/lib/types'
 import { OverviewCards } from '@/components/OverviewCards'
@@ -8,6 +8,7 @@ import { TimeseriesChart } from '@/components/TimeseriesChart'
 import { LedgerPanel } from '@/components/LedgerPanel'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { ServerKeyPanel } from '@/components/ServerKeyPanel'
+import { AdminAccountsPanel } from '@/components/AdminAccountsPanel'
 import { MailPanel } from '@/components/MailPanel'
 import { PlansPanel } from '@/components/PlansPanel'
 import { AuditLogPanel } from '@/components/AuditLogPanel'
@@ -21,41 +22,80 @@ import { CdkRedemptionsPanel } from '@/components/CdkRedemptionsPanel'
 import { HealthPanel } from '@/components/HealthPanel'
 import { JobStatsPanel } from '@/components/JobStatsPanel'
 
-type GateState = 'checking' | 'disabled' | 'locked' | 'unlocked'
+// 'error' 是这次新增的一档：**带着令牌但这次没验成**。
+// 它必须与 'locked' 分开——合并的话，一次网络抖动或后端 500 就会被当成
+// "令牌无效"，把人踢回登录页重打一次密码，而令牌其实一直是好的。
+type GateState = 'checking' | 'disabled' | 'locked' | 'unlocked' | 'error'
 
 export default function App() {
   const [gate, setGate] = useState<GateState>('checking')
-  const [tokenInput, setTokenInput] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [gateError, setGateError] = useState<string | null>(null)
+  const [loggingIn, setLoggingIn] = useState(false)
 
-  const tryUnlock = useCallback(async (token: string) => {
-    setGateError(null)
-    setAdminToken(token || null)
+  // 已存会话令牌（登录换来的，或历史遗留的静态主密钥）先拿去验一次——
+  // 免得每次刷新页面都要重新登录。
+  const checkExistingToken = useCallback(async () => {
+    const existing = getAdminToken()
+    if (!existing) {
+      setGate('locked')
+      return
+    }
     try {
       await adminApi.overview()
+      setGateError(null)
       setGate('unlocked')
     } catch (e) {
       if (e instanceof ApiError && e.code === 'admin_disabled') {
         setGate('disabled')
       } else if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        // 只有后端明确说"这把令牌不认"时才丢掉它。
+        setAdminToken(null)
         setGate('locked')
-        setGateError('令牌无效')
       } else {
-        setGate('locked')
+        // 网络不通 / 502 / 500：这些**不说明令牌失效**。原先这里一律
+        // setAdminToken(null)，于是刷新时后端恰好抖一下，管理员就被迫重新登录
+        // 一次——把一次瞬时故障升级成了一次凭据丢失。保留令牌，报错 + 重试。
         setGateError(e instanceof Error ? e.message : '连接失败')
+        setGate('error')
       }
     }
   }, [])
 
   useEffect(() => {
-    void tryUnlock(getAdminToken() ?? '')
-  }, [tryUnlock])
+    void checkExistingToken()
+  }, [checkExistingToken])
+
+  const login = useCallback(async () => {
+    if (!username.trim() || !password) return
+    setGateError(null)
+    setLoggingIn(true)
+    try {
+      const { token, username: loggedInAs } = await adminApi.login(username.trim(), password)
+      setAdminToken(token)
+      // 记下"我是谁"，供停用管理员账号时判断目标是不是自己（见 AdminAccountsPanel）。
+      setAdminUsername(loggedInAs || username.trim())
+      setPassword('')
+      setGate('unlocked')
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'admin_disabled') {
+        setGate('disabled')
+      } else if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        setGateError('用户名或密码错误')
+      } else {
+        setGateError(e instanceof Error ? e.message : '连接失败')
+      }
+    } finally {
+      setLoggingIn(false)
+    }
+  }, [username, password])
 
   return (
     <div className="min-h-screen bg-bg-primary">
       <AppHeader
         showLock={gate === 'unlocked'}
-        onLock={() => { setAdminToken(null); setGate('locked'); setTokenInput('') }}
+        onLock={() => { setAdminToken(null); setGate('locked'); setUsername(''); setPassword('') }}
       />
       <main>
         {gate === 'checking' && <CenterMessage>检查中…</CenterMessage>}
@@ -70,28 +110,67 @@ export default function App() {
           </CenterMessage>
         )}
 
+        {/* 带着令牌但这次没验成：令牌**没有**被清掉，重试就行。
+            同时给一条"换个账号登录"的出路——万一真的是令牌坏了，
+            用户不该被困在一个只能重试的页面里。 */}
+        {gate === 'error' && (
+          <CenterMessage>
+            <p className="text-text-primary">无法确认登录状态</p>
+            <p className="mt-2 max-w-md font-mono text-xs text-severity-critical">{gateError}</p>
+            <p className="mt-2 max-w-md text-xs text-text-muted">
+              这通常是后端没起或网络不通，不代表你的登录已经失效——令牌已保留。
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => { setGate('checking'); void checkExistingToken() }}
+                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+              >
+                重试
+              </button>
+              <button
+                onClick={() => { setAdminToken(null); setGateError(null); setGate('locked') }}
+                className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:border-brand-primary/40 hover:text-brand-primary transition-colors"
+              >
+                改用账号密码登录
+              </button>
+            </div>
+          </CenterMessage>
+        )}
+
         {gate === 'locked' && (
           <CenterMessage>
             <div className="mb-4 flex items-center gap-2 text-text-primary">
               <Lock className="h-4 w-4 text-brand-primary" strokeWidth={1.5} />
-              输入管理员令牌
+              管理员登录
             </div>
-            <div className="flex w-full max-w-sm gap-2">
+            <div className="flex w-full max-w-sm flex-col gap-2">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void login()}
+                aria-label="用户名"
+                placeholder="用户名"
+                autoFocus
+                autoComplete="username"
+                className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
+              />
               <input
                 type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void tryUnlock(tokenInput)}
-                aria-label="管理员令牌"
-                placeholder="AL_ADMIN_TOKEN"
-                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void login()}
+                aria-label="密码"
+                placeholder="密码"
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 font-mono text-sm text-text-primary placeholder-text-muted outline-none focus:border-brand-primary transition-colors"
               />
               <button
-                onClick={() => void tryUnlock(tokenInput)}
-                className="shrink-0 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors"
+                onClick={() => void login()}
+                disabled={loggingIn || !username.trim() || !password}
+                className="w-full rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-semibold text-bg-primary hover:bg-brand-primary-dim transition-colors disabled:opacity-50"
               >
-                解锁
+                {loggingIn ? '登录中…' : '登录'}
               </button>
             </div>
             {gateError && <p className="mt-3 font-mono text-xs text-severity-critical">{gateError}</p>}
@@ -281,6 +360,7 @@ function Dashboard() {
               <SettingsPanel />
               <ServerKeyPanel />
               <MailPanel />
+              <AdminAccountsPanel />
             </div>
           )}
 

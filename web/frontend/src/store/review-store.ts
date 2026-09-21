@@ -119,6 +119,11 @@ export const useReviewStore = create<ReviewState>((set) => ({
     // 显式写 null 而不是"有值才写"：不覆盖的话，上一次降级的提示会挂在
     // store 上，下一次正常创建时被页面当成本次的降级又弹一遍。
     set({ lastSkillDegraded: res.skill_degraded ?? null })
+    // 注意：res.guest_token 不在这里处理。首次匿名发起评审时后端会铸造独立游客
+    // 身份、把评审落在那个**新的** user_id 下；token 丢了就等于这条评审对它自己
+    // 的作者隐身（跳过去的进度页 404、WS 被拒，而次数已经扣掉）。这段收在
+    // apiClient.createReview → adoptGuestToken 里，是全站唯一的创建出口，
+    // 不要在这里再抄一份——这一页之前正是因为"没抄"而漏掉了整条游客链路。
     return res.review_id
   },
   /** 删除失败要往上抛：以前这里 catch {} 吞掉异常，界面上表现为"点了删除，

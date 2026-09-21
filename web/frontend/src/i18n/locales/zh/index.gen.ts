@@ -17,6 +17,7 @@ import common_calibration_gauge from './common.calibration_gauge'
 import common_meta from './common.meta'
 import common_persona_card from './common.persona_card'
 import common_persona_radar from './common.persona_radar'
+import common_report_charts from './common.report_charts'
 import common_ui from './common.ui'
 import common_validate from './common.validate'
 import enum_behavior_axis from './enum.behavior_axis'
@@ -59,6 +60,7 @@ import page_personas from './page.personas'
 import page_plans from './page.plans'
 import page_privacy from './page.privacy'
 import page_progress from './page.progress'
+import page_qq_callback from './page.qq_callback'
 import page_register from './page.register'
 import page_report from './page.report'
 import page_reset from './page.reset'
@@ -83,6 +85,7 @@ const TABLES: Record<string, Record<string, string>> = {
   'common.meta': common_meta,
   'common.persona_card': common_persona_card,
   'common.persona_radar': common_persona_radar,
+  'common.report_charts': common_report_charts,
   'common.ui': common_ui,
   'common.validate': common_validate,
   'enum.behavior_axis': enum_behavior_axis,
@@ -125,6 +128,7 @@ const TABLES: Record<string, Record<string, string>> = {
   'page.plans': page_plans,
   'page.privacy': page_privacy,
   'page.progress': page_progress,
+  'page.qq_callback': page_qq_callback,
   'page.register': page_register,
   'page.report': page_report,
   'page.reset': page_reset,

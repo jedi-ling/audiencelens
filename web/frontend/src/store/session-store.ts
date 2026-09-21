@@ -37,6 +37,11 @@ interface SessionState {
 
   /** 当前是否可以发起评审（BYOK 模式下必须有 key） */
   canReview: () => boolean
+
+  /** 后端是否配齐了 QQ 登录（APP ID / APP KEY / 回调地址三项）。
+   *  页面据此决定要不要画那个按钮——没配齐还画出来，用户点进去必然失败。
+   *  与 canReview 同一模式：config 的解读收敛在 store 里，页面不直接读原始字段。 */
+  qqLoginEnabled: () => boolean
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -117,6 +122,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ identity: null, keyStatus: null, usage: null })
     void get().bootstrap()
   },
+
+  qqLoginEnabled: () => Boolean(get().config?.qq_login_enabled),
 
   canReview: () => {
     const { config, keyStatus } = get()

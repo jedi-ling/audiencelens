@@ -10,6 +10,7 @@ import { loadSkillTruth, NON_REVIEW_SKILL_TYPES } from '@/lib/skills'
 import type { SkillTruth } from '@/lib/skills'
 import TaskTypeCard from '@/components/TaskTypeCard'
 import PersonaRadarChart from '@/components/PersonaRadarChart'
+import ModeCostCompare from '@/components/ModeCostCompare'
 import { ArrowLeft, ArrowRight, Upload, CheckCircle2, X, Loader2, ChevronDown, ChevronUp, Star, AlignLeft, FileText, Shield, FlaskConical, AlertTriangle, RefreshCw, Layers, Target } from 'lucide-react'
 import { t, Trans } from '@/i18n/runtime'
 import {
@@ -787,6 +788,9 @@ export default function CreateReviewPage() {
                       )
                     })}
                   </div>
+                  {/* 三张卡只说"含哪些环节"，不说"贵多少"——用户没有依据判断
+                      该选哪一档。这块把开销摆出来，让取舍看得见。 */}
+                  <ModeCostCompare selectedMode={selectedMode} />
                 </div>
               )
             })()}

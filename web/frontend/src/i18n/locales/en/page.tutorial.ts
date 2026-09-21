@@ -28,6 +28,16 @@ export default {
   'step_panel.label': 'Pick personas and run',
   'step_panel.desc': 'Choose a persona pack, start the review, read the report',
 
+  // ---- Which review mode to pick. Tier names read enum.mode_badge.*,
+  //      descriptions read i18n/catalog.ts::getReviewModes() — not duplicated here ----
+  'modes.title': 'Which review mode to pick',
+  'modes.desc': 'The three tiers differ in persona count and whether cross-examination / confidence calibration run — price scales with that',
+  'modes_personas.label': 'Personas',
+  'modes_cross_exam.label': 'Cross-examination',
+  'modes_calibration.label': 'Confidence calibration',
+  'modes_yes.value': '✓ Yes',
+  'modes_no.value': '—',
+
   // ---- Upload and extract ----
   'upload.title': 'Upload a file, let the AI extract',
   'upload.desc': 'The main path: upload a document → the AI reads and extracts → you confirm',
@@ -95,4 +105,17 @@ export default {
   'result_calibration.desc': 'Quality signals: agreement, coverage, hallucination rate',
 
   'start.cta': 'Create a review',
+
+  // ---- More features. These already ship but aren't mentioned on any tutorial-like page ----
+  'more.title': 'More features',
+  'more.desc': "Beyond running a review, these are worth a look",
+  'more_ledger.title': 'Judgment ledger · Prediction review',
+  'more_ledger.desc': "Save both the panel's judgment and your own, then verify against reality once it lands and see who called it",
+  // 见 zh 侧：/dashboard 已并进设置页，key 与文案一起改名。
+  'more_overview.title': 'Track record & shortcuts',
+  'more_overview.desc': 'A quick look at your track record, recent reviews, and shortcuts (the first section of Settings)',
+  'more_byok.title': 'Bring your own key (BYOK)',
+  'more_byok.desc': 'Plug in your own API key to skip platform quotas — billing goes straight to your own account',
+  'more_cdk.title': 'Redeem code',
+  'more_cdk.desc': 'Got a redeem code? Add it on the settings page and your balance tops up in seconds',
 } satisfies Messages

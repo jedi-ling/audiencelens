@@ -7,4 +7,6 @@ export default {
   logout: 'Sign out',
   guest: 'Guest',
   login: 'Sign in',
+  'provider_qq.badge': 'QQ sign-in',
+  'provider_email.badge': 'Email sign-in',
 } satisfies Messages

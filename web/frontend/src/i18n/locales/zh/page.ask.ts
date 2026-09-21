@@ -80,6 +80,13 @@ export default {
   'no_key.desc': '评审需要调用真实模型，未配置 Key 无法开始。',
   'no_key.cta': '去设置页填写',
 
+  /* 次数制（quota_mode=credits）下的余额展示——用户兑换 CDK 换来的就是这个数字，
+     必须在发起评审的主路径上看得见，而不是只能去设置页翻。归零时颜色转警示色，
+     由调用方按 usage.bonus_credits === 0 判断，这里只提供文案两态。 */
+  'count.credits_remaining': '还剩 {{count}} 次评审额度',
+  'credits_zero.hint': '评审额度已用完，兑换 CDK 或填写自己的 API Key 可继续使用',
+  'credits.cta': '去兑换',
+
   // ---- 附件：拖拽、预览、随消息发送 ----
   'drop.hint': '松开以上传截图/文件',
   'attach.hint': '支持拖拽文件到对话区，或 Ctrl+V 粘贴截图',
@@ -225,7 +232,10 @@ export default {
   'report_card.loading': '读取报告中…',
   // 读不到就说读不到：0 值行看起来跟正常结果一模一样，不能拿它冒充结论。
   'report_card.empty': '报告内容为空（没读到角色意见）',
-  'report_card.cta': '查看完整报告',
+  /* 这个按钮打开的是弹窗摘要，不是真正的完整报告页——之前两处都叫"完整报告"，
+     用户点进去发现内容对不上、又找不到真正的完整报告在哪，就会觉得"卡在
+     弹窗里不知道什么情况"。名字诚实一点，弹窗里再给一条去完整报告页的路。 */
+  'report_card.cta': '查看报告摘要',
   'count.fixes': '{{count}} 条修复项',
   'count.personas': '{{count}} 位角色',
   'token.tooltip': '输入 {{input}} · 输出 {{output}} token',
@@ -233,7 +243,8 @@ export default {
   'cost.value': '花费 {{amount}}',
 
   // ---- 报告弹窗 ----
-  'report_modal.subtitle': '完整报告',
+  'report_modal.subtitle': '快速摘要',
+  'report_modal.link': '完整报告页',
   'conclusion.title': '结论',
   'evidence.badge': '证据 · {{quality}}',
   'count.priority_fixes': '优先修复项 · {{count}}',
