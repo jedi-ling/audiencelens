@@ -1,0 +1,49 @@
+# 试点专用预算配置——与 budget.yaml 的唯一区别是 retry_on 扩到四类。
+#
+# 为什么试点要开 role_drift / hallucination 重试（budget.yaml 默认关）：
+# 默认关的理由是"重跑未必更好且每次都花钱"——那是 Claude 时代的账。试点用
+# MiniMax-M3（$0.3/$1.2 per Mtok），整次人格调用约 $0.004，重试成本可忽略；
+# 而 MiniMax 的输出方差大，同一人格两次抽样常在 40% 推断率闸两侧漂移，
+# 重试确实能捞回完整面板。客户等 48 小时的交付物，完整性比这几分钱重要。
+# 这只影响试点驱动器（tools/pilot_review.py --budget 指向本文件），
+# 不动 Web 端与 CLI 的默认行为。
+version: 0.1.0
+max_cost_per_run_usd: 2.0
+default_model: claude-sonnet-5
+fallback_model: claude-haiku-4-5-20251001
+premium_model: claude-opus-5
+unknown_model_pricing:
+  input_per_mtok: 15.0
+  output_per_mtok: 75.0
+model_pricing:
+  claude-haiku-4-5-20251001:
+    input_per_mtok: 1.0
+    output_per_mtok: 5.0
+  claude-haiku-4-5:
+    input_per_mtok: 1.0
+    output_per_mtok: 5.0
+  claude-sonnet-5:
+    input_per_mtok: 2.0
+    output_per_mtok: 10.0
+  claude-opus-5:
+    input_per_mtok: 5.0
+    output_per_mtok: 25.0
+  claude-sonnet-4-6:
+    input_per_mtok: 3.0
+    output_per_mtok: 15.0
+  claude-sonnet-4-5-20250929:
+    input_per_mtok: 3.0
+    output_per_mtok: 15.0
+  claude-sonnet-4-20250514:
+    input_per_mtok: 3.0
+    output_per_mtok: 15.0
+  claude-opus-4-20250514:
+    input_per_mtok: 15.0
+    output_per_mtok: 75.0
+  MiniMax-M3:
+    input_per_mtok: 0.3
+    output_per_mtok: 1.2
+retry:
+  max_retries_per_persona: 2
+  retry_on: [transport_error, schema_failure, role_drift, hallucination]
+  backoff_base_seconds: 1.0

@@ -67,6 +67,8 @@ def main() -> int:
     ap.add_argument("--task-type", default="steam_page_review")
     ap.add_argument("--mode", default="standard", choices=["quick", "standard", "full"])
     ap.add_argument("--baseline", action="store_true", help="同材料跑 single-prompt 公平基线")
+    ap.add_argument("--budget", default=os.path.join("src", "config", "budget-pilot.yaml"),
+                    help="预算配置（默认试点版：四类重试全开；Web/CLI 默认 budget.yaml 不受影响）")
     args = ap.parse_args()
 
     llm = load_llm_config()
@@ -84,6 +86,7 @@ def main() -> int:
         api_base=llm["base"],
         model_override=llm["model"],
         mode=args.mode,
+        budget_path=args.budget,
         progress_callback=lambda d, t, pid: print(f"  [{d}/{t}] {pid}", flush=True),
     )
 
