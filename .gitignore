@@ -160,3 +160,7 @@ docs/**/*.pdf
 
 # mcp-admin-server 的本地 venv（见 docs/MAINTENANCE.md §9）
 mcp-admin-server/venv/
+
+# 试点客户数据（材料/报告/成本信封——客户资产，绝不入库）
+pilot-data/
+balatro_api.json

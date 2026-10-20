@@ -224,6 +224,12 @@ RETRY_ROLE_DRIFT = "role_drift"
 RETRY_HALLUCINATION = "hallucination"
 KNOWN_RETRY_REASONS = (RETRY_TRANSPORT, RETRY_SCHEMA, RETRY_ROLE_DRIFT, RETRY_HALLUCINATION)
 
+# 单个人格调用的输出上限。chat_completion 的默认 4096 对 Claude 够用，但
+# MiniMax-M3 这类中文长文模型的人格 schema 输出会超过 4096 而被截断——
+# 截断在 llm_client 里按不可重试的硬失败处理，等于这位人格白花钱。
+# max_tokens 是上限不是目标：简洁的模型不会因此多输出。
+PERSONA_MAX_TOKENS = 8192
+
 # schema 校验里哪些字段不合格算"这位人格根本没交出可用意见"（硬失败、计入
 # failed_personas / degradation），哪些只是元数据瑕疵（标注即可）。
 #
@@ -661,6 +667,7 @@ def run_single_persona(
                 api_base=api_base,
                 usage_details=cache_usage,
                 system=system,
+                max_tokens=PERSONA_MAX_TOKENS,
                 # 有 schema 就要求模型结构化交卷（Anthropic 强制工具调用 / OpenAI
                 # 兼容开 json_object），schema_failure 这类"整次重发"的重试从源头消掉。
                 # 没传 schema（run_panel 的旧统一校验路径）就保持老行为。

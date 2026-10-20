@@ -49,6 +49,14 @@ model_pricing:
   claude-opus-4-20250514:
     input_per_mtok: 15.0
     output_per_mtok: 75.0
+  # MiniMax 官方 anthropic 兼容端点（试点样例评审用）。键名必须与传入的模型 ID
+  # 逐字一致（resolve_model_pricing 是区分大小写的精确匹配）。单价 2026-10-20
+  # 核对于 cc-switch 的 model-pricing.json（与 MiniMax 开放平台公示一致）：
+  # 输入 $0.3/M、输出 $1.2/M；缓存读约 $0.06/M，M3 缓存写不计费——引擎统一按
+  # CACHE_WRITE/READ 倍率折算，与该口径略有出入，属可接受的估算误差。
+  MiniMax-M3:
+    input_per_mtok: 0.3
+    output_per_mtok: 1.2
 # 人格评审的重试。**这一段的每个键都有真实读取点**：src/runner/cli.py 的
 # _retry_settings 读取并解析它，run_single_persona 拿到解析结果后在同一层统一
 # 执行最多 max_retries 次重试（重试预算只有这一套，覆盖 transport_error /

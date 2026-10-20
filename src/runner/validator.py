@@ -75,7 +75,11 @@ def validate_evidence_grounding(output: dict, artifact_texts: List[str]) -> dict
 
     for entry in direct_entries:
         content = entry.get("content", "")
-        tokens = [t for t in re.split(r"[\s,，。.!！?？、：:；;()（）\[\]【】]+", content) if len(t) > 1]
+        # 中文引号/破折号/连接符必须算分隔符：模型用「CRT风格的像素艺术」、
+        # "扑克之旅"+"策略构建" 这种写法**逐字引用**材料时，引号不加进分隔集，
+        # 引号会和词句粘成一个永远匹配不上材料原文的长 token，诚实的引用被
+        # 误判成幻觉（实测：Balatro 材料下 4/6 人格全部误伤）。
+        tokens = [t for t in re.split(r"[\s,，。.!！?？、：:；;()（）\[\]【】「」『』“”‘’《》〈〉—–\-+*]+", content) if len(t) > 1]
         found = False
         for token in tokens:
             for text in artifact_texts:

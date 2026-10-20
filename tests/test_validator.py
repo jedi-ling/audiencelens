@@ -413,6 +413,35 @@ class TestValidateEvidenceGrounding:
         assert result["grounded"] is True
         assert result["ungrounded_evidence"] == []
 
+    def test_chinese_quoted_verbatim_evidence_is_grounded(self):
+        # 回归：模型用「」/""/+/—— 逐字引用材料词组时，引号曾和词句粘成
+        # 永远匹配不上的长 token，诚实引用被误判为幻觉（Balatro 材料实测
+        # 4/6 人格被误伤）。引号类符号必须算切词分隔符。
+        output = _make_valid_output()
+        output["evidence"] = [
+            {"content": "页面明确宣称视觉风格为「CRT风格的像素艺术」", "inference_level": "direct"},
+            {"content": "短描述直接给出核心承诺：“扑克之旅”+“策略构建”——三秒能读到机制核心", "inference_level": "direct"},
+        ]
+        artifact_texts = [
+            "沉浸于 CRT风格的像素艺术，细节惊人",
+            "Balatro是一场循环不息的扑克之旅。策略构建游戏。",
+        ]
+        result = validate_evidence_grounding(output, artifact_texts)
+        assert result["ungrounded_evidence"] == []
+        assert result["grounded"] is True
+
+    def test_fabricated_quote_still_fails_after_tokenizer_fix(self):
+        # 切词放宽不等于放水：材料里不存在的词组，引号拆开也匹配不上。
+        output = _make_valid_output()
+        output["evidence"] = [
+            {"content": "页面宣称「支持多人联机对战」", "inference_level": "direct"},
+        ]
+        artifact_texts = ["这是一款单人roguelike卡牌游戏"]
+        result = validate_evidence_grounding(output, artifact_texts)
+        assert result["grounded"] is False
+        assert result["ungrounded_evidence"] == ["页面宣称「支持多人联机对战」"]
+
+
 
 class TestValidateOutput:
     def test_all_pass(self):
