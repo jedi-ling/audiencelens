@@ -133,9 +133,9 @@ class TestChangePassword:
 class TestUpdateProfile:
     def test_updates_display_name(self, client):
         t = _signup(client, "prof@example.com")
-        r = client.patch("/api/auth/me", headers=_h(t), json={"display_name": "熵呓"})
+        r = client.patch("/api/auth/me", headers=_h(t), json={"display_name": "新昵称"})
         assert r.status_code == 200
-        assert r.json()["display_name"] == "熵呓"
+        assert r.json()["display_name"] == "新昵称"
 
     def test_persists(self, client, db):
         """反向对照：接口回显参数太容易了，得确认真的落库。"""

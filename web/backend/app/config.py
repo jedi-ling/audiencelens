@@ -178,6 +178,11 @@ class Settings:
         # 真正的读取点是 plan_service._free_plan(db)。
         self.quota_free_reviews_per_day: int = _int("AL_QUOTA_FREE_REVIEWS_PER_DAY", 5)
         self.quota_free_cost_usd_per_day: float = _float("AL_QUOTA_FREE_COST_USD_PER_DAY", 1.0)
+        # 付费档每日平台垫付成本上限（USD）的默认值，后台面板仍可覆盖（plan_override:*）。
+        # 默认 ≈ 月价 / 30：以前写死 Pro 20 / Team 100，等于一个 $19/月 的用户
+        # 一天就能烧掉月价的 100 倍以上，一旦接入平台 Key 就是直接亏钱。
+        self.plan_pro_cost_usd_per_day: float = _float("AL_PLAN_PRO_COST_USD_PER_DAY", round(19 / 30, 2))
+        self.plan_team_cost_usd_per_day: float = _float("AL_PLAN_TEAM_COST_USD_PER_DAY", round(49 / 30, 2))
         # 每个用户**累计**（非每日）能烧掉的平台 token 上限，0 = 不限制。
         # 这是钱包的最后一道闸，和次数/成本那两道的性质不同：
         #   · 次数闸管"一天能发几次"，跨天就重置，拦不住长期消耗；

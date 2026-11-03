@@ -885,6 +885,7 @@ export type MessageKey =
   | 'page.plans.anon.hint'
   | 'page.plans.banner_byok'
   | 'page.plans.banner_credits'
+  | 'page.plans.banner_no_platform_key'
   | 'page.plans.banner_no_quota'
   | 'page.plans.bonus.label'
   | 'page.plans.byok.cta'
@@ -2482,6 +2483,7 @@ export type PlainMessageKey =
   | 'page.plans.anon.hint'
   | 'page.plans.banner_byok'
   | 'page.plans.banner_credits'
+  | 'page.plans.banner_no_platform_key'
   | 'page.plans.banner_no_quota'
   | 'page.plans.bonus.label'
   | 'page.plans.byok.cta'
@@ -2516,6 +2518,7 @@ export type PlainMessageKey =
   | 'page.plans.quota.error'
   | 'page.plans.quota.pending'
   | 'page.plans.quota.title'
+  | 'page.plans.request.hint'
   | 'page.plans.tagline_free'
   | 'page.plans.tagline_pro'
   | 'page.plans.tagline_team'
@@ -3221,6 +3224,7 @@ export type RichMessageKey =
   | 'page.plans.anon.hint'
   | 'page.plans.banner_byok'
   | 'page.plans.banner_credits'
+  | 'page.plans.banner_no_platform_key'
   | 'page.plans.banner_no_quota'
   | 'page.plans.credits.value'
   | 'page.plans.feature_reviews'
@@ -4125,6 +4129,7 @@ export interface MessageVars {
   'page.plans.anon.hint': Record<string, never>
   'page.plans.banner_byok': Record<string, never>
   'page.plans.banner_credits': Record<string, never>
+  'page.plans.banner_no_platform_key': Record<string, never>
   'page.plans.banner_no_quota': Record<string, never>
   'page.plans.bonus.label': Record<string, never>
   'page.plans.byok.cta': Record<string, never>
@@ -4163,7 +4168,7 @@ export interface MessageVars {
   'page.plans.quota.error': Record<string, never>
   'page.plans.quota.pending': Record<string, never>
   'page.plans.quota.title': Record<string, never>
-  'page.plans.request.hint': { email: string | number }
+  'page.plans.request.hint': Record<string, never>
   'page.plans.tagline_free': Record<string, never>
   'page.plans.tagline_pro': Record<string, never>
   'page.plans.tagline_team': Record<string, never>
@@ -4982,6 +4987,7 @@ export interface MessageSlots {
   'page.plans.anon.hint': 'register'
   'page.plans.banner_byok': 'mode'
   'page.plans.banner_credits': 'mode'
+  'page.plans.banner_no_platform_key': 'mode'
   'page.plans.banner_no_quota': 'mode'
   'page.plans.credits.value': 'unit'
   'page.plans.feature_reviews': 'n'

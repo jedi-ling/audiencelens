@@ -26,6 +26,9 @@ export default {
 
   // ---- 部署模式横幅：三选一，互斥。<mode> 槽是原来的 <strong> ----
   banner_byok: '当前部署为 <mode>BYOK 模式</mode>：评审使用你自己填的 Key，套餐额度不生效。',
+  // 部署方没有配置平台 Key 时（/api/health 的 server_key_present=false）置顶显示；
+  // 此时下方套餐卡片里"每天 N 次评审 / 平台承担费用"两条会被隐藏，见 PlansPage。
+  banner_no_platform_key: '<mode>平台 Key 当前未开放</mode>，目前仅支持自带 API Key（BYOK）。',
   banner_no_quota: '当前部署<mode>未开启配额限制</mode>，评审暂不受次数约束。',
   banner_credits: '当前部署按 <mode>CDK 次数制</mode>计费：每次评审消耗 1 次，用完可再兑。',
 
@@ -65,7 +68,7 @@ export default {
   'card.badge': '当前使用',
   'card.label': '正在使用',
   'card.hint': '免费档 · 无需付费',
-  'card.cta': '联系升级',
+  'card.cta': '申请升级',
 
   // ---- 兑换 CDK ----
   'cdk.title': '兑换码（CDK）',
@@ -80,13 +83,12 @@ export default {
   'cdk.success': '兑换成功 +{{count}} 次，当前余额 {{balance}} 次',
   'cdk.error': '兑换失败',
   'guest.hint': '（已为你创建游客身份并自动登录）',
-  // 邮箱是常量（CONTACT_EMAIL），当变量传进来而不是写死在译文里——
-  // 写死的话改邮箱要改两份语料，必然漏一份。
-  'request.hint': '需要兑换码？发邮件至 <mail>{{email}}</mail> 申请。',
+  // 联系渠道是仓库的 GitHub Issues（PlansPage 的 REPO_ISSUES_URL），界面上不放邮箱。
+  'request.hint': '需要兑换码？在 <mail>GitHub Issues</mail> 提交申请（不要贴邮箱等个人信息）。',
 
   // ---- 其他方式 ----
   'manual.title': '人工开通 Pro / Team',
-  'manual.desc': '如需开通 Pro 或 Team 档，发邮件告知目标档位和账号邮箱即可。',
+  'manual.desc': '如需开通 Pro 或 Team 档，在 GitHub Issues 留言说明目标档位即可（issue 是公开的，不要贴邮箱等个人信息）。',
   'byok.title': '自带 API Key',
   'byok.desc':
     '填入自己的 API Key（Anthropic 原生，或任意 OpenAI 兼容服务），评审消耗你自己的 API 额度，不受平台次数和日限约束，token 费用由服务商直接结算。',

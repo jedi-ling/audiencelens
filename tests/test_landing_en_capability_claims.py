@@ -263,10 +263,15 @@ def test_en_body_is_structurally_parallel():
     # 测试数那一格必须带统计日期。中文侧的规矩（test_public_claims.py::
     # test_test_counts_are_stated_once_and_dated）是"全页只写一处并带日期"，
     # 英文侧同样不许出现第二个测试数，也不许把 skipped 抹掉写成 all green。
-    assert re.search(r"2026-08-02", en), "英文 STATS 区的测试数缺统计日期"
-    assert re.search(r"\b8\b[^<]*skipped", en), (
-        "英文 STATS 区没写 skipped 数。中文原件的注释明写：不要写成"
-        "『全绿』抹掉那 8 项 skipped——英文侧同理，all green 是假绿。"
+    # 日期与 skipped 数从中文原件的那一格取，不在这里写死：写死的话每次重新实测
+    # 都要改测试，而真正要守住的是"两边同一个日期、同一个 skipped 数"。
+    zh_tile = re.search(r"(\d{4}-\d{2}-\d{2}) 实测 · 另 (\d+) 项 skipped", zh)
+    assert zh_tile, "中文 STATS 区的测试数那一格缺统计日期或 skipped 数"
+    date, skipped = zh_tile.groups()
+    assert re.search(re.escape(date), en), f"英文 STATS 区的测试数缺统计日期（应与中文同为 {date}）"
+    assert re.search(rf"\b{skipped}\b[^<]*skipped", en), (
+        f"英文 STATS 区没写 skipped 数（应与中文同为 {skipped}）。中文原件的注释明写：不要写成"
+        "『全绿』抹掉那些 skipped——英文侧同理，all green 是假绿。"
     )
     assert en.lower().count("tests passing") == 1, (
         "英文落地页出现了不止一处测试数声明。测试数会随开发漂移，"

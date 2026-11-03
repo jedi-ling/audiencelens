@@ -9,6 +9,9 @@ COPY . .
 # 语言切换器不出现，不会半成品上线。
 ARG VITE_AL_LOCALES=zh
 ENV VITE_AL_LOCALES=$VITE_AL_LOCALES
+# ICP 备案号（只有在中国大陆提供服务的实例才需要）。不传就不显示，见 src/lib/site.ts
+ARG VITE_ICP_TEXT=
+ENV VITE_ICP_TEXT=$VITE_ICP_TEXT
 RUN npm run build
 
 FROM nginx:alpine

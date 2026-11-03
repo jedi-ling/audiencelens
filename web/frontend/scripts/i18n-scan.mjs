@@ -122,16 +122,6 @@ const ALLOW = [
     why: '128 个汉字全部在 GLSL 着色器源码的注释里，零 UI 字符串（契约 4.3）',
   },
   {
-    file: 'src/components/Layout.tsx',
-    text: '苏ICP备2025198057号',
-    why: '法定 ICP 备案号，逐字符固定。工信部要求原样公示，翻译或改写都是违规',
-  },
-  {
-    file: 'src/pages/TermsPage.tsx',
-    text: '苏ICP备2025198057号',
-    why: '法定 ICP 备案号，逐字符固定。工信部要求原样公示，翻译或改写都是违规（同 Layout.tsx 页脚那条，两处渲染的是同一个备案号）',
-  },
-  {
     file: 'src/pages/PlansPage.tsx',
     text: [
       // upgradeMailto()：subject 模板串被 ${plan.name} 切成两段

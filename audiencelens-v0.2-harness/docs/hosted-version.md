@@ -1,8 +1,8 @@
-# Hosted Version by Shuoji
+# Hosted Version
 
 AudienceLens open-source edition is for technical users who want full local control.
 
-The Shuoji hosted version is for creators who want one-click reviews without environment setup.
+The AudienceLens hosted version is for creators who want one-click reviews without environment setup.
 
 ## Open-source edition
 
@@ -26,6 +26,6 @@ The Shuoji hosted version is for creators who want one-click reviews without env
 
 Platform feature name:
 
-**熵呓 AI 玩家评审团**
+**AI 玩家评审团**
 
-Powered by AudienceLens · 熵呓工作室出品
+AudienceLens by Ling Yuanyi

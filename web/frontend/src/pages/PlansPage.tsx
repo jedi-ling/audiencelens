@@ -33,10 +33,9 @@ import { useDocumentTitle } from '@/i18n/head'
 import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
 import { tApiError } from '@/i18n/api-error'
 
-/** 人工开通的联系方式。必须是真地址——example.com 是 RFC 2606 保留域名，
- *  写在这里等于告诉用户"想付钱请发邮件到黑洞"。 */
-const CONTACT_EMAIL = 'REMOVED'
-const REPO_ISSUES_URL = 'https://github.com/jedilpf/audiencelens/issues'
+/** 人工开通 / 申请兑换码的唯一联系渠道：仓库的 GitHub Issues。
+ *  界面上不放任何邮箱地址——个人邮箱写进前端就是公开给爬虫。 */
+const REPO_ISSUES_URL = 'https://github.com/jedi-ling/audiencelens/issues'
 
 /** 后台可以把价格改成小数，所以不能无脑 toFixed(0)，也不该给整数补 ".00" */
 function money(n: number): string {
@@ -46,18 +45,17 @@ function money(n: number): string {
 }
 
 /**
- * ⚠ 这封信的 subject / body **恒为中文，不进 key 表**（契约 12.2）。
+ * 升级申请：打开一个预填标题的 GitHub issue。
  *
- * 理由是收件人：这是发给站方（solo dev）本人的询价邮件，不是给终端用户看的界面。
- * 跟着 ui_lang 翻的话，一个把界面切成英文的中文用户会给同一个中国人发出一封
- * 英文询价邮件——语言选错的是**信**，而用户完全不知道自己发出去的是什么。
- * 界面语言表达的是"我想用什么语言读界面"，不是"我想用什么语言写信给作者"。
+ * ⚠ 标题 / 正文 **恒为中文，不进 key 表**（契约 12.2）：收件人是作者本人，
+ * 不是终端用户——跟着 ui_lang 翻的话，界面切成英文的中文用户会发出一封英文申请。
+ * 正文刻意不带账号邮箱等个人信息：issue 是公开的。
  */
-function upgradeMailto(plan: Plan): string {
-  const subject = `AudienceLens 升级到 ${plan.name} 档`
-  // 正文不带用户邮箱等个人信息——收件人从发件地址就能看到，没必要塞进 URL
-  const body = `我想升级到 ${plan.name}（${money(plan.price_usd_month)}/月，每天 ${plan.reviews_per_day} 次评审）。\n\n请告诉我怎么付款。`
-  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+function upgradeIssueUrl(plan: Plan, showPlatformQuota: boolean): string {
+  const title = `AudienceLens 升级到 ${plan.name} 档`
+  const quota = showPlatformQuota ? `，每天 ${plan.reviews_per_day} 次评审` : ''
+  const body = `我想升级到 ${plan.name}（${money(plan.price_usd_month)}/月${quota}）。\n\n（请不要在这里贴邮箱、密码等个人信息。）`
+  return `${REPO_ISSUES_URL}/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
 }
 
 export default function PlansPage() {
@@ -138,6 +136,13 @@ export default function PlansPage() {
   const quotaEnabled = usage ? usage.quota_enabled : (config?.quota_enabled ?? true)
   const creditsMode = usage?.quota_mode === 'credits'
   const byokOnly = config?.key_mode === 'byok'
+  // 部署方没配平台 Key：套餐里"每天 N 次评审 / 平台承担费用"这两条承诺兑现不了——
+  // 那 N 次是按平台 Key 计的，而平台 Key 根本不存在。此时隐藏这两条，置顶说明只支持 BYOK。
+  // 为什么是隐藏而不是"按成本上限 ÷ 单次成本"换算出一个数：代码里只有单次评审的
+  // token 估算（AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE），没有 token 单价，
+  // 换算出来的数字没有事实源，等于再编一个承诺。拿不到 config 时不下结论。
+  const noPlatformKey = config ? !config.server_key_present : false
+  const showPlatformQuota = !noPlatformKey
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 animate-fade-in">
@@ -158,6 +163,11 @@ export default function PlansPage() {
         {/* 三条横幅是互斥分支，各一条整句 key：<mode> 槽就是原来那个 <strong>。
             不拆成「当前部署 + {模式名} + 后半句」——那等于把语序锁死成中文的，
             英文里强调词的位置和中文不在一处。 */}
+        {noPlatformKey && (
+          <Banner tone="info">
+            <Trans k="page.plans.banner_no_platform_key" slots={{ mode: (s) => <strong className="font-semibold">{s}</strong> }} />
+          </Banner>
+        )}
         {byokOnly ? (
           <Banner tone="info">
             <Trans k="page.plans.banner_byok" slots={{ mode: (s) => <strong className="font-semibold">{s}</strong> }} />
@@ -366,26 +376,30 @@ export default function PlansPage() {
 
                     {/* 特性列表 */}
                     <ul className="mb-6 space-y-2.5 text-sm text-text-secondary">
-                      <li className="flex items-start gap-2.5">
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
-                          <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
-                        </div>
-                        <span>
-                          {/* 数字插在句子中间，中英语序不同（"每天 N 次评审" / "N reviews per day"）。
-                              整句一条 key，<n> 槽保留原来那个 tabular-nums 的 <strong>。 */}
-                          <Trans
-                            k="page.plans.feature_reviews"
-                            vars={{ count: plan.reviews_per_day }}
-                            slots={{ n: (s) => <strong className="text-text-primary tabular-nums">{s}</strong> }}
-                          />
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-2.5">
-                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
-                          <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
-                        </div>
-                        <span>{t('page.plans.feature_cost')}</span>
-                      </li>
+                      {showPlatformQuota && (
+                        <>
+                          <li className="flex items-start gap-2.5">
+                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+                              <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
+                            </div>
+                            <span>
+                              {/* 数字插在句子中间，中英语序不同（"每天 N 次评审" / "N reviews per day"）。
+                                  整句一条 key，<n> 槽保留原来那个 tabular-nums 的 <strong>。 */}
+                              <Trans
+                                k="page.plans.feature_reviews"
+                                vars={{ count: plan.reviews_per_day }}
+                                slots={{ n: (s) => <strong className="text-text-primary tabular-nums">{s}</strong> }}
+                              />
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2.5">
+                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
+                              <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
+                            </div>
+                            <span>{t('page.plans.feature_cost')}</span>
+                          </li>
+                        </>
+                      )}
                       <li className="flex items-start gap-2.5">
                         <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary/10">
                           <Check className="h-3 w-3 text-brand-primary" strokeWidth={2.5} />
@@ -408,7 +422,9 @@ export default function PlansPage() {
                         </div>
                       ) : (
                         <a
-                          href={upgradeMailto(plan)}
+                          href={upgradeIssueUrl(plan, showPlatformQuota)}
+                          target="_blank"
+                          rel="noreferrer"
                           className="flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-primary/90 hover:shadow-[0_4px_16px_rgba(0,113,227,0.3)] active:scale-[0.98]"
                         >
                           <Mail className="h-4 w-4" strokeWidth={1.5} />
@@ -491,15 +507,15 @@ export default function PlansPage() {
           )}
 
           <p className="mt-3 text-xs text-text-muted">
-            {/* 邮箱当变量传，不写死在译文里：改邮箱要改两份语料的话必然漏一份。
-                这封信的 subject 同样恒为中文——收件人是站方本人（契约 12.2）。 */}
+            {/* issue 标题恒为中文——收件人是作者本人（契约 12.2）。 */}
             <Trans
               k="page.plans.request.hint"
-              vars={{ email: CONTACT_EMAIL }}
               slots={{
                 mail: (s) => (
                   <a
-                    href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
+                    href={`${REPO_ISSUES_URL}/new?title=${encodeURIComponent('AudienceLens 兑换码申请')}`}
+                    target="_blank"
+                    rel="noreferrer"
                     className="text-brand-primary underline underline-offset-2 hover:text-text-primary"
                   >
                     {s}
@@ -523,16 +539,10 @@ export default function PlansPage() {
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
-              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 升级咨询')}`}
-              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-text-primary"
-            >
-              {CONTACT_EMAIL}
-            </a>
-            <a
               href={REPO_ISSUES_URL}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-text-muted underline underline-offset-2 hover:text-text-secondary"
+              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-text-primary"
             >
               GitHub Issues
             </a>

@@ -354,7 +354,7 @@ def convert(md_path, pdf_path, doc_title):
     doc = BaseDocTemplate(pdf_path, pagesize=A4,
                           leftMargin=margin_l, rightMargin=margin_r,
                           topMargin=margin_t, bottomMargin=margin_b,
-                          title=doc_title, author="ShanYi Studio")
+                          title=doc_title, author="Ling Yuanyi")
     frame = Frame(margin_l, margin_b, avail, A4[1] - margin_t - margin_b, id="f")
     doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=decorate)])
     doc.build(story)

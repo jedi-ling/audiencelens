@@ -61,17 +61,19 @@ def _free_plan(db: Optional[Session] = None) -> dict:
 
 PLANS: Dict[str, dict] = {
     "free": _free_plan(),
+    # cost_usd_per_day 的默认值来自 AL_PLAN_{PRO,TEAM}_COST_USD_PER_DAY（≈ 月价 / 30，
+    # 见 config.py），后台面板的 plan_override 仍优先。
     "pro": {
         "name": "Pro",
         "price_usd_month": 19,
         "reviews_per_day": 100,
-        "cost_usd_per_day": 20.0,
+        "cost_usd_per_day": settings.plan_pro_cost_usd_per_day,
     },
     "team": {
         "name": "Team",
         "price_usd_month": 49,
         "reviews_per_day": 500,
-        "cost_usd_per_day": 100.0,
+        "cost_usd_per_day": settings.plan_team_cost_usd_per_day,
     },
 }
 

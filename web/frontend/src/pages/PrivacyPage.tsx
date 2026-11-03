@@ -341,11 +341,13 @@ export default function PrivacyPage() {
             {t('page.privacy.contact.desc')}
           </p>
           <a
-            href="mailto:audience-lens@example.com"
+            href="https://github.com/jedi-ling/audiencelens/issues"
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex max-w-full items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium break-all"
           >
             <Mail className="w-4 h-4" strokeWidth={1.25} />
-            audience-lens@example.com
+            GitHub Issues
           </a>
         </section>
 
