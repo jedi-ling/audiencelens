@@ -151,12 +151,7 @@ dist-package/
 
 # docs/ 下的 PDF 是 scripts/md_to_pdf.py 从同目录 .md 渲染出来的产物，
 # 每导出一次就多几 MB 二进制进历史，而历史里的大文件删不干净。
-# 下面三份是例外：它们在加这条规则之前就已入库（其中两份在 archive/，
-# 按发布当时的口径留档），忽略它们只会让已跟踪文件与 .gitignore 互相矛盾。
 docs/**/*.pdf
-!REMOVED/business-plan/AudienceLens-BP-2026-07-27.pdf
-!REMOVED/business-plan/archive/AudienceLens-BP.pdf
-!REMOVED/business-plan/archive/_bp_new.pdf
 
 # mcp-admin-server 的本地 venv（见 docs/MAINTENANCE.md §9）
 mcp-admin-server/venv/

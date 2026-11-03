@@ -12,7 +12,7 @@
 
 AudienceLens 的核心主张是"多代理合成评审能替代部分真人测试"，但当前**没有任何真人对照数据**来验证这一主张：
 
-- `REMOVED/benchmark-report.md`（2026-07-27 口径勘误版）§7.1 明确声明：**"本报告中的所有评分基于设计分析而非真实用户对比实验"**；§7.4 又指出"一致性验证需要真人数据作为参照，目前 parity_check.py 的基准线基于 SyntheticUsers 的公开数据"。
+- 原 `benchmark-report.md`（2026-07-27 口径勘误版，现已移出仓库）§7.1 明确声明：**"本报告中的所有评分基于设计分析而非真实用户对比实验"**；§7.4 又指出"一致性验证需要真人数据作为参照，目前 parity_check.py 的基准线基于 SyntheticUsers 的公开数据"。
 - `docs/product-validation.md`「仍需补齐」清单中列出："建立至少 100 组预测与真人测试/上线数据的配对样本"。
 - `docs/benchmark-protocol.md` 的 JSON 契约与 `benchmark-init / benchmark-compare / benchmark-suite` 脚手架已就绪，但缺少真人参考数据填充。
 
@@ -279,4 +279,3 @@ python tools/parity_check.py \
 | `docs/benchmark-protocol.md` | 本方案是它的"真人参考数据"来源；JSON 契约与其 §「JSON 契约」一致 |
 | `docs/pilot-playbook.md` | Steam 商店页试点的真人盲测数据可直接并入本方案的 T1/T2 样本 |
 | `docs/product-validation.md` | 本方案推进其"仍需补齐"中的"100 组配对样本"第一步（≥ 50 份起步） |
-| `REMOVED/benchmark-report.md` | 本方案产生的实测数字将成为该报告"设计分析 → 实证"升级的证据；当前报告明确无真人对照数据 |

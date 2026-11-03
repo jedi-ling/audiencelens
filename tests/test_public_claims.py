@@ -183,15 +183,9 @@ EXEMPT_FILES = {
     # 路线图按版本记「那一版当时交付了什么」，v0.1 那节的 50 人格 / 8 包是历史事实，
     # 改成今天的 72/11 反而是把历史记错。
     "docs/project/roadmap.md",
-    # PDF 审计报告的**全部内容就是引用 PDF 里写错的数字**（"4 份 PDF 全部写
-    # '66 个人格 / 10 个 YAML Pack'"）。引用错误值是它的职责所在，跟着仓库改
-    # 反而会把这份证据毁掉——它就不再能证明 PDF 错在哪了。
-    # 注意这跟 FROZEN_BODY_FILES 不是一回事：那些是"已发出的稿子正文冻结"，
-    # 这份是"内容本身即错误值的引用"。
-    "REMOVED/business-plan/pdf-audit-report.md",
     # i18n 实施契约是**内部工程文档**，不是对外材料，里面一个人格数字都没有。
     # 它被扫到是因为正文反复写「12 个 agent」——指的是并行改代码的 12 个编码 agent，
-    # 而 persona 的正则里有一条专门捞「N 个 agent」（那条是为 REMOVED-bp.html
+    # 而 persona 的正则里有一条专门捞「N 个 agent」（那条是为 一份早期 BP 页面（已移出仓库）
     # 用「72 个 agent」指代人格而加的，见 PATTERNS 里的注释）。
     # 两种「agent」同形不同义，正则分不开。豁免整份文件而不是放宽那条正则：
     # 放宽会让对外材料里真正写错的「N 个 agent」重新隐身，那条正则当初就是为此加的。
@@ -233,7 +227,7 @@ def rel_path(path):
 #     正文必须冻结，改了反而和视频对不上；顶部勘误负责说明现状。
 #   · BP / 说明类文档 —— 它们还会被人打开当作产品说明来读，
 #     里面的数字错着就是在误导，正文该跟着仓库走。
-# 以前一刀切豁免了全部带横幅的文件，结果 REMOVED-bp.html 的正文被改成
+# 以前一刀切豁免了全部带横幅的文件，结果 一份早期 BP 页面（已移出仓库） 的正文被改成
 # 72 却不受检查，同一个文件里 171/287 行改对、222 行漏改，谁都不会发现。
 # 所以改成显式白名单：加进来必须写清"这份东西已经以什么形式发出去了"。
 FROZEN_BODY_FILES = frozenset(
@@ -299,7 +293,7 @@ PATTERNS = {
         r"\|\s*\*\*(?:Total|合计)\*\*\s*\|\s*\*\*\d+\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\*\*\d+\*\*",
         r"\|\s*\*\*(?:Total|合计)\*\*\s*\|\s*\*\*(\d+)\*\*\s*\|\s*\|",
         # 「N 个 agent」这种写法。补这条是有具体来由的：
-        # REMOVED-bp.html 同一个文件里，171 和 287 行的「72 个 agent」改对了，
+        # 一份早期 BP 页面（已移出仓库） 同一个文件里，171 和 287 行的「72 个 agent」改对了，
         # 222 行的「66 个 agent」漏改 —— 同一处声称改了一半，正是本测试要治的病。
         # 而它当时逃掉，就是因为下面这两条正则不存在。
         r"(\d+)\s*个\s*agent",
@@ -379,8 +373,6 @@ MUST_STATE = {
     "docs/business-plan.md": ("persona", "pack"),
     "docs/paper/arxiv-paper.md": ("persona", "pack", "task_type"),
     "docs/paper/arxiv-paper-zh.md": ("persona", "pack", "task_type"),
-    "REMOVED/benchmark-report.md": ("persona", "pack"),
-    "REMOVED/business-plan/index.html": ("persona", "pack"),
 }
 
 
