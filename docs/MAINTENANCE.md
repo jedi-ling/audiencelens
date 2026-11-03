@@ -13,6 +13,7 @@
 7. [故障排查](#7-故障排查)
 8. [安全清单](#8-安全清单)
 9. [`mcp-admin-server/`](#9-mcp-admin-server本地运维用的-mcp-工具不随产品部署)
+10. [已知待办](#10-已知待办记录在案尚未实现)
 
 ---
 
@@ -174,6 +175,8 @@ AL_KEY_MODE=managed       # 服务端垫付 key（后台面板填）
 | `AL_QUOTA_MODE` | `plan` | `plan`（套餐日限）/ `credits`（纯 CDK 次数制，用完即止）——见"两种配额模式" |
 | `AL_QUOTA_FREE_REVIEWS_PER_DAY` | `5` | 仅约束走服务端 key 的评审 |
 | `AL_QUOTA_FREE_COST_USD_PER_DAY` | `1.0` | 同上 |
+| `AL_PLAN_PRO_COST_USD_PER_DAY` | `0.63`（≈ $19 / 30） | Pro 档每日平台垫付成本上限的默认值；后台「套餐」可覆盖 |
+| `AL_PLAN_TEAM_COST_USD_PER_DAY` | `1.63`（≈ $49 / 30） | Team 档同上 |
 | `AL_QUOTA_TOKENS_TOTAL` | `0` | 每账号**累计**能烧掉的平台 token，`0` = 不限。上面两条是 24h 滚动窗口，跨天重置，拦不住"每天用满连用一个月"；这一条不重置。只算平台垫付，BYOK 不受影响 |
 | `AL_QUOTA_TOKENS_PER_REVIEW_ESTIMATE` | `150000` | 发起评审时按这个数给终身额度占位，跑完用真实用量顶掉。**它决定并发超额的上界**：没有占位时并发请求会各自读到"没超"而全部放行（实测 8 线程 8/8 全过）。设 `0` = 关闭占位，闸门仍生效但退回逐次检查 |
 | `AL_QUOTA_UNVERIFIED_REVIEWS_PER_DAY` | `1` | 未验证邮箱的账号每天能用平台 key 评审几次。软拦：能登录能用，验证邮箱即解锁完整额度。负数 = 关闭本机制 |
@@ -604,3 +607,13 @@ alembic upgrade head
   只接受 `/admin` 或 `/admin/...`（此前 `startswith("/admin")` 会连
   `/administrator-elsewhere` 一起放行），并且会拒绝含 `..` 的路径。
   即便如此，它仍是权限最大的一个工具——不要把它暴露给不受信的会话。
+
+---
+
+## 10. 已知待办（记录在案，尚未实现）
+
+- **定期清理空的过期游客行。** 游客身份 cookie 上线后（见 `deps.resolve_guest_identity`），
+  每个新浏览器会话都会在 `users` 表里留一行 `is_guest=True` 的记录，其中大多数从未产生任何
+  数据（爬虫、只看了一眼首页的访客）。需要一个定期任务：删除"游客 cookie 已过期
+  （`AL_GUEST_COOKIE_TTL_SECONDS`）且名下没有任何评审 / 对话 / 项目 / 上传 / CDK 流水"的
+  游客行。注意不能动有数据的游客——那是别人还没认领的历史。

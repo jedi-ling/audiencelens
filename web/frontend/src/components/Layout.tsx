@@ -9,6 +9,7 @@ import { t } from '@/i18n/runtime'
 import { useLocale } from '@/i18n/locale'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { ICP_TEXT } from '@/lib/site'
 
 /**
  * 导航项。
@@ -579,20 +580,23 @@ export default function Layout() {
               v1.0.0
             </span>
             <span className="text-[10px] text-text-muted">
-              © 2026 AudienceLens
+              © 2026 AudienceLens by Ling Yuanyi
             </span>
-            {/* ICP 备案号。工信部要求：在网站首页**底部**公示，且必须超链接到
+            {/* ICP 备案号（构建期 VITE_ICP_TEXT，见 lib/site.ts；不设置就不渲染）。
+                工信部要求：在网站首页**底部**公示，且必须超链接到
                 beian.miit.gov.cn（《互联网信息服务管理办法》）。
                 target/rel 是安全惯例——noopener 防止新标签页通过 window.opener
                 回改本页。 */}
-            <a
-              href="https://beian.miit.gov.cn/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
-            >
-              苏ICP备2025198057号
-            </a>
+            {ICP_TEXT && (
+              <a
+                href="https://beian.miit.gov.cn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+              >
+                {ICP_TEXT}
+              </a>
+            )}
           </div>
         </div>
       </footer>

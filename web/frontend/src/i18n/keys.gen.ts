@@ -2516,6 +2516,7 @@ export type PlainMessageKey =
   | 'page.plans.quota.error'
   | 'page.plans.quota.pending'
   | 'page.plans.quota.title'
+  | 'page.plans.request.hint'
   | 'page.plans.tagline_free'
   | 'page.plans.tagline_pro'
   | 'page.plans.tagline_team'
@@ -4163,7 +4164,7 @@ export interface MessageVars {
   'page.plans.quota.error': Record<string, never>
   'page.plans.quota.pending': Record<string, never>
   'page.plans.quota.title': Record<string, never>
-  'page.plans.request.hint': { email: string | number }
+  'page.plans.request.hint': Record<string, never>
   'page.plans.tagline_free': Record<string, never>
   'page.plans.tagline_pro': Record<string, never>
   'page.plans.tagline_team': Record<string, never>

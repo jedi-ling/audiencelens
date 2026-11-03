@@ -34,9 +34,10 @@ import { cn } from '@/lib/utils'
 import { t, Trans } from '@/i18n/runtime'
 import { useDocumentTitle } from '@/i18n/head'
 import type { PlainMessageKey } from '@/i18n/keys.gen'
+import { ICP_TEXT } from '@/lib/site'
 
-/** 与隐私政策同一个联系邮箱。必须是真地址——example.com 是 RFC 2606 保留域名。 */
-const CONTACT_EMAIL = 'REMOVED'
+/** 与隐私政策同一个联系渠道：仓库的 GitHub Issues（界面上不放任何邮箱地址）。 */
+const CONTACT_URL = 'https://github.com/jedi-ling/audiencelens/issues'
 
 /**
  * 章节表。存的是 **key 不是文案**：这个数组在模块求值时就固定了，存翻译结果
@@ -308,11 +309,13 @@ export default function TermsPage() {
         </div>
         <div>
           <a
-            href={`mailto:${CONTACT_EMAIL}`}
+            href={CONTACT_URL}
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex max-w-full items-center gap-2 px-4 py-2 rounded-lg bg-cyan/10 text-cyan border border-cyan/20 hover:bg-cyan/20 transition-colors text-sm font-medium break-all"
           >
             <Mail className="w-4 h-4 shrink-0" strokeWidth={1.25} />
-            {CONTACT_EMAIL}
+            GitHub Issues
           </a>
         </div>
         {/* 链接文字不拆成单独的 key：拆了之后英文语序改不动，只能硬凑成
@@ -331,21 +334,22 @@ export default function TermsPage() {
         </p>
 
         {/* 备案主体信息。条款是一份协议，用户有权知道对方是谁——
-            只在页脚放一个备案号，等于告诉用户"有备案"但不告诉他跟谁签的约。 */}
-        <p className="mt-4 text-xs text-text-muted">
-          {t('page.terms.filing.label')}
-          {/* 备案号**刻意不进 key 表**：工信部要求逐字符原样公示，翻译或改写
-              都是违规；而写进语料又会因为 zh/en 逐字相同被 i18n:check 判成
-              "照抄中文"。所以它留在这里当字面量，和 Layout.tsx 页脚同一处理。 */}
-          <a
-            href="https://beian.miit.gov.cn/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mx-1 hover:text-text-secondary transition-colors"
-          >
-            苏ICP备2025198057号
-          </a>
-        </p>
+            只在页脚放一个备案号，等于告诉用户"有备案"但不告诉他跟谁签的约。
+            备案号来自构建期 VITE_ICP_TEXT（lib/site.ts），不设置时整行不渲染。
+            它**刻意不进 key 表**：工信部要求逐字符原样公示，翻译或改写都是违规。 */}
+        {ICP_TEXT && (
+          <p className="mt-4 text-xs text-text-muted">
+            {t('page.terms.filing.label')}
+            <a
+              href="https://beian.miit.gov.cn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mx-1 hover:text-text-secondary transition-colors"
+            >
+              {ICP_TEXT}
+            </a>
+          </p>
+        )}
       </section>
     </div>
   )

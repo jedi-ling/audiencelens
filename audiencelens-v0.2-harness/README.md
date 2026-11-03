@@ -1,6 +1,6 @@
 # AudienceLens
 
-**Open-source multi-agent synthetic audience review skill pack by Shuoji Team.**
+**Open-source multi-agent synthetic audience review skill pack by Ling Yuanyi.**
 
 AudienceLens lets Claude Code / Cursor / OpenCode style AI agents summon different audience personas to review games, products, landing pages, DevLogs, startup ideas, and creative projects before real user testing.
 
@@ -56,13 +56,13 @@ Behavior must be grounded in motivation, domain knowledge, patience, platform ha
 ## Hosted Version
 
 Open source edition = full control.  
-Shuoji hosted edition = lower friction, managed model calls, visual reports, report history, version comparison, private/public sharing, advanced player panels.
+AudienceLens hosted edition = lower friction, managed model calls, visual reports, report history, version comparison, private/public sharing, advanced player panels.
 
-Platform feature name: **熵呓 AI 玩家评审团**  
-Powered by AudienceLens · 熵呓工作室出品
+Platform feature name: **AI 玩家评审团**  
+AudienceLens by Ling Yuanyi
 
 ## Disclaimer
 
 Synthetic audience feedback is not a substitute for real user research. Use it for blind-spot detection, hypothesis generation, pre-screening, critique preparation, and next-test planning.
 
-## Made by Shuoji Team
+## Made by Ling Yuanyi

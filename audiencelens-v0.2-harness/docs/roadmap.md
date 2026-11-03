@@ -32,7 +32,7 @@
 
 ## v1.0 — Hosted Integration
 
-- Shuoji platform integration
+- Hosted platform integration
 - credit system
 - visual reports
 - version comparison

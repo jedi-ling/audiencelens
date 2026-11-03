@@ -33,10 +33,9 @@ import { useDocumentTitle } from '@/i18n/head'
 import { formatNumber, formatPercent, formatUsd } from '@/i18n/format'
 import { tApiError } from '@/i18n/api-error'
 
-/** 人工开通的联系方式。必须是真地址——example.com 是 RFC 2606 保留域名，
- *  写在这里等于告诉用户"想付钱请发邮件到黑洞"。 */
-const CONTACT_EMAIL = 'REMOVED'
-const REPO_ISSUES_URL = 'https://github.com/jedilpf/audiencelens/issues'
+/** 人工开通 / 申请兑换码的唯一联系渠道：仓库的 GitHub Issues。
+ *  界面上不放任何邮箱地址——个人邮箱写进前端就是公开给爬虫。 */
+const REPO_ISSUES_URL = 'https://github.com/jedi-ling/audiencelens/issues'
 
 /** 后台可以把价格改成小数，所以不能无脑 toFixed(0)，也不该给整数补 ".00" */
 function money(n: number): string {
@@ -46,18 +45,16 @@ function money(n: number): string {
 }
 
 /**
- * ⚠ 这封信的 subject / body **恒为中文，不进 key 表**（契约 12.2）。
+ * 升级申请：打开一个预填标题的 GitHub issue。
  *
- * 理由是收件人：这是发给站方（solo dev）本人的询价邮件，不是给终端用户看的界面。
- * 跟着 ui_lang 翻的话，一个把界面切成英文的中文用户会给同一个中国人发出一封
- * 英文询价邮件——语言选错的是**信**，而用户完全不知道自己发出去的是什么。
- * 界面语言表达的是"我想用什么语言读界面"，不是"我想用什么语言写信给作者"。
+ * ⚠ 标题 / 正文 **恒为中文，不进 key 表**（契约 12.2）：收件人是作者本人，
+ * 不是终端用户——跟着 ui_lang 翻的话，界面切成英文的中文用户会发出一封英文申请。
+ * 正文刻意不带账号邮箱等个人信息：issue 是公开的。
  */
-function upgradeMailto(plan: Plan): string {
-  const subject = `AudienceLens 升级到 ${plan.name} 档`
-  // 正文不带用户邮箱等个人信息——收件人从发件地址就能看到，没必要塞进 URL
-  const body = `我想升级到 ${plan.name}（${money(plan.price_usd_month)}/月，每天 ${plan.reviews_per_day} 次评审）。\n\n请告诉我怎么付款。`
-  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+function upgradeIssueUrl(plan: Plan): string {
+  const title = `AudienceLens 升级到 ${plan.name} 档`
+  const body = `我想升级到 ${plan.name}（${money(plan.price_usd_month)}/月，每天 ${plan.reviews_per_day} 次评审）。\n\n（请不要在这里贴邮箱、密码等个人信息。）`
+  return `${REPO_ISSUES_URL}/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
 }
 
 export default function PlansPage() {
@@ -408,7 +405,9 @@ export default function PlansPage() {
                         </div>
                       ) : (
                         <a
-                          href={upgradeMailto(plan)}
+                          href={upgradeIssueUrl(plan)}
+                          target="_blank"
+                          rel="noreferrer"
                           className="flex items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-brand-primary/90 hover:shadow-[0_4px_16px_rgba(0,113,227,0.3)] active:scale-[0.98]"
                         >
                           <Mail className="h-4 w-4" strokeWidth={1.5} />
@@ -491,15 +490,15 @@ export default function PlansPage() {
           )}
 
           <p className="mt-3 text-xs text-text-muted">
-            {/* 邮箱当变量传，不写死在译文里：改邮箱要改两份语料的话必然漏一份。
-                这封信的 subject 同样恒为中文——收件人是站方本人（契约 12.2）。 */}
+            {/* issue 标题恒为中文——收件人是作者本人（契约 12.2）。 */}
             <Trans
               k="page.plans.request.hint"
-              vars={{ email: CONTACT_EMAIL }}
               slots={{
                 mail: (s) => (
                   <a
-                    href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 兑换码申请')}`}
+                    href={`${REPO_ISSUES_URL}/new?title=${encodeURIComponent('AudienceLens 兑换码申请')}`}
+                    target="_blank"
+                    rel="noreferrer"
                     className="text-brand-primary underline underline-offset-2 hover:text-text-primary"
                   >
                     {s}
@@ -523,16 +522,10 @@ export default function PlansPage() {
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
-              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('AudienceLens 升级咨询')}`}
-              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-text-primary"
-            >
-              {CONTACT_EMAIL}
-            </a>
-            <a
               href={REPO_ISSUES_URL}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-text-muted underline underline-offset-2 hover:text-text-secondary"
+              className="flex items-center gap-1.5 text-brand-primary underline underline-offset-2 hover:text-text-primary"
             >
               GitHub Issues
             </a>

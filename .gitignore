@@ -100,9 +100,11 @@ write_report.py
 Thumbs.db
 Desktop.ini
 
-# Database
+# Database（含 SQL 导出：数据转储一律不进仓库）
 *.db
+*.sqlite
 *.sqlite3
+*.sql
 
 # Node
 node_modules/
@@ -110,15 +112,24 @@ node_modules/
 # Build output
 web/frontend/dist/
 
-# Environment variables
+# Environment variables：任何 .env* 都不进仓库，只有模板例外
 .env
 .env.local
+.env*
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
 
 # Logs
 # - *.log covers any .log file anywhere in the repo (legacy + npm-debug etc.)
 # - /logs/ covers the dev runtime directory (backend-supervisor.sh + backend.log + future runtime artifacts)
 *.log
 /logs/
+logs/
+
+# 运行期上传目录（任何层级）
+uploads/
 
 # Coverage
 htmlcov/

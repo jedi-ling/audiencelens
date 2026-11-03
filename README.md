@@ -181,10 +181,11 @@ sides have settled samples; otherwise it says so rather than turning 0/0 into a 
 Historical hit rate still does **not** feed panel selection or aggregation weights —
 "gets better the more you use it" is roadmap, not current behaviour.
 
-**Guest trial.** An anonymous visitor's first review mints an isolated guest identity
-with a few free reviews attached — no signup, no CDK. Minting is rate-limited per day
-so nobody can farm identities for free platform-key reviews, and the guest can bind an
-email later to keep the history. **QQ login** is available when
+**Guest identity.** Every unauthenticated visitor gets their own isolated guest identity
+on their first request (a signed HttpOnly cookie) — no signup. Reviews run on the visitor's
+own API key (BYOK); when the operator has configured a platform key, the first few guests
+per source per day also get a small free trial. New identities are rate-limited per source,
+and the guest can bind an email later to keep the history. **QQ login** is available when
 `AL_QQ_APP_ID` / `AL_QQ_APP_KEY` / `AL_QQ_REDIRECT_URI` are all set; `/api/health`
 reports `qq_login_enabled` so the frontend only draws the button when it will work.
 Reviews can be published as a revocable read-only **share page**, grouped into
@@ -453,7 +454,9 @@ MIT License — see [LICENSE](LICENSE)
 
 ---
 
-## Made by 熵呓工作室
+## Made by Ling Yuanyi
+
+AudienceLens by Ling Yuanyi · GitHub [@jedi-ling](https://github.com/jedi-ling)
 
 ---
 
@@ -613,9 +616,10 @@ AudienceLens 是一个**全栈合成观众评审系统**，模拟多元玩家人
 时才给对比结论，否则如实说明，而不是把 0/0 说成"你领先"。历史命中率**仍然没有**
 接回面板选择或聚合权重——"越用越准"是路线图，不是现状。
 
-**游客试用。** 匿名访客第一次发起评审时会自动签发一个独立的游客身份并附赠
-几次体验额度，不需要注册也不需要 CDK；签发有每日上限，防止有人循环刷身份把
-垫付额度当无限用，试用完可以绑定邮箱把身份升级成正式账号、历史不丢。
+**游客身份。** 每个未登录访客第一次请求就会拿到自己独立的游客身份（签名的 HttpOnly
+cookie），不需要注册；评审用访客自己的 API Key（BYOK），部署方配置了平台 Key 时，
+同一来源每天前几个游客还附赠少量体验额度。新身份按来源限速，防止循环刷身份；
+之后可以绑定邮箱把身份升级成正式账号、历史不丢。
 **QQ 登录**在 `AL_QQ_APP_ID` / `AL_QQ_APP_KEY` / `AL_QQ_REDIRECT_URI` 三项配齐时可用，
 `/api/health` 回的 `qq_login_enabled` 决定前端画不画那个按钮（配不全就不画，
 免得点进去必然失败）。评审可以发布成可撤销的只读**分享页**，可以按**项目**归组
@@ -857,4 +861,6 @@ MIT License — 详见 [LICENSE](LICENSE)
 
 ---
 
-## Made by 熵呓工作室
+## Made by Ling Yuanyi
+
+AudienceLens by Ling Yuanyi · GitHub [@jedi-ling](https://github.com/jedi-ling)

@@ -125,7 +125,7 @@ AudienceLens 的 persona 是基于行为模式和公开信息的合成设计，�
 - 生成虚假的"玩家证言"或"社区反馈"
 - 对真实个人进行行为预测或画像
 
-如发现违规使用，AudienceLens 团队保留追究的权利。
+如发现违规使用，AudienceLens 作者（Ling Yuanyi）保留追究的权利。
 
 ---
 

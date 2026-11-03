@@ -54,7 +54,7 @@ export default {
   'card.badge': 'Current',
   'card.label': 'In use',
   'card.hint': 'Free · nothing to pay',
-  'card.cta': 'Email to upgrade',
+  'card.cta': 'Request an upgrade',
 
   'cdk.title': 'Redemption code (CDK)',
   cdk_desc_credits: 'Redeeming adds review credits; each review costs one credit.',
@@ -68,11 +68,11 @@ export default {
   'cdk.success_other': 'Redeemed — {{count}} credits added, balance now {{balance}}',
   'cdk.error': 'Could not redeem that code',
   'guest.hint': '(a guest identity was created and signed in for you)',
-  'request.hint': 'Need a code? Email <mail>{{email}}</mail> to request one.',
+  'request.hint': 'Need a code? Request one on <mail>GitHub Issues</mail> (please don\'t post your email or other personal details).',
 
   'manual.title': 'Manual Pro / Team activation',
   'manual.desc':
-    'To move to Pro or Team, email us the plan you want and the address on your account.',
+    'To move to Pro or Team, open a GitHub issue saying which plan you want (issues are public, so leave out your email and other personal details).',
   'byok.title': 'Bring your own API key',
   'byok.desc':
     'Add your own API key (native Anthropic, or any OpenAI-compatible service). Reviews then draw on your API quota instead of ours — no per-day cap, no platform limits — and your provider bills you for tokens directly.',

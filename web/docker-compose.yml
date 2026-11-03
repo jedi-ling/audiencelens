@@ -88,6 +88,9 @@ services:
       - AL_GUEST_COOKIE_SECURE=${AL_GUEST_COOKIE_SECURE:-true}
       - AL_GUEST_COOKIE_TTL_SECONDS=${AL_GUEST_COOKIE_TTL_SECONDS:-2592000}
       - AL_GUEST_IDENTITY_PER_HOUR=${AL_GUEST_IDENTITY_PER_HOUR:-30}
+      # 付费档每日平台成本上限默认值（≈ 月价 / 30；后台面板可覆盖）
+      - AL_PLAN_PRO_COST_USD_PER_DAY=${AL_PLAN_PRO_COST_USD_PER_DAY:-0.63}
+      - AL_PLAN_TEAM_COST_USD_PER_DAY=${AL_PLAN_TEAM_COST_USD_PER_DAY:-1.63}
       # ---------------------------------------------------------------
       # 下面这一整段是补齐上面那条「新增任何 AL_* 配置项时必须同步加到这里」
       # 长期没被执行的欠账：config.py 一共读 52 个变量，这里曾经只列出 35 个。
@@ -152,6 +155,8 @@ services:
       # 落地页能力声明测试 / 浏览器实测），可以直接对外。
       args:
         VITE_AL_LOCALES: ${VITE_AL_LOCALES:-zh,en}
+        # 本实例自己的 ICP 备案号（构建期）；留空则页脚与条款页不显示备案信息
+        VITE_ICP_TEXT: ${VITE_ICP_TEXT:-}
     ports:
       # 默认直接占 80（无 TLS 的裸跑）。上 Caddy 时在 .env 设
       # FRONTEND_BIND=127.0.0.1:8080 让出公网 80/443，由 Caddy 终结 TLS。

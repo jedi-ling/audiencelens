@@ -57,7 +57,7 @@ MCP server 整体已落地（commit 882f8f8）：`audiencelens-mcp` 入口 + Fas
 
 ## v1.0 — Hosted Integration
 
-- 🔲 平台集成（代码中无平台对接实现；署名已统一为"熵呓工作室"）
+- 🔲 平台集成（代码中无平台对接实现；署名已统一为 Ling Yuanyi）
 - ✅ 积分系统（web/backend：plan_service 套餐 + cdk_service CDK 兑换 + ledger_service 账本 + quota_service 配额计费，前端 PlansPage / LedgerPage；CDK 兑换实际已在 commit 9ced26e 完成，套餐实际已在 commit a838286 完成）
 - ✅ 可视化报告（web/frontend ReportPage / ReviewProgressPage / EvaluationPage；评审卡片美化与完整报告弹窗化实际已在 commit 70610ef / 3113e45 完成）
 - 🔲 版本对比（前端无版本对比功能，ReportPage 中"对比"仅指配色对比度）
