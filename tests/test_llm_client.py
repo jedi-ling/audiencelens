@@ -587,6 +587,28 @@ class TestSamplingParamsAndModelQuirks:
         assert kwargs["tools"][0]["name"] == "submit_review"
         assert "submit_review" in kwargs["messages"][0]["content"]
 
+    @pytest.mark.parametrize("model", ["claude-sonnet-5-5", "claude-opus-5-5"])
+    def test_5_5_models_also_fall_back_to_auto(self, model):
+        """Opus 5.5 / Sonnet 5.5 同样移除了强制工具调用，强制就是不可重试的 400。"""
+        fake_client, module = self._anthropic(
+            [SimpleNamespace(type="tool_use", name="submit_review", input={"primary_stance": "观望"})]
+        )
+        with patch.dict(sys.modules, {"anthropic": module}):
+            chat_completion(
+                model=model, prompt="hi", api_key="k",
+                provider="anthropic", json_schema=self.SCHEMA,
+            )
+        _, kwargs = fake_client.messages.create.call_args
+        assert kwargs["tool_choice"] == {"type": "auto"}
+
+    def test_sonnet_5_keeps_forced_tool_choice(self):
+        """家族子串匹配不能误伤 claude-sonnet-5：它仍支持强制工具调用。"""
+        from runner.llm_client import _supports_forced_tool_choice
+
+        assert _supports_forced_tool_choice("claude-sonnet-5") is True
+        assert _supports_forced_tool_choice("claude-opus-5") is True
+        assert _supports_forced_tool_choice("claude-sonnet-5-5") is False
+
     def test_truncated_structured_output_is_a_non_retryable_failure(self):
         """stop_reason=max_tokens 时 tool_use 的 input 是**残缺**的，但结构上能解析——
         不拦下来就会有半份评审被当成成功计进报告和账单。"""

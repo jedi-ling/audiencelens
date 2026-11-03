@@ -34,13 +34,14 @@ PromptContent = Union[str, List[dict]]
 STRUCTURED_OUTPUT_TOOL_NAME = "submit_review"
 
 # 已移除"强制工具调用"的模型家族：对它们传 tool_choice={"type":"tool"} 或
-# {"type":"any"} 会直接 400（Claude Fable 5.1 / Mythos 5.1 起），而 400 是不可重试
-# 的死错，等于整次评审全灭。
+# {"type":"any"} 会直接 400（Claude Fable 5.1 / Mythos 5.1 起，Claude Opus 5.5 /
+# Sonnet 5.5 同样如此），而 400 是不可重试的死错，等于整次评审全灭。
 # 这里按**模型家族子串**匹配而不是精确 ID：模型 ID 是自由文本（带不带日期后缀、
 # 带不带 us.anthropic. 之类的供应商前缀、BYOK 手填的拼法都不一样），精确列表必漏。
 # 宁可多匹配几个——命中只是退回 tool_choice="auto" 再在提示词里点名要它调这个
 # 工具，对本来支持强制的模型也完全合法，代价仅仅是少一层硬约束。
-_NO_FORCED_TOOL_FAMILIES = ("fable", "mythos")
+# "sonnet-5-5" / "opus-5-5" 不会误伤 claude-sonnet-5 / claude-opus-5（它们仍支持强制）。
+_NO_FORCED_TOOL_FAMILIES = ("fable", "mythos", "sonnet-5-5", "opus-5-5")
 
 # 退回 auto 时补进提示词的一句话：没有强制约束，就得明着让模型交卷到工具里，
 # 否则它很可能直接写一段散文，白跑一次付费调用。
