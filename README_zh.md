@@ -19,9 +19,21 @@
 
 ## 截图
 
-<!-- TODO(作者): 补两张截图 -->
 ![对话式评审入口](docs/images/hero.png)
 ![评审报告](docs/images/report.png)
+
+## 样例报告
+
+对虚构产品材料的真实引擎运行结果，原样保存、没有手工修改（`examples/reports/`，也可以在应用的 `/samples` 页浏览）。
+standard 档，模型 `claude-sonnet-5-5`，2026-11-04 生成，成本取自应用自己的计费。
+
+| 报告 | 输入 | 成本 | 结果 |
+|---|---|---|---|
+| [Steam 商店页 — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` | $0.34 | 6 位人格中 4 位通过校验；没有触发交叉质询 |
+| [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | $0.23 | 5 位全部通过；没有触发交叉质询 |
+| [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | $0.35 | 6 位人格中 3 位通过校验；没有触发交叉质询 |
+
+部分人格没通过校验、交叉质询没触发的原因，见 [docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md](docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md) 和下方「已知局限」。
 
 ## 架构
 
@@ -102,6 +114,8 @@ python -m pytest tests/ -q
 - 结果继承底层模型的偏见，不同服务商差异明显；
 - 成本随面板人数增长；
 - 目前不提供平台 Key，只支持自带 Key（BYOK）；
+- 不装可选的语义模型（`sentence-transformers`）时，`src/runner/similarity.py` 退回字符串相似度，换个说法的同一问题合并不到一起，交叉质询往往触发不了——三份样例都没有触发；
+- 部分人格输出会被校验拦下（把改写标成 direct、或提交残缺），一轮修复能救回不少，但不是全部；
 - 只有一轮反驳，θ 未经校准。
 
 ## 开发说明
@@ -110,4 +124,4 @@ AudienceLens 由 Ling Yuanyi 借助 AI 辅助开发（Claude Code）完成；设
 
 ## 许可与作者
 
-[MIT](LICENSE) © 2025 Ling Yuanyi · GitHub [@jedi-ling](https://github.com/jedi-ling)
+[MIT](LICENSE) © 2026 Ling Yuanyi · GitHub [@jedi-ling](https://github.com/jedi-ling)

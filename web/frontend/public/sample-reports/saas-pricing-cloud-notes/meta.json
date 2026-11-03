@@ -1,0 +1,13 @@
+{
+  "input_file": "test-materials/04_定价页_云笔记订阅.md",
+  "task_type": "pricing_page_review",
+  "persona_pack": "general-consumer",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-04",
+  "cost_usd": 0.2297,
+  "tokens_in": 50130,
+  "tokens_out": 19951,
+  "app_commit": "de65474",
+  "retries": 2
+}

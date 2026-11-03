@@ -1,9 +1,9 @@
 # Screenshots
 
-Placeholders referenced by the top-level README. Add:
+Used by the top-level README:
 
-- `hero.png` — the conversational review entry page
-- `report.png` — a completed review report
+- `hero.png` — the homepage (conversational review entry)
+- `report.png` — a stored sample report (`examples/reports/steam-page-abyss-echo/report.html`)
 
-Capture them from a local instance with a real review (not simulation mode), and do not include
-API keys, personal data or the address of any deployed instance in the images.
+Captured 2026-11-04 at 1440×900 with headless Chrome from a local instance in single-user mode,
+with no API key loaded into the web process. The app ships a single (dark) theme.

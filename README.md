@@ -23,9 +23,26 @@ English · [中文](README_zh.md)
 
 ## Screenshots
 
-<!-- TODO(author): capture and add these two images. -->
 ![Conversational review entry](docs/images/hero.png)
 ![Review report](docs/images/report.png)
+
+---
+
+## Sample reports
+
+Real engine runs on fictional product material, saved exactly as generated — no manual edits
+(`examples/reports/`; also browsable on the app's `/samples` page). Standard depth, model
+`claude-sonnet-5-5`, generated 2026-11-04; cost is the app's own accounting.
+
+| Report | Input | Cost | Outcome |
+|---|---|---|---|
+| [Steam store page — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` (`steam_page_review`, `game-core`) | $0.34 | 4 of 6 personas passed validation; no cross-examination (no qualifying dispute) |
+| [SaaS pricing page — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` (`pricing_page_review`, `general-consumer`) | $0.23 | 5 of 5 personas passed; no cross-examination (no qualifying dispute) |
+| [Startup pitch — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` (`pitch_review`, `startup-panel`) | $0.35 | 3 of 6 personas passed validation; no cross-examination |
+
+Why some personas fail and why cross-examination did not trigger is written up in
+[docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md](docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md)
+and the [Known limitations](#known-limitations) below.
 
 ---
 
@@ -67,7 +84,7 @@ flowchart LR
 The same engine runs behind the CLI (`audiencelens`), the Python API (`runner.cli.run_panel`), the MCP server (`audiencelens-mcp`) and the web app. Deeper write-ups: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the methodology paper [docs/paper/arxiv-paper.md](docs/paper/arxiv-paper.md).
 
 **By the numbers** (each one is recomputed from the repo by `tests/test_public_claims.py`, which fails if this file drifts):
-72 behavior-driven personas across 11 packs, 14 task types; the backend has 121 route handlers, 28 service modules and 7 emitted WebSocket event types; the frontend has 24 page components and 16 components.
+72 behavior-driven personas across 11 packs, 14 task types; the backend has 121 route handlers, 28 service modules and 7 emitted WebSocket event types; the frontend has 25 page components and 16 components.
 
 ---
 
@@ -182,7 +199,7 @@ python -m pytest tests/ -q                          # core engine
 (cd web/admin && npx vitest run)                    # admin panel unit tests
 ```
 
-Measured 2026-11-04: core 1831 passed / 9 skipped · backend 944 passed / 1 skipped · admin vitest 35 passed.
+Measured 2026-11-04: core 1853 passed / 9 skipped · backend 944 passed / 1 skipped · admin vitest 35 passed.
 
 CI ([ci.yml](.github/workflows/ci.yml)) runs all of the above on every push and pull request, plus a PostgreSQL 16 backend job, a skill-mirror consistency check and a YAML parse check.
 
@@ -209,6 +226,8 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 - **LLM bias.** Outputs inherit the underlying model's biases. Stereotype checks reduce but do not remove this, and different providers give materially different reviews.
 - **Cost scales with panel size.** Each persona is a separate model call, and `full` mode adds one rebuttal call per involved persona.
 - **No platform key is offered.** Hosted use is bring-your-own-key only; the plan / quota / CDK machinery exists in code but is not funded.
+- **Cross-examination often does not trigger without the optional semantic model.** Without `sentence-transformers`, `src/runner/similarity.py` falls back to string similarity, so differently worded versions of the same issue are not merged and no point qualifies as a dispute — none of the three sample reports ran it.
+- **Some persona outputs fail validation.** The validator rejects paraphrases labelled `direct` and malformed submissions; one repair turn recovers many of them, not all (see the sample outcomes above).
 - **Single debate round.** Further rounds, early termination and consensus tracking are designed but not implemented; θ is uncalibrated.
 
 ---
@@ -219,7 +238,7 @@ AudienceLens was built by Ling Yuanyi with AI-assisted development (Claude Code)
 
 ## License
 
-[MIT](LICENSE) © 2025 Ling Yuanyi
+[MIT](LICENSE) © 2026 Ling Yuanyi
 
 ## Author
 

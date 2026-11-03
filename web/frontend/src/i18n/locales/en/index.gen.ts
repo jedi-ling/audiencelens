@@ -64,6 +64,7 @@ import page_qq_callback from './page.qq_callback'
 import page_register from './page.register'
 import page_report from './page.report'
 import page_reset from './page.reset'
+import page_samples from './page.samples'
 import page_settings from './page.settings'
 import page_shared from './page.shared'
 import page_skills from './page.skills'
@@ -132,6 +133,7 @@ const TABLES: Record<string, Record<string, string>> = {
   'page.register': page_register,
   'page.report': page_report,
   'page.reset': page_reset,
+  'page.samples': page_samples,
   'page.settings': page_settings,
   'page.shared': page_shared,
   'page.skills': page_skills,

@@ -1371,6 +1371,18 @@ export type MessageKey =
   | 'page.reset.password.placeholder'
   | 'page.reset.submit.cta'
   | 'page.reset.submit.error'
+  | 'page.samples.cost.label'
+  | 'page.samples.date.label'
+  | 'page.samples.header.desc'
+  | 'page.samples.header.title'
+  | 'page.samples.load.error'
+  | 'page.samples.load.pending'
+  | 'page.samples.meta.title'
+  | 'page.samples.model.label'
+  | 'page.samples.no_cross_exam.hint'
+  | 'page.samples.notice.desc'
+  | 'page.samples.open.cta'
+  | 'page.samples.personas.label'
   | 'page.settings.account_card.desc'
   | 'page.settings.account_card.title'
   | 'page.settings.api_base.hint'
@@ -2878,6 +2890,18 @@ export type PlainMessageKey =
   | 'page.reset.password.placeholder'
   | 'page.reset.submit.cta'
   | 'page.reset.submit.error'
+  | 'page.samples.cost.label'
+  | 'page.samples.date.label'
+  | 'page.samples.header.desc'
+  | 'page.samples.header.title'
+  | 'page.samples.load.error'
+  | 'page.samples.load.pending'
+  | 'page.samples.meta.title'
+  | 'page.samples.model.label'
+  | 'page.samples.no_cross_exam.hint'
+  | 'page.samples.notice.desc'
+  | 'page.samples.open.cta'
+  | 'page.samples.personas.label'
   | 'page.settings.account_card.title'
   | 'page.settings.api_base.hint'
   | 'page.settings.api_base.label'
@@ -4615,6 +4639,18 @@ export interface MessageVars {
   'page.reset.password.placeholder': Record<string, never>
   'page.reset.submit.cta': Record<string, never>
   'page.reset.submit.error': Record<string, never>
+  'page.samples.cost.label': Record<string, never>
+  'page.samples.date.label': Record<string, never>
+  'page.samples.header.desc': Record<string, never>
+  'page.samples.header.title': Record<string, never>
+  'page.samples.load.error': Record<string, never>
+  'page.samples.load.pending': Record<string, never>
+  'page.samples.meta.title': Record<string, never>
+  'page.samples.model.label': Record<string, never>
+  'page.samples.no_cross_exam.hint': Record<string, never>
+  'page.samples.notice.desc': Record<string, never>
+  'page.samples.open.cta': Record<string, never>
+  'page.samples.personas.label': Record<string, never>
   'page.settings.account_card.desc': { email: string | number }
   'page.settings.account_card.title': Record<string, never>
   'page.settings.api_base.hint': Record<string, never>
@@ -5067,6 +5103,7 @@ export const RESOURCE_FILES = [
   'page.register.ts',
   'page.report.ts',
   'page.reset.ts',
+  'page.samples.ts',
   'page.settings.ts',
   'page.shared.ts',
   'page.skills.ts',

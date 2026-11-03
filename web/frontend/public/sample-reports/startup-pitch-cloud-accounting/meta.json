@@ -1,0 +1,13 @@
+{
+  "input_file": "test-materials/02_创业BP_云会计SaaS.pdf",
+  "task_type": "pitch_review",
+  "persona_pack": "startup-panel",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-04",
+  "cost_usd": 0.3508,
+  "tokens_in": 79684,
+  "tokens_out": 22380,
+  "app_commit": "de65474",
+  "retries": 5
+}

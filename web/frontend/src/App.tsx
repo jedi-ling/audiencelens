@@ -24,6 +24,7 @@ const LedgerPage = lazy(() => import('@/pages/LedgerPage'))
 const ReviewHistoryPage = lazy(() => import('@/pages/ReviewHistoryPage'))
 const SharedReportPage = lazy(() => import('@/pages/SharedReportPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const SamplesPage = lazy(() => import('@/pages/SamplesPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 
 /** Suspense 不捕获加载错误——发版后旧 chunk 404 会直接白屏，必须有边界兜底。 */
@@ -88,6 +89,7 @@ export default function App() {
             {/* 配额提示里的"升级套餐"此前无处可去（全站没有任何定价路由）。
                 /pricing 是外部最常被手输/被链接的写法，一并指到同一页，
                 否则它会被 * 兜底静默送回首页——用户以为自己点错了。 */}
+            <Route path="/samples" element={<SamplesPage />} />
             <Route path="/plans" element={<PlansPage />} />
             <Route path="/pricing" element={<PlansPage />} />
             <Route path="/login" element={<LoginPage />} />
