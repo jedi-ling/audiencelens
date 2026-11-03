@@ -37,12 +37,24 @@ def _headers(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _anonymous_review(db, title="匿名跑的评审"):
-    """直接建一条归属匿名桶的评审——等价于"用户没登录时跑的那次"。"""
+def _guest_id(client):
+    """这个 client（= 这台浏览器）的游客身份。第一次请求时铸造并写进 cookie。"""
+    me = client.get("/api/auth/me").json()
+    assert me["is_guest"] is True, me
+    return me["user_id"]
+
+
+def _anonymous_review(client, db, title="匿名跑的评审"):
+    """直接建一条归属**这台浏览器游客身份**的评审——等价于"用户没登录时跑的那次"。
+
+    以前这里建的是 user_id="anonymous" 的行：那时所有未登录访客共用一个桶。
+    现在每个访客有自己的游客身份（见 tests/test_guest_isolation.py），
+    认领的来源是当前游客 cookie，而不是共享桶。
+    """
     from app.models import Review
 
     review = Review(
-        user_id="anonymous",
+        user_id=_guest_id(client),
         task_type="concept_review",
         target_title=title,
         artifact_bundle={"title": title, "materials": [{"type": "text", "text": "x"}]},
@@ -59,7 +71,7 @@ class TestClaimFixesTheDisappearingReport:
     def test_login_without_claim_makes_review_404(self, client, db, monkeypatch):
         """先把 bug 本身钉住：不认领，登录后这条评审就是打不开的。"""
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         token = _register(client, "ghost@example.com")
 
         assert client.get(f"/api/reviews/{review_id}", headers=_headers(token)).status_code == 404
@@ -67,7 +79,7 @@ class TestClaimFixesTheDisappearingReport:
 
     def test_claim_then_review_and_report_open(self, client, db, monkeypatch):
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         token = _register(client, "claimer@example.com")
 
         r = client.post(
@@ -89,7 +101,7 @@ class TestClaimFixesTheDisappearingReport:
     def test_claimed_review_shows_up_in_history(self, client, db, monkeypatch):
         """"报告会保存在你的历史记录里"这句文案要真的成立。"""
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db, title="历史里应该看得到")
+        review_id = _anonymous_review(client, db, title="历史里应该看得到")
         token = _register(client, "history@example.com")
 
         client.post(
@@ -105,7 +117,7 @@ class TestClaimFixesTheDisappearingReport:
     def test_claimed_report_is_no_longer_gated(self, client, db, monkeypatch):
         """认领的意义是拿到完整报告，不是拿到一份仍被裁剪的体验版。"""
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         token = _register(client, "ungated@example.com")
 
         client.post(
@@ -124,7 +136,7 @@ class TestClaimSecurityBoundary:
         from app.models import Review
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         owner = _register(client, "owner@example.com")
         thief = _register(client, "thief@example.com")
 
@@ -163,17 +175,19 @@ class TestClaimSecurityBoundary:
         assert r.json()["rejected"] == ["11111111-2222-3333-4444-555555555555"]
 
     def test_anonymous_caller_is_refused(self, client, db, monkeypatch):
-        """匿名不是"某个人"而是所有人共用的桶，让它认领没有任何意义，
-        还会把评审改挂成它自己。与导出/删号同一道闸（_require_own_identity）。"""
+        """未登录的调用方现在是它自己的游客：拿自己的 cookie 认领到自己身上是空操作，
+        不会搬动任何东西（以前共享匿名桶会被直接拒绝，见 _require_own_identity）。"""
         from app.models import Review
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
+        owner = _guest_id(client)
 
         r = client.post("/api/auth/me/claim-reviews", json={"review_ids": [review_id]})
-        assert r.status_code == 400
+        assert r.status_code == 200
+        assert r.json()["claimed"] == []
         db.expire_all()
-        assert db.get(Review, review_id).user_id == "anonymous"
+        assert db.get(Review, review_id).user_id == owner
 
     def test_batch_size_is_capped(self, client, monkeypatch):
         """一次请求能塞进去的 id 数要有上限，别让它变成批量 uuid 探测器。"""
@@ -209,7 +223,7 @@ class TestClaimSecurityBoundary:
 
     def test_duplicate_ids_counted_once(self, client, db, monkeypatch):
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         token = _register(client, "dupe@example.com")
 
         r = client.post(
@@ -229,11 +243,11 @@ class TestClaimMovesRelatedRecords:
         from app.models import Judgment
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         db.add(
             Judgment(
                 review_id=review_id,
-                user_id="anonymous",
+                user_id=_guest_id(client),
                 claim="新手引导太长会劝退",
                 severity="high",
             )
@@ -254,11 +268,11 @@ class TestClaimMovesRelatedRecords:
         from app.models import ReviewFeedback
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         db.add(
             ReviewFeedback(
                 review_id=review_id,
-                user_id="anonymous",
+                user_id=_guest_id(client),
                 useful=True,
                 decision_changed=True,
                 fixes_suggested=3,
@@ -284,8 +298,9 @@ class TestClaimMovesRelatedRecords:
         from app.models import UsageRecord
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
-        db.add(UsageRecord(user_id="anonymous", review_id=review_id, kind="review", persona_count=6))
+        review_id = _anonymous_review(client, db)
+        guest = _guest_id(client)
+        db.add(UsageRecord(user_id=guest, review_id=review_id, kind="review", persona_count=6))
         db.commit()
 
         token = _register(client, "usage@example.com")
@@ -297,7 +312,7 @@ class TestClaimMovesRelatedRecords:
 
         db.expire_all()
         row = db.query(UsageRecord).filter(UsageRecord.review_id == review_id).one()
-        assert row.user_id == "anonymous"
+        assert row.user_id == guest
         db.delete(row)
         db.commit()
 
@@ -313,7 +328,7 @@ class TestConcurrentClaim:
         from app.models import Review
 
         _enable_auth(monkeypatch)
-        review_id = _anonymous_review(db)
+        review_id = _anonymous_review(client, db)
         token_a = _register(client, "race-a@example.com")
         token_b = _register(client, "race-b@example.com")
 

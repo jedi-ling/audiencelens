@@ -1,5 +1,5 @@
 import type { Review, ReviewListItem, Report, Persona, PersonaPack, Preset, WSMessage, Example, ReviewModeConfig, TaskTypeDetail, ReviewResultData, SkillType, SkillDetail, EvaluationScorecard, EthicsReport } from './mock-data'
-import { getToken, ApiError } from './apiClient'
+import { getToken, ApiError, ensureGuestSession } from './apiClient'
 import type { ApiErrorCode } from './types'
 import { t } from '@/i18n/runtime'
 import { getHtmlLang, getLocale } from '@/i18n/locale'
@@ -11,10 +11,12 @@ const tPlain = t as unknown as (key: PlainMessageKey) => string
 
 /** v1 链路统一出口：所有请求都带上登录态——
  *  后端按身份归属/裁剪数据，漏带 token 的调用会拿到匿名视角（见 fetchReport 的教训）。 */
-function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken()
   const headers = new Headers(init.headers)
   if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+  // 未登录时先等游客 cookie 就位，理由见 apiClient.ensureGuestSession
+  if (!token) await ensureGuestSession()
   return fetch(input, { ...init, headers })
 }
 

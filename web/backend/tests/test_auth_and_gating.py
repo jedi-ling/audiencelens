@@ -70,11 +70,13 @@ class TestProgressiveAuth:
         assert r.status_code == 422  # pydantic min_length 校验
 
     def test_anonymous_review_creation_still_works_when_auth_enabled(self, client, monkeypatch):
-        """核心承诺：打开认证开关不等于关闭匿名体验——两者互不冲突。"""
+        """核心承诺：打开认证开关不等于关闭免登录体验——两者互不冲突。
+        未登录访客拿到的是**自己的**游客身份，而不是全站共享的 anonymous。"""
         _enable_auth(monkeypatch)
         r = client.get("/api/auth/me")
         assert r.status_code == 200
-        assert r.json()["is_anonymous"] is True
+        assert r.json()["is_guest"] is True
+        assert r.json()["user_id"] != settings.anonymous_user_id
 
     def test_logged_in_me_reflects_real_identity(self, client, monkeypatch):
         _enable_auth(monkeypatch)
@@ -105,8 +107,12 @@ class TestReportGatingLegacyEndpoint:
         return review
 
     def test_anonymous_sees_gated_report(self, client, db, monkeypatch):
+        # 多租户形态下 anonymous 行不属于任何访客：直接 404，连体验版都不给
         _enable_auth(monkeypatch)
         review = self._make_review(db)
+        assert client.get(f"/api/reviews/{review.id}/report").status_code == 404
+        # 裁剪逻辑本身照旧：单机形态下请求方就是 anonymous，看到的是体验版
+        monkeypatch.setattr(settings, "auth_enabled", False)
         r = client.get(f"/api/reviews/{review.id}/report")
         assert r.status_code == 200
         report = r.json()["report_json"]
@@ -166,10 +172,11 @@ class TestReportGatingLegacyEndpoint:
         关认证（单机形态，页面没有登录入口）不能指一条走不通的路。"""
         review = self._make_review(db)
 
+        # 开认证时未登录访客是自己的游客身份，anonymous 行对他是 404——
+        # 那句"登录后可查看"已经没有匿名读者能走到了。
         _enable_auth(monkeypatch)
         r = client.get(f"/api/reviews/{review.id}/result")
-        assert r.status_code == 200
-        assert "登录后可查看" in r.json()["html_error"]
+        assert r.status_code == 404
 
         monkeypatch.setattr(settings, "auth_enabled", False)
         r = client.get(f"/api/reviews/{review.id}/result")
@@ -208,6 +215,8 @@ class TestReportGatingV2Endpoint:
     def test_anonymous_gated(self, client, db, monkeypatch):
         _enable_auth(monkeypatch)
         review = self._make_review(db)
+        assert client.get(f"/api/v2/reviews/{review.id}").status_code == 404
+        monkeypatch.setattr(settings, "auth_enabled", False)
         r = client.get(f"/api/v2/reviews/{review.id}")
         assert r.status_code == 200
         assert r.json()["report"]["is_gated"] is True

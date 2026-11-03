@@ -72,7 +72,12 @@ class TestGuestMintingOnFirstReview:
         r = client.post("/api/v2/reviews", json=_payload())
         assert r.status_code == 202, r.text
         body = r.json()
-        assert body["guest_token"], "第一次匿名发起评审必须铸造独立身份并把令牌带回去"
+        # 身份在这次请求的依赖解析里就铸好了，凭证走 HttpOnly cookie 而不是响应体：
+        # guest_token 只在"仍然落到共享匿名桶、需要现场铸造"时才会出现，现在不会了。
+        assert settings.guest_cookie_name in r.headers.get("set-cookie", ""), (
+            "第一次匿名发起评审必须铸造独立身份并把凭证带回去"
+        )
+        assert body.get("guest_token") is None
 
         review = db.query(Review).filter(Review.id == body["review_id"]).first()
         assert review.user_id != settings.anonymous_user_id, "不能继续记进共享匿名桶"
@@ -87,12 +92,11 @@ class TestGuestMintingOnFirstReview:
         self, client, db, _server_key, _no_op_enqueue
     ):
         first = client.post("/api/v2/reviews", json=_payload()).json()
-        token = first["guest_token"]
 
-        second = client.post(
-            "/api/v2/reviews", headers={"Authorization": f"Bearer {token}"}, json=_payload()
-        ).json()
-        assert second.get("guest_token") is None, "已经持有游客令牌就不该再铸造新身份"
+        # 同一个 client = 同一份 cookie jar = 同一台浏览器
+        second_resp = client.post("/api/v2/reviews", json=_payload())
+        second = second_resp.json()
+        assert "set-cookie" not in second_resp.headers, "已经持有游客 cookie 就不该再铸造新身份"
 
         r1 = db.query(Review).filter(Review.id == first["review_id"]).first()
         r2 = db.query(Review).filter(Review.id == second["review_id"]).first()
@@ -101,14 +105,11 @@ class TestGuestMintingOnFirstReview:
 
 class TestGuestFreeReviewGate:
     def test_exhausts_after_three_then_blocked(self, client, db, _server_key, _no_op_enqueue):
-        token = None
         for _ in range(guest_service.GUEST_FREE_REVIEWS):
-            headers = {"Authorization": f"Bearer {token}"} if token else {}
-            r = client.post("/api/v2/reviews", headers=headers, json=_payload())
+            r = client.post("/api/v2/reviews", json=_payload())
             assert r.status_code == 202, r.text
-            token = token or r.json()["guest_token"]
 
-        r = client.post("/api/v2/reviews", headers={"Authorization": f"Bearer {token}"}, json=_payload())
+        r = client.post("/api/v2/reviews", json=_payload())
         assert r.status_code == 402
         assert r.json()["error"]["code"] == "quota_exceeded"
         assert "邮箱" in r.json()["error"]["message"]

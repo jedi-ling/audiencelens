@@ -203,8 +203,11 @@ class TestLoginWallNotBypassable:
         """
         rid = _make_review(db, "anonymous")
 
+        # 开认证时不带 token 的访客是自己的游客：共享桶里的评审对他不存在（404），
+        # 更谈不上给它建链接。游客给**自己的**评审建链接不构成绕过——
+        # 游客读自己的报告本来就是完整版（is_anonymous=False）。
         r = client.post(f"/api/v2/reviews/{rid}/share")  # 不带任何 token
-        assert r.status_code == 401, r.text
+        assert r.status_code == 404, r.text
         assert db.get(Review, rid).share_token is None
 
     def test_shared_report_is_not_gated(self, client, db):

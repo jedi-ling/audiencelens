@@ -202,7 +202,7 @@ def sessions_revoked_at(db: Session, user_id: str) -> Optional[int]:
     return math.ceil(created_at.timestamp())
 
 
-def issue_session_token(db: Session, user_id: str) -> str:
+def issue_session_token(db: Session, user_id: str, ttl_seconds: Optional[int] = None) -> str:
     """签发一把**不会被既有撤销声明误杀**的会话令牌。
 
     所有签发会话令牌的地方都必须走这里，不要直接调 create_token。
@@ -220,7 +220,8 @@ def issue_session_token(db: Session, user_id: str) -> str:
     revoked_at = sessions_revoked_at(db, user_id)
     now = int(time.time())
     issued_at = max(now, revoked_at) if revoked_at is not None else now
-    return create_token(user_id, settings.jwt_secret, settings.jwt_ttl_seconds, issued_at=issued_at)
+    ttl = ttl_seconds if ttl_seconds is not None else settings.jwt_ttl_seconds
+    return create_token(user_id, settings.jwt_secret, ttl, issued_at=issued_at)
 
 
 def revoke_user_sessions(db: Session, user_id: str) -> None:
@@ -304,6 +305,69 @@ async def current_identity(
     )
 
 
+def guest_cookie_identity(request: Request, db: Session) -> Optional[Identity]:
+    """从游客 cookie 解析出游客身份；没有 / 无效 / 已转正 / 已撤销一律 None。
+
+    cookie 里是一把签名的会话令牌（sub = 游客 User.id，uuid4），不是裸 id：
+    裸 id 可以被猜测之外还没法撤回，而令牌复用了 bind_email 那套
+    revoke_user_sessions——游客转正的瞬间这把 cookie 就失效。
+    只认 is_guest=True 的账号：cookie 永远不能充当正式账号的登录态，
+    正式账号只走 Authorization 头。
+    """
+    raw = request.cookies.get(settings.guest_cookie_name)
+    if not raw:
+        return None
+    try:
+        payload = decode_token(raw, settings.jwt_secret)
+    except ValueError:
+        return None
+    user = db.get(User, payload.get("sub"))
+    if not user or not user.is_active or not user.is_guest:
+        return None
+    revoked_at = sessions_revoked_at(db, user.id)
+    if revoked_at is not None and int(payload.get("iat") or 0) < revoked_at:
+        return None
+    return Identity(
+        user_id=user.id,
+        email=user.email,
+        plan=user.plan,
+        is_anonymous=False,
+        display_name=user.display_name,
+        is_guest=True,
+    )
+
+
+def resolve_guest_identity(request: Request, db: Session) -> Identity:
+    """未登录访客的身份：有游客 cookie 用它，没有就当场铸造一个。
+
+    这是"共享匿名桶"问题的根因修复。以前没有令牌的请求一律落到
+    settings.anonymous_user_id，游客身份只在「首次发起评审 / 兑换 CDK」时
+    才铸造——在那之前访客建的对话、项目、上传、跑的 v1 评审全部写进同一个
+    anonymous 桶，/api/v2/conversations、/api/v2/projects 按 user_id 一列，
+    就是全站所有未登录访客的数据。
+
+    新令牌挂在 request.state 上，由 main.py 的中间件写成 Set-Cookie：
+    依赖里拿不到最终的 Response 对象（路由可能自己返回 JSONResponse）。
+    同一请求里 optional_identity 会被多处依赖，FastAPI 按请求缓存依赖结果，
+    所以一个请求最多铸造一次。
+    """
+    from app.services import guest_service
+
+    found = guest_cookie_identity(request, db)
+    if found is not None:
+        return found
+    guest, token = guest_service.mint_cookie_guest(db, request)
+    request.state.guest_cookie_token = token
+    return Identity(
+        user_id=guest.id,
+        email=guest.email,
+        plan=guest.plan,
+        is_anonymous=False,
+        display_name=guest.display_name,
+        is_guest=True,
+    )
+
+
 async def optional_identity(
     request: Request,
     authorization: Optional[str] = Header(default=None),
@@ -312,15 +376,19 @@ async def optional_identity(
     """不强制登录的接口用（列人格、任务类型、发起体验评审等）。
 
     两种"没有身份"必须区别对待，这是本函数存在的全部要点：
-      · 压根没带令牌 → 匿名。"不登录也能试用"这条产品线全靠它，不能动。
-      · 带了令牌但它无效 → 401 session_expired，绝不悄悄降级成匿名。
+      · 压根没带令牌 → 认证开启时是**本访客自己的**游客身份（cookie，没有就铸造）；
+        认证关闭（单机开源形态）时仍是 anonymous——那台机器就一个使用者。
+        "不登录也能试用"这条产品线全靠它，不能动。
+      · 带了令牌但它无效 → 401 session_expired，绝不悄悄降级。
         以前这里对所有 Unauthorized 一律 except 掉回落匿名，后果不是"少了个提示"：
         token 一过期，用户新发起的评审归属直接落到共享匿名桶（认领不回来的那种
         错主人）、报告被匿名门禁裁剪、/history 空白、/keys 显示没配 key——
         每一项单看都像"数据没了"，而后端从头到尾返回 200。
     """
     if bearer_token(authorization) is None:
-        return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+        if not settings.auth_enabled:
+            return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+        return resolve_guest_identity(request, db)
     return await current_identity(request, authorization, db)
 
 
@@ -338,13 +406,20 @@ async def probe_identity(
     失败在这里不是被吞掉，而是被如实翻译成 session_expired=true 带回前端。
     """
     if bearer_token(authorization) is None:
-        return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+        if not settings.auth_enabled:
+            return Identity(user_id=settings.anonymous_user_id, is_anonymous=True)
+        return resolve_guest_identity(request, db)
     try:
         return await current_identity(request, authorization, db)
     except Unauthorized:
-        return Identity(
-            user_id=settings.anonymous_user_id, is_anonymous=True, session_expired=True
-        )
+        if not settings.auth_enabled:
+            return Identity(
+                user_id=settings.anonymous_user_id, is_anonymous=True, session_expired=True
+            )
+        # 令牌烂了也不回落共享桶：如实标 session_expired，身份落到本访客的游客上
+        guest = resolve_guest_identity(request, db)
+        guest.session_expired = True
+        return guest
 
 
 def is_shared_anonymous(identity: Identity) -> bool:
@@ -414,7 +489,10 @@ def rate_limit(scope: str = "default", limit: int = None, window: float = 60.0):
         if not admin_settings_service.get(db, "ratelimit_enabled", settings.ratelimit_enabled):
             return
         cap = resolve_rate_limit(db, scope, limit)
-        key = f"{scope}:{_client_key(request, identity.user_id)}"
+        # 游客按来源分桶而不是按 user_id：游客身份是免费铸造的，按 id 分桶的话
+        # 清一次 cookie 就是一份全新的限额（与以前匿名按 IP 计的口径一致）。
+        bucket_id = None if identity.is_guest else identity.user_id
+        key = f"{scope}:{_client_key(request, bucket_id)}"
         if not get_limiter().allow(key, cap, window):
             raise RateLimited(
                 f"「{scope}」操作过于频繁（限 {cap} 次 / {int(window)}s），请稍后再试。"

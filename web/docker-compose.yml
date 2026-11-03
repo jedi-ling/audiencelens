@@ -83,6 +83,11 @@ services:
       # 危险默认值的逃生舱（只在确实要这么跑时才设 true）
       - AL_ALLOW_SHARED_ANONYMOUS=${AL_ALLOW_SHARED_ANONYMOUS:-false}
       - AL_ALLOW_CONSOLE_MAIL=${AL_ALLOW_CONSOLE_MAIL:-false}
+      # 游客身份 cookie（见 config.py「游客身份 cookie」一节）
+      - AL_GUEST_COOKIE_NAME=${AL_GUEST_COOKIE_NAME:-al_guest}
+      - AL_GUEST_COOKIE_SECURE=${AL_GUEST_COOKIE_SECURE:-true}
+      - AL_GUEST_COOKIE_TTL_SECONDS=${AL_GUEST_COOKIE_TTL_SECONDS:-2592000}
+      - AL_GUEST_IDENTITY_PER_HOUR=${AL_GUEST_IDENTITY_PER_HOUR:-30}
       # ---------------------------------------------------------------
       # 下面这一整段是补齐上面那条「新增任何 AL_* 配置项时必须同步加到这里」
       # 长期没被执行的欠账：config.py 一共读 52 个变量，这里曾经只列出 35 个。

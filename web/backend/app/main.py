@@ -81,7 +81,40 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class GuestCookieMiddleware(BaseHTTPMiddleware):
+    """把依赖里铸造 / 作废的游客身份写成 Set-Cookie（见 deps.resolve_guest_identity）。
+
+    放在中间件而不是依赖里：依赖只能改 FastAPI 注入的临时 Response，
+    路由自己返回 JSONResponse、或抛错走 error handler 时那些头会丢——
+    而铸造已经落库了，cookie 丢了就等于这个访客下一个请求又被铸成另一个人。
+    """
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        token = getattr(request.state, "guest_cookie_token", None)
+        if token:
+            response.set_cookie(
+                settings.guest_cookie_name,
+                token,
+                max_age=settings.guest_cookie_ttl_seconds,
+                httponly=True,
+                secure=settings.guest_cookie_secure,
+                samesite="lax",
+                path="/",
+            )
+        elif getattr(request.state, "clear_guest_cookie", False):
+            response.delete_cookie(
+                settings.guest_cookie_name,
+                path="/",
+                httponly=True,
+                secure=settings.guest_cookie_secure,
+                samesite="lax",
+            )
+        return response
+
+
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(GuestCookieMiddleware)
 app.middleware("http")(request_context_middleware)
 
 app.add_middleware(

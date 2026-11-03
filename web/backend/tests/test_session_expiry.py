@@ -61,13 +61,15 @@ class TestExpiredTokenIsDistinguishableFromAnonymous:
         r = client.get("/api/auth/me")
         assert r.status_code == 200
         body = r.json()
-        assert body["is_anonymous"] is True
+        # 未登录访客是**自己的**游客身份，不是共享的 anonymous
+        # （见 tests/test_guest_isolation.py）
+        assert body["is_guest"] is True
+        assert body["user_id"] != settings.anonymous_user_id
         assert body["session_expired"] is False  # 从来没带过令牌，谈不上"过期"
 
-        # 匿名照样能打公开接口。注意不能用 /api/usage 当这个探测口：
-        # 用量是"属于你自己的数据"，多租户下未登录访客共用匿名桶，会 401
-        # （spec 3.6，见 test_shared_anonymous_isolation.py）
+        # 照样能打公开接口，也能读自己的用量（游客是隔离身份）
         assert client.get("/api/plans").status_code == 200
+        assert client.get("/api/usage").status_code == 200
 
     def test_expired_token_is_reported_not_silently_downgraded(self, client, monkeypatch):
         expired = create_token("whoever", settings.jwt_secret, -1)
@@ -76,7 +78,9 @@ class TestExpiredTokenIsDistinguishableFromAnonymous:
         me = client.get("/api/auth/me", headers=_auth(expired))
         assert me.status_code == 200
         body = me.json()
-        assert body["is_anonymous"] is True
+        # 令牌烂了也不回落共享桶：身份是这个访客的游客，但必须如实标出来
+        assert body["user_id"] != settings.anonymous_user_id
+        assert body["is_guest"] is True
         assert body["session_expired"] is True  # 与"从来没登录"的区别就在这个字段
 
         # 其余接口一律 401，绝不当成匿名放行

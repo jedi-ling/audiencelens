@@ -98,40 +98,44 @@ class TestGuestMintingIsRateLimited:
         monkeypatch.setattr(settings, "ratelimit_enabled", True)
 
     def test_same_client_can_only_mint_a_few_per_day(
-        self, client, db, _server_key, _no_op_enqueue
+        self, db, _server_key, _no_op_enqueue
     ):
-        """每次不带令牌的请求都铸一个新身份、各送 3 次额度，
-        不限速的话 "3 次" 这个上限对同一个人毫无约束力。"""
-        before = _guest_count(db)
-        for i in range(guest_service.GUEST_MINT_PER_DAY):
-            r = client.post("/api/v2/reviews", json=_payload())
-            assert r.status_code == 202, f"第 {i + 1} 次就被挡了：{r.text}"
+        """每个新访客都铸一个新身份、各送 3 次额度，不限速的话 "3 次" 这个上限
+        对同一个人毫无约束力（清 cookie 就是一个新访客）。
 
-        blocked = client.post("/api/v2/reviews", json=_payload())
-        assert blocked.status_code == 429, (
-            f"同一来源铸了 {guest_service.GUEST_MINT_PER_DAY} 个身份后还能继续铸："
+        现在身份在第一次请求时就铸造（cookie），所以这道闸管的是**试用额度**：
+        同一来源一天内前 3 个新访客各送 3 次，第 4 个照样拿到独立身份
+        （不能回落共享桶），但 credits=0——平台垫付的评审直接 402，
+        提示走注册 / CDK / 自带 key。"""
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
+        for i in range(guest_service.GUEST_MINT_PER_DAY):
+            with TestClient(app) as visitor:
+                r = visitor.post("/api/v2/reviews", json=_payload())
+            assert r.status_code == 202, f"第 {i + 1} 个访客就被挡了：{r.text}"
+
+        with TestClient(app) as visitor:
+            blocked = visitor.post("/api/v2/reviews", json=_payload())
+            me = visitor.get("/api/auth/me").json()
+        assert blocked.status_code == 402, (
+            f"同一来源铸了 {guest_service.GUEST_MINT_PER_DAY} 个身份后还能继续拿到免费试用："
             f"{blocked.status_code}"
         )
         body = blocked.json()["error"]
-        assert body["code"] == "rate_limited"
-        # 提示必须给出下一步：注册，或者自带 key
-        assert "注册" in body["message"] and "API Key" in body["message"]
-
-        assert _guest_count(db) == before + guest_service.GUEST_MINT_PER_DAY, (
-            "被拒绝的那次仍然铸了一个身份——攻击者照样能刷 users 行和 PBKDF2"
-        )
+        # 提示必须给出下一步：绑定邮箱 / CDK，或者自带 key
+        assert "绑定邮箱" in body["message"] and "API Key" in body["message"]
+        assert me["is_guest"] is True and me["user_id"] != settings.anonymous_user_id
+        assert db.get(User, me["user_id"]).guest_review_credits == 0
 
     def test_holding_a_guest_token_is_not_affected(
         self, client, db, _server_key, _no_op_enqueue
     ):
         """限的是"变出新身份"，不是"已有身份继续用"。
-        已经拿到令牌的游客要能把赠送的 3 次用完。"""
-        first = client.post("/api/v2/reviews", json=_payload())
-        token = first.json()["guest_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
-        for _ in range(guest_service.GUEST_FREE_REVIEWS - 1):
-            assert client.post("/api/v2/reviews", headers=headers, json=_payload()).status_code == 202
+        已经拿到游客 cookie 的访客要能把赠送的 3 次用完。"""
+        for _ in range(guest_service.GUEST_FREE_REVIEWS):
+            assert client.post("/api/v2/reviews", json=_payload()).status_code == 202
 
 
 # ---------------------------------------------------------------------------

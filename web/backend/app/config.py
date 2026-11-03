@@ -317,6 +317,19 @@ class Settings:
         self.allow_shared_anonymous: bool = _bool("AL_ALLOW_SHARED_ANONYMOUS", False)
         self.allow_console_mail: bool = _bool("AL_ALLOW_CONSOLE_MAIL", False)
 
+        # ---- 游客身份 cookie（AL_AUTH_ENABLED=true 时生效）----
+        # 未登录访客第一次请求就铸造独立游客身份，凭证放 HttpOnly cookie。
+        # 以前只有「首次发起评审 / 兑换 CDK」才铸造，之前的对话、项目、上传
+        # 全部落在共享的 anonymous 桶里，任何访客都能列出彼此的数据。
+        # Secure 默认跟着 looks_like_production 走：本机 http 开发时浏览器
+        # 不会回传 Secure cookie，强开等于每个请求都铸一个新游客。
+        self.guest_cookie_name: str = os.environ.get("AL_GUEST_COOKIE_NAME", "al_guest")
+        self.guest_cookie_secure: bool = _bool("AL_GUEST_COOKIE_SECURE", self.looks_like_production)
+        self.guest_cookie_ttl_seconds: int = _int("AL_GUEST_COOKIE_TTL_SECONDS", 30 * 24 * 3600)
+        # 每个来源每小时最多铸造多少个游客身份（只拦"刷身份"，与 3 次试用额度的
+        # 每日闸是两件事）。超过就 429，绝不回落共享匿名桶。
+        self.guest_identity_per_hour: int = _int("AL_GUEST_IDENTITY_PER_HOUR", 30)
+
         # ---- 启动自检 ----
         self.startup_warnings: list = []
         self._validate_startup()

@@ -20,11 +20,10 @@
 """
 
 import re
-import secrets
 import uuid
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -39,7 +38,19 @@ from app.deps import (
     issue_session_token,
     revoke_user_sessions,
 )
-from app.models import User
+from app.models import (
+    CdkRedemption,
+    Conversation,
+    CreditLedger,
+    Job,
+    Judgment,
+    Project,
+    Review,
+    ReviewFeedback,
+    UploadedFile,
+    UsageRecord,
+    User,
+)
 
 GUEST_FREE_REVIEWS = 3
 
@@ -70,20 +81,59 @@ GUEST_MINT_SCOPE = "guest_mint"
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def mint_guest(db: Session) -> Tuple[str, str]:
-    """铸造一个独立的游客身份，赠送体验额度，返回 (user_id, session_token)。"""
+# 游客行的密码字段。不是 pbkdf2 格式，verify_password 对它恒为 False——
+# 与"随机密码的 PBKDF2 摘要"一样不可登录，但不用为每个访客烧 200k 轮哈希：
+# 游客现在是每个新访客第一次请求就铸造（见 mint_cookie_guest），
+# 那份哈希开销会直接变成 /auth/me 上的 CPU 放大器。
+GUEST_PASSWORD_MARKER = "!guest-no-login"
+
+GUEST_IDENTITY_SCOPE = "guest_identity"
+GUEST_IDENTITY_WINDOW_SECONDS = 3600.0
+
+
+def mint_guest(
+    db: Session, credits: int = GUEST_FREE_REVIEWS, ttl_seconds: Optional[int] = None
+) -> Tuple[str, str]:
+    """铸造一个独立的游客身份，赠送体验额度，返回 (user_id, session_token)。
+
+    credits 传 0 表示"身份照发、试用不送"：guest_review_credits=0 与 NULL
+    是两回事——0 仍受游客额度闸约束（用完了），NULL 才是不受约束。
+    """
     guest = User(
         email=f"guest-{uuid.uuid4().hex[:12]}@guest.local",
-        password_hash=hash_password(secrets.token_urlsafe(32)),  # 合成密文，不可登录
+        password_hash=GUEST_PASSWORD_MARKER,
         display_name="游客",
         is_guest=True,
-        guest_review_credits=GUEST_FREE_REVIEWS,
+        guest_review_credits=credits,
     )
     db.add(guest)
     db.commit()
     db.refresh(guest)
-    token = issue_session_token(db, guest.id)
+    token = issue_session_token(db, guest.id, ttl_seconds=ttl_seconds)
     return guest.id, token
+
+
+def mint_cookie_guest(db: Session, request) -> Tuple[User, str]:
+    """给没有任何会话的访客铸造游客身份，返回 (User, 放进 cookie 的令牌)。
+
+    两道闸，语义不同，分开数：
+      · 身份闸（guest_identity_per_hour）——拦"写个循环刷出无数 users 行"。
+        超了就 429：宁可拒绝，也绝不回落到共享 anonymous 桶。
+      · 试用闸（GUEST_MINT_PER_DAY，沿用原来的每日 3 个）——拦"每个身份送 3 次"
+        被刷成无限次平台垫付评审。超了身份照发，只是 credits=0：
+        这个游客能用 BYOK / CDK / 注册，但拿不到新的免费试用。
+    """
+    from app.services import admin_settings_service
+
+    if admin_settings_service.get(db, "ratelimit_enabled", settings.ratelimit_enabled):
+        key = f"{GUEST_IDENTITY_SCOPE}:{_client_key(request)}"
+        if not get_limiter().allow(key, settings.guest_identity_per_hour, GUEST_IDENTITY_WINDOW_SECONDS):
+            raise RateLimited(
+                "同一来源短时间内创建的访客会话过多，请稍后再试，或登录后继续。"
+            )
+    credits = GUEST_FREE_REVIEWS if mint_allowed(db, request) else 0
+    user_id, token = mint_guest(db, credits=credits, ttl_seconds=settings.guest_cookie_ttl_seconds)
+    return db.get(User, user_id), token
 
 
 def mint_allowed(db: Session, request) -> bool:
@@ -238,3 +288,68 @@ def bind_email(db: Session, user_id: str, email: str, password: str) -> User:
     # 不早于撤销点），直接 create_token 会当场被自己刚写下的撤销声明打掉。
     revoke_user_sessions(db, user.id)
     return user
+
+
+# ============================================================================
+# legacy 共享匿名桶的隔离（scripts/quarantine_anonymous.py 调用）
+# ============================================================================
+# 隔离 legacy 共享匿名桶里的存量数据。
+#
+# 背景：游客身份 cookie 上线之前，AL_AUTH_ENABLED=true 的实例上所有未登录访客
+# 共用 user_id = "anonymous"（见 deps.resolve_guest_identity 的说明）。那段时间里
+# 访客建的对话、项目、上传、跑的评审全部写在这一个 id 名下，任何未登录访客都能
+# 列出、读取、改写、删除。新代码已经不会再让任何请求解析成 "anonymous"，
+# 但库里的存量行还在——它们不属于任何人，也不该再被任何人看到。
+#
+# 做法：把这些行改挂到一个**不对应任何 User 行**的固定 owner（QUARANTINE_OWNER）。
+# 不删：数据真正的主人无从识别（那正是共享桶的问题），删了就再也找不回来；
+# 运营者日后若能凭别的线索确认归属，可以手工改挂回去。
+#
+# 幂等：第二次跑时已经没有 "anonymous" 行可改，所有计数为 0。
+#
+# user_id 为 NULL 的行同样隔离（仅限"内容"表）：v1 归属校验以前把 NULL 当作
+# "无主历史数据，谁都能看"，它们和 anonymous 行一样是公共空间。
+# 计量/财务表（UsageRecord / CreditLedger / CdkRedemption / ReviewFeedback）的
+# user_id 是 NOT NULL，只处理 "anonymous"——改挂后共享桶的 CDK 余额也就不再
+# 能被任何访客花掉。
+
+QUARANTINE_OWNER = "quarantine:legacy-anonymous"
+
+# (模型, 是否连 NULL 一起隔离)
+TABLES = (
+    (Review, True),
+    (Conversation, True),
+    (Project, True),
+    (UploadedFile, True),
+    (Judgment, True),
+    (Job, True),
+    (ReviewFeedback, False),
+    (UsageRecord, False),
+    (CreditLedger, False),
+    (CdkRedemption, False),
+)
+
+
+def _condition(model, include_null: bool):
+    anon = model.user_id == settings.anonymous_user_id
+    return or_(anon, model.user_id.is_(None)) if include_null else anon
+
+
+def count_legacy_rows(db: Session) -> Dict[str, int]:
+    return {
+        model.__tablename__: db.query(model).filter(_condition(model, include_null)).count()
+        for model, include_null in TABLES
+    }
+
+
+def quarantine_legacy_anonymous(db: Session, apply: bool = False) -> Dict[str, int]:
+    """返回每张表命中的行数；apply=False 时只统计不改动。"""
+    counts = count_legacy_rows(db)
+    if not apply:
+        return counts
+    for model, include_null in TABLES:
+        db.query(model).filter(_condition(model, include_null)).update(
+            {"user_id": QUARANTINE_OWNER}, synchronize_session=False
+        )
+    db.commit()
+    return counts
