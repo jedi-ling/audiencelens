@@ -407,6 +407,19 @@ cd web/backend && ../../.venv/bin/python -m pytest -q
 
 ---
 
+
+### 升级到「游客身份 cookie」版本后：隔离存量匿名数据（一次性）
+
+旧版本里所有未登录访客共用 `user_id="anonymous"`。升级后跑一次（先备份；幂等；不删数据，
+只改挂到 `quarantine:legacy-anonymous`，详见 `web/DEPLOY.md` 同名一节）：
+
+```bash
+cd /opt/audiencelens/web/backend
+# config.py 会自己读 web/.env（与服务进程同一份配置），不用手动 source
+../../.venv/bin/python scripts/quarantine_anonymous.py           # 预览
+../../.venv/bin/python scripts/quarantine_anonymous.py --apply   # 执行
+```
+
 ## 10. 排障：先看这几条
 
 | 现象 | 多半是 |

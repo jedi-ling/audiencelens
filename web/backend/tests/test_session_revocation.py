@@ -133,16 +133,21 @@ class TestRevokeAllSessions:
         assert key_service.resolve_key(db, uid).key, "密钥还在但解不开了"
         key_service.delete_user_key(db, uid)
 
-    def test_anonymous_cannot_revoke(self, client):
-        """未登录不能调——否则任何人都能把共享匿名桶里的所有人踢下线。
+    def test_anonymous_cannot_revoke(self, client, monkeypatch):
+        """以前未登录调用必须被拒——否则任何人都能把共享匿名桶里的所有人踢下线。
 
-        状态码是 400 而不是 401：走的是 _require_own_identity，
-        它对"匿名身份不是某个人"这件事的语义就是 BadRequest。
-        这里只钉住**被拒绝**，不钉具体码——码变了不影响安全性。
+        现在（认证开启时）未登录访客是**自己的**游客身份：撤销只作废这个游客
+        自己的会话（它的 cookie 当场失效，下一个请求是一个新游客），
+        碰不到任何别人。
         """
+        bystander = _signup(client, "revoke-bystander@example.com")
+        before = client.get("/api/auth/me").json()["user_id"]
         r = client.post("/api/auth/sessions/revoke-all")
-        assert r.status_code >= 400, "未登录竟然能触发撤销"
-        assert r.status_code < 500, "应该是客户端错误，不是把服务端打崩"
+        assert r.status_code == 200, r.text
+        assert client.get("/api/auth/me").json()["user_id"] != before, "游客 cookie 没被作废"
+        assert client.get("/api/auth/me", headers=_h(bystander)).json()["email"] == (
+            "revoke-bystander@example.com"
+        ), "撤销波及了别人的会话"
 
     def test_cannot_revoke_someone_elses_sessions(self, client):
         """只能撤销自己的。接口不收 user_id 参数，这条是防止将来有人加上去。"""

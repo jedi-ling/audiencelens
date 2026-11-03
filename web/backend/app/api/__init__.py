@@ -219,11 +219,21 @@ def create_review(
 
 
 def _check_review_owner(review: Review, identity: Identity) -> None:
-    """review.user_id 为空视为无主历史数据（早于 user_id 字段/迁移遗留），不拦；
-    否则必须跟当前身份一致。用 404 而不是 403——不向非本人确认"这个 ID 存在"。
-    注意：AL_AUTH_ENABLED=false 时所有匿名请求共享同一个 "anonymous" user_id，
-    这种单机/开源形态下互相能看到彼此的评审是设计使然（判断复利、CDK 额度也是
-    同一个共享桶），不是这次修复要解决的问题——这里堵的是"登录用户能看别人账号"的洞。"""
+    """必须跟当前身份一致。用 404 而不是 403——不向非本人确认"这个 ID 存在"。
+
+    两种形态口径不同：
+      · AL_AUTH_ENABLED=false（单机开源）：所有请求都是同一个 "anonymous"，
+        user_id 为空的无主历史数据（早于 user_id 字段/迁移遗留）也放行——
+        那台机器上就一个使用者。
+      · AL_AUTH_ENABLED=true（多租户）：每个访客都有自己的游客或正式身份，
+        **无主行和 legacy "anonymous" 行不属于任何人**，一律 404。以前这里对
+        无主行放行、对 anonymous 行按字符串相等放行，于是任何未登录访客拿到
+        id 就能读、能删别的访客的评审。存量 anonymous 行由
+        scripts/quarantine_anonymous.py 隔离。"""
+    if settings.auth_enabled:
+        if review.user_id != identity.user_id:
+            raise HTTPException(status_code=404, detail="Review not found")
+        return
     if review.user_id and review.user_id != identity.user_id:
         raise HTTPException(status_code=404, detail="Review not found")
 

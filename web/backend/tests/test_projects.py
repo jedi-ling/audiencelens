@@ -202,11 +202,11 @@ class TestClaim:
             headers=_h(t),
         )
         got = client.get(f"/api/v2/conversations/{cid}", headers=_h(t)).json()
-        # 对话认领成功了，但它的 project_id 指向一个还没认领的项目——
-        # 这正是本组测试要暴露的真实缺口：字段还在，但从新账号的视角查不到该项目。
+        # 以前这里是一个真实缺口：只认领对话时项目还留在匿名桶，从新账号查不到。
+        # 现在认领搬的是当前游客名下的**全部**数据，对话和它的项目一起过来。
         assert got["project_id"] == pid
         proj_list = [p["id"] for p in client.get("/api/v2/projects", headers=_h(t)).json()["projects"]]
-        assert pid not in proj_list, "项目未认领时不该出现在新账号的项目列表里"
+        assert pid in proj_list, "对话认领过来了，它所在的项目却查不到"
 
         # 现在把项目也认领上——两个都认领之后，归属才完全一致
         client.post(

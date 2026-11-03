@@ -43,44 +43,100 @@ PRIVATE_READ_ENDPOINTS = [
 ]
 
 
-class TestSharedAnonymousIsBlocked:
-    @pytest.mark.parametrize("path", PRIVATE_READ_ENDPOINTS)
-    def test_private_reads_rejected_for_shared_anonymous(self, client, monkeypatch, path):
-        _enable_auth(monkeypatch)
-        r = client.get(path)
-        assert r.status_code == 401, (
-            f"{path} 对未登录访客返回了 {r.status_code}，"
-            f"共享匿名桶下这等于把别人的数据给了他：{r.text[:200]}"
-        )
+def _seed_shared_bucket(db):
+    """在 legacy anonymous 桶里放一份"别的访客留下的"数据，返回 (review_id, judgment_id)。"""
+    from app.models import Judgment, Review, UsageRecord
 
-    def test_review_list_is_empty_not_other_peoples(self, client, monkeypatch):
-        """列表要返回空 + 标记，而不是 401——侧栏在轮询它，报错会把整页打成错误态。"""
+    review = Review(
+        user_id=settings.anonymous_user_id,
+        task_type="concept_review",
+        target_title="共享桶里别人的评审",
+        artifact_bundle={},
+        status="completed",
+        report_json={"executive_summary": {"release_risk": "medium"}},
+    )
+    db.add(review)
+    db.commit()
+    db.add(Judgment(review_id=review.id, user_id=settings.anonymous_user_id, claim="共享桶里别人的判断"))
+    db.add(UsageRecord(user_id=settings.anonymous_user_id, cost_usd=9.5, key_source="server"))
+    db.commit()
+    judgment = db.query(Judgment).filter(Judgment.review_id == review.id).first()
+    return review.id, judgment.id
+
+
+@pytest.fixture
+def _cleanup_seed(db):
+    yield
+    from app.models import Judgment, Review, UsageRecord, UserApiKey
+
+    db.query(Judgment).delete()
+    db.query(UsageRecord).delete()
+    db.query(UserApiKey).delete()
+    db.query(Review).delete()
+    db.commit()
+
+
+@pytest.mark.usefixtures("_cleanup_seed")
+class TestSharedAnonymousIsBlocked:
+    """以前这里断言"未登录 → 401"：共享桶唯一安全的处理就是什么都不给。
+    现在未登录访客有**自己的**游客身份（deps.resolve_guest_identity），
+    这些接口照常返回 200——返回的必须只是他自己的（全新游客 = 空），
+    共享桶里别人的东西一个字都不能出现。"""
+
+    @pytest.mark.parametrize("path", PRIVATE_READ_ENDPOINTS)
+    def test_private_reads_rejected_for_shared_anonymous(self, client, monkeypatch, db, path):
         _enable_auth(monkeypatch)
+        _seed_shared_bucket(db)
+        r = client.get(path)
+        assert r.status_code == 200, r.text
+        assert "共享桶里别人的" not in r.text, f"{path} 把共享桶里别人的数据给了访客：{r.text[:200]}"
+        assert client.get("/api/auth/me").json()["user_id"] != settings.anonymous_user_id
+        if path == "/api/usage":
+            assert r.json()["cost_usd_total"] == 0, "访客看到了全站未登录用户加起来的用量"
+
+    def test_review_list_is_empty_not_other_peoples(self, client, monkeypatch, db):
+        _enable_auth(monkeypatch)
+        _seed_shared_bucket(db)
         r = client.get("/api/reviews?limit=100")
         assert r.status_code == 200
         assert r.json() == [], "未登录访客不该列出任何评审（那些是别人的）"
-        assert r.headers.get("X-Requires-Login") == "1", "要给前端一个可据此提示的信号"
         assert r.headers.get("X-Total-Count") == "0"
 
     def test_saving_api_key_rejected(self, client, monkeypatch):
-        """API Key 落进共享桶 = 把自己的付费凭据交给所有访客。"""
+        """游客可以保存自己的 key（BYOK 发起评审要用），但它只属于这个游客：
+        另一个访客（另一份 cookie）看不到、也删不掉。"""
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
         _enable_auth(monkeypatch)
         r = client.post("/api/keys", json={"api_key": "sk-ant-fake-key-value", "provider": "anthropic"})
-        assert r.status_code == 401, r.text
+        assert r.status_code == 200, r.text
+        assert [k["provider"] for k in client.get("/api/keys").json()["keys"]] == ["anthropic"]
+        with TestClient(app) as other:
+            assert other.get("/api/keys").json()["keys"] == []
 
     def test_deleting_api_key_rejected(self, client, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
         _enable_auth(monkeypatch)
-        r = client.delete("/api/keys/anthropic")
-        assert r.status_code == 401, r.text
+        client.post("/api/keys", json={"api_key": "sk-ant-fake-key-value", "provider": "anthropic"})
+        with TestClient(app) as other:
+            other.delete("/api/keys/anthropic")
+        assert [k["provider"] for k in client.get("/api/keys").json()["keys"]] == ["anthropic"], (
+            "别的访客删掉了这个游客的 key"
+        )
 
     def test_testing_stored_key_rejected(self, client, monkeypatch):
-        """不传 api_key 会解密并真的拿去调模型——那把 key 是别人的。"""
+        """/keys/test 是出网探针，游客（自动铸造的身份）一律不开放。"""
         _enable_auth(monkeypatch)
         r = client.post("/api/keys/test", json={"provider": "anthropic"})
         assert r.status_code == 401, r.text
 
     def test_key_listing_hides_other_peoples_keys(self, client, monkeypatch):
-        """GET /keys 不报错（设置页要能打开），但绝不能回显桶里别人的 key——
+        """GET /keys 不报错（设置页要能打开），但绝不能回显别人的 key——
         连掩码和 provider 都不行，那等于告诉访客「这儿有把能用的 key」。"""
         _enable_auth(monkeypatch)
         token = _register(client, "keyowner@example.com")
@@ -93,9 +149,7 @@ class TestSharedAnonymousIsBlocked:
 
         r = client.get("/api/keys")
         assert r.status_code == 200
-        body = r.json()
-        assert body["keys"] == [], "未登录访客看到了别人的 key"
-        assert body.get("requires_login") is True
+        assert r.json()["keys"] == [], "未登录访客看到了别人的 key"
 
 
 class TestSingleMachineFormStillWorks:
@@ -134,23 +188,35 @@ class TestLedgerWritesAreAlsoGuarded:
         那些"采用率/付费意愿"数字的来源（读那边早就挡住了，写这边没挡）。
     """
 
-    def test_verify_judgment_rejected_for_shared_anonymous(self, client, monkeypatch):
+    @pytest.mark.usefixtures("_cleanup_seed")
+    def test_verify_judgment_rejected_for_shared_anonymous(self, client, monkeypatch, db):
+        """以前未登录访客与 anonymous 桶是同一个人，service 层的归属校验恒等成立。
+        现在访客是自己的游客：共享桶里的判断对他不存在。"""
+        from app.models import Outcome
+
         _enable_auth(monkeypatch)
+        _, judgment_id = _seed_shared_bucket(db)
         r = client.post(
-            "/api/ledger/judgments/whatever/verify", json={"verdict": "correct"}
+            f"/api/ledger/judgments/{judgment_id}/verify", json={"verdict": "hit"}
         )
-        assert r.status_code == 401, (
+        assert r.status_code in (403, 404), (
             f"未登录访客能回填别人的判断：{r.status_code} {r.text[:200]}"
         )
+        assert db.query(Outcome).filter(Outcome.judgment_id == judgment_id).count() == 0
 
-    def test_review_feedback_rejected_for_shared_anonymous(self, client, monkeypatch):
+    @pytest.mark.usefixtures("_cleanup_seed")
+    def test_review_feedback_rejected_for_shared_anonymous(self, client, monkeypatch, db):
+        from app.models import ReviewFeedback
+
         _enable_auth(monkeypatch)
+        review_id, _ = _seed_shared_bucket(db)
         r = client.post(
-            "/api/validation/reviews/whatever/feedback", json={"useful": True}
+            f"/api/validation/reviews/{review_id}/feedback", json={"useful": True}
         )
-        assert r.status_code == 401, (
+        assert r.status_code in (403, 404), (
             f"未登录访客能改写别人的评审反馈：{r.status_code} {r.text[:200]}"
         )
+        assert db.query(ReviewFeedback).filter(ReviewFeedback.review_id == review_id).count() == 0
 
     def test_single_machine_form_still_allows_both(self, client, db):
         """auth_enabled=false 的单机形态不能被这两道守卫误伤。

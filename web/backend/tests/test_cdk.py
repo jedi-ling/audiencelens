@@ -96,13 +96,16 @@ class TestRedeemAnonymous:
         assert body["credits_granted"] == 7
         assert body["balance"] == 7
         assert body["guest"] is True
-        assert body["token"]
+        assert body["user_id"] != settings.anonymous_user_id
+        # 凭证是游客 cookie（第一次请求就铸好了），不再在响应体里发 token
+        assert "token" not in body
 
-        # 游客是真实 User 行，token 能正常通过身份解析
-        me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {body['token']}"})
+        # 游客是真实 User 行，同一份 cookie 能正常通过身份解析
+        me = client.get("/api/auth/me")
         assert me.status_code == 200
         assert me.json()["is_anonymous"] is False
         assert me.json()["user_id"] == body["user_id"]
+        assert client.get("/api/usage").json()["bonus_credits"] == 7
 
         guest = db.get(User, body["user_id"])
         assert guest.is_guest is True
@@ -117,12 +120,17 @@ class TestRedeemAnonymous:
         assert "token" not in body
 
     def test_failed_redeem_does_not_leave_orphan_guest(self, client, monkeypatch, db):
+        """以前兑换时才铸造游客，失败要回滚那一行，免得枚举者批量制造空账号。
+        现在游客是这个访客自己的会话身份（第一次请求就有），兑换失败不该
+        把它删掉；要守住的是"反复失败不会多出任何账号"。刷身份本身由
+        guest_identity_per_hour 拦（见 tests/test_guest_isolation.py）。"""
         monkeypatch.setattr(settings, "auth_enabled", True)
         before = db.query(User).filter(User.is_guest.is_(True)).count()
-        r = client.post("/api/cdk/redeem", json={"code": "AL-FAKE-FAKE-FAKE"})
-        assert r.status_code == 400
+        for _ in range(3):
+            r = client.post("/api/cdk/redeem", json={"code": "AL-FAKE-FAKE-FAKE"})
+            assert r.status_code == 400
         after = db.query(User).filter(User.is_guest.is_(True)).count()
-        assert after == before  # 兑换失败的游客行已回滚
+        assert after - before <= 1  # 至多就是这个访客自己的游客身份
 
 
 class TestRedeemRules:
@@ -178,15 +186,21 @@ class TestRedeemRules:
     def test_multi_use_code_shared_by_different_users(self, client, monkeypatch):
         monkeypatch.setattr(settings, "auth_enabled", True)
         code = _generate(client, credits=2, max_uses=3)["codes"][0]
-        # 三个匿名访客各自兑换 → 各自拿到独立游客身份
+        # 三个匿名访客（三份 cookie jar）各自兑换 → 各自拿到独立游客身份
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
         user_ids = set()
         for _ in range(3):
-            r = client.post("/api/cdk/redeem", json={"code": code})
+            with TestClient(app) as visitor:
+                r = visitor.post("/api/cdk/redeem", json={"code": code})
             assert r.status_code == 200
             user_ids.add(r.json()["user_id"])
         assert len(user_ids) == 3
         # 第 4 人：用完了
-        r = client.post("/api/cdk/redeem", json={"code": code})
+        with TestClient(app) as visitor:
+            r = visitor.post("/api/cdk/redeem", json={"code": code})
         assert r.status_code == 400
 
 

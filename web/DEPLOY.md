@@ -127,6 +127,24 @@ docker compose logs -f backend
 crontab -l | grep -E 'audiencelens-backup|audiencelens-restore-drill'
 ```
 
+## 升级到「游客身份 cookie」版本后：隔离存量匿名数据（一次性）
+
+这个版本之前，`AL_AUTH_ENABLED=true` 的实例上所有未登录访客共用 `user_id="anonymous"`，
+彼此能列出、读取、删除对方的对话 / 项目 / 评审。新版本起每个访客有自己的游客身份，
+但库里已有的 `anonymous` 行还在。升级后跑一次隔离命令：把它们改挂到一个不对应任何账号的
+owner（`quarantine:legacy-anonymous`），**谁都看不到，一行都不删**。可以重复跑（幂等）。
+
+```bash
+# 先备份
+./deploy/backup.sh
+# 预览：每张表会动多少行（不改数据）
+docker compose exec backend python scripts/quarantine_anonymous.py
+# 执行
+docker compose exec backend python scripts/quarantine_anonymous.py --apply
+```
+
+单机形态（`AL_AUTH_ENABLED=false`）下 `anonymous` 就是唯一使用者，脚本会拒绝执行（除非 `--force`）。
+
 ## 健康检查（接外部监控用哪个）
 
 两条端点分工不同，接错了监控会一直显示绿色：

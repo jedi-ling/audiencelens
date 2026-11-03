@@ -94,6 +94,30 @@ export function getToken(): string | null {
 export function setToken(token: string | null): void {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+  // 退出登录后回到游客视角：下一批请求之前要重新确认（或铸造）游客 cookie
+  if (!token) guestSession = null
+}
+
+/**
+ * 未登录访客的身份是后端第一次见到他时铸造的游客（HttpOnly cookie，前端读不到也不用读）。
+ *
+ * 为什么要在发请求之前先等这一步：新访客打开页面时，侧栏会同时拉对话、项目、
+ * /auth/me……这几个请求都不带 cookie，后端会给**每一个**各铸一个游客，
+ * 最后浏览器只留下最后到的那把 cookie——其余请求里建的东西就归了一个再也认不回来的身份。
+ * 所以没有登录态时，所有请求先排在同一个 /api/auth/me 后面，拿到 cookie 再并发。
+ */
+let guestSession: Promise<void> | null = null
+
+export function ensureGuestSession(): Promise<void> {
+  if (!guestSession) {
+    guestSession = fetch(`${BASE}/api/auth/me`).then(
+      () => undefined,
+      () => {
+        guestSession = null // 网络失败不缓存，下一个请求重试
+      },
+    )
+  }
+  return guestSession
 }
 
 /**
@@ -174,10 +198,11 @@ export function forgetPendingReviews(ids: string[]): void {
  */
 export async function claimPendingReviews(): Promise<string[]> {
   if (!getToken()) return []
+  // 本地清单为空也要调：认领搬的是**这台浏览器的游客 cookie** 名下的全部数据，
+  // 清单只是给老后端的兼容字段（见后端 claim_reviews 的说明）。
   const pending = listPendingReviews()
   const pendingConvs = listPendingConversations()
   const pendingProjects = listPendingProjects()
-  if (!pending.length && !pendingConvs.length && !pendingProjects.length) return []
   const res = await api.claimReviews(pending, pendingConvs, pendingProjects)
   forgetPendingReviews([...res.claimed, ...res.rejected])
   forgetPendingConversations([
@@ -322,6 +347,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   const token = getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  else await ensureGuestSession()
 
   let res: Response
   try {

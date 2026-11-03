@@ -123,7 +123,7 @@ def _resolve_ws_user(websocket: WebSocket) -> str:
     if "," in token:
         token = next((t.strip() for t in token.split(",") if t.strip()), "")
     if not token:
-        return settings.anonymous_user_id
+        return _resolve_ws_guest(websocket)
     try:
         from app.core.security import decode_token
 
@@ -131,6 +131,26 @@ def _resolve_ws_user(websocket: WebSocket) -> str:
         return str(payload.get("sub") or settings.anonymous_user_id)
     except Exception:
         return settings.anonymous_user_id
+
+
+def _resolve_ws_guest(websocket: WebSocket) -> str:
+    """没有子协议令牌时按游客 cookie 认人（同源握手浏览器会自动带上 cookie）。
+
+    与 HTTP 侧 deps.guest_cookie_identity 同一套校验（签名 / 仍是游客 / 未撤销）。
+    这里不铸造：WebSocket 只订阅已存在的评审，认不出来就是匿名，
+    下面的归属校验会把它挡在门外。
+    """
+    if not websocket.cookies.get(settings.guest_cookie_name):
+        return settings.anonymous_user_id
+    from app.db import SessionLocal
+    from app.deps import guest_cookie_identity
+
+    db = SessionLocal()
+    try:
+        found = guest_cookie_identity(websocket, db)
+    finally:
+        db.close()
+    return found.user_id if found is not None else settings.anonymous_user_id
 
 
 def _ws_auth_subprotocol(websocket: WebSocket) -> Optional[str]:
@@ -163,8 +183,10 @@ async def review_websocket(websocket: WebSocket, review_id: str):
         await websocket.close(code=4404, reason="Review not found")
         return
     owner = review.user_id or settings.anonymous_user_id
-    if owner != settings.anonymous_user_id:
-        if _resolve_ws_user(websocket) != owner:
+    # 多租户形态下 anonymous / 无主评审不属于任何人：以前这里对它们直接放行，
+    # 任何人拿到 review_id 就能旁听。单机形态（认证关闭）所有人本来就是 anonymous。
+    if settings.auth_enabled or owner != settings.anonymous_user_id:
+        if _resolve_ws_user(websocket) != owner or owner == settings.anonymous_user_id:
             await websocket.close(code=4403, reason="Not your review")
             return
 

@@ -26,7 +26,6 @@ from app.core.security import create_token, hash_password, verify_password
 from app.db import get_db
 from app.deps import (
     Identity,
-    current_identity,
     is_shared_anonymous,
     optional_identity,
     probe_identity,
@@ -351,7 +350,8 @@ class BindEmailRequest(BaseModel):
 @router.post("/auth/bind-email", dependencies=[Depends(rate_limit("auth", 20, 3600))])
 async def bind_email(
     body: BindEmailRequest,
-    identity: Identity = Depends(current_identity),
+    request: Request,
+    identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
     """游客账号原地转正：换真邮箱/真密码，user_id 不变，历史评审/次数原样带过去。
@@ -367,6 +367,9 @@ async def bind_email(
 
     await _send_verify_email(db, user)
     token = issue_session_token(db, user.id)
+    # 游客 cookie 认的是同一个 user_id：bind_email 里的 revoke_user_sessions
+    # 已经让它失效，这里再把它从浏览器清掉，转正后的账号只走 Authorization 头。
+    request.state.clear_guest_cookie = True
     return {"token": token, "user": {"id": user.id, "email": user.email, "plan": user.plan}}
 
 
@@ -723,156 +726,78 @@ CLAIM_MAX_IDS = 50
 )
 async def claim_reviews(
     body: ClaimReviewsRequest,
+    request: Request,
     identity: Identity = Depends(optional_identity),
     db: Session = Depends(get_db),
 ):
-    """把「登录前以匿名身份跑的评审」改挂到当前账号名下。
+    """把「登录前以游客身份产生的数据」改挂到当前账号名下。
 
-    为什么必须有这个接口：匿名评审落库时 user_id = settings.anonymous_user_id，
-    而所有归属校验都是精确字符串比对（v1 的 _check_review_owner、v2 的
-    `review.user_id != identity.user_id → 404`）。用户一登录，identity.user_id
-    变成真实 id，这条评审的每一个路由都开始返回 404——前端承诺的"登录后可查看
-    完整报告"实际表现是**报告凭空消失**。没有认领，那句文案就是假的。
+    ── 认领的来源是谁 ──────────────────────────────────────────
+    只有**这台浏览器自己的游客身份**：它的签名 cookie（见 deps.guest_cookie_identity）
+    就是"这些数据是我的"的证明。认领时把该游客名下的评审、判断、价值回填、
+    对话、上传文件、项目**全部**改挂到当前账号，然后清掉游客 cookie。
 
-    ── 安全边界（写清楚，不假装它不存在）──────────────────────────
-    1. 只认领**当前仍归属匿名桶**（anonymous_user_id）或 user_id 为空的评审。
-       已经属于某个真实账号的一律跳过，绝不转移——所以这个接口无法把别人
-       账号里的评审偷过来。
-    2. 匿名桶是**共享**的：AL_AUTH_ENABLED=false 时全实例共用一个 anonymous
-       身份。因此"任何知道某条评审 uuid 的人都能把它认领走"是事实，唯一的
-       防线是 review.id 为 uuid4（122 位随机，不可枚举）+ 本接口的限流。
-       这是取舍，不是疏漏：换成"必须先证明你是创建者"就得引入匿名会话密钥，
-       而匿名本来就没有可信的身份可绑。
-    3. 认领是**一次性、不可逆**的（先到先得）：评审一旦离开匿名桶，其他匿名
-       访客就再也看不到它。单机/开源形态（认证关闭）下所有人都是匿名，
-       `_require_own_identity` 会直接挡住调用，不受影响。
-    4. 返回值不区分"这条 id 不存在"和"这条已属于别人"——两者都进 rejected。
-       理由与归属校验用 404 而不是 403 一致：不向调用方确认某个 id 是否存在。
+    以前的做法是"按前端 localStorage 里记的 id，认领仍归属共享 anonymous 桶的行"。
+    那个设计的安全边界只有 uuid4 不可猜：任何知道某条评审 id 的人都能把别人的
+    评审认领走，而匿名桶本身就是所有未登录访客共用的。现在每个访客有自己的
+    游客身份，anonymous 桶里的存量行由 scripts/quarantine_anonymous.py 隔离，
+    这条接口不再从 anonymous 桶搬任何东西。
 
-    ── 关联记录怎么处理 ─────────────────────────────────────────
-    跟着评审走（它们随 Review 级联删除，归属必须一致，否则新主人在
-    「判断复利」「价值指标」里看不到自己评审的数据，旧数据还留在匿名桶里）：
-        · Judgment（该评审产出的预测，/ledger/* 全部按 user_id 过滤）
-        · ReviewFeedback（价值回填，/validation/metrics 按 user_id 聚合）
-    **不跟着走**（计量/财务事实源，与 user_data_service 的删除口径同一条线）：
-        · UsageRecord / CreditLedger —— 这次消耗当时就记在匿名桶头上了，
-          事后改挂到新账号等于让用户为"注册前已经用掉的额度"再被扣一次配额。
-        · Job —— 队列簿记，评审跑完就没用了，不值得为它多写一次库。
+    请求体里的三组 id 仍然接受（老前端会带），但它们**不决定**搬什么：
+    搬的永远是当前游客名下的全部数据；不属于当前游客的 id 一律进 rejected。
+    返回值不区分"不存在"和"属于别人"——与归属校验用 404 而不是 403 同一理由。
+
+    ── 不跟着走的（与 user_data_service 的删除口径同一条线）──────────
+        · UsageRecord / CreditLedger —— 计量/财务事实源，这次消耗当时就记在
+          游客头上，事后改挂等于让用户为"注册前用掉的额度"再被扣一次配额。
+          游客兑过的 CDK 余额同理留在游客名下；想带着余额转正请走
+          /auth/bind-email（同一个 user_id 原地转正，什么都不用搬）。
+        · Job —— 队列簿记，评审跑完就没用了。
     """
-    from sqlalchemy import or_
-
-    from app.models import Judgment, ReviewFeedback
+    from app.deps import guest_cookie_identity
+    from app.models import Conversation, Judgment, Project, ReviewFeedback, UploadedFile
 
     _require_own_identity(identity)
 
-    seen = set()
-    wanted: List[str] = []
-    for raw in body.review_ids or []:
-        rid = str(raw).strip()
-        if rid and rid not in seen:
-            seen.add(rid)
-            wanted.append(rid)
-    if len(wanted) > CLAIM_MAX_IDS:
-        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 条评审")
-    # 注意这里没有"评审为空就提前返回"：只带对话来认领是完全正常的情形
-    # （用户聊了半天还没开评审就去登录了）。之前那个 early return 会把
-    # 这种请求直接吞掉，对话永远归不到账号名下。
-    anon = settings.anonymous_user_id
-    rows = db.query(Review).filter(Review.id.in_(wanted)).all() if wanted else []
+    def _dedupe(ids, label):
+        out = list(dict.fromkeys(str(x).strip() for x in (ids or []) if str(x).strip()))
+        if len(out) > CLAIM_MAX_IDS:
+            raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 个{label}")
+        return out
+
+    wanted = _dedupe(body.review_ids, "评审")
+    wanted_convs = _dedupe(body.conversation_ids, "对话")
+    wanted_projects = _dedupe(body.project_ids, "项目")
+
     claimed: List[str] = []
-    for review in rows:
-        if review.user_id and review.user_id != anon:
-            continue  # 已属于某个真实账号 —— 拒绝，不做转移
-        # 条件 UPDATE：只有"此刻仍归属匿名桶/无主"的行才改挂。并发认领时
-        # 后到者的 UPDATE 匹配不到行（rowcount=0），绝不覆盖先到者的归属——
-        # 无条件赋值是"谁先读谁赢"（读到旧值覆盖新值），这里是"谁先写谁赢"。
-        updated = (
-            db.query(Review)
-            .filter(
-                Review.id == review.id,
-                or_(Review.user_id.is_(None), Review.user_id == anon),
-            )
-            .update({"user_id": identity.user_id}, synchronize_session=False)
-        )
-        if updated == 1:
-            claimed.append(review.id)
-
-    if claimed:
-        for model in (Judgment, ReviewFeedback):
-            db.query(model).filter(
-                model.review_id.in_(claimed),
-                or_(model.user_id == anon, model.user_id.is_(None)),
-            ).update({"user_id": identity.user_id}, synchronize_session=False)
-        db.commit()
-
-    # ---- 对话：同一套条件 UPDATE ----
-    wanted_convs = list(dict.fromkeys(body.conversation_ids or []))
-    if len(wanted_convs) > CLAIM_MAX_IDS:
-        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 段对话")
     claimed_convs: List[str] = []
-    if wanted_convs:
-        from app.models import Conversation, UploadedFile
-
-        conv_rows = db.query(Conversation).filter(Conversation.id.in_(wanted_convs)).all()
-        for conv in conv_rows:
-            if conv.user_id and conv.user_id != anon:
-                continue  # 已属真实账号，绝不转移
-            updated = (
-                db.query(Conversation)
-                .filter(
-                    Conversation.id == conv.id,
-                    or_(Conversation.user_id.is_(None), Conversation.user_id == anon),
-                )
-                .update({"user_id": identity.user_id}, synchronize_session=False)
-            )
-            if updated == 1:
-                claimed_convs.append(conv.id)
-
-        if claimed_convs:
-            # 对话里引用的图片也要跟着改挂，否则重放时每张图都 404：
-            # 消息还在、file_id 还在，但那些文件仍归匿名桶，取回接口按归属校验
-            # 会拒绝。用户看到的是"登录之后图全丢了"。
-            file_ids: set = set()
-            for conv in conv_rows:
-                if conv.id not in claimed_convs:
-                    continue
-                for m in conv.messages:
-                    meta = m.meta_json or {}
-                    for fid in meta.get("fileIds") or []:
-                        if isinstance(fid, str):
-                            file_ids.add(fid)
-            if file_ids:
-                db.query(UploadedFile).filter(
-                    UploadedFile.id.in_(list(file_ids)),
-                    or_(UploadedFile.user_id == anon, UploadedFile.user_id.is_(None)),
-                ).update({"user_id": identity.user_id}, synchronize_session=False)
-            db.commit()
-
-    # ---- 项目：同一套条件 UPDATE。放在对话认领之后——项目本身的认领
-    # 顺序其实无所谓，但这样读下来是"内容 → 内容的容器"，逻辑顺序更顺。
-    wanted_projects = list(dict.fromkeys(body.project_ids or []))
-    if len(wanted_projects) > CLAIM_MAX_IDS:
-        raise BadRequest(f"一次最多认领 {CLAIM_MAX_IDS} 个项目")
     claimed_projects: List[str] = []
-    if wanted_projects:
-        from app.models import Project
 
-        proj_rows = db.query(Project).filter(Project.id.in_(wanted_projects)).all()
-        for proj in proj_rows:
-            if proj.user_id and proj.user_id != anon:
-                continue  # 已属真实账号，绝不转移
-            updated = (
-                db.query(Project)
-                .filter(
-                    Project.id == proj.id,
-                    or_(Project.user_id.is_(None), Project.user_id == anon),
-                )
-                .update({"user_id": identity.user_id}, synchronize_session=False)
+    source = guest_cookie_identity(request, db)
+    if source is not None and source.user_id != identity.user_id:
+        src, dst = source.user_id, identity.user_id
+        claimed = [r for (r,) in db.query(Review.id).filter(Review.user_id == src)]
+        claimed_convs = [c for (c,) in db.query(Conversation.id).filter(Conversation.user_id == src)]
+        claimed_projects = [p for (p,) in db.query(Project.id).filter(Project.user_id == src)]
+        # 按 user_id 精确匹配整批改挂：游客名下的东西只属于这一个游客，
+        # 不需要逐条条件 UPDATE 去和别的认领者抢（没有别人能证明自己是 src）。
+        for model in (Review, Judgment, ReviewFeedback, Conversation, UploadedFile, Project):
+            db.query(model).filter(model.user_id == src).update(
+                {"user_id": dst}, synchronize_session=False
             )
-            if updated == 1:
-                claimed_projects.append(proj.id)
-        if claimed_projects:
-            db.commit()
+        db.commit()
+        # 报告"认领到了什么"必须以落库结果为准，不能用 UPDATE 之前那次 SELECT：
+        # 同一个游客 cookie 被两个账号同时拿来认领时（同一台浏览器先后登录两个号），
+        # 后到者的 UPDATE 在 WHERE user_id = src 上匹配不到行，但它 SELECT 时
+        # 看到的列表和先到者一模一样——照那个列表回报就成了"两个都认领成功"。
+        claimed = [r for (r,) in db.query(Review.id).filter(
+            Review.id.in_(claimed), Review.user_id == dst)] if claimed else []
+        claimed_convs = [c for (c,) in db.query(Conversation.id).filter(
+            Conversation.id.in_(claimed_convs), Conversation.user_id == dst)] if claimed_convs else []
+        claimed_projects = [p for (p,) in db.query(Project.id).filter(
+            Project.id.in_(claimed_projects), Project.user_id == dst)] if claimed_projects else []
+        # 游客已经被"搬空"了，cookie 留着只会让退出登录后回到一个空壳游客
+        request.state.clear_guest_cookie = True
 
     claimed_set = set(claimed)
     claimed_conv_set = set(claimed_convs)
@@ -1136,6 +1061,11 @@ async def test_key(
     # 代价可控：单机开源形态（AL_AUTH_ENABLED=false）下这一句是空操作，
     # 只有多租户形态才要求先登录——那正是"未登录访客"真实存在的形态。
     require_isolated_identity(identity)
+    # 游客身份现在是每个未登录访客第一次请求就自动铸造的（deps.resolve_guest_identity），
+    # 只挡共享匿名桶已经不等于"挡住未认证访客"了。出网探针要求正式账号：
+    # 游客照样能保存 key、用 BYOK 发起评审，只是"测一下"这个按钮要登录后才可用。
+    if settings.auth_enabled and identity.is_guest:
+        raise Unauthorized("测试 API Key 需要先登录或注册（游客可以直接保存 key 并发起评审）。")
     # 拒绝必须发生在发请求之前，见 assert_api_base_is_safe 的说明
     await _assert_api_base_is_safe_off_loop(body.api_base)
 
@@ -1458,6 +1388,10 @@ async def redeem_cdk(
     resp = {**result, "user_id": user_id}
     if guest_token:
         resp["token"] = guest_token
+        resp["guest"] = True
+    elif identity.is_guest:
+        # 游客 cookie 身份（deps.resolve_guest_identity）：次数已经记在这个浏览器的
+        # 游客名下，凭证就是那把 cookie，不需要再发 token。
         resp["guest"] = True
     return resp
 

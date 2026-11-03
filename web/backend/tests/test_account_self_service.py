@@ -153,9 +153,19 @@ class TestUpdateProfile:
         r = client.patch("/api/auth/me", headers=_h(t), json={"display_name": "   "})
         assert r.status_code == 400
 
-    def test_anonymous_rejected(self, client):
-        r = client.patch("/api/auth/me", json={"display_name": "谁"})
-        assert r.status_code in (400, 401)
+    def test_anonymous_rejected(self, client, monkeypatch, db):
+        """以前未登录调用一律拒绝（共享匿名桶不是"某个人"）。现在未登录访客是
+        自己的游客：只能改到它自己那一行，别人的资料纹丝不动。"""
+        from app.models import User
+
+        other = _signup(client, "prof-bystander@example.com")
+        r = client.patch("/api/auth/me", json={"display_name": "游客改名"})
+        assert r.status_code == 200, r.text
+        guest_id = client.get("/api/auth/me").json()["user_id"]
+        assert r.json()["id"] == guest_id
+        db.expire_all()
+        assert db.get(User, guest_id).display_name == "游客改名"
+        assert client.get("/api/auth/me", headers=_h(other)).json()["display_name"] != "游客改名"
 
     def test_email_is_not_changeable_here(self, client):
         """邮箱是登录名 + 找回密码的收件地址 + 账号唯一键，换它必须走

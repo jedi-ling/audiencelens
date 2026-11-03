@@ -103,6 +103,10 @@ cd web/admin && npx tsc -b                      # 后台管理前端类型检查
 | `AL_AUTH_ENABLED` | `false` | false = `/auth/register`\`/login` 关闭；true = 开放注册登录 |
 | `AL_JWT_SECRET` | `dev-insecure-...` | **生产必须改**；只用于签发登录态，**不参与任何加密** |
 | `AL_JWT_TTL_SECONDS` | `604800`（7天） | 令牌有效期 |
+| `AL_GUEST_COOKIE_NAME` | `al_guest` | 未登录访客游客身份 cookie 的名字（认证开启时，第一次请求即铸造，见下方「游客身份」） |
+| `AL_GUEST_COOKIE_SECURE` | 类生产 → `true`，否则 `false` | cookie 的 Secure 标记；只有纯 http 本机调试才该关 |
+| `AL_GUEST_COOKIE_TTL_SECONDS` | `2592000`（30天） | 游客 cookie / 游客令牌有效期；过期后该浏览器会拿到一个新游客 |
+| `AL_GUEST_IDENTITY_PER_HOUR` | `30` | 每个来源每小时最多新建的游客身份数；超了 429，不会回落共享 anonymous 桶 |
 | `AL_ENCRYPTION_KEY` | 空 → 回落 `DEV_ENCRYPTION_KEY`（一个**独立的**开发默认值） | **落库 API Key 的加密主密钥**；类生产下仍是默认值会**拒绝启动** |
 
 > ⚠️ 这两个密钥**从来不共用**。不设 `AL_ENCRYPTION_KEY` 时回落的是 `config.py` 里
@@ -524,6 +528,12 @@ alembic upgrade head
 ```
 
 生产环境**建议直接上 Alembic**，手写 ALTER 只适合早期。
+
+**数据迁移：隔离 legacy 共享匿名桶**（游客身份 cookie 上线后跑一次）——
+`web/backend/scripts/quarantine_anonymous.py`，默认只预览、`--apply` 才执行、可重复跑。
+它把 `user_id="anonymous"`（以及内容表里 `user_id IS NULL`）的行改挂到
+`quarantine:legacy-anonymous`，不删任何数据。逻辑在 `app/services/guest_service.py`
+末尾一节，部署时的命令见 `web/DEPLOY.md`「升级到游客身份 cookie 版本后」。
 
 ---
 

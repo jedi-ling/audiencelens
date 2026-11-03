@@ -122,10 +122,9 @@ def test_anonymous_gets_a_reason_not_a_blank(client, db, monkeypatch):
         不能指一条不存在的路（"登录后可查看"在这形态下是死路）。"""
     review = _make_completed(db, settings.anonymous_user_id)
     try:
+        # 开认证时未登录访客是自己的游客，anonymous 行对他是 404（连解释都轮不到）
         monkeypatch.setattr(settings, "auth_enabled", True)
-        body = client.get(f"/api/reviews/{review.id}/result").json()
-        assert body["report_html"] is None
-        assert "登录" in (body["html_error"] or "")
+        assert client.get(f"/api/reviews/{review.id}/result").status_code == 404
 
         monkeypatch.setattr(settings, "auth_enabled", False)
         body = client.get(f"/api/reviews/{review.id}/result").json()

@@ -141,12 +141,18 @@ class TestImagesFollowTheConversation:
         assert client.get(url, headers=_h(t)).status_code == 200, "对话认领了但图还留在匿名桶里"
 
     def test_does_not_claim_unrelated_files(self, client):
-        """只跟着对话走。顺手把匿名桶里所有文件都改挂，等于把别人上传的图
-        也划到自己名下。"""
-        other = client.post(
-            "/api/uploads",
-            files={"file": ("o.png", io.BytesIO(bytes([137, 80, 78, 71]) + b"unrelated"), "image/png")},
-        ).json()
+        """认领搬的是**当前游客**名下的东西。别的访客（另一份 cookie）上传的图
+        绝不能跟着划到自己名下——以前共享匿名桶里大家的文件混在一起，
+        所以这里才要"只跟着对话走"；现在边界是游客身份本身。"""
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
+        with TestClient(app) as stranger:
+            other = stranger.post(
+                "/api/uploads",
+                files={"file": ("o.png", io.BytesIO(bytes([137, 80, 78, 71]) + b"unrelated"), "image/png")},
+            ).json()
 
         cid = _anon_conv(client)  # 这段对话里没有任何图
         t = _signup(client, "claim-img2@example.com")
