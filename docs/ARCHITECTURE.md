@@ -59,7 +59,7 @@
 **根目录下两个 `audiencelens-*-harness/` 与 `src/harness/` 的关系**（三者容易被误认为同一样东西，注意区分）：
 - `src/harness/`——本项目内置的质量评估引擎（8 维评分、刻板印象检测、消融实验），是 `src/runner/` 评审流水线的一部分，随主仓库一起维护。
 - `audiencelens-v0.2-harness/`——`web/backend` 运行时依赖的评委规则集/评分标准来源（`ethics_service.py`、`evaluation_service.py` 在启动时从这里读取 evaluators/rubrics/刻板印象模式；缺失时优雅降级为内置规则）。**已转正入库**：`.gitignore` 里那条忽略已删除并写明原因，`git ls-files audiencelens-v0.2-harness` 下有 33 个文件，`docker-compose.yml` 也把它挂进后端容器。转正的理由是「缺了它会静默降级」——降级这件事不报错，fresh clone 出来的站点看起来一切正常，只是评分口径悄悄换成了内置的那套。
-- `audiencelens-harness/`——完全独立的开源发行仓库，自带 `.git`（指向 `github.com/jedilpf/audiencelens-harness`），是面向 Claude Code / Cursor 的 Skill 包分发版本，与本仓库的 `src/`、`web/` 代码无任何导入/调用关系，只是恰好放在同一层目录下。同样已 `.gitignore`。
+- `audiencelens-harness/`——完全独立的 Skill 包分发版本（面向 Claude Code / Cursor 的独立打包，自带自己的 `.git`，不属于本仓库），与本仓库的 `src/`、`web/` 代码无任何导入/调用关系，只是恰好放在同一层目录下。同样已 `.gitignore`。
 
 ---
 

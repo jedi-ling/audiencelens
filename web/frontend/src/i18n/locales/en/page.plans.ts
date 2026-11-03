@@ -19,6 +19,7 @@ export default {
 
   banner_byok:
     'This deployment runs in <mode>BYOK mode</mode>: reviews use the key you supply, so plan quotas don’t apply.',
+  banner_no_platform_key: '<mode>Platform key not currently offered</mode> — BYOK only.',
   banner_no_quota:
     'This deployment has <mode>quota limits switched off</mode> — reviews aren’t capped right now.',
   banner_credits:

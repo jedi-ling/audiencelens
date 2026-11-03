@@ -26,6 +26,9 @@ export default {
 
   // ---- 部署模式横幅：三选一，互斥。<mode> 槽是原来的 <strong> ----
   banner_byok: '当前部署为 <mode>BYOK 模式</mode>：评审使用你自己填的 Key，套餐额度不生效。',
+  // 部署方没有配置平台 Key 时（/api/health 的 server_key_present=false）置顶显示；
+  // 此时下方套餐卡片里"每天 N 次评审 / 平台承担费用"两条会被隐藏，见 PlansPage。
+  banner_no_platform_key: '<mode>平台 Key 当前未开放</mode>，目前仅支持自带 API Key（BYOK）。',
   banner_no_quota: '当前部署<mode>未开启配额限制</mode>，评审暂不受次数约束。',
   banner_credits: '当前部署按 <mode>CDK 次数制</mode>计费：每次评审消耗 1 次，用完可再兑。',
 
