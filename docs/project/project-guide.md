@@ -172,7 +172,7 @@ AudienceLens-Server/          ← 服务器部署版
 |------|---------|
 | **Demo 评价书** | `AudienceLens-Skills/demo/demo-report.html` |
 | **Demo 摘要** | `AudienceLens-Skills/demo/demo-summary.md` |
-| **Landing Page** | `AudienceLens-Skills/docs/landing-page/index.html` |
+| **Landing Page** | `web/frontend/src/pages/landing/` |
 | **arXiv 论文** | `AudienceLens-Skills/docs/arxiv-paper.md` |
 | **基准测试** | `AudienceLens-Skills/docs/benchmark-report.md` |
 | **竞品对比** | `AudienceLens-Skills/docs/competitive-landscape.md` |

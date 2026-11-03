@@ -230,12 +230,8 @@ def rel_path(path):
 # 以前一刀切豁免了全部带横幅的文件，结果 一份早期 BP 页面（已移出仓库） 的正文被改成
 # 72 却不受检查，同一个文件里 171/287 行改对、222 行漏改，谁都不会发现。
 # 所以改成显式白名单：加进来必须写清"这份东西已经以什么形式发出去了"。
-FROZEN_BODY_FILES = frozenset(
-    {
-        "docs/video-promotion-campaign.md",  # 已录制视频的分镜脚本
-        "docs/video-publishing-kit.md",  # 同上，发布物料脚本
-    }
-)
+# 目前为空：原先的两份视频脚本已移出仓库。
+FROZEN_BODY_FILES = frozenset()
 
 
 # 这些行里的数字不是"我们现在有多少"，扫进来只会逼着把正则放松到什么都拦不住。
@@ -370,7 +366,6 @@ MUST_STATE = {
         "persona", "pack", "task_type", "route", "service", "page", "component", "ws_event",
     ),
     "web/frontend/src/pages/landing/landing-body.html": ("persona", "pack", "task_type"),
-    "docs/business-plan.md": ("persona", "pack"),
     "docs/paper/arxiv-paper.md": ("persona", "pack", "task_type"),
     "docs/paper/arxiv-paper-zh.md": ("persona", "pack", "task_type"),
 }
