@@ -601,6 +601,28 @@ class TestSamplingParamsAndModelQuirks:
         _, kwargs = fake_client.messages.create.call_args
         assert kwargs["tool_choice"] == {"type": "auto"}
 
+    def test_repair_sends_follow_up_turn_and_captures_blocks(self):
+        """修复轮：上一次的响应块原样回放 + 每个 tool_use 一个 is_error 的 tool_result。"""
+        fake_client, module = self._anthropic(
+            [SimpleNamespace(type="tool_use", id="toolu_2", name="submit_review", input={"primary_stance": "观望"})]
+        )
+        previous = [{"type": "tool_use", "id": "toolu_1", "name": "submit_review", "input": {}}]
+        blocks: list = []
+        with patch.dict(sys.modules, {"anthropic": module}):
+            chat_completion(
+                model="claude-sonnet-5-5", prompt="hi", api_key="k", provider="anthropic",
+                json_schema=self.SCHEMA, response_blocks=blocks,
+                repair={"assistant_content": previous, "feedback": "缺 scores"},
+            )
+        _, kwargs = fake_client.messages.create.call_args
+        roles = [m["role"] for m in kwargs["messages"]]
+        assert roles == ["user", "assistant", "user"]
+        assert kwargs["messages"][1]["content"] == previous
+        assert kwargs["messages"][2]["content"][0] == {
+            "type": "tool_result", "tool_use_id": "toolu_1", "is_error": True, "content": "缺 scores",
+        }
+        assert blocks and blocks[0]["id"] == "toolu_2"
+
     def test_sonnet_5_keeps_forced_tool_choice(self):
         """家族子串匹配不能误伤 claude-sonnet-5：它仍支持强制工具调用。"""
         from runner.llm_client import _supports_forced_tool_choice

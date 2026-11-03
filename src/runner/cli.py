@@ -310,6 +310,30 @@ def _backoff_sleep(attempt: int, backoff_base_seconds: float) -> None:
     time.sleep(delay + random.uniform(0, backoff_base_seconds))
 
 
+# ---- 诊断落盘（默认关闭）----
+# AUDIENCELENS_DEBUG_RUNS=1 时，每位人格每一次尝试的**原始响应**（有没有调用
+# 工具、工具输入、文本块、stop_reason）和校验结论写进仓库根的 .debug/runs/
+# （已 .gitignore）。用来回答"为什么这位人格没过校验"——默认关闭，因为原始
+# 响应里有完整评审内容。绝不写请求头、API key 或 prompt。
+DEBUG_RUNS_ENV = "AUDIENCELENS_DEBUG_RUNS"
+
+
+def _debug_runs_enabled() -> bool:
+    return os.environ.get(DEBUG_RUNS_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _write_debug_attempt(run_dir: Optional[str], persona_id: str, attempt: int, record: dict) -> None:
+    if not run_dir:
+        return
+    try:
+        os.makedirs(run_dir, exist_ok=True)
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", persona_id)
+        with open(os.path.join(run_dir, f"{safe}-attempt{attempt}.json"), "w", encoding="utf-8") as f:
+            json.dump(record, f, ensure_ascii=False, indent=2, default=str)
+    except OSError:
+        pass  # 诊断落盘失败不得影响评审本身
+
+
 def _validation_failure_reason(validation: dict) -> Optional[str]:
     """把 validate_output 的布尔结论翻译成 retry_on / 门控认的失败类型。
 
@@ -328,6 +352,39 @@ def _validation_failure_reason(validation: dict) -> Optional[str]:
     if not validation.get("evidence_grounded"):
         return RETRY_HALLUCINATION
     return None
+
+
+REPAIR_FEEDBACK_MAX_ITEMS = 8
+
+
+def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
+    """重试时回喂给模型的那段话：校验器说了什么，就原样告诉它，并说清楚怎么改。
+
+    不说"请再试一次"这种空话——同一份提示词原样重发，模型大概率交回同样的东西
+    （诊断实测：同一位人格连续 4 次交回同一种残缺的工具输入）。
+    """
+    details = (validation or {}).get("details") or {}
+    if reason == RETRY_HALLUCINATION:
+        quotes = ((details.get("evidence") or {}).get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
+        listed = "\n".join(f"- {str(q)[:160]}" for q in quotes)
+        return (
+            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据在材料原文里"
+            "找不到逐字出处：\n" + listed + "\n\n"
+            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话）。"
+            "概括、改写或你自己的判断请标为 inferred；材料里没有提到的请标为 gap。"
+        )
+    if reason == RETRY_SCHEMA:
+        errors = blocking_schema_errors(((details.get("schema") or {}).get("errors")) or [])
+        listed = "\n".join(f"- {e}" for e in errors[:REPAIR_FEEDBACK_MAX_ITEMS])
+        return (
+            "你上一次的提交没有通过 JSON Schema 校验：\n" + listed + "\n\n"
+            "请按提示词里的输出骨架提交**完整**结果：所有必填字段都要有；evidence 和 "
+            "key_issues 必须是对象数组，不是字符串；不要在字段值里写 <parameter> 之类的标签。"
+        )
+    return (
+        "你上一次的回复里没有可以解析的评审结果。请通过调用提交工具交出完整的评审结果，"
+        "不要用普通文本作答。"
+    )
 
 
 def _validation_error_message(validation: dict, reason: str) -> str:
@@ -654,11 +711,18 @@ def run_single_persona(
     total_input_tokens = 0
     total_output_tokens = 0
 
+    # 上一次交卷没过校验时的修复信息（上一次的原始响应块 + 校验错误），交给下一次
+    # 调用接成一轮修复对话；传输层错误的重试仍是原样重发（repair 为 None）。
+    repair: Optional[dict] = None
+
     for attempt in range(max_attempts):
         try:
             # 缓存明细走出参：返回的 input_tokens 是真实 token 数（落库/配额用），
             # 缓存折扣只在 estimate_cost 那一步生效，见 persona_agent 的不变式注释。
             cache_usage: dict = {}
+            debug_dir = config.get("debug_run_dir")
+            debug_details: Optional[dict] = {} if debug_dir else None
+            response_blocks: list = []
             raw_output, input_tokens, output_tokens = chat_completion(
                 model=model,
                 prompt=prompt,
@@ -672,6 +736,9 @@ def run_single_persona(
                 # 兼容开 json_object），schema_failure 这类"整次重发"的重试从源头消掉。
                 # 没传 schema（run_panel 的旧统一校验路径）就保持老行为。
                 json_schema=output_schema,
+                debug_details=debug_details,
+                repair=repair,
+                response_blocks=response_blocks,
             )
             cost = estimate_cost(
                 input_tokens, output_tokens, model, budget_config, cache_breakdown=cache_usage
@@ -694,8 +761,13 @@ def run_single_persona(
             # 触发面并不小：max_tokens 截断就足以让花括号不配对，人格 schema 又很大；
             # 第三方 BYOK 模型不守 JSON 格式更是常态。
             if isinstance(output, dict) and output.get("parse_error"):
+                _write_debug_attempt(debug_dir, persona["id"], attempt, {
+                    "persona_id": persona["id"], "attempt": attempt, "model": model,
+                    "response": debug_details, "raw_output": raw_output, "parse_error": True,
+                })
                 if RETRY_SCHEMA in retry_on and attempt < max_attempts - 1:
                     retry_reasons.append(RETRY_SCHEMA)
+                    repair = {"assistant_content": response_blocks, "feedback": _repair_feedback("parse_error", None)}
                     _backoff_sleep(attempt, backoff)
                     continue
                 snippet = str(output.get("raw_output") or "")[:200]
@@ -728,8 +800,20 @@ def run_single_persona(
             if output_schema is not None:
                 validation = validate_output(output, persona, output_schema, artifact_texts)
                 reason = _validation_failure_reason(validation)
+                _write_debug_attempt(debug_dir, persona["id"], attempt, {
+                    "persona_id": persona["id"], "attempt": attempt, "model": model,
+                    "response": debug_details, "raw_output": raw_output,
+                    "validation": validation, "failure_reason": reason,
+                })
                 if reason is not None and reason in retry_on and attempt < max_attempts - 1:
                     retry_reasons.append(reason)
+                    if reason in (RETRY_SCHEMA, RETRY_HALLUCINATION):
+                        repair = {
+                            "assistant_content": response_blocks,
+                            "feedback": _repair_feedback(reason, validation),
+                        }
+                    else:
+                        repair = None
                     _backoff_sleep(attempt, backoff)
                     continue
 
@@ -752,8 +836,13 @@ def run_single_persona(
             # retry_on 里开了 transport_error 且次数没用完才重试；死错一次就返回，
             # 不把"key 配错了"这种该立刻报的错误拖成 N 次重试后才报。
             retryable = is_retryable_error(e)
+            _write_debug_attempt(config.get("debug_run_dir"), persona["id"], attempt, {
+                "persona_id": persona["id"], "attempt": attempt, "model": model,
+                "exception": f"{type(e).__name__}: {e}"[:2000], "retryable": retryable,
+            })
             if retryable and RETRY_TRANSPORT in retry_on and attempt < max_attempts - 1:
                 retry_reasons.append(RETRY_TRANSPORT)
+                repair = None
                 _backoff_sleep(attempt, backoff)
                 continue
             return {
@@ -1075,6 +1164,10 @@ def run_panel(
     config = {
         "budget": budget_config,
         "persona_prompt_path": persona_prompt_path,
+        "debug_run_dir": (
+            os.path.join(base, ".debug", "runs", time.strftime("%Y%m%d-%H%M%S") + f"-{task_type}")
+            if _debug_runs_enabled() else None
+        ),
     }
 
     # 人格评审彼此独立，是 I/O 密集（等 LLM 返回）任务，用线程池并发。
@@ -1549,6 +1642,8 @@ def run_panel(
             # persona_count 必须是真实成功数：以前算的是 len(persona_results)（把失败的
             # 也算进去），于是"8 个人格"的说法和计费都建立在没跑成的人格上。
             "persona_count": succeeded_count,
+            # 每位人格的重试（修复轮 / 传输层重发）次数之和；钱已经算进 total_cost 了
+            "persona_retries": sum(int(r.get("retries") or 0) for r in persona_results),
             "attempted_count": attempted_count,
             "failed_count": failed_count,
             "skipped_count": skipped_count,

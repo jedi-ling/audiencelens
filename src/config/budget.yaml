@@ -83,7 +83,11 @@ model_pricing:
 # 默认只开前两项：role_drift 和 hallucination 是**输出质量**信号而不是"这次调用
 # 坏了"，重跑一次未必更好，但每次重试都是一整轮人格调用的钱。想开的人自己权衡。
 retry:
-  max_retries_per_persona: 3
-  retry_on: [transport_error, schema_failure]
+  # 每位人格最多重试 1 次。schema_failure / hallucination 的重试不是原样重发，
+  # 而是一轮修复对话：把校验器的具体错误（缺哪些字段 / 哪几条 direct 证据在原文里
+  # 找不到）回喂给模型，要求它重新交卷（src/runner/cli.py::_repair_feedback）。
+  # 2026-11-04 诊断：原样重发 3 次，同一位人格每次交回同一种残缺输入，钱白花。
+  max_retries_per_persona: 1
+  retry_on: [transport_error, schema_failure, hallucination]
   # 指数退避基数（秒）：第 n 次重试等 backoff * 2^n + 随机抖动
   backoff_base_seconds: 1.0

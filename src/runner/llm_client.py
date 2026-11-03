@@ -174,6 +174,44 @@ def _append_text_instruction(content: PromptContent, extra: str) -> PromptConten
     return list(content) + [{"type": "text", "text": extra}]
 
 
+def _dump_block(block) -> dict:
+    if hasattr(block, "model_dump"):
+        return block.model_dump(mode="json", exclude_none=True)
+    if isinstance(block, dict):
+        return dict(block)
+    return {k: v for k, v in vars(block).items() if v is not None}
+
+
+def _repair_messages(messages: list, repair: dict) -> list:
+    """把一次"交卷没过校验"的响应接成一轮修复对话。
+
+    assistant_content 是上一次响应的原始内容块（_dump_block 的结果），原样回放；
+    其中每个 tool_use 都必须配一个 tool_result（API 的硬性要求），一律标 is_error，
+    内容是校验器给的具体错误。最后再用一段文字要求重新调用提交工具。
+    没有 assistant_content（比如上一次连工具都没调、或调用方拿不到原始块）时，
+    就只追加一段反馈文字。
+    """
+    feedback = repair.get("feedback") or ""
+    assistant_content = repair.get("assistant_content") or []
+    if not assistant_content:
+        first = messages[0]
+        return [{"role": "user", "content": _append_text_instruction(first["content"], "\n\n" + feedback)}]
+    tool_ids = [b.get("id") for b in assistant_content if b.get("type") == "tool_use" and b.get("id")]
+    follow_up = [
+        {"type": "tool_result", "tool_use_id": tid, "is_error": True, "content": feedback}
+        for tid in tool_ids
+    ]
+    follow_up.append({
+        "type": "text",
+        "text": feedback + "\n\n请只调用一次 `" + STRUCTURED_OUTPUT_TOOL_NAME + "`，提交一份完整、"
+        "通过校验的评审结果。",
+    })
+    return messages + [
+        {"role": "assistant", "content": assistant_content},
+        {"role": "user", "content": follow_up},
+    ]
+
+
 def _anthropic_chat(
     model: str,
     content: PromptContent,
@@ -184,6 +222,9 @@ def _anthropic_chat(
     system: Optional[str] = None,
     json_schema: Optional[dict] = None,
     usage_details: Optional[dict] = None,
+    debug_details: Optional[dict] = None,
+    repair: Optional[dict] = None,
+    response_blocks: Optional[list] = None,
 ) -> Tuple[str, int, int]:
     import anthropic
 
@@ -200,10 +241,13 @@ def _anthropic_chat(
     if json_schema and not forced_tool_choice:
         content = _append_text_instruction(content, _FORCED_TOOL_FALLBACK_INSTRUCTION)
 
+    messages = [{"role": "user", "content": _to_anthropic_content(content)}]
+    if repair:
+        messages = _repair_messages(messages, repair)
     kwargs = {
         "model": model,
         "max_tokens": max_tokens,
-        "messages": [{"role": "user", "content": _to_anthropic_content(content)}],
+        "messages": messages,
     }
     if temperature is not None:
         # temperature 只在调用方**明确指定**时才发出去，见 chat_completion 的形参注释：
@@ -257,6 +301,9 @@ def _anthropic_chat(
         tool_block = next(
             (b for b in response.content if getattr(b, "type", None) == "tool_use"), None
         )
+        if debug_details is not None:
+            debug_details["tool_called"] = tool_block is not None
+            debug_details["tool_input"] = tool_block.input if tool_block is not None else None
         if tool_block is not None:
             # 序列化成 JSON 字符串再交出去，而不是改返回值形状：下游
             # parse_persona_output 的最后一条兜底就是裸 json.loads，直接命中，
@@ -268,6 +315,18 @@ def _anthropic_chat(
         text = "".join(
             block.text for block in response.content if getattr(block, "type", None) == "text"
         )
+    if response_blocks is not None:
+        # 原样留下这次响应的全部内容块（含 thinking 块与它的 signature），修复轮要
+        # 一字不改地回放给模型——Sonnet 5.5 / Opus 5.5 的 thinking 块绑定所在的对话。
+        response_blocks.extend(_dump_block(b) for b in response.content)
+    if debug_details is not None:
+        # 只记**响应内容**（stop_reason / 块类型 / 文本），不记请求头、key、prompt。
+        debug_details["stop_reason"] = getattr(response, "stop_reason", None)
+        debug_details["content_types"] = [getattr(b, "type", None) for b in response.content]
+        debug_details["text_blocks"] = [
+            block.text for block in response.content if getattr(block, "type", None) == "text"
+        ]
+        debug_details.setdefault("tool_called", None)
     usage = response.usage
     # usage.input_tokens 在打了 cache_control 之后只统计**没命中缓存的新增部分**，
     # 缓存读写各自单独记账。这里返回三者之和，即**真实输入 token 总数**。
@@ -382,6 +441,9 @@ def chat_completion(
     system: Optional[str] = None,
     json_schema: Optional[dict] = None,
     usage_details: Optional[dict] = None,
+    debug_details: Optional[dict] = None,
+    repair: Optional[dict] = None,
+    response_blocks: Optional[list] = None,
 ) -> Tuple[str, int, int]:
     """返回 (回复文本, input_tokens, output_tokens)。provider='anthropic' 走官方 SDK，
     其余一律按 OpenAI 兼容协议处理（api_base 必填，否则默认 OpenAI 官方地址）。
@@ -408,6 +470,17 @@ def chat_completion(
     （uncached / cache_creation / cache_read input tokens）写进去。返回的
     input_tokens 始终是**真实 token 总数**，缓存折扣由算钱那一层
     （persona_agent.estimate_cost 的 cache_breakdown 参数）按这份明细折算。
+
+    debug_details：传一个空 dict 进来，Anthropic 路径会把这次**响应**的诊断信息
+    （stop_reason、内容块类型、有没有调用工具、工具输入、文本块）写进去，供
+    runner/cli.py 的 AUDIENCELENS_DEBUG_RUNS 诊断落盘用。不含请求头和 key。
+
+    response_blocks：传一个空 list 进来，Anthropic 路径会把响应的全部内容块原样
+    （含 thinking 块）追加进去，供下一次的 repair 回放。
+    repair：{"assistant_content": 上一次的 response_blocks, "feedback": 校验错误说明}。
+    Anthropic 路径把它接成一轮修复对话（回放上一次响应 + 每个 tool_use 一个
+    is_error 的 tool_result + 反馈）；OpenAI 兼容路径没有块回放，只把反馈追加到
+    这一次的提示词末尾。
     """
     if not isinstance(prompt, str) and not supports_vision(model):
         # 模型不认图，把内容块降级成纯文字，别让评审因为模型选错而整体失败
@@ -423,9 +496,12 @@ def chat_completion(
                 return _anthropic_chat(
                     model, prompt, api_key, max_tokens, temperature,
                     api_base=api_base, system=system, json_schema=json_schema,
-                    usage_details=usage_details,
+                    usage_details=usage_details, debug_details=debug_details,
+                    repair=repair, response_blocks=response_blocks,
                 )
             effective_base = api_base or OPENAI_COMPATIBLE_PRESETS["openai"]["api_base"]
+            if repair and repair.get("feedback"):
+                prompt = _append_text_instruction(prompt, "\n\n" + repair["feedback"])
             return _openai_compatible_chat(
                 model, prompt, api_key, effective_base, max_tokens, temperature,
                 system=system, json_schema=json_schema,

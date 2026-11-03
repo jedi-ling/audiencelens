@@ -1,0 +1,12 @@
+{
+  "input_file": "test-materials/03_steam商店页_深渊回响.md",
+  "task_type": "steam_page_review",
+  "persona_pack": "game-core",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-04",
+  "cost_usd": 0.2716,
+  "tokens_in": 82360,
+  "tokens_out": 15092,
+  "app_commit": "f2a1268"
+}

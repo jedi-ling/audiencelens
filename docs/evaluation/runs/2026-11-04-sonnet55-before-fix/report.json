@@ -1,0 +1,801 @@
+{
+  "meta": {
+    "task_type": "steam_page_review",
+    "target": "深渊回响",
+    "generated_at": "2026-11-03T19:19:22.114287+00:00",
+    "is_synthetic": true,
+    "caveats": [
+      "材料只有文字，不含图片和视频，我无法确认页面是否真的缺少这些素材。",
+      "观望是基于信息缺失，而非已有负面证据。",
+      "毒舌立场被刻意放大，用来暴露最容易挨喷的点，不代表对游戏品质的最终定论。",
+      "本评审基于材料,价格和日期均为「预计」,可能变化。",
+      "核心决策规则「价格与内容体量/质量不匹配则不买」没有被触发,因为纸面体量与价格大致匹配。但付费点模糊触发了观望,这是信息缺失而非负面证据。",
+      "价格锚点判断部分依赖角色先验,材料没有提供同类对比。"
+    ],
+    "build_version": "0.3.0",
+    "persona_pack_version": "game-core@0.1.0"
+  },
+  "executive_summary": {
+    "primary_recommendation": "观望",
+    "release_risk": "critical",
+    "evidence_quality": "weak"
+  },
+  "consensus": {
+    "agreed_points": [],
+    "questioned_points": [
+      "零实机、零 trailer、零截图，卖点全靠嘴说",
+      "回响机制没有证明，也没讲清和同类的区别",
+      "发售状态含糊，EA 与正式版没说清",
+      "评价样本太少，且回避了已暴露的问题",
+      "新人团队的完成度和优化风险没有保障",
+      "付费边界完全没写",
+      "没有 demo 或试错空间",
+      "12-15 小时的体量没有佐证,重复风险没被回应",
+      "价格是「预计」,也没有价格锚点",
+      "首作团队的交付风险没有缓冲说明"
+    ],
+    "shared_concerns": [
+      {
+        "issue": "零实机、零 trailer、零截图，卖点全靠嘴说",
+        "personas": [
+          "P15-toxic-skeptic-reviewer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "零实机、零 trailer、零截图，卖点全靠嘴说"
+        ]
+      },
+      {
+        "issue": "回响机制没有证明，也没讲清和同类的区别",
+        "personas": [
+          "P15-toxic-skeptic-reviewer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "回响机制没有证明，也没讲清和同类的区别"
+        ]
+      },
+      {
+        "issue": "发售状态含糊，EA 与正式版没说清",
+        "personas": [
+          "P15-toxic-skeptic-reviewer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "发售状态含糊，EA 与正式版没说清"
+        ]
+      },
+      {
+        "issue": "评价样本太少，且回避了已暴露的问题",
+        "personas": [
+          "P15-toxic-skeptic-reviewer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "评价样本太少，且回避了已暴露的问题"
+        ]
+      },
+      {
+        "issue": "新人团队的完成度和优化风险没有保障",
+        "personas": [
+          "P15-toxic-skeptic-reviewer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "新人团队的完成度和优化风险没有保障"
+        ]
+      },
+      {
+        "issue": "付费边界完全没写",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "付费边界完全没写"
+        ]
+      },
+      {
+        "issue": "没有 demo 或试错空间",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有 demo 或试错空间"
+        ]
+      },
+      {
+        "issue": "12-15 小时的体量没有佐证,重复风险没被回应",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "12-15 小时的体量没有佐证,重复风险没被回应"
+        ]
+      },
+      {
+        "issue": "价格是「预计」,也没有价格锚点",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "价格是「预计」,也没有价格锚点"
+        ]
+      },
+      {
+        "issue": "首作团队的交付风险没有缓冲说明",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "首作团队的交付风险没有缓冲说明"
+        ]
+      }
+    ],
+    "stance_distribution": {
+      "观望": 2
+    },
+    "persona_count": 2,
+    "threshold": 0.7,
+    "min_personas_for_agreement": 2
+  },
+  "major_disagreements": [],
+  "priority_fixes": [
+    {
+      "priority": 1,
+      "issue": "零实机、零 trailer、零截图，卖点全靠嘴说",
+      "severity": "critical",
+      "why_it_matters": "我的第一条规则：卖点没证据就先怀疑。水墨美术是唯一的招牌，却看不到画面，我只能当它是文案包装。",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "suggested_fix": "页面顶部放 60 秒真实录屏的 trailer，要有战斗、探索和“回响”机制的实际演示。再补 5 张以上无后期的游戏内截图。",
+      "score": 2.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "零实机、零 trailer、零截图，卖点全靠嘴说"
+      ]
+    },
+    {
+      "priority": 2,
+      "issue": "回响机制没有证明，也没讲清和同类的区别",
+      "severity": "high",
+      "why_it_matters": "这是唯一的差异化卖点。内测玩家 B 又说中期重复，所以我怀疑这个机制只是噱头。",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "suggested_fix": "用 GIF 展示回响如何改变玩法和解谜，并说明中期如何避免重复。",
+      "score": 1.5,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "回响机制没有证明，也没讲清和同类的区别"
+      ]
+    },
+    {
+      "priority": 3,
+      "issue": "发售状态含糊，EA 与正式版没说清",
+      "severity": "high",
+      "why_it_matters": "评价标着“早期访问阶段”，发售却写 2027 年 Q1。如果是 EA，却用正式版口吻卖，我会倾向差评。",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "suggested_fix": "明确写出是 EA 还是 1.0。如果是 EA，补上路线图、哪些内容未完成、EA 期限和价格变动。",
+      "score": 1.5,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "发售状态含糊，EA 与正式版没说清"
+      ]
+    },
+    {
+      "priority": 4,
+      "issue": "付费边界完全没写",
+      "severity": "high",
+      "why_it_matters": "我对 DLC、内购和版本拆分很敏感。页面不写「一次买断即完整」,我就要先假设有后续付费,这会触发观望。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "页面明确写出买断制、无内购、无计划中的付费 DLC。如果有 DLC 计划,写清内容和价格。",
+      "score": 1.5,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "付费边界完全没写"
+      ]
+    },
+    {
+      "priority": 5,
+      "issue": "没有 demo 或试错空间",
+      "severity": "high",
+      "why_it_matters": "首作团队加上内测反馈提到中期重复,我没法在付费前验证 12-15 小时是否值 $19.99。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "在 Steam Next Fest 或上线前提供一段 demo,至少覆盖前 1-2 小时和一次回响死亡。",
+      "score": 1.5,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "没有 demo 或试错空间"
+      ]
+    },
+    {
+      "priority": 6,
+      "issue": "评价样本太少，且回避了已暴露的问题",
+      "severity": "medium",
+      "why_it_matters": "只有 2 条 Discord 评价，显得像挑选过的。迷路和重复这两个差评点，页面没有回应。",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "suggested_fix": "说明评价来源和人数。对小地图和中期重复给出明确的改进承诺或已有改动。",
+      "score": 1.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "评价样本太少，且回避了已暴露的问题"
+      ]
+    },
+    {
+      "priority": 7,
+      "issue": "新人团队的完成度和优化风险没有保障",
+      "severity": "medium",
+      "why_it_matters": "4 人业余开发，首作。流程 12-15 小时和 8 种能力的说法无从核验，$19.99 的价格缺少支撑。",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "suggested_fix": "提供免费 Demo 或 Steam Next Fest 试玩。公布已完成内容比例和开发里程碑。",
+      "score": 1.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "新人团队的完成度和优化风险没有保障"
+      ]
+    },
+    {
+      "priority": 8,
+      "issue": "12-15 小时的体量没有佐证,重复风险没被回应",
+      "severity": "medium",
+      "why_it_matters": "每小时价值取决于内容是否真实。内测玩家 B 说中期重复,A 说迷路。流程时长可能靠绕路和重复撑出来。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "补充能力数量、区域数、Boss 数,说明中期如何变化。回应小地图问题。",
+      "score": 1.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "12-15 小时的体量没有佐证,重复风险没被回应"
+      ]
+    },
+    {
+      "priority": 9,
+      "issue": "价格是「预计」,也没有价格锚点",
+      "severity": "medium",
+      "why_it_matters": "价格没有锁定,也没有和同类作品、早期折扣或愿望单折扣对比。我无法判断 $19.99 是否合理。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "确认发售价和区域定价。说明首发折扣。对比同类作品的时长与价格。",
+      "score": 1.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "价格是「预计」,也没有价格锚点"
+      ]
+    },
+    {
+      "priority": 10,
+      "issue": "首作团队的交付风险没有缓冲说明",
+      "severity": "medium",
+      "why_it_matters": "业余时间开发的首作团队,延期或质量问题的概率较高。我没有退路,只能靠退款。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "公开开发进度、已完成内容比例、里程碑和 Bug 修复承诺。",
+      "score": 1.0,
+      "dedup_method": "lexical",
+      "title_variants": [
+        "首作团队的交付风险没有缓冲说明"
+      ]
+    }
+  ],
+  "persona_notes": [
+    {
+      "persona_id": "P15-toxic-skeptic-reviewer",
+      "persona_name": "老刀",
+      "stance": "观望",
+      "evidence_top3": [
+        "材料里没有任何截图、实机视频或 trailer 描述。我首先要看的就是实机，这页一个都没给。",
+        "核心卖点“回响”死亡机制、8 种能力、黑白水墨加血红点缀，全是文字自夸，没有任何可核验的画面或演示。",
+        "“用户评价”只有 2 条，来自 Discord 内测群，没有 Steam 评测，也没说明是否由团队自己挑选。一条说迷路、要小地图，一条说中期重复。这两条本身就是在暴露缺点，页面却没有回应。"
+      ],
+      "top_issues": [
+        "零实机、零 trailer、零截图，卖点全靠嘴说",
+        "回响机制没有证明，也没讲清和同类的区别",
+        "发售状态含糊，EA 与正式版没说清",
+        "评价样本太少，且回避了已暴露的问题",
+        "新人团队的完成度和优化风险没有保障"
+      ],
+      "continue_triggers": [
+        "放出真实、未剪辑的实机 trailer，并和页面描述一致",
+        "明确 EA 或正式版状态，并附路线图",
+        "有可试玩的 Demo，且优化稳定",
+        "团队公开回应小地图、中期重复等内测反馈"
+      ],
+      "quit_triggers": [
+        "到发售前仍然没有实机",
+        "宣传的“回响”机制和实际体验对不上",
+        "EA 却用完整版口吻卖，价格不降",
+        "Demo 或 Steam 评测里优化口碑差",
+        "团队回避内测暴露的问题"
+      ]
+    },
+    {
+      "persona_id": "P14-price-sensitive-buyer",
+      "persona_name": "张宁",
+      "stance": "观望",
+      "evidence_top3": [
+        "预计定价 $19.99;预计流程 12-15 小时。按流程折算约 $1.3-1.7/小时,纸面上体量与价格大致匹配。",
+        "页面没有说明 DLC、内购、版本差异或后续付费计划。无法确认这 $19.99 是否买到完整内容。",
+        "页面没有提 demo、试玩或退款友好的试错入口。我没法在掏钱前验证 12-15 小时的质量。"
+      ],
+      "top_issues": [
+        "付费边界完全没写",
+        "没有 demo 或试错空间",
+        "12-15 小时的体量没有佐证,重复风险没被回应",
+        "价格是「预计」,也没有价格锚点",
+        "首作团队的交付风险没有缓冲说明"
+      ],
+      "continue_triggers": [
+        "页面明确写出买断制、无内购、无付费 DLC 计划",
+        "有 demo,能验证前 1-2 小时和回响机制",
+        "发售后公开评测中没有「坑钱」或「后期重复」的共识",
+        "发售价锁定且 $19.99 配有清晰的内容量佐证"
+      ],
+      "quit_triggers": [
+        "把未来更新(如小地图或后期区域)当成现有价值来卖",
+        "发售时出现付费结构不透明的内购、季票或拆分版本",
+        "没有 demo,首发评测里出现「后半程重复」的集中反馈",
+        "价格上调但内容量没有变化"
+      ]
+    }
+  ],
+  "evidence_profile": {
+    "total": 19,
+    "direct": 14,
+    "inferred": 2,
+    "gap": 3,
+    "inferred_ratio": 0.105,
+    "threshold": 0.4,
+    "per_persona": [
+      {
+        "persona_id": "P15-toxic-skeptic-reviewer",
+        "direct": 7,
+        "inferred": 1,
+        "gap": 1,
+        "total": 9,
+        "inferred_ratio": 0.111
+      },
+      {
+        "persona_id": "P14-price-sensitive-buyer",
+        "direct": 7,
+        "inferred": 1,
+        "gap": 2,
+        "total": 10,
+        "inferred_ratio": 0.1
+      }
+    ]
+  },
+  "dimension_scores": [
+    {
+      "dim": "clarity",
+      "avg": 3.5,
+      "min": 3.0,
+      "max": 4.0,
+      "count": 2
+    },
+    {
+      "dim": "trust",
+      "avg": 2.0,
+      "min": 2.0,
+      "max": 2.0,
+      "count": 2
+    },
+    {
+      "dim": "differentiation",
+      "avg": 2.5,
+      "min": 2.0,
+      "max": 3.0,
+      "count": 2
+    },
+    {
+      "dim": "value_for_money",
+      "avg": 2.5,
+      "min": 2.0,
+      "max": 3.0,
+      "count": 2
+    },
+    {
+      "dim": "wishlist_appeal",
+      "avg": 2.5,
+      "min": 2.0,
+      "max": 3.0,
+      "count": 2
+    }
+  ],
+  "information_gaps": [
+    "实机视频 / trailer",
+    "游戏截图",
+    "EA 或正式版的明确状态与路线图",
+    "Demo 链接",
+    "Steam 公开评测或第三方口碑",
+    "实测性能数据",
+    "8 种能力和 12-15 小时流程的完成度证明",
+    "开发者公告或更新日志",
+    "是否买断制,有无 DLC、内购或季票",
+    "demo 或试玩计划",
+    "内容量细节(区域数、Boss 数、能力解锁节奏)",
+    "是否会加入小地图和中期内容变化的回应",
+    "同类作品对比与首发折扣",
+    "发售价和区域定价是否锁定",
+    "公开评价或第三方评测"
+  ],
+  "next_human_test": {
+    "suggested_tasks": [],
+    "recruit_types": [
+      "22-40 · 全球平台评论生态 · 老平台用户 · PC · broad-but-cynical",
+      "20-30 · 日本/台湾文化圈 · 核心 · PC/Switch · artsy-indie/cozy/walking-sim",
+      "23-35 · 北美城市 · 平台重度浏览 · PC/SteamDeck · wide-variety",
+      "24-40 · 中国大陆 · 中核消费型 · PC/Mobile · broad",
+      "27-40 · 北美 · 核心老兵 · PC/Console · genre-veteran",
+      "25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim"
+    ],
+    "recruit_types_basis": "本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议",
+    "next_materials": [
+      "补充材料：实机视频 / trailer",
+      "补充材料：游戏截图",
+      "补充材料：EA 或正式版的明确状态与路线图",
+      "补充材料：Demo 链接",
+      "补充材料：Steam 公开评测或第三方口碑",
+      "补充材料：实测性能数据",
+      "补充材料：8 种能力和 12-15 小时流程的完成度证明",
+      "补充材料：开发者公告或更新日志",
+      "补充材料：是否买断制,有无 DLC、内购或季票",
+      "补充材料：demo 或试玩计划",
+      "补充材料：内容量细节(区域数、Boss 数、能力解锁节奏)",
+      "补充材料：是否会加入小地图和中期内容变化的回应",
+      "补充材料：同类作品对比与首发折扣",
+      "补充材料：发售价和区域定价是否锁定",
+      "补充材料：公开评价或第三方评测"
+    ]
+  },
+  "cross_examination": null,
+  "compliance": {
+    "status": "通过",
+    "status_class": "pass",
+    "ethics_score": 100,
+    "score_class": "high",
+    "recommended_steps": [
+      "结果可供参考，但仍建议人工抽检"
+    ],
+    "scope": "identity_behavior_decoupling",
+    "scope_label": "身份-行为解耦检查",
+    "violation_count": 0
+  },
+  "predictions": [
+    {
+      "prediction_id": "PRED-001",
+      "type": "intervention_hypothesis",
+      "claim": "修复“零实机、零 trailer、零截图，卖点全靠嘴说”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "零实机、零 trailer、零截图，卖点全靠嘴说",
+      "intervention": "页面顶部放 60 秒真实录屏的 trailer，要有战斗、探索和“回响”机制的实际演示。再补 5 张以上无后期的游戏内截图。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "critical",
+      "confidence": 0.825,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "evidence": "我的第一条规则：卖点没证据就先怀疑。水墨美术是唯一的招牌，却看不到画面，我只能当它是文案包装。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-002",
+      "type": "intervention_hypothesis",
+      "claim": "修复“回响机制没有证明，也没讲清和同类的区别”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "回响机制没有证明，也没讲清和同类的区别",
+      "intervention": "用 GIF 展示回响如何改变玩法和解谜，并说明中期如何避免重复。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.725,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "evidence": "这是唯一的差异化卖点。内测玩家 B 又说中期重复，所以我怀疑这个机制只是噱头。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-003",
+      "type": "intervention_hypothesis",
+      "claim": "修复“发售状态含糊，EA 与正式版没说清”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "发售状态含糊，EA 与正式版没说清",
+      "intervention": "明确写出是 EA 还是 1.0。如果是 EA，补上路线图、哪些内容未完成、EA 期限和价格变动。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.725,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "evidence": "评价标着“早期访问阶段”，发售却写 2027 年 Q1。如果是 EA，却用正式版口吻卖，我会倾向差评。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-004",
+      "type": "intervention_hypothesis",
+      "claim": "修复“付费边界完全没写”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "付费边界完全没写",
+      "intervention": "页面明确写出买断制、无内购、无计划中的付费 DLC。如果有 DLC 计划,写清内容和价格。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.725,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "我对 DLC、内购和版本拆分很敏感。页面不写「一次买断即完整」,我就要先假设有后续付费,这会触发观望。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-005",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有 demo 或试错空间”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "没有 demo 或试错空间",
+      "intervention": "在 Steam Next Fest 或上线前提供一段 demo,至少覆盖前 1-2 小时和一次回响死亡。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.725,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "首作团队加上内测反馈提到中期重复,我没法在付费前验证 12-15 小时是否值 $19.99。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-006",
+      "type": "intervention_hypothesis",
+      "claim": "修复“评价样本太少，且回避了已暴露的问题”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "评价样本太少，且回避了已暴露的问题",
+      "intervention": "说明评价来源和人数。对小地图和中期重复给出明确的改进承诺或已有改动。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.625,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "evidence": "只有 2 条 Discord 评价，显得像挑选过的。迷路和重复这两个差评点，页面没有回应。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-007",
+      "type": "intervention_hypothesis",
+      "claim": "修复“新人团队的完成度和优化风险没有保障”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "新人团队的完成度和优化风险没有保障",
+      "intervention": "提供免费 Demo 或 Steam Next Fest 试玩。公布已完成内容比例和开发里程碑。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.625,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P15-toxic-skeptic-reviewer"
+      ],
+      "evidence": "4 人业余开发，首作。流程 12-15 小时和 8 种能力的说法无从核验，$19.99 的价格缺少支撑。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-008",
+      "type": "intervention_hypothesis",
+      "claim": "修复“12-15 小时的体量没有佐证,重复风险没被回应”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "12-15 小时的体量没有佐证,重复风险没被回应",
+      "intervention": "补充能力数量、区域数、Boss 数,说明中期如何变化。回应小地图问题。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.625,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "每小时价值取决于内容是否真实。内测玩家 B 说中期重复,A 说迷路。流程时长可能靠绕路和重复撑出来。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-009",
+      "type": "intervention_hypothesis",
+      "claim": "修复“价格是「预计」,也没有价格锚点”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "价格是「预计」,也没有价格锚点",
+      "intervention": "确认发售价和区域定价。说明首发折扣。对比同类作品的时长与价格。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.625,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "价格没有锁定,也没有和同类作品、早期折扣或愿望单折扣对比。我无法判断 $19.99 是否合理。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-010",
+      "type": "intervention_hypothesis",
+      "claim": "修复“首作团队的交付风险没有缓冲说明”后，wishlist_add_rate 相较当前版本将提高",
+      "issue": "首作团队的交付风险没有缓冲说明",
+      "intervention": "公开开发进度、已完成内容比例、里程碑和 Bug 修复承诺。",
+      "target_metric": "wishlist_add_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.wishlist_add_rate > control.wishlist_add_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.625,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "业余时间开发的首作团队,延期或质量问题的概率较高。我没有退路,只能靠退款。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    }
+  ],
+  "adaptive_panel": {
+    "requested": false,
+    "enabled": false,
+    "disabled_reason": null,
+    "method": "fixed_panel",
+    "initial_size": null,
+    "eligible_personas": 6,
+    "executed_personas": 6,
+    "saved_persona_calls": 0,
+    "min_score": null,
+    "decisions": [],
+    "limitation": null
+  },
+  "degradation": {
+    "degraded": true,
+    "attempted_count": 6,
+    "succeeded_count": 2,
+    "failed_count": 4,
+    "failed_personas": [
+      {
+        "persona_id": "P06-visual-atmosphere-lover",
+        "error": "校验未通过（hallucination）：direct 证据 33% 在材料中找不到出处（阈值 30%），疑似幻觉",
+        "model": "claude-sonnet-5-5",
+        "failure_reason": "hallucination",
+        "retries": 0
+      },
+      {
+        "persona_id": "P10-steam-wishlist-browser",
+        "error": "校验未通过（hallucination）：direct 证据 40% 在材料中找不到出处（阈值 30%），疑似幻觉",
+        "model": "claude-sonnet-5-5",
+        "failure_reason": "hallucination",
+        "retries": 0
+      },
+      {
+        "persona_id": "P16-competitor-loyal-veteran",
+        "error": "校验未通过（schema_failure）：: 'scores' is a required property; : 'key_issues' is a required property",
+        "model": "claude-sonnet-5-5",
+        "failure_reason": "schema_failure",
+        "retries": 3
+      },
+      {
+        "persona_id": "P01-indie-core-operator",
+        "error": "校验未通过（schema_failure）：: 'scores' is a required property; : 'key_issues' is a required property",
+        "model": "claude-sonnet-5-5",
+        "failure_reason": "schema_failure",
+        "retries": 3
+      }
+    ],
+    "notice": "本次有 4 位人格未能完成评审，以下结论仅基于 2 位人格的输出。"
+  },
+  "abstentions": [],
+  "validation": {
+    "retry": {
+      "max_retries": 3,
+      "retry_on": [
+        "transport_error",
+        "schema_failure"
+      ],
+      "unknown_retry_on": [],
+      "backoff_base_seconds": 1.0
+    },
+    "gated_out": [
+      {
+        "persona_id": "P06-visual-atmosphere-lover",
+        "failure_reason": "hallucination"
+      },
+      {
+        "persona_id": "P10-steam-wishlist-browser",
+        "failure_reason": "hallucination"
+      },
+      {
+        "persona_id": "P16-competitor-loyal-veteran",
+        "failure_reason": "schema_failure"
+      },
+      {
+        "persona_id": "P01-indie-core-operator",
+        "failure_reason": "schema_failure"
+      }
+    ]
+  },
+  "budget": {
+    "max_cost_per_run_usd": 2.0,
+    "persona_cost_usd": 0.271562,
+    "exceeded": false,
+    "skipped_stages": [],
+    "notice": ""
+  }
+}
