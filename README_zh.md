@@ -19,9 +19,9 @@
 
 ## 截图
 
-![对话式评审入口](docs/images/hero.png)
-![样例报告页](docs/images/samples.png)
-![评审报告](docs/images/report.png)
+![对话式评审入口](docs/images/zh/hero.png)
+![样例报告页](docs/images/zh/samples.png)
+![评审报告](docs/images/zh/report.png)
 
 ## 样例报告
 

@@ -21,9 +21,11 @@
 
 ## スクリーンショット
 
-![対話型のレビュー入力画面](docs/images/hero.png)
-![サンプルレポート一覧](docs/images/samples.png)
-![レビューレポート](docs/images/report.png)
+![対話型のレビュー入力画面](docs/images/en/hero.png)
+![サンプルレポート一覧](docs/images/en/samples.png)
+![レビューレポート](docs/images/en/report.png)
+
+<sub>UI は英語版のスクリーンショットです（日本語 UI は未対応）。レポート本文は中国語です。現在のエンジンは中国語のレポートのみを生成します。</sub>
 
 ---
 

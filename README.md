@@ -23,9 +23,11 @@ English · [中文](README_zh.md) · [日本語](README_ja.md)
 
 ## Screenshots
 
-![Conversational review entry](docs/images/hero.png)
-![Sample reports page](docs/images/samples.png)
-![Review report](docs/images/report.png)
+![Conversational review entry](docs/images/en/hero.png)
+![Sample reports page](docs/images/en/samples.png)
+![Review report](docs/images/en/report.png)
+
+<sub>English UI. The report body is Chinese because the engine currently generates reports in Chinese only.</sub>
 
 ---
 
