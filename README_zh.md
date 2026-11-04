@@ -7,7 +7,7 @@
 [![CI](https://github.com/jedi-ling/audiencelens/actions/workflows/ci.yml/badge.svg)](https://github.com/jedi-ling/audiencelens/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) · 中文
+[English](README.md) · 中文 · [日本語](README_ja.md)
 
 </div>
 

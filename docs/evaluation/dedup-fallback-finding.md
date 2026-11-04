@@ -43,6 +43,7 @@ threshold and nothing above it. Character overlap is low even when the meaning i
   (`runner.cli.run_panel_from_outputs`, cross-exam only, standard mode). Cross-examination ran in
   all three: 2 / 3 / 1 disputes, every rebuttal parsed (no failures, no truncation), total
   $0.0720 for the three rebuttal calls. No vote changed: the largest confidence movement was 2
-  points against a threshold of 15 (θ = 0.15).
+  points against a threshold of 15 (θ = 0.15). What that does and does not tell us:
+  [cross-exam-observation.md](cross-exam-observation.md).
 - Still open (docs/MAINTENANCE.md §10): a deterministic issue-category fallback for deployments
   without the semantic model, and making the model name configurable.
