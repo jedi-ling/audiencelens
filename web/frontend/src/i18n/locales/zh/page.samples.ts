@@ -20,5 +20,6 @@ export default {
   'date.label': '生成日期',
   'cost.label': '本次花费',
   'personas.label': '通过校验的人格',
+  'disputes.label': '交叉质询：{{count}} 个争议点，每个都跑了一轮反驳',
   'no_cross_exam.hint': '这份报告里人格之间没有足够明显的分歧，交叉质询这一步没有运行。',
 } satisfies Messages

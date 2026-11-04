@@ -20,7 +20,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "examples", "reports")
 DST = os.path.join(ROOT, "web", "frontend", "public", "sample-reports")
-COPIED = ("report.html", "meta.json")
+COPIED = ("report.html", "meta.json")  # persona_outputs.json stays in examples/ only
 
 
 def expected_files() -> dict:
@@ -49,7 +49,9 @@ def expected_files() -> dict:
             "cost_usd": meta["cost_usd"],
             "personas_passed": degradation.get("succeeded_count"),
             "personas_attempted": degradation.get("attempted_count"),
-            "cross_exam_ran": bool(report.get("cross_examination")),
+            "cross_exam_ran": bool((report.get("cross_examination") or {}).get("is_live_debate")),
+            "disputes": len((report.get("cross_examination") or {}).get("disputes") or []),
+            "dedup_method": meta.get("dedup_method"),
         })
     out["index.json"] = (json.dumps(index, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     return out

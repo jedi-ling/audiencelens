@@ -172,3 +172,24 @@ def test_semantic_dedup_carries_no_notice(monkeypatch):
     assert result["report"]["dedup"] == {"method": "semantic", "notice": ""}
     assert "Semantic dedup not installed" not in result["markdown"]
     assert "Semantic dedup not installed" not in result["html"]
+
+
+# ---------------------------------------------------------------------------
+# Docker 镜像预下载的模型必须就是引擎要加载的那个
+# ---------------------------------------------------------------------------
+
+
+def test_docker_image_bakes_the_model_the_engine_loads():
+    """镜像里 HF_HUB_OFFLINE=1，运行时不再下载：两边模型名一旦不一致，引擎加载失败、
+    悄悄退回词面档，报告里只会多一条"语义去重未安装"的提示。"""
+    import os
+    import re
+
+    from runner.similarity import SEMANTIC_MODEL_NAME
+
+    dockerfile = open(os.path.join(tc.PROJECT_ROOT, "web", "backend", "Dockerfile"), encoding="utf-8").read()
+    assert re.search(r"^ARG INSTALL_SEMANTIC_DEDUP=true$", dockerfile, re.M), "语义去重应默认开启"
+    model = re.search(r"^ARG SEMANTIC_MODEL=(\S+)$", dockerfile, re.M)
+    assert model and model.group(1) == SEMANTIC_MODEL_NAME
+    assert "download.pytorch.org/whl/cpu" in dockerfile, "只能装 CPU 版 torch"
+    assert re.search(r"^ENV HF_HUB_OFFLINE=1$", dockerfile, re.M)

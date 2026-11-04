@@ -271,7 +271,7 @@
     <div class="post-badge">玩家模拟评审报告</div>
     <h1 class="post-title">选择适合你的方案</h1>
     <div class="post-meta">
-      <span>📅 2026-11-03T19:37:06.399774+00:00</span>
+      <span>📅 2026-11-04T01:20:56.029143+00:00</span>
       <span class="sep">|</span>
       <span>👤 5 位模拟评审员</span>
       <span class="sep">|</span>
@@ -346,22 +346,16 @@
     
     <div class="sub-title">多数 persona 共同提出的议题</div>
     
-    <div style="font-size:12px;opacity:.8">本次没有任何议题达到共识门槛。</div>
+    <ul class="point-list agree">
+      
+      <li><span class="dot"></span>竞品对比口径不一致，缺少来源</li>
+      
+    </ul>
     
     
     
     <div class="sub-title" style="margin-top:12px">仅个别 persona 提出的议题</div>
     <ul class="point-list question">
-      
-      <li><span class="dot"></span>竞品对比表匿名、口径不一，一眼就是“自说自话”</li>
-      
-      <li><span class="dot"></span>“无隐藏费用”“随时降级”缺少超限处理说明</li>
-      
-      <li><span class="dot"></span>零社会证明：没有评论、评分、用户数，“最受欢迎”无来源</li>
-      
-      <li><span class="dot"></span>AI 摘要、“无限”权益缺少限制说明和演示</li>
-      
-      <li><span class="dot"></span>团队版不标透明条款，SLA 无赔付</li>
       
       <li><span class="dot"></span>没有试用期，也没有自动续费条款</li>
       
@@ -369,39 +363,23 @@
       
       <li><span class="dot"></span>AI 摘要用量边界和涨价承诺未说明</li>
       
-      <li><span class="dot"></span>竞品对比口径不一致，缺少来源</li>
-      
       <li><span class="dot"></span>团队版价格和合同不透明</li>
+      
+      <li><span class="dot"></span>“无隐藏费用”“随时降级”缺少超限处理说明</li>
+      
+      <li><span class="dot"></span>零社会证明：没有评论、评分、用户数，“最受欢迎”无来源</li>
       
       <li><span class="dot"></span>页面没有任何安全合规信息</li>
       
       <li><span class="dot"></span>没有迁移和上线支持路径</li>
       
-      <li><span class="dot"></span>团队版预算不可自助测算</li>
-      
       <li><span class="dot"></span>长期可靠性的证据只有一个 SLA 数字</li>
-      
-      <li><span class="dot"></span>竞品对比与团队采购无关</li>
-      
-      <li><span class="dot"></span>完全没有导入和迁移支持说明</li>
-      
-      <li><span class="dot"></span>竞品对比只挑自家占优的项，竞品还匿名</li>
-      
-      <li><span class="dot"></span>没有专业版试用，免费版也无法试迁移</li>
-      
-      <li><span class="dot"></span>导出保真度没说清</li>
-      
-      <li><span class="dot"></span>AI 摘要等高级功能的用量上限未写明</li>
       
       <li><span class="dot"></span>功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）</li>
       
-      <li><span class="dot"></span>免费版超过限制后会怎样没有说明</li>
-      
-      <li><span class="dot"></span>价格数字多且口径混杂，“无隐藏费用”没落到具体内容</li>
-      
-      <li><span class="dot"></span>没有试用入口，升级和退款流程也没讲</li>
-      
       <li><span class="dot"></span>“联系销售”让人不知道后面会发生什么</li>
+      
+      <li><span class="dot"></span>导出保真度没说清</li>
       
     </ul>
     
@@ -428,6 +406,54 @@
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">1</td>
+          <td style="font-weight:600;">竞品对比口径不一致，缺少来源</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer, P47-skeptical-reviewer-general, P48-b2b-decision-maker, P53-competitor-loyal-switcher</td>
+          <td style="color:var(--text-secondary);">写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">2</td>
+          <td style="font-weight:600;">没有试用期，也没有自动续费条款</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer, P49-first-time-user, P53-competitor-loyal-switcher</td>
+          <td style="color:var(--text-secondary);">写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">3</td>
+          <td style="font-weight:600;">没有迁移和上线支持路径</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker, P53-competitor-loyal-switcher</td>
+          <td style="color:var(--text-secondary);">增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">4</td>
+          <td style="font-weight:600;">“无隐藏费用”“随时降级”缺少超限处理说明</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general, P49-first-time-user</td>
+          <td style="color:var(--text-secondary);">在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">5</td>
+          <td style="font-weight:600;">AI 摘要用量边界和涨价承诺未说明</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer, P47-skeptical-reviewer-general, P53-competitor-loyal-switcher</td>
+          <td style="color:var(--text-secondary);">列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">6</td>
+          <td style="font-weight:600;">团队版价格和合同不透明</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer, P47-skeptical-reviewer-general, P48-b2b-decision-maker</td>
+          <td style="color:var(--text-secondary);">公开团队版年付价和合同期限，附 SLA 条款和赔付比例。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">7</td>
           <td style="font-weight:600;">页面没有任何安全合规信息</td>
           <td><span class="severity-badge critical">critical</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker</td>
@@ -435,39 +461,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">2</td>
-          <td style="font-weight:600;">完全没有导入和迁移支持说明</td>
-          <td><span class="severity-badge critical">critical</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P53-competitor-loyal-switcher</td>
-          <td style="color:var(--text-secondary);">增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">3</td>
-          <td style="font-weight:600;">竞品对比表匿名、口径不一，一眼就是“自说自话”</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general</td>
-          <td style="color:var(--text-secondary);">写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">4</td>
-          <td style="font-weight:600;">“无隐藏费用”“随时降级”缺少超限处理说明</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general</td>
-          <td style="color:var(--text-secondary);">在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">5</td>
-          <td style="font-weight:600;">没有试用期，也没有自动续费条款</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer</td>
-          <td style="color:var(--text-secondary);">写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">6</td>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">8</td>
           <td style="font-weight:600;">退款规则只有一句话，细节缺失</td>
           <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer</td>
@@ -475,31 +469,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">7</td>
-          <td style="font-weight:600;">没有迁移和上线支持路径</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker</td>
-          <td style="color:var(--text-secondary);">提供“从 Notion/Evernote 等工具迁移”的指南、批量导入能力说明、团队上线流程和时间预期，并说明客户成功经理在迁移阶段负责什么。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">8</td>
-          <td style="font-weight:600;">竞品对比只挑自家占优的项，竞品还匿名</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P53-competitor-loyal-switcher</td>
-          <td style="color:var(--text-secondary);">实名对比，注明数据日期，并按同口径比较月付和年付。补上同步、搜索、插件、API、移动端和协作等维度，坦白说明哪些项落后。</td>
-        </tr>
-        
-        <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">9</td>
-          <td style="font-weight:600;">没有专业版试用，免费版也无法试迁移</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P53-competitor-loyal-switcher</td>
-          <td style="color:var(--text-secondary);">给专业版 14–30 天全功能试用，试用期不限笔记数量。导入的数据在试用结束后保持可读可导出。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">10</td>
           <td style="font-weight:600;">功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）</td>
           <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P49-first-time-user</td>
@@ -507,15 +477,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">11</td>
-          <td style="font-weight:600;">免费版超过限制后会怎样没有说明</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P49-first-time-user</td>
-          <td style="color:var(--text-secondary);">在免费版下写明“满 200 篇后：已有笔记可正常查看和编辑，只是不能新建”，附件超限的提示也要写出来；同时说明超限时如何提示和升级。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">12</td>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">10</td>
           <td style="font-weight:600;">零社会证明：没有评论、评分、用户数，“最受欢迎”无来源</td>
           <td><span class="severity-badge medium">medium</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general</td>
@@ -523,47 +485,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">13</td>
-          <td style="font-weight:600;">AI 摘要、“无限”权益缺少限制说明和演示</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general</td>
-          <td style="color:var(--text-secondary);">配上实际截图或短视频，标注 AI 用量上限、公平使用政策和数据隐私条款。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">14</td>
-          <td style="font-weight:600;">团队版不标透明条款，SLA 无赔付</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P47-skeptical-reviewer-general</td>
-          <td style="color:var(--text-secondary);">公开团队版年付价和合同期限，附 SLA 条款和赔付比例。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">15</td>
-          <td style="font-weight:600;">AI 摘要用量边界和涨价承诺未说明</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer</td>
-          <td style="color:var(--text-secondary);">列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">16</td>
-          <td style="font-weight:600;">竞品对比口径不一致，缺少来源</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer</td>
-          <td style="color:var(--text-secondary);">统一用月付或年付折算对比，标注竞品名称、版本和数据日期。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">17</td>
-          <td style="font-weight:600;">团队版预算不可自助测算</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker</td>
-          <td style="color:var(--text-secondary);">公布团队版年付价和 10/50/100 人的阶梯价，提供团队试用或试点方案，并写明合同期内价格锁定和涨价条款。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">18</td>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">11</td>
           <td style="font-weight:600;">长期可靠性的证据只有一个 SLA 数字</td>
           <td><span class="severity-badge medium">medium</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker</td>
@@ -571,7 +493,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">19</td>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">12</td>
           <td style="font-weight:600;">导出保真度没说清</td>
           <td><span class="severity-badge medium">medium</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P53-competitor-loyal-switcher</td>
@@ -579,47 +501,7 @@
         </tr>
         
         <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">20</td>
-          <td style="font-weight:600;">价格数字多且口径混杂，“无隐藏费用”没落到具体内容</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P49-first-time-user</td>
-          <td style="color:var(--text-secondary);">月付、年付分成两个明确的切换，直接显示“年付一次付 ¥168”。竞品表要写明按年付还是月付比较。顶部“无隐藏费用”下面列出所有可能的额外收费，没有的话明确写“没有”。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">21</td>
-          <td style="font-weight:600;">没有试用入口，升级和退款流程也没讲</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P49-first-time-user</td>
-          <td style="color:var(--text-secondary);">增加“免费试用专业版 14 天”之类的入口，并在退款说明里写清申请入口、条件和到账时间。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">22</td>
-          <td style="font-weight:600;">团队版价格和合同不透明</td>
-          <td><span class="severity-badge low">low</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P46-value-conscious-buyer</td>
-          <td style="color:var(--text-secondary);">公开年付价、最低合同期、SLA 赔付规则。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">23</td>
-          <td style="font-weight:600;">竞品对比与团队采购无关</td>
-          <td><span class="severity-badge low">low</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P48-b2b-decision-maker</td>
-          <td style="color:var(--text-secondary);">增加团队档对比，包括权限、审计、SSO、SLA 和支持响应时间，并注明竞品名称和数据日期。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">24</td>
-          <td style="font-weight:600;">AI 摘要等高级功能的用量上限未写明</td>
-          <td><span class="severity-badge low">low</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P53-competitor-loyal-switcher</td>
-          <td style="color:var(--text-secondary);">在专业版权益旁标明 AI 摘要的月额度，以及超量后怎么处理。</td>
-        </tr>
-        
-        <tr>
-          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">25</td>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">13</td>
           <td style="font-weight:600;">“联系销售”让人不知道后面会发生什么</td>
           <td><span class="severity-badge low">low</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P49-first-time-user</td>
@@ -638,164 +520,7 @@
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(147, 65%, 55%)">老</div>
-        <div class="comment-user-info">
-          <div class="comment-username">老赵</div>
-          <div class="comment-archetype">P47-skeptical-reviewer-general</div>
-        </div>
-        <span class="stance-tag neutral">观望</span>
-      </div>
-      <div class="comment-body">
-
-        
-        <div class="voice-sample">“无隐藏费用”“最受欢迎”，哪条有证据？匿名竞品表和年付折算价当起价，这就是评论区要骂的点。定价结构还算清楚，FAQ 的退款承诺也比别家具体，但没评论、没截图，我先观望。</div>
-        
-
-        
-        <div class="scores-grid">
-          
-          <div class="score-item">
-            <div class="score-label">clarity</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
-              <span class="score-num">4</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">trust</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
-              <span class="score-num">2</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">value_for_money</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">pricing_clarity</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
-              <span class="score-num">4</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">trust_signals</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-        </div>
-        
-
-        
-        <div class="evidence-list">
-          <div class="sub-title">关键证据</div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>页眉承诺“随时可以升级或降级，无隐藏费用”，但页面没有给出降级时数据超限（如超过200篇笔记、附件超5MB）怎么处理的说明。</span>
-          </div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>“最受欢迎”标签没有任何用户数、占比或来源。页面上也没有评论、评分、用户案例或第三方评测。</span>
-          </div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>竞品对比表用的是匿名的“某笔记 Pro”“某文档 Plus”，没有名称、日期和来源，无法核验。表里只列我方占优的维度，没有同步设备数、AI、协作等维度。</span>
-          </div>
-          
-        </div>
-        
-
-        
-        <div class="issues-list">
-          <div class="sub-title">关键问题</div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge high">high</span>
-              <span class="issue-title">竞品对比表匿名、口径不一，一眼就是“自说自话”</span>
-            </div>
-            <div class="issue-why">我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。</div>
-            
-            <div class="issue-fix">写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。</div>
-            
-          </div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge high">high</span>
-              <span class="issue-title">“无隐藏费用”“随时降级”缺少超限处理说明</span>
-            </div>
-            <div class="issue-why">降级到免费版时，超过200篇笔记或5MB的附件会被只读、被删，还是被锁，页面没说。这最容易引发“被套路”的差评。</div>
-            
-            <div class="issue-fix">在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。</div>
-            
-          </div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge medium">medium</span>
-              <span class="issue-title">零社会证明：没有评论、评分、用户数，“最受欢迎”无来源</span>
-            </div>
-            <div class="issue-why">我第一眼就找评论区和差评回应，这里一个都没有。无法核验团队遇到负面反馈时是装死还是正面回应。</div>
-            
-            <div class="issue-fix">接入真实第三方评价（应用商店评分、社区帖），公开已知问题和更新日志，保留差评并回应。</div>
-            
-          </div>
-          
-        </div>
-        
-
-        <div class="triggers-row">
-          
-          <div class="trigger-group continue">
-            <div class="sub-title">✅ 留存触发</div>
-            
-            <span class="trigger-tag continue">竞品对比标明实名、日期和来源，并列出对我方不利的维度</span>
-            
-            <span class="trigger-tag continue">降级、超限、退款的细则写清楚，并附条款链接</span>
-            
-            <span class="trigger-tag continue">出现真实用户评价，且团队对差评有公开回应</span>
-            
-            <span class="trigger-tag continue">AI 摘要和白板有真实演示或截图</span>
-            
-          </div>
-          
-          
-          <div class="trigger-group quit">
-            <div class="sub-title">🚫 流失触发</div>
-            
-            <span class="trigger-tag quit">发现竞品数据造假或口径明显偏袒自己</span>
-            
-            <span class="trigger-tag quit">退款或降级实测与页面承诺不符</span>
-            
-            <span class="trigger-tag quit">社区里差评被删或被引导</span>
-            
-            <span class="trigger-tag quit">“无限”实际有隐性限速或限量</span>
-            
-          </div>
-          
-        </div>
-
-      </div>
-    </div>
-    
-    <div class="comment">
-      <div class="comment-top">
-        <div class="avatar" style="background:hsl(110, 65%, 55%)">沈</div>
+        <div class="avatar" style="background:hsl(177, 65%, 55%)">沈</div>
         <div class="comment-user-info">
           <div class="comment-username">沈静</div>
           <div class="comment-archetype">P46-value-conscious-buyer</div>
@@ -952,7 +677,164 @@
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(48, 65%, 55%)">G</div>
+        <div class="avatar" style="background:hsl(178, 65%, 55%)">老</div>
+        <div class="comment-user-info">
+          <div class="comment-username">老赵</div>
+          <div class="comment-archetype">P47-skeptical-reviewer-general</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">“无隐藏费用”“最受欢迎”，哪条有证据？匿名竞品表和年付折算价当起价，这就是评论区要骂的点。定价结构还算清楚，FAQ 的退款承诺也比别家具体，但没评论、没截图，我先观望。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">pricing_clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust_signals</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>页眉承诺“随时可以升级或降级，无隐藏费用”，但页面没有给出降级时数据超限（如超过200篇笔记、附件超5MB）怎么处理的说明。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>“最受欢迎”标签没有任何用户数、占比或来源。页面上也没有评论、评分、用户案例或第三方评测。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>竞品对比表用的是匿名的“某笔记 Pro”“某文档 Plus”，没有名称、日期和来源，无法核验。表里只列我方占优的维度，没有同步设备数、AI、协作等维度。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">竞品对比表匿名、口径不一，一眼就是“自说自话”</span>
+            </div>
+            <div class="issue-why">我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。</div>
+            
+            <div class="issue-fix">写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">“无隐藏费用”“随时降级”缺少超限处理说明</span>
+            </div>
+            <div class="issue-why">降级到免费版时，超过200篇笔记或5MB的附件会被只读、被删，还是被锁，页面没说。这最容易引发“被套路”的差评。</div>
+            
+            <div class="issue-fix">在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge medium">medium</span>
+              <span class="issue-title">零社会证明：没有评论、评分、用户数，“最受欢迎”无来源</span>
+            </div>
+            <div class="issue-why">我第一眼就找评论区和差评回应，这里一个都没有。无法核验团队遇到负面反馈时是装死还是正面回应。</div>
+            
+            <div class="issue-fix">接入真实第三方评价（应用商店评分、社区帖），公开已知问题和更新日志，保留差评并回应。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">竞品对比标明实名、日期和来源，并列出对我方不利的维度</span>
+            
+            <span class="trigger-tag continue">降级、超限、退款的细则写清楚，并附条款链接</span>
+            
+            <span class="trigger-tag continue">出现真实用户评价，且团队对差评有公开回应</span>
+            
+            <span class="trigger-tag continue">AI 摘要和白板有真实演示或截图</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">发现竞品数据造假或口径明显偏袒自己</span>
+            
+            <span class="trigger-tag quit">退款或降级实测与页面承诺不符</span>
+            
+            <span class="trigger-tag quit">社区里差评被删或被引导</span>
+            
+            <span class="trigger-tag quit">“无限”实际有隐性限速或限量</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(310, 65%, 55%)">G</div>
         <div class="comment-user-info">
           <div class="comment-username">Grace</div>
           <div class="comment-archetype">P48-b2b-decision-maker</div>
@@ -1109,7 +991,160 @@
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(341, 65%, 55%)">M</div>
+        <div class="avatar" style="background:hsl(151, 65%, 55%)">阿</div>
+        <div class="comment-user-info">
+          <div class="comment-username">阿泽</div>
+          <div class="comment-archetype">P49-first-time-user</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">我扫到“双向链接”“SLA”就卡住了，没人告诉我这是什么。我不敢直接点“立即升级”，怕买错了又不知道怎么退。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">pricing_clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust_signals</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>三档方案并列，每档都有一句“适合谁”（个人轻度使用/重度笔记用户和自由职业者/小型团队），我能很快对号入座，先选免费版。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>专业版功能列表写“高级编辑器（双向链接、白板、AI 摘要）”，没有解释双向链接是什么、能帮我做什么。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>“SLA 保证”“管理员后台”“客户成功经理”“知识库模板”都没有解释；SLA 只写了 99.9%，没说达不到怎么办。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）</span>
+            </div>
+            <div class="issue-why">我第一次看到这些词就不知道它们对我有什么用，也就不知道要不要为专业版付钱。我可能因此直接留在免费版，或者离开。</div>
+            
+            <div class="issue-fix">每个术语后面加一句大白话和一个小例子，比如“双向链接：在 A 笔记里提到 B，B 里也能看到 A”。SLA 要写清楚是什么，以及没达到时怎么赔。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">免费版超过限制后会怎样没有说明</span>
+            </div>
+            <div class="issue-why">我第一次写满 200 篇或传了超过 5MB 的文件时，如果被突然拦住又不知道原因，会觉得被惩罚，很可能就此流失。</div>
+            
+            <div class="issue-fix">在免费版下写明“满 200 篇后：已有笔记可正常查看和编辑，只是不能新建”，附件超限的提示也要写出来；同时说明超限时如何提示和升级。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge medium">medium</span>
+              <span class="issue-title">价格数字多且口径混杂，“无隐藏费用”没落到具体内容</span>
+            </div>
+            <div class="issue-why">¥19、¥168、¥14、26%、¥49/用户/月并排出现，我得自己算。竞品表里的“起价 ¥14/月”其实是年付折算价，容易让人觉得被误导。</div>
+            
+            <div class="issue-fix">月付、年付分成两个明确的切换，直接显示“年付一次付 ¥168”。竞品表要写明按年付还是月付比较。顶部“无隐藏费用”下面列出所有可能的额外收费，没有的话明确写“没有”。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">每个功能名词后面有一句大白话解释</span>
+            
+            <span class="trigger-tag continue">免费版超限时的提示和处理方式写清楚</span>
+            
+            <span class="trigger-tag continue">有免费试用专业版的入口，并说明升级步骤</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">看不懂专业版到底多了什么，不知道要不要升级</span>
+            
+            <span class="trigger-tag quit">免费版用到一半被突然拦住，又看不懂原因</span>
+            
+            <span class="trigger-tag quit">价格数字要自己算，还担心被扣费</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(136, 65%, 55%)">M</div>
         <div class="comment-user-info">
           <div class="comment-username">Marcus</div>
           <div class="comment-archetype">P53-competitor-loyal-switcher</div>
@@ -1264,162 +1299,167 @@
       </div>
     </div>
     
-    <div class="comment">
-      <div class="comment-top">
-        <div class="avatar" style="background:hsl(73, 65%, 55%)">阿</div>
-        <div class="comment-user-info">
-          <div class="comment-username">阿泽</div>
-          <div class="comment-archetype">P49-first-time-user</div>
-        </div>
-        <span class="stance-tag neutral">观望</span>
-      </div>
-      <div class="comment-body">
-
-        
-        <div class="voice-sample">我扫到“双向链接”“SLA”就卡住了，没人告诉我这是什么。我不敢直接点“立即升级”，怕买错了又不知道怎么退。</div>
-        
-
-        
-        <div class="scores-grid">
-          
-          <div class="score-item">
-            <div class="score-label">clarity</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">trust</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">value_for_money</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
-              <span class="score-num">4</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">pricing_clarity</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-          <div class="score-item">
-            <div class="score-label">trust_signals</div>
-            <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
-            </div>
-          </div>
-          
-        </div>
-        
-
-        
-        <div class="evidence-list">
-          <div class="sub-title">关键证据</div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>三档方案并列，每档都有一句“适合谁”（个人轻度使用/重度笔记用户和自由职业者/小型团队），我能很快对号入座，先选免费版。</span>
-          </div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>专业版功能列表写“高级编辑器（双向链接、白板、AI 摘要）”，没有解释双向链接是什么、能帮我做什么。</span>
-          </div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>“SLA 保证”“管理员后台”“客户成功经理”“知识库模板”都没有解释；SLA 只写了 99.9%，没说达不到怎么办。</span>
-          </div>
-          
-        </div>
-        
-
-        
-        <div class="issues-list">
-          <div class="sub-title">关键问题</div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge high">high</span>
-              <span class="issue-title">功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）</span>
-            </div>
-            <div class="issue-why">我第一次看到这些词就不知道它们对我有什么用，也就不知道要不要为专业版付钱。我可能因此直接留在免费版，或者离开。</div>
-            
-            <div class="issue-fix">每个术语后面加一句大白话和一个小例子，比如“双向链接：在 A 笔记里提到 B，B 里也能看到 A”。SLA 要写清楚是什么，以及没达到时怎么赔。</div>
-            
-          </div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge high">high</span>
-              <span class="issue-title">免费版超过限制后会怎样没有说明</span>
-            </div>
-            <div class="issue-why">我第一次写满 200 篇或传了超过 5MB 的文件时，如果被突然拦住又不知道原因，会觉得被惩罚，很可能就此流失。</div>
-            
-            <div class="issue-fix">在免费版下写明“满 200 篇后：已有笔记可正常查看和编辑，只是不能新建”，附件超限的提示也要写出来；同时说明超限时如何提示和升级。</div>
-            
-          </div>
-          
-          <div class="issue-item">
-            <div class="issue-title-row">
-              <span class="severity-badge medium">medium</span>
-              <span class="issue-title">价格数字多且口径混杂，“无隐藏费用”没落到具体内容</span>
-            </div>
-            <div class="issue-why">¥19、¥168、¥14、26%、¥49/用户/月并排出现，我得自己算。竞品表里的“起价 ¥14/月”其实是年付折算价，容易让人觉得被误导。</div>
-            
-            <div class="issue-fix">月付、年付分成两个明确的切换，直接显示“年付一次付 ¥168”。竞品表要写明按年付还是月付比较。顶部“无隐藏费用”下面列出所有可能的额外收费，没有的话明确写“没有”。</div>
-            
-          </div>
-          
-        </div>
-        
-
-        <div class="triggers-row">
-          
-          <div class="trigger-group continue">
-            <div class="sub-title">✅ 留存触发</div>
-            
-            <span class="trigger-tag continue">每个功能名词后面有一句大白话解释</span>
-            
-            <span class="trigger-tag continue">免费版超限时的提示和处理方式写清楚</span>
-            
-            <span class="trigger-tag continue">有免费试用专业版的入口，并说明升级步骤</span>
-            
-          </div>
-          
-          
-          <div class="trigger-group quit">
-            <div class="sub-title">🚫 流失触发</div>
-            
-            <span class="trigger-tag quit">看不懂专业版到底多了什么，不知道要不要升级</span>
-            
-            <span class="trigger-tag quit">免费版用到一半被突然拦住，又看不懂原因</span>
-            
-            <span class="trigger-tag quit">价格数字要自己算，还担心被扣费</span>
-            
-          </div>
-          
-        </div>
-
-      </div>
-    </div>
-    
   </div>
 
   <!-- Cross-Examination Record -->
+  
+  <div class="section-card">
+    
+    
+    <div class="section-title"><span class="icon">⚔️</span> 交叉质询（仲裁式反驳：一次调用代双方各写一轮，非各自独立发言）</div>
+    
+
+    
+    
+    <div style="border:1px solid var(--border,#334155);background:rgba(148,163,184,.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;opacity:.9;">
+      本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。
+    </div>
+    
+
+    
+    
+
+    
+    <div class="round-indicator">
+      
+      <div class="round-step active">
+        <span class="step-num">1</span>
+        <span>Round 1</span>
+      </div>
+      
+      
+    </div>
+    
+
+    
+    
+    <div class="debate-card">
+      <div class="debate-topic">竞品对比口径不一致，缺少来源</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。<div class="debate-arg-persona">— 老赵</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">对比表只展示个人档的价格和文件大小，不能支持团队采购决策，匿名竞品的数据也无法核验。<div class="debate-arg-persona">— Grace</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="debate-card">
+      <div class="debate-topic">没有迁移和上线支持路径</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">免费版限 200 篇笔记、1 台设备，装不下我的真实笔记库，也没法测多端同步。不先试就要付费，我的风险承受度太低。<div class="debate-arg-persona">— Marcus</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">我无法估算团队迁移的工时和成本，也不知道有没有导入工具、上线辅导或培训。迁移成本不可预估时，我倾向观望而不是签约。<div class="debate-arg-persona">— Grace</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="debate-card">
+      <div class="debate-topic">没有试用期，也没有自动续费条款</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。<div class="debate-arg-persona">— 沈静</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">我是新手，对付费很谨慎，需要先试一下再决定。“可申请退款”但不知道怎么申请，我不敢点“立即升级”。<div class="debate-arg-persona">— 阿泽</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    
+
+    
+
+    
+    <div class="confidence-chart">
+      <div class="sub-title">置信度变化</div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">沈静</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:70%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">70%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">老赵</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:60%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">Grace</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:75%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">75%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">阿泽</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:60%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">Marcus</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:60%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+    </div>
+    
+
+  </div>
   
 
   <!-- 可证伪预测：判断闭环的入口。必须在 information_gaps 的条件块**之外**——
@@ -1431,6 +1471,54 @@
     
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“竞品对比口径不一致，缺少来源”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 77% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“没有试用期，也没有自动续费条款”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 74% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“没有迁移和上线支持路径”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 81% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复““无隐藏费用”“随时降级”缺少超限处理说明”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 71% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“AI 摘要用量边界和涨价承诺未说明”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 64% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“团队版价格和合同不透明”后，paid_conversion_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 64% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
       <div style="font-weight:600;margin-bottom:3px">修复“页面没有任何安全合规信息”后，paid_conversion_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
@@ -1439,63 +1527,7 @@
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“完全没有导入和迁移支持说明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“竞品对比表匿名、口径不一，一眼就是“自说自话””后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复““无隐藏费用”“随时降级”缺少超限处理说明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有试用期，也没有自动续费条款”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
       <div style="font-weight:600;margin-bottom:3px">修复“退款规则只有一句话，细节缺失”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有迁移和上线支持路径”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“竞品对比只挑自家占优的项，竞品还匿名”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有专业版试用，免费版也无法试迁移”后，paid_conversion_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
       <div style="opacity:.8">验证窗口：14d</div>
@@ -1511,55 +1543,7 @@
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“免费版超过限制后会怎样没有说明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
       <div style="font-weight:600;margin-bottom:3px">修复“零社会证明：没有评论、评分、用户数，“最受欢迎”无来源”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“AI 摘要、“无限”权益缺少限制说明和演示”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“团队版不标透明条款，SLA 无赔付”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“AI 摘要用量边界和涨价承诺未说明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“竞品对比口径不一致，缺少来源”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“团队版预算不可自助测算”后，paid_conversion_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
       <div style="opacity:.8">验证窗口：14d</div>
@@ -1583,46 +1567,6 @@
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“价格数字多且口径混杂，“无隐藏费用”没落到具体内容”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有试用入口，升级和退款流程也没讲”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 58% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“团队版价格和合同不透明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 48% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“竞品对比与团队采购无关”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 48% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“AI 摘要等高级功能的用量上限未写明”后，paid_conversion_rate 相较当前版本将提高</div>
-      <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
-      <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
-      <div style="opacity:.8">验证窗口：14d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 48% · synthetic_panel_heuristic_not_empirically_calibrated</div>
-    </div>
-    
-    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
       <div style="font-weight:600;margin-bottom:3px">修复““联系销售”让人不知道后面会发生什么”后，paid_conversion_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：paid_conversion_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.paid_conversion_rate > control.paid_conversion_rate</div>
@@ -1643,22 +1587,6 @@
     <div class="section-title"><span class="icon">🕳️</span> 信息缺口</div>
     <ul class="point-list gap">
       
-      <li><span class="dot"></span>降级后超限数据的处理规则</li>
-      
-      <li><span class="dot"></span>退款的具体条款、手续费和到账时间</li>
-      
-      <li><span class="dot"></span>用户评价、评分、用户数</li>
-      
-      <li><span class="dot"></span>AI 摘要的用量上限和隐私说明</li>
-      
-      <li><span class="dot"></span>“无限设备”的公平使用政策</li>
-      
-      <li><span class="dot"></span>团队版年付价和 SLA 赔付条款</li>
-      
-      <li><span class="dot"></span>竞品对比的实名、来源和数据日期</li>
-      
-      <li><span class="dot"></span>产品截图或演示</li>
-      
       <li><span class="dot"></span>专业版试用期</li>
       
       <li><span class="dot"></span>自动续费与续费提醒规则</li>
@@ -1675,6 +1603,22 @@
       
       <li><span class="dot"></span>竞品数据来源和日期</li>
       
+      <li><span class="dot"></span>降级后超限数据的处理规则</li>
+      
+      <li><span class="dot"></span>退款的具体条款、手续费和到账时间</li>
+      
+      <li><span class="dot"></span>用户评价、评分、用户数</li>
+      
+      <li><span class="dot"></span>AI 摘要的用量上限和隐私说明</li>
+      
+      <li><span class="dot"></span>“无限设备”的公平使用政策</li>
+      
+      <li><span class="dot"></span>团队版年付价和 SLA 赔付条款</li>
+      
+      <li><span class="dot"></span>竞品对比的实名、来源和数据日期</li>
+      
+      <li><span class="dot"></span>产品截图或演示</li>
+      
       <li><span class="dot"></span>安全与合规信息：SSO/SAML、审计日志、加密、数据驻留、认证、DPA</li>
       
       <li><span class="dot"></span>AI 摘要的数据处理和模型训练政策</li>
@@ -1686,18 +1630,6 @@
       <li><span class="dot"></span>SLA 赔付条款、状态页、历史可用性、灾备</li>
       
       <li><span class="dot"></span>对公发票和企业采购流程</li>
-      
-      <li><span class="dot"></span>支持哪些工具的导入以及保真度</li>
-      
-      <li><span class="dot"></span>迁移文档或迁移工具</li>
-      
-      <li><span class="dot"></span>实名竞品及完整功能对比</li>
-      
-      <li><span class="dot"></span>导出是否保留双向链接、白板、附件</li>
-      
-      <li><span class="dot"></span>同步冲突处理与离线机制</li>
-      
-      <li><span class="dot"></span>团队版迁移服务</li>
       
       <li><span class="dot"></span>各术语的通俗解释（双向链接、SLA、版本历史等）</li>
       
@@ -1712,6 +1644,18 @@
       <li><span class="dot"></span>竞品的具体名称和对比口径</li>
       
       <li><span class="dot"></span>免费版是否有版本历史</li>
+      
+      <li><span class="dot"></span>支持哪些工具的导入以及保真度</li>
+      
+      <li><span class="dot"></span>迁移文档或迁移工具</li>
+      
+      <li><span class="dot"></span>实名竞品及完整功能对比</li>
+      
+      <li><span class="dot"></span>导出是否保留双向链接、白板、附件</li>
+      
+      <li><span class="dot"></span>同步冲突处理与离线机制</li>
+      
+      <li><span class="dot"></span>团队版迁移服务</li>
       
     </ul>
   </div>
@@ -1732,15 +1676,15 @@
         
         <ul>
           
-          <li>30-45 · 全球平台评论生态 · 老平台用户 · Web/iOS/Android · broad-but-cynical</li>
-          
           <li>28-40 · 中国华东 · 中核消费型 · Web/iOS/Android · SaaS工具/电商平台/内容订阅</li>
+          
+          <li>30-45 · 全球平台评论生态 · 老平台用户 · Web/iOS/Android · broad-but-cynical</li>
           
           <li>35-48 · 北美 · 商业视角 · Web/桌面客户端 · SaaS工具/企业协作平台</li>
           
-          <li>30-45 · 欧洲 · 核心老兵 · Web/桌面客户端 · broad/genre-veteran</li>
-          
           <li>20-30 · 中国二线城市 · 新手 · Web/Mobile · product-newbie</li>
+          
+          <li>30-45 · 欧洲 · 核心老兵 · Web/桌面客户端 · broad/genre-veteran</li>
           
         </ul>
       </div>
@@ -1749,22 +1693,6 @@
       <div class="next-step-card">
         <div class="sub-title">需要补充的材料</div>
         <ul>
-          
-          <li>补充材料：降级后超限数据的处理规则</li>
-          
-          <li>补充材料：退款的具体条款、手续费和到账时间</li>
-          
-          <li>补充材料：用户评价、评分、用户数</li>
-          
-          <li>补充材料：AI 摘要的用量上限和隐私说明</li>
-          
-          <li>补充材料：“无限设备”的公平使用政策</li>
-          
-          <li>补充材料：团队版年付价和 SLA 赔付条款</li>
-          
-          <li>补充材料：竞品对比的实名、来源和数据日期</li>
-          
-          <li>补充材料：产品截图或演示</li>
           
           <li>补充材料：专业版试用期</li>
           
@@ -1782,6 +1710,22 @@
           
           <li>补充材料：竞品数据来源和日期</li>
           
+          <li>补充材料：降级后超限数据的处理规则</li>
+          
+          <li>补充材料：退款的具体条款、手续费和到账时间</li>
+          
+          <li>补充材料：用户评价、评分、用户数</li>
+          
+          <li>补充材料：AI 摘要的用量上限和隐私说明</li>
+          
+          <li>补充材料：“无限设备”的公平使用政策</li>
+          
+          <li>补充材料：团队版年付价和 SLA 赔付条款</li>
+          
+          <li>补充材料：竞品对比的实名、来源和数据日期</li>
+          
+          <li>补充材料：产品截图或演示</li>
+          
           <li>补充材料：安全与合规信息：SSO/SAML、审计日志、加密、数据驻留、认证、DPA</li>
           
           <li>补充材料：AI 摘要的数据处理和模型训练政策</li>
@@ -1793,18 +1737,6 @@
           <li>补充材料：SLA 赔付条款、状态页、历史可用性、灾备</li>
           
           <li>补充材料：对公发票和企业采购流程</li>
-          
-          <li>补充材料：支持哪些工具的导入以及保真度</li>
-          
-          <li>补充材料：迁移文档或迁移工具</li>
-          
-          <li>补充材料：实名竞品及完整功能对比</li>
-          
-          <li>补充材料：导出是否保留双向链接、白板、附件</li>
-          
-          <li>补充材料：同步冲突处理与离线机制</li>
-          
-          <li>补充材料：团队版迁移服务</li>
           
           <li>补充材料：各术语的通俗解释（双向链接、SLA、版本历史等）</li>
           
@@ -1819,6 +1751,18 @@
           <li>补充材料：竞品的具体名称和对比口径</li>
           
           <li>补充材料：免费版是否有版本历史</li>
+          
+          <li>补充材料：支持哪些工具的导入以及保真度</li>
+          
+          <li>补充材料：迁移文档或迁移工具</li>
+          
+          <li>补充材料：实名竞品及完整功能对比</li>
+          
+          <li>补充材料：导出是否保留双向链接、白板、附件</li>
+          
+          <li>补充材料：同步冲突处理与离线机制</li>
+          
+          <li>补充材料：团队版迁移服务</li>
           
         </ul>
       </div>
@@ -1835,33 +1779,33 @@
     <div class="section-title"><span class="icon">⚠️</span> 各人格声明的限制条件</div>
     <ul class="point-list question">
       
-      <li><span class="dot"></span>仅基于一页定价文案，没有实际产品、评论区或客服实测，所有判断都是对页面文字的怀疑，不是对产品质量的结论。</li>
-      
-      <li><span class="dot"></span>立场是观望，原因是证据缺失而非发现明确负面证据。</li>
-      
-      <li><span class="dot"></span>竞品信息匿名，无法核实其真实性。</li>
-      
       <li><span class="dot"></span>基于单页定价材料做判断，未见服务条款、退款政策全文和实际产品体验。</li>
       
       <li><span class="dot"></span>观望判断主要来自信息缺失（试用、续费、退款细则），不是发现了负面证据。</li>
       
       <li><span class="dot"></span>是否值得购买取决于我的真实笔记和附件用量，材料里没有这部分信息。</li>
       
+      <li><span class="dot"></span>仅基于一页定价文案，没有实际产品、评论区或客服实测，所有判断都是对页面文字的怀疑，不是对产品质量的结论。</li>
+      
+      <li><span class="dot"></span>立场是观望，原因是证据缺失而非发现明确负面证据。</li>
+      
+      <li><span class="dot"></span>竞品信息匿名，无法核实其真实性。</li>
+      
       <li><span class="dot"></span>评审只基于单个定价页，没有看到安全、帮助或销售页面。这些信息可能存在于其他页面，所以“缺失”指的是本页未呈现，不代表产品没有。</li>
       
       <li><span class="dot"></span>观望的判断主要由信息缺失造成，不是由负面证据造成。</li>
-      
-      <li><span class="dot"></span>这是基于单页定价材料的合成评审，没有实际试用产品，也没有核对竞品真实数据。</li>
-      
-      <li><span class="dot"></span>“观望”基于迁移信息缺失，不是产品被证实不好。</li>
-      
-      <li><span class="dot"></span>我没有说出自己当前在用哪款工具，迁移成本的估算只能按一般情形。</li>
       
       <li><span class="dot"></span>本评审是合成人格输出，基于新手视角，不代表真实用户调研结果。</li>
       
       <li><span class="dot"></span>材料只有定价页文字，没有升级流程、报错提示和产品首次使用界面，“引导顺序”和“首次失败体验”只能就定价页内的阅读顺序和超限说明来判断。</li>
       
       <li><span class="dot"></span>核心决策规则“关键术语没有被上下文解释”已被部分触发：双向链接、SLA 等词没有解释。</li>
+      
+      <li><span class="dot"></span>这是基于单页定价材料的合成评审，没有实际试用产品，也没有核对竞品真实数据。</li>
+      
+      <li><span class="dot"></span>“观望”基于迁移信息缺失，不是产品被证实不好。</li>
+      
+      <li><span class="dot"></span>我没有说出自己当前在用哪款工具，迁移成本的估算只能按一般情形。</li>
       
     </ul>
   </div>

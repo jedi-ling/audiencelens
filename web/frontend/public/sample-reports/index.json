@@ -6,10 +6,12 @@
     "persona_pack": "general-consumer",
     "model_id": "claude-sonnet-5-5",
     "date": "2026-11-04",
-    "cost_usd": 0.2297,
+    "cost_usd": 0.266,
     "personas_passed": 5,
     "personas_attempted": 5,
-    "cross_exam_ran": false
+    "cross_exam_ran": true,
+    "disputes": 3,
+    "dedup_method": "semantic"
   },
   {
     "slug": "startup-pitch-cloud-accounting",
@@ -18,10 +20,12 @@
     "persona_pack": "startup-panel",
     "model_id": "claude-sonnet-5-5",
     "date": "2026-11-04",
-    "cost_usd": 0.3508,
+    "cost_usd": 0.3693,
     "personas_passed": 3,
     "personas_attempted": 6,
-    "cross_exam_ran": false
+    "cross_exam_ran": true,
+    "disputes": 1,
+    "dedup_method": "semantic"
   },
   {
     "slug": "steam-page-abyss-echo",
@@ -30,9 +34,11 @@
     "persona_pack": "game-core",
     "model_id": "claude-sonnet-5-5",
     "date": "2026-11-04",
-    "cost_usd": 0.3373,
+    "cost_usd": 0.3544,
     "personas_passed": 4,
     "personas_attempted": 6,
-    "cross_exam_ran": false
+    "cross_exam_ran": true,
+    "disputes": 2,
+    "dedup_method": "semantic"
   }
 ]

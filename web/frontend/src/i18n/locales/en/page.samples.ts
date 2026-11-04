@@ -14,5 +14,7 @@ export default {
   'date.label': 'Generated',
   'cost.label': 'Run cost',
   'personas.label': 'Personas passing validation',
+  'disputes.label_one': 'Cross-examination: {{count}} dispute, one rebuttal round',
+  'disputes.label_other': 'Cross-examination: {{count}} disputes, one rebuttal round each',
   'no_cross_exam.hint': 'The personas in this report did not disagree enough for the cross-examination step to run.',
 } satisfies Messages

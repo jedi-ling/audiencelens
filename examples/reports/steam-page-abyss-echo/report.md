@@ -12,7 +12,7 @@
 | target | 深渊回响 |
 | build_version | 0.3.0 |
 | persona_pack_version | game-core@0.1.0 |
-| generated_at | 2026-11-03T19:34:05.144082+00:00 |
+| generated_at | 2026-11-04T01:20:00.170931+00:00 |
 
 
 ## Executive Summary
@@ -35,28 +35,21 @@
 ## Consensus
 > 共识判定口径：同一议题被 ≥3/4 位人格各自独立提出。
 ### 多数 persona 共同提出的议题
-- （本次没有任何议题达到共识门槛）
+- 首发团队没有商业发售经验，且只有 Discord 内测的自家好评
 
 ### 仅个别 persona 提出的议题
-- 零实机、零预告，全靠文字吹
-- EA/正式版状态混乱
-- “独创”回响机制没有解释，已被内测反馈打脸
-- 内测评价是开发者自己挑的，且暴露导航缺陷却没回应
-- 首作团队的流程与价格承诺缺少依据
 - 没有胶囊图、截图和预告片，视觉卖点无从验证
 - UI 与导航的视觉方案完全没交代
 - 预告片和音频完全缺席
 - 氛围可能被迷路和中期重复拖垮
-- 首发团队没有商业发售经验，且只有 Discord 内测的自家好评
-- 没有首屏视觉证据：无 GIF、预告片、截图
-- 可信度不足：内测评价少且只来自内部群，首作团队无发售记录
 - 差异化只靠文字承诺，没有对标
 - 卖点缺少可验证的具体内容
 - 付费边界完全没写
-- 没有 demo,也没有可核验的内容证据
 - 没有价格锚点,也没说明 $19.99 凭什么
-- 已知的两个体验短板没有回应:迷路与中期重复
 - 评价来源单一且样本小
+- 零实机、零预告，全靠文字吹
+- EA/正式版状态混乱
+- “独创”回响机制没有解释，已被内测反馈打脸
 
 ### 立场分布
 - 观望：4 人
@@ -66,53 +59,37 @@
 ## Priority Fixes
 | Priority | Issue | Severity | Why it matters | Affected personas | Suggested fix |
 |---|---|---|---|---|---|
-| 1 | 零实机、零预告，全靠文字吹 | critical | 我第一眼就找实机，结果没有。“水墨”“血红点缀”“回响”都不能核验，“卖点没有证据，一律先怀疑”被直接触发。这就是最典型的“只有文案”的页面。 | P15-toxic-skeptic-reviewer | 首屏放 60 秒以内的纯实机预告，不加 CG 和特效剪辑。再放 5 张以上的实机截图，要覆盖战斗、探索、回响互动和地图。 |
-| 2 | 没有胶囊图、截图和预告片，视觉卖点无从验证 | critical | 我买的是气质。『黑白水墨加血红点缀』只写在文字里，没有静帧。我的核心规则（前三张图要建立辨识度）因此没法判定，只能观望。 | P06-visual-atmosphere-lover | 补一张带血红点缀的胶囊图，再放 5 张以上截图。前三张要依次是：标志性水墨场景、回响幽灵的互动瞬间、血红色出现的剧情时刻。 |
-| 3 | 没有首屏视觉证据：无 GIF、预告片、截图 | critical | 水墨风是最大卖点，但页面只给文字。我 20 秒内看不到'回响'机制长什么样，首图也无从判断，所以点不下去。 | P10-steam-wishlist-browser | 首位放一段 15 秒 GIF 或预告：死亡→留下回响幽灵→下一轮与它互动。胶囊图突出黑白水墨加血红点缀。 |
-| 4 | EA/正式版状态混乱 | high | 页面写“早期访问阶段”，却又预告 2027 Q1 发售，没有 EA 说明、当前内容量、路线图。这符合“EA 装正式版”的差评条件，我倾向打差评。 | P15-toxic-skeptic-reviewer | 明确写清楚：是否上 EA、EA 现状、EA 阶段缺什么、预计 EA 多久、价格是否会变、是否承诺 1.0。 |
-| 5 | “独创”回响机制没有解释，已被内测反馈打脸 | high | “独创”是个很容易被喷的词。同类死亡叙事机制已有先例，内测玩家 B 又说中期重复。差评会写“独创个寂寞，重复”。 | P15-toxic-skeptic-reviewer | 去掉“独创”。用一段 GIF 讲清楚回响怎么起作用，以及它在 12-15 小时里怎么变化。公开说明内测反馈的重复问题怎么改。 |
+| 1 | 首发团队没有商业发售经验，且只有 Discord 内测的自家好评 | high | 我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。 | P06-visual-atmosphere-lover、P10-steam-wishlist-browser、P15-toxic-skeptic-reviewer | 放出 Demo 或参加 Steam Next Fest，给开发里程碑和更新节奏；公开已修复的问题，比如加入小地图。 |
+| 2 | 没有胶囊图、截图和预告片，视觉卖点无从验证 | critical | 我买的是气质。『黑白水墨加血红点缀』只写在文字里，没有静帧。我的核心规则（前三张图要建立辨识度）因此没法判定，只能观望。 | P06-visual-atmosphere-lover、P10-steam-wishlist-browser | 补一张带血红点缀的胶囊图，再放 5 张以上截图。前三张要依次是：标志性水墨场景、回响幽灵的互动瞬间、血红色出现的剧情时刻。 |
+| 3 | 卖点缺少可验证的具体内容 | high | 我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。 | P10-steam-wishlist-browser、P14-price-sensitive-buyer | 发售前上线 demo(建议 30–60 分钟,覆盖回响机制和一次能力解锁);补充实机预告和截图;写明退款政策提示。 |
+| 4 | 零实机、零预告，全靠文字吹 | critical | 我第一眼就找实机，结果没有。“水墨”“血红点缀”“回响”都不能核验，“卖点没有证据，一律先怀疑”被直接触发。这就是最典型的“只有文案”的页面。 | P15-toxic-skeptic-reviewer | 首屏放 60 秒以内的纯实机预告，不加 CG 和特效剪辑。再放 5 张以上的实机截图，要覆盖战斗、探索、回响互动和地图。 |
+| 5 | 氛围可能被迷路和中期重复拖垮 | medium | 页面自己引用的内测反馈指出了动线和重复问题。氛围完整性要看全流程，而不是只看开头。 | P06-visual-atmosphere-lover、P14-price-sensitive-buyer | 说明小地图或导航辅助的计划，以及回响机制在中后期怎样变化，比如不同类型的回响或视觉演变。 |
 | 6 | UI 与导航的视觉方案完全没交代 | high | 玩家已经在要小地图。UI 做得不好会直接破坏水墨氛围，而这是我的退出条件之一。 | P06-visual-atmosphere-lover | 放一张含 HUD、地图界面和字体的截图，说明 UI 是怎样融入水墨风格的，比如用墨迹式地图或极简血条。 |
 | 7 | 预告片和音频完全缺席 | high | 无对话叙事主要靠音画推动。没有声音和剪辑的证据，『回响』的情绪冲击就只是一句宣称。 | P06-visual-atmosphere-lover | 做一支 60 到 90 秒、以节奏为主的预告片，重点展示回响出现的瞬间和配乐。页面上也写明音乐和音效的方向。 |
-| 8 | 可信度不足：内测评价少且只来自内部群，首作团队无发售记录 | high | 我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。 | P10-steam-wishlist-browser | 放出 Demo 或参加 Steam Next Fest，给开发里程碑和更新节奏；公开已修复的问题，比如加入小地图。 |
-| 9 | 差异化只靠文字承诺，没有对标 | high | 水墨加死亡叙事的组合有辨识度，但银河城赛道拥挤，页面没说清'回响'比同类强在哪里。 | P10-steam-wishlist-browser | 一句话写清机制闭环，配一个具体谜题或 Boss 例子；标签要精准，如 银河恶魔城、手绘、剧情丰富。 |
-| 10 | 付费边界完全没写 | high | 我的规则是付费点模糊就先观望。页面没说是否买断即完整、有没有 DLC 或内购,我没法判断 $19.99 之后还要不会再掏钱。 | P14-price-sensitive-buyer | 在商店页明确写“买断制,无内购,无计划中的付费 DLC”;如果有 DLC 计划,就写清范围和价格区间。 |
-| 11 | 没有 demo,也没有可核验的内容证据 | high | 我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。 | P14-price-sensitive-buyer | 发售前上线 demo(建议 30–60 分钟,覆盖回响机制和一次能力解锁);补充实机预告和截图;写明退款政策提示。 |
-| 12 | 内测评价是开发者自己挑的，且暴露导航缺陷却没回应 | medium | “迷路、希望加小地图”这种问题，页面没说会不会改。团队没有回应，说明对问题装死，这会降低信任。评价来源是 Discord，不是 Steam 评测。 | P15-toxic-skeptic-reviewer | 在页面上直接回应：小地图是否加、什么时候加。再放一个公开 demo 或 Steam Next Fest，让真实玩家评价。 |
-| 13 | 首作团队的流程与价格承诺缺少依据 | medium | 12-15 小时和 8 种能力没有任何证据，$19.99 定价缺少内容量的支撑。结果达不到时，会被骂“虚标时长”。 | P15-toxic-skeptic-reviewer | 提供 demo 或展示一张能力/区域结构图。把“预计”流程改成区间并说明理由，比如主线和全收集分别多久。 |
-| 14 | 氛围可能被迷路和中期重复拖垮 | medium | 页面自己引用的内测反馈指出了动线和重复问题。氛围完整性要看全流程，而不是只看开头。 | P06-visual-atmosphere-lover | 说明小地图或导航辅助的计划，以及回响机制在中后期怎样变化，比如不同类型的回响或视觉演变。 |
-| 15 | 卖点缺少可验证的具体内容 | medium | '8 种能力'有数字但没有证明，抽象文案我扫过就忘，转化不成愿望单理由。 | P10-steam-wishlist-browser | 补充区域数、Boss 数、回响种类，并标明演示在页面哪里。 |
-| 16 | 没有价格锚点,也没说明 $19.99 凭什么 | medium | 页面没有对比同类作品,也没有拆分内容量(区域数、Boss 数、能力数、结局数),价格是否合理只能靠我自己猜。 | P14-price-sensitive-buyer | 列出区域/Boss/收集要素数量和 100% 通关时长;说明 12–15 小时是主线还是全收集;必要时设置首发折扣作为价格锚点。 |
-| 17 | 已知的两个体验短板没有回应:迷路与中期重复 | medium | 这两点直接影响 12–15 小时是否值那个钱。内测玩家 B 说的“中期重复”会让有效内容缩水。 | P14-price-sensitive-buyer | 说明已规划的改进(小地图或标记系统、中期内容变化),并在发售前用更新日志公开。 |
-| 18 | 首发团队没有商业发售经验，且只有 Discord 内测的自家好评 | low | 这会降低对关键帧稳定性和完成度的信心。 | P06-visual-atmosphere-lover | 提供公开 Demo 或节日试玩版，让玩家自己看画面是否稳定。 |
-| 19 | 评价来源单一且样本小 | low | 两条 Discord 内测评价不能代表社区共识,我没法判断是否存在“坑钱”声音。 | P14-price-sensitive-buyer | 开放更大范围的试玩,收集 Steam 外的独立评价并公开引用。 |
+| 8 | 差异化只靠文字承诺，没有对标 | high | 水墨加死亡叙事的组合有辨识度，但银河城赛道拥挤，页面没说清'回响'比同类强在哪里。 | P10-steam-wishlist-browser | 一句话写清机制闭环，配一个具体谜题或 Boss 例子；标签要精准，如 银河恶魔城、手绘、剧情丰富。 |
+| 9 | 付费边界完全没写 | high | 我的规则是付费点模糊就先观望。页面没说是否买断即完整、有没有 DLC 或内购,我没法判断 $19.99 之后还要不会再掏钱。 | P14-price-sensitive-buyer | 在商店页明确写“买断制,无内购,无计划中的付费 DLC”;如果有 DLC 计划,就写清范围和价格区间。 |
+| 10 | EA/正式版状态混乱 | high | 页面写“早期访问阶段”，却又预告 2027 Q1 发售，没有 EA 说明、当前内容量、路线图。这符合“EA 装正式版”的差评条件，我倾向打差评。 | P15-toxic-skeptic-reviewer | 明确写清楚：是否上 EA、EA 现状、EA 阶段缺什么、预计 EA 多久、价格是否会变、是否承诺 1.0。 |
+| 11 | “独创”回响机制没有解释，已被内测反馈打脸 | high | “独创”是个很容易被喷的词。同类死亡叙事机制已有先例，内测玩家 B 又说中期重复。差评会写“独创个寂寞，重复”。 | P15-toxic-skeptic-reviewer | 去掉“独创”。用一段 GIF 讲清楚回响怎么起作用，以及它在 12-15 小时里怎么变化。公开说明内测反馈的重复问题怎么改。 |
+| 12 | 没有价格锚点,也没说明 $19.99 凭什么 | medium | 页面没有对比同类作品,也没有拆分内容量(区域数、Boss 数、能力数、结局数),价格是否合理只能靠我自己猜。 | P14-price-sensitive-buyer | 列出区域/Boss/收集要素数量和 100% 通关时长;说明 12–15 小时是主线还是全收集;必要时设置首发折扣作为价格锚点。 |
+| 13 | 评价来源单一且样本小 | low | 两条 Discord 内测评价不能代表社区共识,我没法判断是否存在“坑钱”声音。 | P14-price-sensitive-buyer | 开放更大范围的试玩,收集 Steam 外的独立评价并公开引用。 |
 
+## 交叉质询
+**模式**：仲裁式反驳（一次调用代双方各写一轮，非各自独立发言）
+> 本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。
+### 首发团队没有商业发售经验，且只有 Discord 内测的自家好评
+**正方**
+- 我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。 — Mika
+**反方**
+- 这会降低对关键帧稳定性和完成度的信心。 — 羽晨
+### 卖点缺少可验证的具体内容
+**正方**
+- 我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。 — 张宁
+**反方**
+- '8 种能力'有数字但没有证明，抽象文案我扫过就忘，转化不成愿望单理由。 — Mika
 
 
 
 ## Persona-by-Persona Notes
-### P15-toxic-skeptic-reviewer 老刀
-- **Stance**: 观望
-- **Top Evidence**:
-  - 材料里没有任何实机截图、GIF、预告片或视频描述，全是文字卖点。美术风格、回响机制都无法核验。
-  - 唯一的“用户评价”是 Discord 内测群里的两条匿名引用，是开发者自己挑的。其中一条还说“中期开始有点重复”，另一条说“容易迷路”。这不是 Steam 评测，没有可信度。
-  - 页面标注“早期访问阶段”，但发售信息写的是“预计发售 2027 年第一季度”。没有说明是否上 EA、现在已有哪些内容、路线图和更新频率。
-- **Top Issues**:
-  - 零实机、零预告，全靠文字吹
-  - EA/正式版状态混乱
-  - “独创”回响机制没有解释，已被内测反馈打脸
-  - 内测评价是开发者自己挑的，且暴露导航缺陷却没回应
-  - 首作团队的流程与价格承诺缺少依据
-- **Continue Triggers**:
-  - 放出纯实机预告，且画面与文案中的水墨/血红风格一致
-  - 明确 EA 状态、当前内容量与路线图
-  - 提供可玩 demo，并回应迷路/小地图与中期重复问题
-  - 出现来源可查的真实玩家评测或 Next Fest 反馈
-- **Quit Triggers**:
-  - 上线后实机与宣传的美术风格不一致
-  - 在 EA 阶段却按正式完整版收费
-  - “独创”机制实际只是普通的幽灵血迹系统
-  - 发售后出现性能/优化差评
-  - 继续用文案代替证据，对导航/重复的反馈装死
 ### P06-visual-atmosphere-lover 羽晨
 - **Stance**: 观望
 - **Top Evidence**:
@@ -181,8 +158,55 @@
   - 社区出现中期内容重复、注水的共识
   - 发售价高于 $19.99 但内容证据仍然不足
   - 没有 demo 且退款体验差
+### P15-toxic-skeptic-reviewer 老刀
+- **Stance**: 观望
+- **Top Evidence**:
+  - 材料里没有任何实机截图、GIF、预告片或视频描述，全是文字卖点。美术风格、回响机制都无法核验。
+  - 唯一的“用户评价”是 Discord 内测群里的两条匿名引用，是开发者自己挑的。其中一条还说“中期开始有点重复”，另一条说“容易迷路”。这不是 Steam 评测，没有可信度。
+  - 页面标注“早期访问阶段”，但发售信息写的是“预计发售 2027 年第一季度”。没有说明是否上 EA、现在已有哪些内容、路线图和更新频率。
+- **Top Issues**:
+  - 零实机、零预告，全靠文字吹
+  - EA/正式版状态混乱
+  - “独创”回响机制没有解释，已被内测反馈打脸
+  - 内测评价是开发者自己挑的，且暴露导航缺陷却没回应
+  - 首作团队的流程与价格承诺缺少依据
+- **Continue Triggers**:
+  - 放出纯实机预告，且画面与文案中的水墨/血红风格一致
+  - 明确 EA 状态、当前内容量与路线图
+  - 提供可玩 demo，并回应迷路/小地图与中期重复问题
+  - 出现来源可查的真实玩家评测或 Next Fest 反馈
+- **Quit Triggers**:
+  - 上线后实机与宣传的美术风格不一致
+  - 在 EA 阶段却按正式完整版收费
+  - “独创”机制实际只是普通的幽灵血迹系统
+  - 发售后出现性能/优化差评
+  - 继续用文案代替证据，对导航/重复的反馈装死
 
 ## 可证伪预测
+### 修复“首发团队没有商业发售经验，且只有 Discord 内测的自家好评”后，wishlist_add_rate 相较当前版本将提高
+| 项 | 值 |
+|---|---|
+| 目标指标 | wishlist_add_rate（increase） |
+| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
+| 验证窗口 | 14d |
+| 验证方式 | controlled_comparison |
+| 启发式置信度 | 76%（synthetic_panel_heuristic_not_empirically_calibrated） |
+### 修复“没有胶囊图、截图和预告片，视觉卖点无从验证”后，wishlist_add_rate 相较当前版本将提高
+| 项 | 值 |
+|---|---|
+| 目标指标 | wishlist_add_rate（increase） |
+| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
+| 验证窗口 | 14d |
+| 验证方式 | controlled_comparison |
+| 启发式置信度 | 82%（synthetic_panel_heuristic_not_empirically_calibrated） |
+### 修复“卖点缺少可验证的具体内容”后，wishlist_add_rate 相较当前版本将提高
+| 项 | 值 |
+|---|---|
+| 目标指标 | wishlist_add_rate（increase） |
+| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
+| 验证窗口 | 14d |
+| 验证方式 | controlled_comparison |
+| 启发式置信度 | 72%（synthetic_panel_heuristic_not_empirically_calibrated） |
 ### 修复“零实机、零预告，全靠文字吹”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
@@ -191,38 +215,14 @@
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
 | 启发式置信度 | 79%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“没有胶囊图、截图和预告片，视觉卖点无从验证”后，wishlist_add_rate 相较当前版本将提高
+### 修复“氛围可能被迷路和中期重复拖垮”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
 | 目标指标 | wishlist_add_rate（increase） |
 | 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
-| 启发式置信度 | 79%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“没有首屏视觉证据：无 GIF、预告片、截图”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 79%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“EA/正式版状态混乱”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复““独创”回响机制没有解释，已被内测反馈打脸”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
+| 启发式置信度 | 62%（synthetic_panel_heuristic_not_empirically_calibrated） |
 ### 修复“UI 与导航的视觉方案完全没交代”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
@@ -232,14 +232,6 @@
 | 验证方式 | controlled_comparison |
 | 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
 ### 修复“预告片和音频完全缺席”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“可信度不足：内测评价少且只来自内部群，首作团队无发售记录”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
 | 目标指标 | wishlist_add_rate（increase） |
@@ -263,7 +255,7 @@
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
 | 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“没有 demo,也没有可核验的内容证据”后，wishlist_add_rate 相较当前版本将提高
+### 修复“EA/正式版状态混乱”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
 | 目标指标 | wishlist_add_rate（increase） |
@@ -271,38 +263,14 @@
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
 | 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“内测评价是开发者自己挑的，且暴露导航缺陷却没回应”后，wishlist_add_rate 相较当前版本将提高
+### 修复““独创”回响机制没有解释，已被内测反馈打脸”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
 | 目标指标 | wishlist_add_rate（increase） |
 | 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
-| 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“首作团队的流程与价格承诺缺少依据”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“氛围可能被迷路和中期重复拖垮”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“卖点缺少可验证的具体内容”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
+| 启发式置信度 | 69%（synthetic_panel_heuristic_not_empirically_calibrated） |
 ### 修复“没有价格锚点,也没说明 $19.99 凭什么”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
@@ -311,22 +279,6 @@
 | 验证窗口 | 14d |
 | 验证方式 | controlled_comparison |
 | 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“已知的两个体验短板没有回应:迷路与中期重复”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 59%（synthetic_panel_heuristic_not_empirically_calibrated） |
-### 修复“首发团队没有商业发售经验，且只有 Discord 内测的自家好评”后，wishlist_add_rate 相较当前版本将提高
-| 项 | 值 |
-|---|---|
-| 目标指标 | wishlist_add_rate（increase） |
-| 判定标准 | treatment.wishlist_add_rate > control.wishlist_add_rate |
-| 验证窗口 | 14d |
-| 验证方式 | controlled_comparison |
-| 启发式置信度 | 49%（synthetic_panel_heuristic_not_empirically_calibrated） |
 ### 修复“评价来源单一且样本小”后，wishlist_add_rate 相较当前版本将提高
 | 项 | 值 |
 |---|---|
@@ -339,14 +291,6 @@
 > 它不再进入同项目下一次评审的上下文。
 
 ## Information Gaps
-- 实机预告和截图
-- Early Access 说明与路线图
-- 回响机制的具体玩法
-- 当前可玩内容量或 demo
-- 小地图/导航问题的处理方案
-- Steam 上的真实玩家评测
-- 语言本地化的质量说明
-- 开发者公告或更新记录
 - 胶囊图和截图
 - 预告片
 - UI/HUD/字体设计
@@ -369,6 +313,14 @@
 - 发售首周折扣计划
 - 同类作品对比或价格锚点
 - 更大范围的独立玩家评价
+- 实机预告和截图
+- Early Access 说明与路线图
+- 回响机制的具体玩法
+- 当前可玩内容量或 demo
+- 小地图/导航问题的处理方案
+- Steam 上的真实玩家评测
+- 语言本地化的质量说明
+- 开发者公告或更新记录
 
 ## What to Test with Real Players Next
 ### Suggested Playtest Tasks
@@ -376,22 +328,14 @@
 
 ### 本次面板覆盖的受众特征
 > 本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议
-- 22-40 · 全球平台评论生态 · 老平台用户 · PC · broad-but-cynical
+- 25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim
 - 20-30 · 日本/台湾文化圈 · 核心 · PC/Switch · artsy-indie/cozy/walking-sim
 - 23-35 · 北美城市 · 平台重度浏览 · PC/SteamDeck · wide-variety
 - 24-40 · 中国大陆 · 中核消费型 · PC/Mobile · broad
+- 22-40 · 全球平台评论生态 · 老平台用户 · PC · broad-but-cynical
 - 27-40 · 北美 · 核心老兵 · PC/Console · genre-veteran
-- 25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim
 
 ### Suggested Next Materials
-- 补充材料：实机预告和截图
-- 补充材料：Early Access 说明与路线图
-- 补充材料：回响机制的具体玩法
-- 补充材料：当前可玩内容量或 demo
-- 补充材料：小地图/导航问题的处理方案
-- 补充材料：Steam 上的真实玩家评测
-- 补充材料：语言本地化的质量说明
-- 补充材料：开发者公告或更新记录
 - 补充材料：胶囊图和截图
 - 补充材料：预告片
 - 补充材料：UI/HUD/字体设计
@@ -414,11 +358,19 @@
 - 补充材料：发售首周折扣计划
 - 补充材料：同类作品对比或价格锚点
 - 补充材料：更大范围的独立玩家评价
+- 补充材料：实机预告和截图
+- 补充材料：Early Access 说明与路线图
+- 补充材料：回响机制的具体玩法
+- 补充材料：当前可玩内容量或 demo
+- 补充材料：小地图/导航问题的处理方案
+- 补充材料：Steam 上的真实玩家评测
+- 补充材料：语言本地化的质量说明
+- 补充材料：开发者公告或更新记录
 
 
 ## 被校验拦下的人格
-- P16-competitor-loyal-veteran：hallucination
 - P01-indie-core-operator：hallucination
+- P16-competitor-loyal-veteran：hallucination
 
 ## 合规检查
 - **检查项**：身份-行为解耦检查（唯一口径，不覆盖隐私/刻板印象/材料合规等其它维度）
@@ -431,9 +383,6 @@
 本报告全部由 AI 人格模拟生成，非真人研究数据。任何决策前须经过真人验证。
 
 ## Limitations & Caveats
-- 本评审基于一页纯文字材料，没有任何媒体素材，“观望”源于证据缺失，而非已确认的负面事实。
-- 老刀是毒舌怀疑型角色，语气偏尖锐，用来暴露可能被喷的点，不代表所有玩家的看法。
-- 推断条目仅用于价格对比与视觉风险，没有对未提供的系统或内容做补充设想。
 - 材料只有文字，没有图片和视频，所有视觉判断都基于文案描述和缺失，不是对实际画面的评价。
 - 『观望』是因为信息缺失，不是因为有负面证据。核心规则『前三张图』没法判定，既不算触发，也不算通过。
 - 评分里 trust 偏低，主要因为没有可核验的素材，并不代表质量差。
@@ -444,6 +393,9 @@
 - 核心规则“价格与内容体量不匹配则不买”本次没有被明确触发:$19.99 对 12–15 小时的价格本身可以接受,但内容质量无法核验。
 - 价格锚点的比较依赖角色先验,未经页面材料验证。
 - 这是合成评审,不代表真实玩家。
+- 本评审基于一页纯文字材料，没有任何媒体素材，“观望”源于证据缺失，而非已确认的负面事实。
+- 老刀是毒舌怀疑型角色，语气偏尖锐，用来暴露可能被喷的点，不代表所有玩家的看法。
+- 推断条目仅用于价格对比与视觉风险，没有对未提供的系统或内容做补充设想。
 
 ---
 *Generated by AudienceLens Synthetic Playtest. This is NOT human research data.*

@@ -24,6 +24,7 @@ English · [中文](README_zh.md)
 ## Screenshots
 
 ![Conversational review entry](docs/images/hero.png)
+![Sample reports page](docs/images/samples.png)
 ![Review report](docs/images/report.png)
 
 ---
@@ -32,17 +33,20 @@ English · [中文](README_zh.md)
 
 Real engine runs on fictional product material, saved exactly as generated — no manual edits
 (`examples/reports/`; also browsable on the app's `/samples` page). Standard depth, model
-`claude-sonnet-5-5`, generated 2026-11-04; cost is the app's own accounting.
+`claude-sonnet-5-5`, 2026-11-04; cost is the app's own accounting. The persona panels ran first;
+cross-examination was then run on those same validated outputs with semantic de-duplication
+(`runner.cli.run_panel_from_outputs`) — each folder's `meta.json` records both steps and
+`persona_outputs.json` holds the validated inputs, so the cross-exam step is reproducible from the repo.
 
-| Report | Input | Cost | Outcome |
-|---|---|---|---|
-| [Steam store page — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` (`steam_page_review`, `game-core`) | $0.34 | 4 of 6 personas passed validation; no cross-examination (no qualifying dispute) |
-| [SaaS pricing page — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` (`pricing_page_review`, `general-consumer`) | $0.23 | 5 of 5 personas passed; no cross-examination (no qualifying dispute) |
-| [Startup pitch — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` (`pitch_review`, `startup-panel`) | $0.35 | 3 of 6 personas passed validation; no cross-examination |
+| Report | Input | Cost | Personas passed | Cross-examination |
+|---|---|---|---|---|
+| [Steam store page — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` (`steam_page_review`, `game-core`) | $0.35 | 4 of 6 | 2 disputes, one rebuttal round each |
+| [SaaS pricing page — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` (`pricing_page_review`, `general-consumer`) | $0.27 | 5 of 5 | 3 disputes, one rebuttal round each |
+| [Startup pitch — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` (`pitch_review`, `startup-panel`) | $0.37 | 3 of 6 | 1 dispute, one rebuttal round |
 
-Why some personas fail and why cross-examination did not trigger is written up in
-[docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md](docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md)
-and the [Known limitations](#known-limitations) below.
+No vote changed in any rebuttal: the largest confidence movement was 2 points against the
+15-point threshold. Why some personas fail validation, and why cross-examination needed the
+semantic backend, is written up in [docs/evaluation/](docs/evaluation/).
 
 ---
 
@@ -174,6 +178,21 @@ npm run dev
 
 With the default `AL_AUTH_ENABLED=false` the app runs in single-user mode. Open **Settings → API keys** and add either an Anthropic key or any **OpenAI-compatible** provider (DeepSeek, Kimi, Qwen, GLM, … — presets are in `OPENAI_COMPATIBLE_PRESETS` in `src/runner/llm_client.py`). Configuration reference: [.env.example](.env.example) (names only) and [docs/MAINTENANCE.md](docs/MAINTENANCE.md).
 
+### Semantic de-duplication (needed for cross-examination)
+
+Cross-examination only debates issues that several personas raised, so differently worded versions
+of the same issue have to be merged. That needs the Chinese embedding model in
+`src/runner/similarity.py`; the Docker image installs it by default. For a local setup:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers   # downloads BAAI/bge-small-zh-v1.5 (~93 MB) on first use
+```
+
+Without it the engine falls back to string similarity and the report says so explicitly
+("Semantic dedup not installed — cross-examination may not trigger"); see
+[docs/evaluation/dedup-fallback-finding.md](docs/evaluation/dedup-fallback-finding.md).
+
 ### Ollama (local models)
 
 Pick the **Ollama** preset (`http://localhost:11434/v1`) as an OpenAI-compatible provider and enter the model you have pulled. From Python, pass `provider="openai_compatible"`, `api_base=...` and `model_override=...` to `run_panel`.
@@ -199,7 +218,7 @@ python -m pytest tests/ -q                          # core engine
 (cd web/admin && npx vitest run)                    # admin panel unit tests
 ```
 
-Measured 2026-11-04: core 1853 passed / 9 skipped · backend 944 passed / 1 skipped · admin vitest 35 passed.
+Measured 2026-11-04 (default requirements, as in CI): core 1863 passed / 9 skipped · backend 944 passed / 1 skipped · admin vitest 35 passed; with the optional semantic backend installed, 3 more core tests run instead of skipping.
 
 CI ([ci.yml](.github/workflows/ci.yml)) runs all of the above on every push and pull request, plus a PostgreSQL 16 backend job, a skill-mirror consistency check and a YAML parse check.
 
@@ -226,7 +245,6 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 - **LLM bias.** Outputs inherit the underlying model's biases. Stereotype checks reduce but do not remove this, and different providers give materially different reviews.
 - **Cost scales with panel size.** Each persona is a separate model call, and `full` mode adds one rebuttal call per involved persona.
 - **No platform key is offered.** Hosted use is bring-your-own-key only; the plan / quota / CDK machinery exists in code but is not funded.
-- **Cross-examination often does not trigger without the optional semantic model.** Without `sentence-transformers`, `src/runner/similarity.py` falls back to string similarity, so differently worded versions of the same issue are not merged and no point qualifies as a dispute — none of the three sample reports ran it.
 - **Some persona outputs fail validation.** The validator rejects paraphrases labelled `direct` and malformed submissions; one repair turn recovers many of them, not all (see the sample outcomes above).
 - **Single debate round.** Further rounds, early termination and consensus tracking are designed but not implemented; θ is uncalibrated.
 

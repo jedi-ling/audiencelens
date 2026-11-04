@@ -20,20 +20,21 @@
 ## 截图
 
 ![对话式评审入口](docs/images/hero.png)
+![样例报告页](docs/images/samples.png)
 ![评审报告](docs/images/report.png)
 
 ## 样例报告
 
 对虚构产品材料的真实引擎运行结果，原样保存、没有手工修改（`examples/reports/`，也可以在应用的 `/samples` 页浏览）。
-standard 档，模型 `claude-sonnet-5-5`，2026-11-04 生成，成本取自应用自己的计费。
+standard 档，模型 `claude-sonnet-5-5`，2026-11-04，成本取自应用自己的计费。先跑人格评审，再用语义去重在同一批通过校验的人格输出上续跑交叉质询（`runner.cli.run_panel_from_outputs`）；`meta.json` 记录两步的出处，`persona_outputs.json` 存了续跑的输入，交叉质询这一步可以从仓库复现。
 
-| 报告 | 输入 | 成本 | 结果 |
-|---|---|---|---|
-| [Steam 商店页 — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` | $0.34 | 6 位人格中 4 位通过校验；没有触发交叉质询 |
-| [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | $0.23 | 5 位全部通过；没有触发交叉质询 |
-| [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | $0.35 | 6 位人格中 3 位通过校验；没有触发交叉质询 |
+| 报告 | 输入 | 成本 | 通过校验的人格 | 交叉质询 |
+|---|---|---|---|---|
+| [Steam 商店页 — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` | $0.35 | 6 位中 4 位 | 2 个争议点，各一轮反驳 |
+| [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | $0.27 | 5 位全部 | 3 个争议点，各一轮反驳 |
+| [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | $0.37 | 6 位中 3 位 | 1 个争议点，一轮反驳 |
 
-部分人格没通过校验、交叉质询没触发的原因，见 [docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md](docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md) 和下方「已知局限」。
+三份反驳都没有改票：置信度最大只变了 2 分，阈值是 15 分。部分人格没通过校验、交叉质询为什么需要语义去重，见 [docs/evaluation/](docs/evaluation/)。
 
 ## 架构
 
@@ -89,6 +90,15 @@ cd web/frontend && npm install && npm run dev                          # 另开�
 
 默认 `AL_AUTH_ENABLED=false`（单机形态）。在「设置 → API Key」里填 Anthropic Key，或任意 OpenAI 兼容服务（DeepSeek、Kimi、通义千问、智谱 GLM……），也可以选 **Ollama** 预设（`http://localhost:11434/v1`）用本地模型。
 
+交叉质询只对多个人格都提到的问题发起，换个说法的同一问题要靠中文 embedding 模型合并（Docker 镜像默认已装）。本地开发：
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers   # 首次使用会下载 BAAI/bge-small-zh-v1.5（约 93 MB）
+```
+
+不装的话引擎退回字符串相似度，报告里会明确提示"语义去重未安装，交叉质询可能无法触发"。
+
 > **SSRF 防护**：后端拒绝指向环回 / 私网地址的 `api_base`，只有单机形态（`AL_AUTH_ENABLED=false`）且非生产主机时才放行，所以本地 Ollama 只适合本机自用。
 
 ## 测试
@@ -114,7 +124,6 @@ python -m pytest tests/ -q
 - 结果继承底层模型的偏见，不同服务商差异明显；
 - 成本随面板人数增长；
 - 目前不提供平台 Key，只支持自带 Key（BYOK）；
-- 不装可选的语义模型（`sentence-transformers`）时，`src/runner/similarity.py` 退回字符串相似度，换个说法的同一问题合并不到一起，交叉质询往往触发不了——三份样例都没有触发；
 - 部分人格输出会被校验拦下（把改写标成 direct、或提交残缺），一轮修复能救回不少，但不是全部；
 - 只有一轮反驳，θ 未经校准。
 

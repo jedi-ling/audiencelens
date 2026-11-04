@@ -1,0 +1,13 @@
+# gitleaks configuration: all default rules, plus one narrow allowlist.
+#
+# The cross-examination section of a review report has "persona_key" fields whose values are
+# persona ids such as "P61-devils-advocate". The default generic-api-key rule matches on the
+# field name. Only values shaped like a persona id are allowed; anything else in a persona_key
+# field (or anywhere else) is still reported.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "persona_key holds a persona id (e.g. P61-devils-advocate), not a credential"
+regexTarget = "match"
+regexes = ['''persona_key"\s*:\s*"P\d{2,3}-[a-z0-9-]+"''']

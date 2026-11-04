@@ -24,6 +24,7 @@ interface SampleReport {
   personas_passed: number | null
   personas_attempted: number | null
   cross_exam_ran: boolean
+  disputes: number
 }
 
 const BASE = '/sample-reports'
@@ -114,9 +115,11 @@ export default function SamplesPage() {
                   </dd>
                 </div>
               </dl>
-              {!s.cross_exam_ran && (
-                <p className="mt-3 text-xs text-text-muted">{t('page.samples.no_cross_exam.hint')}</p>
-              )}
+              <p className="mt-3 text-xs text-text-muted">
+                {s.cross_exam_ran
+                  ? t('page.samples.disputes.label', { count: s.disputes })
+                  : t('page.samples.no_cross_exam.hint')}
+              </p>
             </li>
           ))}
         </ul>

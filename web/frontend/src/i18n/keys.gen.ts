@@ -1373,6 +1373,7 @@ export type MessageKey =
   | 'page.reset.submit.error'
   | 'page.samples.cost.label'
   | 'page.samples.date.label'
+  | 'page.samples.disputes.label'
   | 'page.samples.header.desc'
   | 'page.samples.header.title'
   | 'page.samples.load.error'
@@ -4641,6 +4642,7 @@ export interface MessageVars {
   'page.reset.submit.error': Record<string, never>
   'page.samples.cost.label': Record<string, never>
   'page.samples.date.label': Record<string, never>
+  'page.samples.disputes.label': { count: number }
   'page.samples.header.desc': Record<string, never>
   'page.samples.header.title': Record<string, never>
   'page.samples.load.error': Record<string, never>

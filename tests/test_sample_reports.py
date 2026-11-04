@@ -22,6 +22,8 @@ SLUGS = sorted(
 META_KEYS = {
     "input_file", "task_type", "persona_pack", "depth", "model_id", "date",
     "cost_usd", "tokens_in", "tokens_out", "app_commit", "retries",
+    # 交叉质询是从已有人格输出续跑的（runner.cli.run_panel_from_outputs），出处要写清
+    "persona_outputs_from", "cross_exam_run", "dedup_method", "disputes",
 }
 FORBIDDEN = [
     re.compile(r"sk-ant-[A-Za-z0-9_-]{10,}"),
@@ -38,7 +40,7 @@ def test_there_are_sample_reports():
 @pytest.mark.parametrize("slug", SLUGS)
 def test_sample_is_complete(slug):
     folder = os.path.join(REPORTS, slug)
-    for name in ("report.html", "report.json", "report.md", "meta.json"):
+    for name in ("report.html", "report.json", "report.md", "meta.json", "persona_outputs.json"):
         assert os.path.getsize(os.path.join(folder, name)) > 0, name
     with open(os.path.join(folder, "meta.json"), encoding="utf-8") as f:
         meta = json.load(f)
@@ -50,6 +52,21 @@ def test_sample_is_complete(slug):
     assert report["meta"]["task_type"] == meta["task_type"]
     with open(os.path.join(folder, "report.html"), encoding="utf-8") as f:
         assert f.read().rstrip().endswith("</html>"), "HTML 报告被截断了"
+
+    # meta 里的数字必须和报告本身对得上，不能是手填的
+    cross = report.get("cross_examination") or {}
+    assert meta["disputes"] == len(cross.get("disputes") or [])
+    assert meta["dedup_method"] == (report.get("dedup") or {}).get("method")
+    assert meta["cost_usd"] == pytest.approx(
+        meta["persona_outputs_from"]["cost_usd"] + meta["cross_exam_run"]["cost_usd"], abs=1e-4
+    )
+    with open(os.path.join(folder, "persona_outputs.json"), encoding="utf-8") as f:
+        persona_file = json.load(f)
+    assert persona_file["validated"], "续跑的输入必须随仓库提交，才能复现"
+    assert all("persona_id" in o for o in persona_file["validated"])
+    assert all(set(f) <= {"persona_id", "failure_reason"} for f in persona_file["failed"]), (
+        "没通过校验的人格只记 id 和结论，不提交原文"
+    )
 
 
 @pytest.mark.parametrize("slug", SLUGS)

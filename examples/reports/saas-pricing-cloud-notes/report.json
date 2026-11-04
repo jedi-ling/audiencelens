@@ -2,23 +2,23 @@
   "meta": {
     "task_type": "pricing_page_review",
     "target": "选择适合你的方案",
-    "generated_at": "2026-11-03T19:37:06.399774+00:00",
+    "generated_at": "2026-11-04T01:20:56.029143+00:00",
     "is_synthetic": true,
     "caveats": [
-      "仅基于一页定价文案，没有实际产品、评论区或客服实测，所有判断都是对页面文字的怀疑，不是对产品质量的结论。",
-      "立场是观望，原因是证据缺失而非发现明确负面证据。",
-      "竞品信息匿名，无法核实其真实性。",
       "基于单页定价材料做判断，未见服务条款、退款政策全文和实际产品体验。",
       "观望判断主要来自信息缺失（试用、续费、退款细则），不是发现了负面证据。",
       "是否值得购买取决于我的真实笔记和附件用量，材料里没有这部分信息。",
+      "仅基于一页定价文案，没有实际产品、评论区或客服实测，所有判断都是对页面文字的怀疑，不是对产品质量的结论。",
+      "立场是观望，原因是证据缺失而非发现明确负面证据。",
+      "竞品信息匿名，无法核实其真实性。",
       "评审只基于单个定价页，没有看到安全、帮助或销售页面。这些信息可能存在于其他页面，所以“缺失”指的是本页未呈现，不代表产品没有。",
       "观望的判断主要由信息缺失造成，不是由负面证据造成。",
-      "这是基于单页定价材料的合成评审，没有实际试用产品，也没有核对竞品真实数据。",
-      "“观望”基于迁移信息缺失，不是产品被证实不好。",
-      "我没有说出自己当前在用哪款工具，迁移成本的估算只能按一般情形。",
       "本评审是合成人格输出，基于新手视角，不代表真实用户调研结果。",
       "材料只有定价页文字，没有升级流程、报错提示和产品首次使用界面，“引导顺序”和“首次失败体验”只能就定价页内的阅读顺序和超限说明来判断。",
-      "核心决策规则“关键术语没有被上下文解释”已被部分触发：双向链接、SLA 等词没有解释。"
+      "核心决策规则“关键术语没有被上下文解释”已被部分触发：双向链接、SLA 等词没有解释。",
+      "这是基于单页定价材料的合成评审，没有实际试用产品，也没有核对竞品真实数据。",
+      "“观望”基于迁移信息缺失，不是产品被证实不好。",
+      "我没有说出自己当前在用哪款工具，迁移成本的估算只能按一般情形。"
     ],
     "build_version": "0.3.0",
     "persona_pack_version": "general-consumer@0.1.0"
@@ -29,99 +29,111 @@
     "evidence_quality": "weak"
   },
   "consensus": {
-    "agreed_points": [],
+    "agreed_points": [
+      "竞品对比口径不一致，缺少来源"
+    ],
     "questioned_points": [
-      "竞品对比表匿名、口径不一，一眼就是“自说自话”",
-      "“无隐藏费用”“随时降级”缺少超限处理说明",
-      "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
-      "AI 摘要、“无限”权益缺少限制说明和演示",
-      "团队版不标透明条款，SLA 无赔付",
       "没有试用期，也没有自动续费条款",
       "退款规则只有一句话，细节缺失",
       "AI 摘要用量边界和涨价承诺未说明",
-      "竞品对比口径不一致，缺少来源",
       "团队版价格和合同不透明",
+      "“无隐藏费用”“随时降级”缺少超限处理说明",
+      "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
       "页面没有任何安全合规信息",
       "没有迁移和上线支持路径",
-      "团队版预算不可自助测算",
       "长期可靠性的证据只有一个 SLA 数字",
-      "竞品对比与团队采购无关",
-      "完全没有导入和迁移支持说明",
-      "竞品对比只挑自家占优的项，竞品还匿名",
-      "没有专业版试用，免费版也无法试迁移",
-      "导出保真度没说清",
-      "AI 摘要等高级功能的用量上限未写明",
       "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）",
-      "免费版超过限制后会怎样没有说明",
-      "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
-      "没有试用入口，升级和退款流程也没讲",
-      "“联系销售”让人不知道后面会发生什么"
+      "“联系销售”让人不知道后面会发生什么",
+      "导出保真度没说清"
     ],
     "shared_concerns": [
       {
-        "issue": "竞品对比表匿名、口径不一，一眼就是“自说自话”",
+        "issue": "竞品对比口径不一致，缺少来源",
         "personas": [
-          "P47-skeptical-reviewer-general"
+          "P46-value-conscious-buyer",
+          "P47-skeptical-reviewer-general",
+          "P48-b2b-decision-maker",
+          "P53-competitor-loyal-switcher"
         ],
-        "persona_count": 1,
-        "is_consensus": false,
+        "persona_count": 4,
+        "is_consensus": true,
         "title_variants": [
-          "竞品对比表匿名、口径不一，一眼就是“自说自话”"
-        ]
-      },
-      {
-        "issue": "“无隐藏费用”“随时降级”缺少超限处理说明",
-        "personas": [
-          "P47-skeptical-reviewer-general"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "“无隐藏费用”“随时降级”缺少超限处理说明"
-        ]
-      },
-      {
-        "issue": "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
-        "personas": [
-          "P47-skeptical-reviewer-general"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源"
-        ]
-      },
-      {
-        "issue": "AI 摘要、“无限”权益缺少限制说明和演示",
-        "personas": [
-          "P47-skeptical-reviewer-general"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "AI 摘要、“无限”权益缺少限制说明和演示"
-        ]
-      },
-      {
-        "issue": "团队版不标透明条款，SLA 无赔付",
-        "personas": [
-          "P47-skeptical-reviewer-general"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "团队版不标透明条款，SLA 无赔付"
+          "竞品对比口径不一致，缺少来源",
+          "竞品对比表匿名、口径不一，一眼就是“自说自话”",
+          "竞品对比与团队采购无关",
+          "竞品对比只挑自家占优的项，竞品还匿名"
         ]
       },
       {
         "issue": "没有试用期，也没有自动续费条款",
         "personas": [
-          "P46-value-conscious-buyer"
+          "P46-value-conscious-buyer",
+          "P49-first-time-user",
+          "P53-competitor-loyal-switcher"
         ],
-        "persona_count": 1,
+        "persona_count": 3,
         "is_consensus": false,
         "title_variants": [
-          "没有试用期，也没有自动续费条款"
+          "没有试用期，也没有自动续费条款",
+          "没有试用入口，升级和退款流程也没讲",
+          "没有专业版试用，免费版也无法试迁移"
+        ]
+      },
+      {
+        "issue": "AI 摘要用量边界和涨价承诺未说明",
+        "personas": [
+          "P46-value-conscious-buyer",
+          "P47-skeptical-reviewer-general",
+          "P53-competitor-loyal-switcher"
+        ],
+        "persona_count": 3,
+        "is_consensus": false,
+        "title_variants": [
+          "AI 摘要用量边界和涨价承诺未说明",
+          "AI 摘要、“无限”权益缺少限制说明和演示",
+          "AI 摘要等高级功能的用量上限未写明"
+        ]
+      },
+      {
+        "issue": "团队版价格和合同不透明",
+        "personas": [
+          "P46-value-conscious-buyer",
+          "P47-skeptical-reviewer-general",
+          "P48-b2b-decision-maker"
+        ],
+        "persona_count": 3,
+        "is_consensus": false,
+        "title_variants": [
+          "团队版价格和合同不透明",
+          "团队版不标透明条款，SLA 无赔付",
+          "团队版预算不可自助测算"
+        ]
+      },
+      {
+        "issue": "“无隐藏费用”“随时降级”缺少超限处理说明",
+        "personas": [
+          "P47-skeptical-reviewer-general",
+          "P49-first-time-user"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "“无隐藏费用”“随时降级”缺少超限处理说明",
+          "免费版超过限制后会怎样没有说明",
+          "价格数字多且口径混杂，“无隐藏费用”没落到具体内容"
+        ]
+      },
+      {
+        "issue": "没有迁移和上线支持路径",
+        "personas": [
+          "P48-b2b-decision-maker",
+          "P53-competitor-loyal-switcher"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "没有迁移和上线支持路径",
+          "完全没有导入和迁移支持说明"
         ]
       },
       {
@@ -136,36 +148,14 @@
         ]
       },
       {
-        "issue": "AI 摘要用量边界和涨价承诺未说明",
+        "issue": "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
         "personas": [
-          "P46-value-conscious-buyer"
+          "P47-skeptical-reviewer-general"
         ],
         "persona_count": 1,
         "is_consensus": false,
         "title_variants": [
-          "AI 摘要用量边界和涨价承诺未说明"
-        ]
-      },
-      {
-        "issue": "竞品对比口径不一致，缺少来源",
-        "personas": [
-          "P46-value-conscious-buyer"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "竞品对比口径不一致，缺少来源"
-        ]
-      },
-      {
-        "issue": "团队版价格和合同不透明",
-        "personas": [
-          "P46-value-conscious-buyer"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "团队版价格和合同不透明"
+          "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源"
         ]
       },
       {
@@ -180,28 +170,6 @@
         ]
       },
       {
-        "issue": "没有迁移和上线支持路径",
-        "personas": [
-          "P48-b2b-decision-maker"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "没有迁移和上线支持路径"
-        ]
-      },
-      {
-        "issue": "团队版预算不可自助测算",
-        "personas": [
-          "P48-b2b-decision-maker"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "团队版预算不可自助测算"
-        ]
-      },
-      {
         "issue": "长期可靠性的证据只有一个 SLA 数字",
         "personas": [
           "P48-b2b-decision-maker"
@@ -210,72 +178,6 @@
         "is_consensus": false,
         "title_variants": [
           "长期可靠性的证据只有一个 SLA 数字"
-        ]
-      },
-      {
-        "issue": "竞品对比与团队采购无关",
-        "personas": [
-          "P48-b2b-decision-maker"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "竞品对比与团队采购无关"
-        ]
-      },
-      {
-        "issue": "完全没有导入和迁移支持说明",
-        "personas": [
-          "P53-competitor-loyal-switcher"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "完全没有导入和迁移支持说明"
-        ]
-      },
-      {
-        "issue": "竞品对比只挑自家占优的项，竞品还匿名",
-        "personas": [
-          "P53-competitor-loyal-switcher"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "竞品对比只挑自家占优的项，竞品还匿名"
-        ]
-      },
-      {
-        "issue": "没有专业版试用，免费版也无法试迁移",
-        "personas": [
-          "P53-competitor-loyal-switcher"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "没有专业版试用，免费版也无法试迁移"
-        ]
-      },
-      {
-        "issue": "导出保真度没说清",
-        "personas": [
-          "P53-competitor-loyal-switcher"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "导出保真度没说清"
-        ]
-      },
-      {
-        "issue": "AI 摘要等高级功能的用量上限未写明",
-        "personas": [
-          "P53-competitor-loyal-switcher"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "AI 摘要等高级功能的用量上限未写明"
         ]
       },
       {
@@ -290,39 +192,6 @@
         ]
       },
       {
-        "issue": "免费版超过限制后会怎样没有说明",
-        "personas": [
-          "P49-first-time-user"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "免费版超过限制后会怎样没有说明"
-        ]
-      },
-      {
-        "issue": "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
-        "personas": [
-          "P49-first-time-user"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "价格数字多且口径混杂，“无隐藏费用”没落到具体内容"
-        ]
-      },
-      {
-        "issue": "没有试用入口，升级和退款流程也没讲",
-        "personas": [
-          "P49-first-time-user"
-        ],
-        "persona_count": 1,
-        "is_consensus": false,
-        "title_variants": [
-          "没有试用入口，升级和退款流程也没讲"
-        ]
-      },
-      {
         "issue": "“联系销售”让人不知道后面会发生什么",
         "personas": [
           "P49-first-time-user"
@@ -331,6 +200,17 @@
         "is_consensus": false,
         "title_variants": [
           "“联系销售”让人不知道后面会发生什么"
+        ]
+      },
+      {
+        "issue": "导出保真度没说清",
+        "personas": [
+          "P53-competitor-loyal-switcher"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "导出保真度没说清"
         ]
       }
     ],
@@ -345,47 +225,59 @@
   "priority_fixes": [
     {
       "priority": 1,
-      "issue": "页面没有任何安全合规信息",
-      "severity": "critical",
-      "why_it_matters": "我的决策规则是安全合规文档缺失就直接排除候选。没有 SSO、审计日志、加密说明或合规认证，我过不了内部安全评审和法务审批，也不能承担数据泄露后“谁负责”的责任。",
+      "issue": "竞品对比口径不一致，缺少来源",
+      "severity": "high",
+      "why_it_matters": "我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。",
       "affected_personas": [
-        "P48-b2b-decision-maker"
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P48-b2b-decision-maker",
+        "P53-competitor-loyal-switcher"
       ],
-      "suggested_fix": "在团队版下方加入“安全与合规”入口，公开 SSO/SAML、审计日志、加密方式、数据驻留、认证（如 ISO 27001、等保）和 DPA 模板。明确 AI 摘要的数据处理方式，以及是否用于模型训练。",
-      "score": 2.0,
-      "dedup_method": "lexical",
+      "suggested_fix": "写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。",
+      "score": 6.0,
+      "dedup_method": "semantic",
       "title_variants": [
-        "页面没有任何安全合规信息"
+        "竞品对比口径不一致，缺少来源",
+        "竞品对比表匿名、口径不一，一眼就是“自说自话”",
+        "竞品对比与团队采购无关",
+        "竞品对比只挑自家占优的项，竞品还匿名"
       ]
     },
     {
       "priority": 2,
-      "issue": "完全没有导入和迁移支持说明",
-      "severity": "critical",
-      "why_it_matters": "我已经有一个成熟的笔记库。没有导入器、没有迁移文档，我就要自己承担迁移失败的风险。按我的规则，这是缺乏迁移支持，直接触发退出条件。这个判断来自信息缺失，不是看到了负面证据。",
+      "issue": "没有试用期，也没有自动续费条款",
+      "severity": "high",
+      "why_it_matters": "我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。",
       "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P49-first-time-user",
         "P53-competitor-loyal-switcher"
       ],
-      "suggested_fix": "增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。",
-      "score": 2.0,
-      "dedup_method": "lexical",
+      "suggested_fix": "写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。",
+      "score": 4.5,
+      "dedup_method": "semantic",
       "title_variants": [
-        "完全没有导入和迁移支持说明"
+        "没有试用期，也没有自动续费条款",
+        "没有试用入口，升级和退款流程也没讲",
+        "没有专业版试用，免费版也无法试迁移"
       ]
     },
     {
       "priority": 3,
-      "issue": "竞品对比表匿名、口径不一，一眼就是“自说自话”",
-      "severity": "high",
-      "why_it_matters": "我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。",
+      "issue": "没有迁移和上线支持路径",
+      "severity": "critical",
+      "why_it_matters": "我已经有一个成熟的笔记库。没有导入器、没有迁移文档，我就要自己承担迁移失败的风险。按我的规则，这是缺乏迁移支持，直接触发退出条件。这个判断来自信息缺失，不是看到了负面证据。",
       "affected_personas": [
-        "P47-skeptical-reviewer-general"
+        "P48-b2b-decision-maker",
+        "P53-competitor-loyal-switcher"
       ],
-      "suggested_fix": "写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。",
-      "score": 1.5,
-      "dedup_method": "lexical",
+      "suggested_fix": "增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。",
+      "score": 4.0,
+      "dedup_method": "semantic",
       "title_variants": [
-        "竞品对比表匿名、口径不一，一眼就是“自说自话”"
+        "没有迁移和上线支持路径",
+        "完全没有导入和迁移支持说明"
       ]
     },
     {
@@ -394,32 +286,73 @@
       "severity": "high",
       "why_it_matters": "降级到免费版时，超过200篇笔记或5MB的附件会被只读、被删，还是被锁，页面没说。这最容易引发“被套路”的差评。",
       "affected_personas": [
-        "P47-skeptical-reviewer-general"
+        "P47-skeptical-reviewer-general",
+        "P49-first-time-user"
       ],
       "suggested_fix": "在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。",
-      "score": 1.5,
-      "dedup_method": "lexical",
+      "score": 3.0,
+      "dedup_method": "semantic",
       "title_variants": [
-        "“无隐藏费用”“随时降级”缺少超限处理说明"
+        "“无隐藏费用”“随时降级”缺少超限处理说明",
+        "免费版超过限制后会怎样没有说明",
+        "价格数字多且口径混杂，“无隐藏费用”没落到具体内容"
       ]
     },
     {
       "priority": 5,
-      "issue": "没有试用期，也没有自动续费条款",
-      "severity": "high",
-      "why_it_matters": "我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。",
+      "issue": "AI 摘要用量边界和涨价承诺未说明",
+      "severity": "medium",
+      "why_it_matters": "AI 功能常有隐形限额或后续另收费，会让「无隐藏费用」的承诺打折。价格变动是否通知也没写。",
       "affected_personas": [
-        "P46-value-conscious-buyer"
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P53-competitor-loyal-switcher"
       ],
-      "suggested_fix": "写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。",
-      "score": 1.5,
-      "dedup_method": "lexical",
+      "suggested_fix": "列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。",
+      "score": 3.0,
+      "dedup_method": "semantic",
       "title_variants": [
-        "没有试用期，也没有自动续费条款"
+        "AI 摘要用量边界和涨价承诺未说明",
+        "AI 摘要、“无限”权益缺少限制说明和演示",
+        "AI 摘要等高级功能的用量上限未写明"
       ]
     },
     {
       "priority": 6,
+      "issue": "团队版价格和合同不透明",
+      "severity": "medium",
+      "why_it_matters": "“联系销售”加最低3人，价格看似透明实则要被销售过一遍。SLA 没写赔偿，等于空头保证。",
+      "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P48-b2b-decision-maker"
+      ],
+      "suggested_fix": "公开团队版年付价和合同期限，附 SLA 条款和赔付比例。",
+      "score": 3.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "团队版价格和合同不透明",
+        "团队版不标透明条款，SLA 无赔付",
+        "团队版预算不可自助测算"
+      ]
+    },
+    {
+      "priority": 7,
+      "issue": "页面没有任何安全合规信息",
+      "severity": "critical",
+      "why_it_matters": "我的决策规则是安全合规文档缺失就直接排除候选。没有 SSO、审计日志、加密说明或合规认证，我过不了内部安全评审和法务审批，也不能承担数据泄露后“谁负责”的责任。",
+      "affected_personas": [
+        "P48-b2b-decision-maker"
+      ],
+      "suggested_fix": "在团队版下方加入“安全与合规”入口，公开 SSO/SAML、审计日志、加密方式、数据驻留、认证（如 ISO 27001、等保）和 DPA 模板。明确 AI 摘要的数据处理方式，以及是否用于模型训练。",
+      "score": 2.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "页面没有任何安全合规信息"
+      ]
+    },
+    {
+      "priority": 8,
       "issue": "退款规则只有一句话，细节缺失",
       "severity": "high",
       "why_it_matters": "「按未使用月份比例退款」没写折算基准、到账时间和手续费。年付 ¥168 的退款金额我算不出来，风险无法评估。",
@@ -428,58 +361,13 @@
       ],
       "suggested_fix": "给出退款公式和示例，例如：用满 3 个月，按月付价 ¥19 扣除后退款多少元。写明到账天数。",
       "score": 1.5,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "退款规则只有一句话，细节缺失"
       ]
     },
     {
-      "priority": 7,
-      "issue": "没有迁移和上线支持路径",
-      "severity": "high",
-      "why_it_matters": "我无法估算团队迁移的工时和成本，也不知道有没有导入工具、上线辅导或培训。迁移成本不可预估时，我倾向观望而不是签约。",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "suggested_fix": "提供“从 Notion/Evernote 等工具迁移”的指南、批量导入能力说明、团队上线流程和时间预期，并说明客户成功经理在迁移阶段负责什么。",
-      "score": 1.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "没有迁移和上线支持路径"
-      ]
-    },
-    {
-      "priority": 8,
-      "issue": "竞品对比只挑自家占优的项，竞品还匿名",
-      "severity": "high",
-      "why_it_matters": "我要的是“凭什么不用我现在这个”。对比只有四行，缺少编辑器体验、同步可靠性、搜索、生态、移动端。竞品名字也不写，没法核实，反而让人怀疑。起价一行还用年付折算价对月价。",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "suggested_fix": "实名对比，注明数据日期，并按同口径比较月付和年付。补上同步、搜索、插件、API、移动端和协作等维度，坦白说明哪些项落后。",
-      "score": 1.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "竞品对比只挑自家占优的项，竞品还匿名"
-      ]
-    },
-    {
       "priority": 9,
-      "issue": "没有专业版试用，免费版也无法试迁移",
-      "severity": "high",
-      "why_it_matters": "免费版限 200 篇笔记、1 台设备，装不下我的真实笔记库，也没法测多端同步。不先试就要付费，我的风险承受度太低。",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "suggested_fix": "给专业版 14–30 天全功能试用，试用期不限笔记数量。导入的数据在试用结束后保持可读可导出。",
-      "score": 1.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "没有专业版试用，免费版也无法试迁移"
-      ]
-    },
-    {
-      "priority": 10,
       "issue": "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）",
       "severity": "high",
       "why_it_matters": "我第一次看到这些词就不知道它们对我有什么用，也就不知道要不要为专业版付钱。我可能因此直接留在免费版，或者离开。",
@@ -488,28 +376,13 @@
       ],
       "suggested_fix": "每个术语后面加一句大白话和一个小例子，比如“双向链接：在 A 笔记里提到 B，B 里也能看到 A”。SLA 要写清楚是什么，以及没达到时怎么赔。",
       "score": 1.5,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）"
       ]
     },
     {
-      "priority": 11,
-      "issue": "免费版超过限制后会怎样没有说明",
-      "severity": "high",
-      "why_it_matters": "我第一次写满 200 篇或传了超过 5MB 的文件时，如果被突然拦住又不知道原因，会觉得被惩罚，很可能就此流失。",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "suggested_fix": "在免费版下写明“满 200 篇后：已有笔记可正常查看和编辑，只是不能新建”，附件超限的提示也要写出来；同时说明超限时如何提示和升级。",
-      "score": 1.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "免费版超过限制后会怎样没有说明"
-      ]
-    },
-    {
-      "priority": 12,
+      "priority": 10,
       "issue": "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
       "severity": "medium",
       "why_it_matters": "我第一眼就找评论区和差评回应，这里一个都没有。无法核验团队遇到负面反馈时是装死还是正面回应。",
@@ -518,88 +391,13 @@
       ],
       "suggested_fix": "接入真实第三方评价（应用商店评分、社区帖），公开已知问题和更新日志，保留差评并回应。",
       "score": 1.0,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源"
       ]
     },
     {
-      "priority": 13,
-      "issue": "AI 摘要、“无限”权益缺少限制说明和演示",
-      "severity": "medium",
-      "why_it_matters": "“无限设备”“AI 摘要”是典型会有隐性上限的卖点。限制不提前说，用户踩到后会觉得被夸大宣传。",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "suggested_fix": "配上实际截图或短视频，标注 AI 用量上限、公平使用政策和数据隐私条款。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "AI 摘要、“无限”权益缺少限制说明和演示"
-      ]
-    },
-    {
-      "priority": 14,
-      "issue": "团队版不标透明条款，SLA 无赔付",
-      "severity": "medium",
-      "why_it_matters": "“联系销售”加最低3人，价格看似透明实则要被销售过一遍。SLA 没写赔偿，等于空头保证。",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "suggested_fix": "公开团队版年付价和合同期限，附 SLA 条款和赔付比例。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "团队版不标透明条款，SLA 无赔付"
-      ]
-    },
-    {
-      "priority": 15,
-      "issue": "AI 摘要用量边界和涨价承诺未说明",
-      "severity": "medium",
-      "why_it_matters": "AI 功能常有隐形限额或后续另收费，会让「无隐藏费用」的承诺打折。价格变动是否通知也没写。",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "suggested_fix": "列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "AI 摘要用量边界和涨价承诺未说明"
-      ]
-    },
-    {
-      "priority": 16,
-      "issue": "竞品对比口径不一致，缺少来源",
-      "severity": "medium",
-      "why_it_matters": "用年付折算价对比竞品月付价，会削弱可信度。没有来源就无法核验。",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "suggested_fix": "统一用月付或年付折算对比，标注竞品名称、版本和数据日期。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "竞品对比口径不一致，缺少来源"
-      ]
-    },
-    {
-      "priority": 17,
-      "issue": "团队版预算不可自助测算",
-      "severity": "medium",
-      "why_it_matters": "只有 ¥49/用户/月的单价，没有年付价、规模阶梯或试用，真实报价要联系销售。长期成本的可预测性不足，也无法做年度预算。",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "suggested_fix": "公布团队版年付价和 10/50/100 人的阶梯价，提供团队试用或试点方案，并写明合同期内价格锁定和涨价条款。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "团队版预算不可自助测算"
-      ]
-    },
-    {
-      "priority": 18,
+      "priority": 11,
       "issue": "长期可靠性的证据只有一个 SLA 数字",
       "severity": "medium",
       "why_it_matters": "99.9% SLA 没有赔付条款和历史数据，也没有公司背景、客户案例或灾备说明。我无法判断供应商能否被长期依赖。",
@@ -608,13 +406,13 @@
       ],
       "suggested_fix": "公开 SLA 条款全文和赔付机制，提供状态页和历史可用性，补充企业客户案例、备份与灾备说明。",
       "score": 1.0,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "长期可靠性的证据只有一个 SLA 数字"
       ]
     },
     {
-      "priority": 19,
+      "priority": 12,
       "issue": "导出保真度没说清",
       "severity": "medium",
       "why_it_matters": "能导出 Markdown/PDF/HTML 是好事，但双向链接、白板、附件、版本历史导出后是否还在，页面没写。这些如果丢失，等于变相的数据锁定。",
@@ -623,88 +421,13 @@
       ],
       "suggested_fix": "写一张导出保真度表，注明哪些内容可以无损往返，并提供一键全量导出。",
       "score": 1.0,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "导出保真度没说清"
       ]
     },
     {
-      "priority": 20,
-      "issue": "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
-      "severity": "medium",
-      "why_it_matters": "¥19、¥168、¥14、26%、¥49/用户/月并排出现，我得自己算。竞品表里的“起价 ¥14/月”其实是年付折算价，容易让人觉得被误导。",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "suggested_fix": "月付、年付分成两个明确的切换，直接显示“年付一次付 ¥168”。竞品表要写明按年付还是月付比较。顶部“无隐藏费用”下面列出所有可能的额外收费，没有的话明确写“没有”。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "价格数字多且口径混杂，“无隐藏费用”没落到具体内容"
-      ]
-    },
-    {
-      "priority": 21,
-      "issue": "没有试用入口，升级和退款流程也没讲",
-      "severity": "medium",
-      "why_it_matters": "我是新手，对付费很谨慎，需要先试一下再决定。“可申请退款”但不知道怎么申请，我不敢点“立即升级”。",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "suggested_fix": "增加“免费试用专业版 14 天”之类的入口，并在退款说明里写清申请入口、条件和到账时间。",
-      "score": 1.0,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "没有试用入口，升级和退款流程也没讲"
-      ]
-    },
-    {
-      "priority": 22,
-      "issue": "团队版价格和合同不透明",
-      "severity": "low",
-      "why_it_matters": "只有「联系销售」，无法评估长期成本。",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "suggested_fix": "公开年付价、最低合同期、SLA 赔付规则。",
-      "score": 0.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "团队版价格和合同不透明"
-      ]
-    },
-    {
-      "priority": 23,
-      "issue": "竞品对比与团队采购无关",
-      "severity": "low",
-      "why_it_matters": "对比表只展示个人档的价格和文件大小，不能支持团队采购决策，匿名竞品的数据也无法核验。",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "suggested_fix": "增加团队档对比，包括权限、审计、SSO、SLA 和支持响应时间，并注明竞品名称和数据日期。",
-      "score": 0.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "竞品对比与团队采购无关"
-      ]
-    },
-    {
-      "priority": 24,
-      "issue": "AI 摘要等高级功能的用量上限未写明",
-      "severity": "low",
-      "why_it_matters": "页面一句话说“无隐藏费用”，但 AI 和白板可能有用量限制，口径不清就是隐患。",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "suggested_fix": "在专业版权益旁标明 AI 摘要的月额度，以及超量后怎么处理。",
-      "score": 0.5,
-      "dedup_method": "lexical",
-      "title_variants": [
-        "AI 摘要等高级功能的用量上限未写明"
-      ]
-    },
-    {
-      "priority": 25,
+      "priority": 13,
       "issue": "“联系销售”让人不知道后面会发生什么",
       "severity": "low",
       "why_it_matters": "我不知道点了之后是填表、被打电话还是约会议，团队版价格明明已经写出来了。",
@@ -713,42 +436,13 @@
       ],
       "suggested_fix": "按钮旁加一句“填写表单，1 个工作日内回复，不会强制购买”，或者提供自助试用团队版的路径。",
       "score": 0.5,
-      "dedup_method": "lexical",
+      "dedup_method": "semantic",
       "title_variants": [
         "“联系销售”让人不知道后面会发生什么"
       ]
     }
   ],
   "persona_notes": [
-    {
-      "persona_id": "P47-skeptical-reviewer-general",
-      "persona_name": "老赵",
-      "stance": "观望",
-      "evidence_top3": [
-        "页眉承诺“随时可以升级或降级，无隐藏费用”，但页面没有给出降级时数据超限（如超过200篇笔记、附件超5MB）怎么处理的说明。",
-        "“最受欢迎”标签没有任何用户数、占比或来源。页面上也没有评论、评分、用户案例或第三方评测。",
-        "竞品对比表用的是匿名的“某笔记 Pro”“某文档 Plus”，没有名称、日期和来源，无法核验。表里只列我方占优的维度，没有同步设备数、AI、协作等维度。"
-      ],
-      "top_issues": [
-        "竞品对比表匿名、口径不一，一眼就是“自说自话”",
-        "“无隐藏费用”“随时降级”缺少超限处理说明",
-        "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
-        "AI 摘要、“无限”权益缺少限制说明和演示",
-        "团队版不标透明条款，SLA 无赔付"
-      ],
-      "continue_triggers": [
-        "竞品对比标明实名、日期和来源，并列出对我方不利的维度",
-        "降级、超限、退款的细则写清楚，并附条款链接",
-        "出现真实用户评价，且团队对差评有公开回应",
-        "AI 摘要和白板有真实演示或截图"
-      ],
-      "quit_triggers": [
-        "发现竞品数据造假或口径明显偏袒自己",
-        "退款或降级实测与页面承诺不符",
-        "社区里差评被删或被引导",
-        "“无限”实际有隐性限速或限量"
-      ]
-    },
     {
       "persona_id": "P46-value-conscious-buyer",
       "persona_name": "沈静",
@@ -776,6 +470,35 @@
         "出现页面未披露的额外收费，例如 AI 额度另收费",
         "涨价不通知",
         "退款申请被拒或设置门槛"
+      ]
+    },
+    {
+      "persona_id": "P47-skeptical-reviewer-general",
+      "persona_name": "老赵",
+      "stance": "观望",
+      "evidence_top3": [
+        "页眉承诺“随时可以升级或降级，无隐藏费用”，但页面没有给出降级时数据超限（如超过200篇笔记、附件超5MB）怎么处理的说明。",
+        "“最受欢迎”标签没有任何用户数、占比或来源。页面上也没有评论、评分、用户案例或第三方评测。",
+        "竞品对比表用的是匿名的“某笔记 Pro”“某文档 Plus”，没有名称、日期和来源，无法核验。表里只列我方占优的维度，没有同步设备数、AI、协作等维度。"
+      ],
+      "top_issues": [
+        "竞品对比表匿名、口径不一，一眼就是“自说自话”",
+        "“无隐藏费用”“随时降级”缺少超限处理说明",
+        "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
+        "AI 摘要、“无限”权益缺少限制说明和演示",
+        "团队版不标透明条款，SLA 无赔付"
+      ],
+      "continue_triggers": [
+        "竞品对比标明实名、日期和来源，并列出对我方不利的维度",
+        "降级、超限、退款的细则写清楚，并附条款链接",
+        "出现真实用户评价，且团队对差评有公开回应",
+        "AI 摘要和白板有真实演示或截图"
+      ],
+      "quit_triggers": [
+        "发现竞品数据造假或口径明显偏袒自己",
+        "退款或降级实测与页面承诺不符",
+        "社区里差评被删或被引导",
+        "“无限”实际有隐性限速或限量"
       ]
     },
     {
@@ -808,6 +531,33 @@
       ]
     },
     {
+      "persona_id": "P49-first-time-user",
+      "persona_name": "阿泽",
+      "stance": "观望",
+      "evidence_top3": [
+        "三档方案并列，每档都有一句“适合谁”（个人轻度使用/重度笔记用户和自由职业者/小型团队），我能很快对号入座，先选免费版。",
+        "专业版功能列表写“高级编辑器（双向链接、白板、AI 摘要）”，没有解释双向链接是什么、能帮我做什么。",
+        "“SLA 保证”“管理员后台”“客户成功经理”“知识库模板”都没有解释；SLA 只写了 99.9%，没说达不到怎么办。"
+      ],
+      "top_issues": [
+        "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）",
+        "免费版超过限制后会怎样没有说明",
+        "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
+        "没有试用入口，升级和退款流程也没讲",
+        "“联系销售”让人不知道后面会发生什么"
+      ],
+      "continue_triggers": [
+        "每个功能名词后面有一句大白话解释",
+        "免费版超限时的提示和处理方式写清楚",
+        "有免费试用专业版的入口，并说明升级步骤"
+      ],
+      "quit_triggers": [
+        "看不懂专业版到底多了什么，不知道要不要升级",
+        "免费版用到一半被突然拦住，又看不懂原因",
+        "价格数字要自己算，还担心被扣费"
+      ]
+    },
+    {
       "persona_id": "P53-competitor-loyal-switcher",
       "persona_name": "Marcus",
       "stance": "观望",
@@ -835,33 +585,6 @@
         "发现功能明显落后于我现在用的工具",
         "迁移出问题时没人支持"
       ]
-    },
-    {
-      "persona_id": "P49-first-time-user",
-      "persona_name": "阿泽",
-      "stance": "观望",
-      "evidence_top3": [
-        "三档方案并列，每档都有一句“适合谁”（个人轻度使用/重度笔记用户和自由职业者/小型团队），我能很快对号入座，先选免费版。",
-        "专业版功能列表写“高级编辑器（双向链接、白板、AI 摘要）”，没有解释双向链接是什么、能帮我做什么。",
-        "“SLA 保证”“管理员后台”“客户成功经理”“知识库模板”都没有解释；SLA 只写了 99.9%，没说达不到怎么办。"
-      ],
-      "top_issues": [
-        "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）",
-        "免费版超过限制后会怎样没有说明",
-        "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
-        "没有试用入口，升级和退款流程也没讲",
-        "“联系销售”让人不知道后面会发生什么"
-      ],
-      "continue_triggers": [
-        "每个功能名词后面有一句大白话解释",
-        "免费版超限时的提示和处理方式写清楚",
-        "有免费试用专业版的入口，并说明升级步骤"
-      ],
-      "quit_triggers": [
-        "看不懂专业版到底多了什么，不知道要不要升级",
-        "免费版用到一半被突然拦住，又看不懂原因",
-        "价格数字要自己算，还担心被扣费"
-      ]
     }
   ],
   "evidence_profile": {
@@ -873,20 +596,20 @@
     "threshold": 0.4,
     "per_persona": [
       {
-        "persona_id": "P47-skeptical-reviewer-general",
-        "direct": 8,
-        "inferred": 1,
-        "gap": 0,
-        "total": 9,
-        "inferred_ratio": 0.111
-      },
-      {
         "persona_id": "P46-value-conscious-buyer",
         "direct": 8,
         "inferred": 1,
         "gap": 1,
         "total": 10,
         "inferred_ratio": 0.1
+      },
+      {
+        "persona_id": "P47-skeptical-reviewer-general",
+        "direct": 8,
+        "inferred": 1,
+        "gap": 0,
+        "total": 9,
+        "inferred_ratio": 0.111
       },
       {
         "persona_id": "P48-b2b-decision-maker",
@@ -897,20 +620,20 @@
         "inferred_ratio": 0.111
       },
       {
-        "persona_id": "P53-competitor-loyal-switcher",
-        "direct": 8,
-        "inferred": 1,
-        "gap": 1,
-        "total": 10,
-        "inferred_ratio": 0.1
-      },
-      {
         "persona_id": "P49-first-time-user",
         "direct": 10,
         "inferred": 0,
         "gap": 1,
         "total": 11,
         "inferred_ratio": 0.0
+      },
+      {
+        "persona_id": "P53-competitor-loyal-switcher",
+        "direct": 8,
+        "inferred": 1,
+        "gap": 1,
+        "total": 10,
+        "inferred_ratio": 0.1
       }
     ]
   },
@@ -952,14 +675,6 @@
     }
   ],
   "information_gaps": [
-    "降级后超限数据的处理规则",
-    "退款的具体条款、手续费和到账时间",
-    "用户评价、评分、用户数",
-    "AI 摘要的用量上限和隐私说明",
-    "“无限设备”的公平使用政策",
-    "团队版年付价和 SLA 赔付条款",
-    "竞品对比的实名、来源和数据日期",
-    "产品截图或演示",
     "专业版试用期",
     "自动续费与续费提醒规则",
     "退款折算公式与到账时间",
@@ -968,45 +683,45 @@
     "30 天后数据处理方式",
     "团队版年付价和合同期限",
     "竞品数据来源和日期",
+    "降级后超限数据的处理规则",
+    "退款的具体条款、手续费和到账时间",
+    "用户评价、评分、用户数",
+    "AI 摘要的用量上限和隐私说明",
+    "“无限设备”的公平使用政策",
+    "团队版年付价和 SLA 赔付条款",
+    "竞品对比的实名、来源和数据日期",
+    "产品截图或演示",
     "安全与合规信息：SSO/SAML、审计日志、加密、数据驻留、认证、DPA",
     "AI 摘要的数据处理和模型训练政策",
     "迁移和导入工具、团队上线与培训支持",
     "团队版年付价、规模阶梯、试用、合同期限和涨价条款",
     "SLA 赔付条款、状态页、历史可用性、灾备",
     "对公发票和企业采购流程",
-    "支持哪些工具的导入以及保真度",
-    "迁移文档或迁移工具",
-    "实名竞品及完整功能对比",
-    "导出是否保留双向链接、白板、附件",
-    "同步冲突处理与离线机制",
-    "团队版迁移服务",
     "各术语的通俗解释（双向链接、SLA、版本历史等）",
     "免费版达到 200 篇或 5MB 上限后的具体表现",
     "免费试用和升级流程",
     "退款的申请方式和到账时间",
     "超量收费规则，比如团队存储或 AI 摘要的使用次数",
     "竞品的具体名称和对比口径",
-    "免费版是否有版本历史"
+    "免费版是否有版本历史",
+    "支持哪些工具的导入以及保真度",
+    "迁移文档或迁移工具",
+    "实名竞品及完整功能对比",
+    "导出是否保留双向链接、白板、附件",
+    "同步冲突处理与离线机制",
+    "团队版迁移服务"
   ],
   "next_human_test": {
     "suggested_tasks": [],
     "recruit_types": [
-      "30-45 · 全球平台评论生态 · 老平台用户 · Web/iOS/Android · broad-but-cynical",
       "28-40 · 中国华东 · 中核消费型 · Web/iOS/Android · SaaS工具/电商平台/内容订阅",
+      "30-45 · 全球平台评论生态 · 老平台用户 · Web/iOS/Android · broad-but-cynical",
       "35-48 · 北美 · 商业视角 · Web/桌面客户端 · SaaS工具/企业协作平台",
-      "30-45 · 欧洲 · 核心老兵 · Web/桌面客户端 · broad/genre-veteran",
-      "20-30 · 中国二线城市 · 新手 · Web/Mobile · product-newbie"
+      "20-30 · 中国二线城市 · 新手 · Web/Mobile · product-newbie",
+      "30-45 · 欧洲 · 核心老兵 · Web/桌面客户端 · broad/genre-veteran"
     ],
     "recruit_types_basis": "本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议",
     "next_materials": [
-      "补充材料：降级后超限数据的处理规则",
-      "补充材料：退款的具体条款、手续费和到账时间",
-      "补充材料：用户评价、评分、用户数",
-      "补充材料：AI 摘要的用量上限和隐私说明",
-      "补充材料：“无限设备”的公平使用政策",
-      "补充材料：团队版年付价和 SLA 赔付条款",
-      "补充材料：竞品对比的实名、来源和数据日期",
-      "补充材料：产品截图或演示",
       "补充材料：专业版试用期",
       "补充材料：自动续费与续费提醒规则",
       "补充材料：退款折算公式与到账时间",
@@ -1015,28 +730,186 @@
       "补充材料：30 天后数据处理方式",
       "补充材料：团队版年付价和合同期限",
       "补充材料：竞品数据来源和日期",
+      "补充材料：降级后超限数据的处理规则",
+      "补充材料：退款的具体条款、手续费和到账时间",
+      "补充材料：用户评价、评分、用户数",
+      "补充材料：AI 摘要的用量上限和隐私说明",
+      "补充材料：“无限设备”的公平使用政策",
+      "补充材料：团队版年付价和 SLA 赔付条款",
+      "补充材料：竞品对比的实名、来源和数据日期",
+      "补充材料：产品截图或演示",
       "补充材料：安全与合规信息：SSO/SAML、审计日志、加密、数据驻留、认证、DPA",
       "补充材料：AI 摘要的数据处理和模型训练政策",
       "补充材料：迁移和导入工具、团队上线与培训支持",
       "补充材料：团队版年付价、规模阶梯、试用、合同期限和涨价条款",
       "补充材料：SLA 赔付条款、状态页、历史可用性、灾备",
       "补充材料：对公发票和企业采购流程",
-      "补充材料：支持哪些工具的导入以及保真度",
-      "补充材料：迁移文档或迁移工具",
-      "补充材料：实名竞品及完整功能对比",
-      "补充材料：导出是否保留双向链接、白板、附件",
-      "补充材料：同步冲突处理与离线机制",
-      "补充材料：团队版迁移服务",
       "补充材料：各术语的通俗解释（双向链接、SLA、版本历史等）",
       "补充材料：免费版达到 200 篇或 5MB 上限后的具体表现",
       "补充材料：免费试用和升级流程",
       "补充材料：退款的申请方式和到账时间",
       "补充材料：超量收费规则，比如团队存储或 AI 摘要的使用次数",
       "补充材料：竞品的具体名称和对比口径",
-      "补充材料：免费版是否有版本历史"
+      "补充材料：免费版是否有版本历史",
+      "补充材料：支持哪些工具的导入以及保真度",
+      "补充材料：迁移文档或迁移工具",
+      "补充材料：实名竞品及完整功能对比",
+      "补充材料：导出是否保留双向链接、白板、附件",
+      "补充材料：同步冲突处理与离线机制",
+      "补充材料：团队版迁移服务"
     ]
   },
-  "cross_examination": null,
+  "cross_examination": {
+    "mode": "moderated_rebuttal",
+    "is_live_debate": true,
+    "requested_mode": "moderated_rebuttal",
+    "limitation": "本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。",
+    "threshold": 0.15,
+    "threshold_source": "rules-dict",
+    "allow_stance_update": true,
+    "rounds": [
+      {
+        "round_num": 1,
+        "is_current": true
+      }
+    ],
+    "disputes": [
+      {
+        "point_id": "C1",
+        "topic": "竞品对比口径不一致，缺少来源",
+        "pro_args": [
+          {
+            "argument_id": "A1",
+            "point": "我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。",
+            "persona_id": "老赵",
+            "persona_key": "P47-skeptical-reviewer-general",
+            "severity": "high",
+            "rebuttal": "B1 提出的团队档缺失是覆盖范围问题，不是“口径不一致、缺来源”本身，不能拿它来说明这个争议点严重度低。B1 自己也承认匿名竞品数据无法核验，这恰好说明对比表的可信度有硬伤。月付与年付折算混用，会让整张表的结论都被质疑，影响的是整页的说服力，不只是个人档。B1 的处理方式与我的有重叠（写明竞品名和日期），但没有处理起价口径混用，也没有补对我方不利的维度，所以“low”低估了影响。B1 提到的团队采购维度确实有价值，但属于另一个改进项，不改变我对口径问题的判断。因此我不改变立场和置信度。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B1",
+            "point": "对比表只展示个人档的价格和文件大小，不能支持团队采购决策，匿名竞品的数据也无法核验。",
+            "persona_id": "Grace",
+            "persona_key": "P48-b2b-decision-maker",
+            "severity": "low",
+            "rebuttal": "A1 的核心推断是“评论区会喷”，这是对舆论反应的预测，没有事实依据。真正的事实问题只有两个：竞品匿名，起价口径不统一。这两个问题改起来成本很低，只需补全名、日期和统一口径，不该判成 high。A1 要求补充同步、协作、插件生态等不利维度，是锦上添花，不是消除口径不一致的必要条件。这张表即使修好了，仍然不能支持团队采购决策，而这才是更大的决策缺口。不过 A1 指出的月付与年付折算混用确实具体可查，我承认它比单纯“数据无法核验”更实在。因此我维持“low”的严重度判断，立场不变，置信度略降。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      },
+      {
+        "point_id": "C2",
+        "topic": "没有迁移和上线支持路径",
+        "pro_args": [
+          {
+            "argument_id": "A2",
+            "point": "免费版限 200 篇笔记、1 台设备，装不下我的真实笔记库，也没法测多端同步。不先试就要付费，我的风险承受度太低。",
+            "persona_id": "Marcus",
+            "persona_key": "P53-competitor-loyal-switcher",
+            "severity": "critical",
+            "rebuttal": "B2 讲的是团队迁移的工时和成本，但页面上连个人用户能否迁入、迁入后保留什么都没写。个人迁移是更基础的一步，团队评估也依赖它：格式支持、标签/附件/链接/时间戳能否保留，这些信息缺失，团队同样无法估算工时。免费版只有 200 篇笔记和 1 台设备，又让用户无法先试再买，所以我认为是 critical，不是 high。B2 的方案偏向销售服务（客户成功经理、培训），没有回答“能不能迁、丢什么”这个前置问题。我没有被说服，不改变立场和置信度。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B2",
+            "point": "我无法估算团队迁移的工时和成本，也不知道有没有导入工具、上线辅导或培训。迁移成本不可预估时，我倾向观望而不是签约。",
+            "persona_id": "Grace",
+            "persona_key": "P48-b2b-decision-maker",
+            "severity": "high",
+            "rebuttal": "A2 的推理有跳步。免费版限 200 篇、1 台设备，是试用额度设计的问题，迁移专区解决不了：即使写清了格式和保留项，用户仍然装不下真实笔记库、测不了多端同步。A2 把两个问题合并成一个 critical，高估了影响。A2 的风险主要落在个人用户身上，团队迁移的成本会随人数放大，还涉及签约承诺和上线排期，影响面更大，所以 high 已经足够。不过 A2 要求的格式和保留项说明对团队也有用，这部分我认可，已经包含在我的迁移指南诉求里。我维持立场与置信度。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      },
+      {
+        "point_id": "C3",
+        "topic": "没有试用期，也没有自动续费条款",
+        "pro_args": [
+          {
+            "argument_id": "A3",
+            "point": "我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。",
+            "persona_id": "沈静",
+            "persona_key": "P46-value-conscious-buyer",
+            "severity": "high",
+            "rebuttal": "B3 只覆盖了试用入口和退款流程，漏掉了自动续费、续费提醒和取消入口。这些条款不清楚，会让用户在付款后才发现扣费风险，信任损失比“不知道怎么申请退款”更大。B3 说“可申请退款”但没有流程，这本身就足以让用户不敢点“立即升级”，直接阻断转化，所以不该只是 medium。B3 的新手视角成立，但它只是众多受影响用户中的一类，没有改变问题的整体严重度。我维持 high，立场与置信度不变。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B3",
+            "point": "我是新手，对付费很谨慎，需要先试一下再决定。“可申请退款”但不知道怎么申请，我不敢点“立即升级”。",
+            "persona_id": "阿泽",
+            "persona_key": "P49-first-time-user",
+            "severity": "medium",
+            "rebuttal": "A3 把“试用”“退款”“续费条款”三件事打包成一个 high，推理上有跳步。页面已经写明“可申请退款”，说明退款保障存在，缺的是入口、条件和到账时间，补文案即可。A3 自己的方案也是“试用或 14 天退款”二选一，说明两者可以互相替代，不是缺一不可。自动续费的提醒问题成立，但页面没有写明是否自动续费，所以风险是否存在还不确定，不能直接当作 high 的事实依据。我承认续费条款是我遗漏的点，但这不足以把整体严重度提升到 high，所以我保持 medium，立场和置信度不变。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      }
+    ],
+    "vote_changes": [],
+    "suppressed_changes": [],
+    "confidence_changes": [
+      {
+        "persona_id": "沈静",
+        "persona_key": "P46-value-conscious-buyer",
+        "before": 70,
+        "after": 70,
+        "delta": 0,
+        "confidence_before": 0.7,
+        "confidence_after": 0.7
+      },
+      {
+        "persona_id": "老赵",
+        "persona_key": "P47-skeptical-reviewer-general",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Grace",
+        "persona_key": "P48-b2b-decision-maker",
+        "before": 75,
+        "after": 75,
+        "delta": 0,
+        "confidence_before": 0.75,
+        "confidence_after": 0.75
+      },
+      {
+        "persona_id": "阿泽",
+        "persona_key": "P49-first-time-user",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Marcus",
+        "persona_key": "P53-competitor-loyal-switcher",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      }
+    ],
+    "failures": [],
+    "usage": {
+      "calls": 1,
+      "input_tokens": 1891,
+      "output_tokens": 3249,
+      "token_counts_available": true
+    }
+  },
   "compliance": {
     "status": "通过",
     "status_class": "pass",
@@ -1052,6 +925,149 @@
   "predictions": [
     {
       "prediction_id": "PRED-001",
+      "type": "intervention_hypothesis",
+      "claim": "修复“竞品对比口径不一致，缺少来源”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "竞品对比口径不一致，缺少来源",
+      "intervention": "写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.77,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P48-b2b-decision-maker",
+        "P53-competitor-loyal-switcher"
+      ],
+      "evidence": "我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-002",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有试用期，也没有自动续费条款”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有试用期，也没有自动续费条款",
+      "intervention": "写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.74,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P49-first-time-user",
+        "P53-competitor-loyal-switcher"
+      ],
+      "evidence": "我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-003",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有迁移和上线支持路径”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有迁移和上线支持路径",
+      "intervention": "增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "critical",
+      "confidence": 0.81,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P48-b2b-decision-maker",
+        "P53-competitor-loyal-switcher"
+      ],
+      "evidence": "我已经有一个成熟的笔记库。没有导入器、没有迁移文档，我就要自己承担迁移失败的风险。按我的规则，这是缺乏迁移支持，直接触发退出条件。这个判断来自信息缺失，不是看到了负面证据。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-004",
+      "type": "intervention_hypothesis",
+      "claim": "修复““无隐藏费用”“随时降级”缺少超限处理说明”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "“无隐藏费用”“随时降级”缺少超限处理说明",
+      "intervention": "在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.71,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P47-skeptical-reviewer-general",
+        "P49-first-time-user"
+      ],
+      "evidence": "降级到免费版时，超过200篇笔记或5MB的附件会被只读、被删，还是被锁，页面没说。这最容易引发“被套路”的差评。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-005",
+      "type": "intervention_hypothesis",
+      "claim": "修复“AI 摘要用量边界和涨价承诺未说明”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "AI 摘要用量边界和涨价承诺未说明",
+      "intervention": "列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.64,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P53-competitor-loyal-switcher"
+      ],
+      "evidence": "AI 功能常有隐形限额或后续另收费，会让「无隐藏费用」的承诺打折。价格变动是否通知也没写。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-006",
+      "type": "intervention_hypothesis",
+      "claim": "修复“团队版价格和合同不透明”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "团队版价格和合同不透明",
+      "intervention": "公开团队版年付价和合同期限，附 SLA 条款和赔付比例。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.64,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P46-value-conscious-buyer",
+        "P47-skeptical-reviewer-general",
+        "P48-b2b-decision-maker"
+      ],
+      "evidence": "“联系销售”加最低3人，价格看似透明实则要被销售过一遍。SLA 没写赔偿，等于空头保证。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-007",
       "type": "intervention_hypothesis",
       "claim": "修复“页面没有任何安全合规信息”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "页面没有任何安全合规信息",
@@ -1073,95 +1089,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-002",
-      "type": "intervention_hypothesis",
-      "claim": "修复“完全没有导入和迁移支持说明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "完全没有导入和迁移支持说明",
-      "intervention": "增加“从 Notion/Evernote/Obsidian/印象笔记迁移”的专区。写清支持的格式、能保留什么（标签、附件、链接、时间戳）、不能保留什么，并给出迁移工具和图文教程。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "critical",
-      "confidence": 0.78,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "evidence": "我已经有一个成熟的笔记库。没有导入器、没有迁移文档，我就要自己承担迁移失败的风险。按我的规则，这是缺乏迁移支持，直接触发退出条件。这个判断来自信息缺失，不是看到了负面证据。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-003",
-      "type": "intervention_hypothesis",
-      "claim": "修复“竞品对比表匿名、口径不一，一眼就是“自说自话””后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "竞品对比表匿名、口径不一，一眼就是“自说自话”",
-      "intervention": "写明竞品全名、数据截取日期和来源链接。起价同时列月付¥19和年付折算价。补上对我方不利的维度，如同步、协作、插件生态。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "evidence": "我的规则是卖点没证据就先怀疑。匿名竞品加上年付折算价对比，评论区会直接被喷“挑数据”“拿年付价冒充起价”。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-004",
-      "type": "intervention_hypothesis",
-      "claim": "修复““无隐藏费用”“随时降级”缺少超限处理说明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "“无隐藏费用”“随时降级”缺少超限处理说明",
-      "intervention": "在 FAQ 增加“降级后超限数据怎么办”，明确只读、不删除，并给出具体期限。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "evidence": "降级到免费版时，超过200篇笔记或5MB的附件会被只读、被删，还是被锁，页面没说。这最容易引发“被套路”的差评。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-005",
-      "type": "intervention_hypothesis",
-      "claim": "修复“没有试用期，也没有自动续费条款”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "没有试用期，也没有自动续费条款",
-      "intervention": "写明专业版免费试用天数，或 14 天无理由退款。写明是否自动续费、续费前几天邮件提醒、取消入口在哪。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "evidence": "我风险承受度低。高级功能试用不了，自动续费和提醒又没写，所以现在不会下单，先观望。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-006",
+      "prediction_id": "PRED-008",
       "type": "intervention_hypothesis",
       "claim": "修复“退款规则只有一句话，细节缺失”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "退款规则只有一句话，细节缺失",
@@ -1183,73 +1111,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-007",
-      "type": "intervention_hypothesis",
-      "claim": "修复“没有迁移和上线支持路径”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "没有迁移和上线支持路径",
-      "intervention": "提供“从 Notion/Evernote 等工具迁移”的指南、批量导入能力说明、团队上线流程和时间预期，并说明客户成功经理在迁移阶段负责什么。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "evidence": "我无法估算团队迁移的工时和成本，也不知道有没有导入工具、上线辅导或培训。迁移成本不可预估时，我倾向观望而不是签约。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-008",
-      "type": "intervention_hypothesis",
-      "claim": "修复“竞品对比只挑自家占优的项，竞品还匿名”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "竞品对比只挑自家占优的项，竞品还匿名",
-      "intervention": "实名对比，注明数据日期，并按同口径比较月付和年付。补上同步、搜索、插件、API、移动端和协作等维度，坦白说明哪些项落后。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "evidence": "我要的是“凭什么不用我现在这个”。对比只有四行，缺少编辑器体验、同步可靠性、搜索、生态、移动端。竞品名字也不写，没法核实，反而让人怀疑。起价一行还用年付折算价对月价。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
       "prediction_id": "PRED-009",
-      "type": "intervention_hypothesis",
-      "claim": "修复“没有专业版试用，免费版也无法试迁移”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "没有专业版试用，免费版也无法试迁移",
-      "intervention": "给专业版 14–30 天全功能试用，试用期不限笔记数量。导入的数据在试用结束后保持可读可导出。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "evidence": "免费版限 200 篇笔记、1 台设备，装不下我的真实笔记库，也没法测多端同步。不先试就要付费，我的风险承受度太低。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-010",
       "type": "intervention_hypothesis",
       "claim": "修复“功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "功能名词没有解释（双向链接、白板、AI 摘要、SLA、版本历史）",
@@ -1271,29 +1133,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-011",
-      "type": "intervention_hypothesis",
-      "claim": "修复“免费版超过限制后会怎样没有说明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "免费版超过限制后会怎样没有说明",
-      "intervention": "在免费版下写明“满 200 篇后：已有笔记可正常查看和编辑，只是不能新建”，附件超限的提示也要写出来；同时说明超限时如何提示和升级。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "high",
-      "confidence": 0.68,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "evidence": "我第一次写满 200 篇或传了超过 5MB 的文件时，如果被突然拦住又不知道原因，会觉得被惩罚，很可能就此流失。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-012",
+      "prediction_id": "PRED-010",
       "type": "intervention_hypothesis",
       "claim": "修复“零社会证明：没有评论、评分、用户数，“最受欢迎”无来源”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "零社会证明：没有评论、评分、用户数，“最受欢迎”无来源",
@@ -1315,117 +1155,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-013",
-      "type": "intervention_hypothesis",
-      "claim": "修复“AI 摘要、“无限”权益缺少限制说明和演示”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "AI 摘要、“无限”权益缺少限制说明和演示",
-      "intervention": "配上实际截图或短视频，标注 AI 用量上限、公平使用政策和数据隐私条款。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "evidence": "“无限设备”“AI 摘要”是典型会有隐性上限的卖点。限制不提前说，用户踩到后会觉得被夸大宣传。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-014",
-      "type": "intervention_hypothesis",
-      "claim": "修复“团队版不标透明条款，SLA 无赔付”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "团队版不标透明条款，SLA 无赔付",
-      "intervention": "公开团队版年付价和合同期限，附 SLA 条款和赔付比例。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P47-skeptical-reviewer-general"
-      ],
-      "evidence": "“联系销售”加最低3人，价格看似透明实则要被销售过一遍。SLA 没写赔偿，等于空头保证。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-015",
-      "type": "intervention_hypothesis",
-      "claim": "修复“AI 摘要用量边界和涨价承诺未说明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "AI 摘要用量边界和涨价承诺未说明",
-      "intervention": "列出 AI 摘要每月额度和超额处理方式。承诺涨价提前 30 天通知，老用户锁价或保留一个周期。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "evidence": "AI 功能常有隐形限额或后续另收费，会让「无隐藏费用」的承诺打折。价格变动是否通知也没写。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-016",
-      "type": "intervention_hypothesis",
-      "claim": "修复“竞品对比口径不一致，缺少来源”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "竞品对比口径不一致，缺少来源",
-      "intervention": "统一用月付或年付折算对比，标注竞品名称、版本和数据日期。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "evidence": "用年付折算价对比竞品月付价，会削弱可信度。没有来源就无法核验。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-017",
-      "type": "intervention_hypothesis",
-      "claim": "修复“团队版预算不可自助测算”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "团队版预算不可自助测算",
-      "intervention": "公布团队版年付价和 10/50/100 人的阶梯价，提供团队试用或试点方案，并写明合同期内价格锁定和涨价条款。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "evidence": "只有 ¥49/用户/月的单价，没有年付价、规模阶梯或试用，真实报价要联系销售。长期成本的可预测性不足，也无法做年度预算。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-018",
+      "prediction_id": "PRED-011",
       "type": "intervention_hypothesis",
       "claim": "修复“长期可靠性的证据只有一个 SLA 数字”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "长期可靠性的证据只有一个 SLA 数字",
@@ -1447,7 +1177,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-019",
+      "prediction_id": "PRED-012",
       "type": "intervention_hypothesis",
       "claim": "修复“导出保真度没说清”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "导出保真度没说清",
@@ -1469,117 +1199,7 @@
       "is_synthetic": true
     },
     {
-      "prediction_id": "PRED-020",
-      "type": "intervention_hypothesis",
-      "claim": "修复“价格数字多且口径混杂，“无隐藏费用”没落到具体内容”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "价格数字多且口径混杂，“无隐藏费用”没落到具体内容",
-      "intervention": "月付、年付分成两个明确的切换，直接显示“年付一次付 ¥168”。竞品表要写明按年付还是月付比较。顶部“无隐藏费用”下面列出所有可能的额外收费，没有的话明确写“没有”。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "evidence": "¥19、¥168、¥14、26%、¥49/用户/月并排出现，我得自己算。竞品表里的“起价 ¥14/月”其实是年付折算价，容易让人觉得被误导。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-021",
-      "type": "intervention_hypothesis",
-      "claim": "修复“没有试用入口，升级和退款流程也没讲”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "没有试用入口，升级和退款流程也没讲",
-      "intervention": "增加“免费试用专业版 14 天”之类的入口，并在退款说明里写清申请入口、条件和到账时间。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "medium",
-      "confidence": 0.58,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P49-first-time-user"
-      ],
-      "evidence": "我是新手，对付费很谨慎，需要先试一下再决定。“可申请退款”但不知道怎么申请，我不敢点“立即升级”。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-022",
-      "type": "intervention_hypothesis",
-      "claim": "修复“团队版价格和合同不透明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "团队版价格和合同不透明",
-      "intervention": "公开年付价、最低合同期、SLA 赔付规则。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "low",
-      "confidence": 0.48,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P46-value-conscious-buyer"
-      ],
-      "evidence": "只有「联系销售」，无法评估长期成本。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-023",
-      "type": "intervention_hypothesis",
-      "claim": "修复“竞品对比与团队采购无关”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "竞品对比与团队采购无关",
-      "intervention": "增加团队档对比，包括权限、审计、SSO、SLA 和支持响应时间，并注明竞品名称和数据日期。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "low",
-      "confidence": 0.48,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P48-b2b-decision-maker"
-      ],
-      "evidence": "对比表只展示个人档的价格和文件大小，不能支持团队采购决策，匿名竞品的数据也无法核验。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-024",
-      "type": "intervention_hypothesis",
-      "claim": "修复“AI 摘要等高级功能的用量上限未写明”后，paid_conversion_rate 相较当前版本将提高",
-      "issue": "AI 摘要等高级功能的用量上限未写明",
-      "intervention": "在专业版权益旁标明 AI 摘要的月额度，以及超量后怎么处理。",
-      "target_metric": "paid_conversion_rate",
-      "direction": "increase",
-      "comparison": "treatment_vs_current_control",
-      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
-      "verification_window": "14d",
-      "verification_method": "controlled_comparison",
-      "severity": "low",
-      "confidence": 0.48,
-      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
-      "affected_personas": [
-        "P53-competitor-loyal-switcher"
-      ],
-      "evidence": "页面一句话说“无隐藏费用”，但 AI 和白板可能有用量限制，口径不清就是隐患。",
-      "status": "pending_verification",
-      "is_synthetic": true
-    },
-    {
-      "prediction_id": "PRED-025",
+      "prediction_id": "PRED-013",
       "type": "intervention_hypothesis",
       "claim": "修复““联系销售”让人不知道后面会发生什么”后，paid_conversion_rate 相较当前版本将提高",
       "issue": "“联系销售”让人不知道后面会发生什么",
@@ -1638,9 +1258,34 @@
   },
   "budget": {
     "max_cost_per_run_usd": 2.0,
-    "persona_cost_usd": 0.229701,
+    "persona_cost_usd": 0.0,
     "exceeded": false,
     "skipped_stages": [],
+    "notice": ""
+  },
+  "panel_selection": {
+    "requested": [
+      "P46-value-conscious-buyer",
+      "P47-skeptical-reviewer-general",
+      "P48-b2b-decision-maker",
+      "P49-first-time-user",
+      "P53-competitor-loyal-switcher"
+    ],
+    "matched": [
+      "P46-value-conscious-buyer",
+      "P47-skeptical-reviewer-general",
+      "P48-b2b-decision-maker",
+      "P49-first-time-user",
+      "P53-competitor-loyal-switcher"
+    ],
+    "missing": [],
+    "truncated_by_mode": [],
+    "fell_back_to_auto": false,
+    "selection_method": null,
+    "notice": ""
+  },
+  "dedup": {
+    "method": "semantic",
     "notice": ""
   }
 }

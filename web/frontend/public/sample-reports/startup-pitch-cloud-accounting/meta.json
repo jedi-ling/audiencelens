@@ -5,9 +5,29 @@
   "depth": "standard",
   "model_id": "claude-sonnet-5-5",
   "date": "2026-11-04",
-  "cost_usd": 0.3508,
-  "tokens_in": 79684,
-  "tokens_out": 22380,
-  "app_commit": "de65474",
+  "persona_outputs_from": {
+    "run_id": "20261104-043717-pitch_review",
+    "date": "2026-11-04",
+    "commit": "de65474",
+    "cost_usd": 0.3508,
+    "tokens_in": 79684,
+    "tokens_out": 22380,
+    "retries": 5
+  },
+  "cross_exam_run": {
+    "date": "2026-11-04",
+    "commit": "92b277e",
+    "cost_usd": 0.0185,
+    "calls": 1,
+    "tokens_in": 1185,
+    "tokens_out": 1616,
+    "mode": "moderated_rebuttal"
+  },
+  "dedup_method": "semantic",
+  "disputes": 1,
+  "cost_usd": 0.3693,
+  "tokens_in": 80869,
+  "tokens_out": 23996,
+  "app_commit": "92b277e",
   "retries": 5
 }
