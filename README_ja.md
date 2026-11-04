@@ -183,7 +183,7 @@ python -m pytest tests/ -q                          # コアエンジン
 
 ## 開発について
 
-AudienceLens は Ling Yuanyi が AI 支援開発（Claude Code）で構築しました。設計・コードレビュー・検証（テストスイート、`tests/test_public_claims.py` による記載内容のチェック、再現できない結果の撤回を含む）は作者自身が行っています。
+AudienceLens は Ling Yuanyi が AI 支援開発（Claude Code、Kimi）で構築しました。設計・コードレビュー・検証（テストスイート、`tests/test_public_claims.py` による記載内容のチェック、再現できない結果の撤回を含む）は作者自身が行っています。
 
 ## ライセンス
 

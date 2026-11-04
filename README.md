@@ -252,7 +252,7 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 
 ## Development note
 
-AudienceLens was built by Ling Yuanyi with AI-assisted development (Claude Code). Design, code review and verification — including the test suites, the claim checks in `tests/test_public_claims.py` and the retraction of unreproducible results — are the author's.
+AudienceLens was built by Ling Yuanyi with AI-assisted development (Claude Code, Kimi). Design, code review and verification — including the test suites, the claim checks in `tests/test_public_claims.py` and the retraction of unreproducible results — are the author's.
 
 ## License
 

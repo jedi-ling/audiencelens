@@ -129,7 +129,7 @@ python -m pytest tests/ -q
 
 ## 开发说明
 
-AudienceLens 由 Ling Yuanyi 借助 AI 辅助开发（Claude Code）完成；设计、代码审阅与验证由作者负责。
+AudienceLens 由 Ling Yuanyi 借助 AI 辅助开发（Claude Code、Kimi）完成；设计、代码审阅与验证由作者负责。
 
 ## 许可与作者
 

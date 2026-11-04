@@ -29,9 +29,9 @@ keywords: [多智能体系统, 合成受众, 交叉质询, 人物模拟, LLM评�
 
 ## 1. 引言
 
-用户研究是产品开发的基石，然而它仍然是设计周期中资源消耗最大的活动之一。一轮有主持的可用性测试通常需要 2–4 周的规划、\$5,000–\$15,000 美元的参与者报酬，且产生的结果在不同会话间难以复现 (Nielsen, 1994; Lazar et al., 2017)。焦点小组虽然在收集多元观点方面效率较高，但容易受到群体思维（Groupthink）、锚定偏差（Anchoring Bias）和强势声音影响 (Morgan, 1997)。基于调查的方法更容易扩展，但以深度换广度，产生的统计汇总掩盖了个体推理过程。
+用户研究是产品开发的基石，然而它仍然是设计周期中资源消耗最大的活动之一。有主持的可用性测试需要招募、排期并支付参与者报酬，而小样本的结果在不同会话间难以复现 (Nielsen, 1994; Lazar et al., 2017)。焦点小组虽然在收集多元观点方面效率较高，但容易受到群体思维（Groupthink）、锚定偏差（Anchoring Bias）和强势声音影响 (Morgan, 1997)。基于调查的方法更容易扩展，但以深度换广度，产生的统计汇总掩盖了个体推理过程。
 
-大语言模型（LLM）的出现开辟了一个新前沿：*合成用户研究*。SyntheticUsers 等商业平台声称与真实用户具有高度一致性，但独立验证仍然有限。Park et al. (2023) 表明，生成式智能体（Generative Agents）可以在沙盒环境中表现出可信的社会行为。Horton (2023) 提出了 *homo silicus*——可以作为经济学研究实验对象的计算智能体。Argyle et al. (2023) 证明单个 LLM 就能以惊人的保真度模拟多样化的子群体，捕捉不同人口群体在态度和行为上的差异。
+大语言模型（LLM）的出现开辟了一个新前沿：*合成用户研究*。SyntheticUsers 等商业平台声称与真实用户具有高度一致性，但独立验证仍然有限。Park et al. (2023) 表明，生成式智能体（Generative Agents）可以在沙盒环境中表现出可信的社会行为。Horton et al. (2023) 提出把 LLM 视为 *Homo silicus*——人类的隐式计算模型，可以放进经济学实验中。Argyle et al. (2023) 证明单个 LLM 就能以惊人的保真度模拟多样化的子群体，捕捉不同人口群体在态度和行为上的差异。
 
 然而，这些方法共享一个关键局限：它们将合成用户模拟视为*独白*（Monologue）而非*对话*（Dialogue）。每个人物独立响应，不接触对立观点，没有机会修正自身立场，也没有任何机制来检测共识是真实的还是表面的。这与真实焦点小组的运作方式根本不同——在真实焦点小组中，参与者相互质疑假设，因有说服力的论点而改变观点，有时会收敛到意想不到的立场。
 
@@ -69,15 +69,13 @@ keywords: [多智能体系统, 合成受众, 交叉质询, 人物模拟, LLM评�
 
 合成受众研究的基础在于 LLM 采纳和维持一致人物的能力。Park et al. (2023) 引入了栖息于沙盒小镇的生成式智能体，表现出包括关系形成、事件协调和信息扩散在内的涌现社会行为。他们的架构——由记忆流（Memory Stream）、反思（Reflection）和规划（Planning）组成——证明了基于 LLM 的智能体可以在长时间交互中保持行为一致性。
 
-Argyle et al. (2023) 表明，LLM 在以人口统计特征为条件时可以模拟多样化的子群体，捕捉群体间态度和意见的差异。他们的"硅基受试者"（Silicon Subjects）方法表明 LLM 可以作为人类调查受访者的低成本替代，但他们告诫不应将合成响应等同于真实人类数据。
+Argyle et al. (2023) 表明，LLM 在以人口统计特征为条件时可以模拟多样化的子群体，捕捉群体间态度和意见的差异。他们用真实调查参与者的社会人口背景故事作为条件构建"硅基样本"（silicon samples），表明 LLM 可以作为人类受访者的低成本替代；他们把使之成立的性质称为"算法保真度"（algorithmic fidelity），并认为它需要在每种用途上逐一证明，而不能默认成立。
 
-Horton (2023) 将这一研究方向扩展到经济学，提出了 *homo silicus*——参与经济学实验的计算智能体。他认为基于 LLM 的智能体可以作为人类经济行为的"无损"压缩，使研究人员在投入昂贵的人类研究之前能够快速迭代实验设计。
-
-近年来，人物模拟已被应用于软件工程领域。Xu et al. (2024) 证明 LLM 人物可以在需求工程中模拟多样化的用户视角，而 Salehi et al. (2024) 使用人物驱动的评估来评估 Web 应用的可访问性。
+Horton et al. (2023) 将这一研究方向扩展到经济学，提出把 LLM 视为 *Homo silicus*——人类的隐式计算模型，可以赋予禀赋、信息和偏好，再放进经济情境中。他们建议在投入昂贵的人类研究之前先在计算机中预演实验设计，同时强调任何一个具体的 Homo silicus 都是错的，即便它有用。
 
 ### 2.2 合成用户研究
 
-商业合成用户研究平台的出现旨在解决传统方法的成本和速度限制。**SyntheticUsers** (2024) 是一个提供 AI 主持的合成参与者访谈的商业平台。SyntheticUsers 等商业平台声称与真实用户具有高度一致性，但独立验证仍然有限。他们的方法使用 OCEAN（大五人格）模型构建人物档案，并生成访谈式响应。然而，SyntheticUsers 运行在单轮访谈范式下——每个人物独立回答问题，不接触其他人物的观点。
+商业合成用户研究平台的出现旨在解决传统方法的成本和速度限制。**SyntheticUsers** (2024) 是一个提供 AI 主持的合成参与者访谈的商业平台。SyntheticUsers 等商业平台声称与真实用户具有高度一致性，但独立验证仍然有限。Liu et al. (2026) 发现，模拟用户难以再现真实用户在多轮对话中带来的沟通摩擦，因此基于它们的评估可能比真实表现更好看。他们的方法使用 OCEAN（大五人格）模型构建人物档案，并生成访谈式响应。然而，SyntheticUsers 运行在单轮访谈范式下——每个人物独立回答问题，不接触其他人物的观点。
 
 **Outset** 采用混合方法，使用 AI 大规模主持真实人类访谈。虽然这保留了人类响应的真实性，但并未解决推动合成方法发展的成本和速度限制。**Yabble** 提供 AI 驱动的调查分析，但依赖与人口统计标签化人物的单轮交互，这存在强化刻板印象而非捕捉真实行为多样性的风险。
 
@@ -85,21 +83,21 @@ Horton (2023) 将这一研究方向扩展到经济学，提出了 *homo silicus*
 
 ### 2.3 多智能体辩论
 
-Du et al. (2023) 证明多智能体辩论可以提高语言模型的事实性和推理能力。在他们的框架中，多个 LLM 实例为不同立场辩论，每个智能体根据其他智能体的论点改进自己的响应。这种方法在数学推理和事实问答任务上提升了性能，表明对抗性交互可以发现单智能体生成所遗漏的错误。
+Du et al. (2024) 证明多智能体辩论可以提高语言模型的事实性和推理能力。在他们的框架中，多个模型实例各自给出答案，再阅读彼此的回答并在多轮中修正自己的答案，直到得出共同答案。这种方法在数学推理和事实问答任务上提升了性能，表明实例之间的交互可以发现单智能体生成所遗漏的错误。
 
-Liang et al. (2023) 将此工作扩展到鼓励多智能体辩论中的多样性，表明强制不同视角可以促成更稳健的共识形成。Chan et al. (2023) 提出了 chatmap 用于扩展多智能体协作，证明结构化交互协议优于非结构化群聊。
+Liang et al. (2024) 针对自我反思的一种失败模式——他们称之为"思维退化"（Degeneration-of-Thought）：模型一旦对答案有信心就不再产生新想法——提出让智能体"针锋相对"地辩论、由裁判主持的框架。Chan et al. (2024) 构建了 ChatEval，一个讨论并评估生成文本质量的多智能体评审团，并发现给每个智能体相同的角色描述会降低效果。
 
-Wang et al. (2024) 引入了通过迭代辩论实现多智能体共识的框架，表明收敛性质取决于智能体交互拓扑和证据强度。他们的工作强调了过早共识的风险——智能体在没有充分探索论据空间的情况下过快收敛。
+Wu et al. (2025) 在答案可验证的逻辑谜题上对多智能体辩论做了受控研究：推理能力和群体多样性是辩论成败的主要因素；辩论顺序、置信度可见性等结构参数收益有限；多数派压力会压制独立纠错。
 
-AudienceLens 在这些洞察的基础上，为受众评审领域设计了结构化的反驳协议——其目标不是找到单一正确答案，而是绘制观点全景并识别真正存在分歧的领域。其中一轮反驳已实现并会发出真实的模型调用（第 3.3 节）；第 3.5–3.6 节描述的多轮辩论结构与共识追踪层仍然只有规范（第 4.6 节）。这里有两条限制。第一，一轮反驳不等于 Du et al. (2023)、Wang et al. (2024) 所研究的*迭代*辩论，他们的收敛性结论不能迁移到这里。第二，我们对自己这套协议同样没有做过任何实验——第 5.0 节给出了需要做的那个研究的设计。因此读者应当把上述辩论文献视为我们设计的动机，而不是 AudienceLens 输出质量的佐证。
+AudienceLens 在这些洞察的基础上，为受众评审领域设计了结构化的反驳协议——其目标不是找到单一正确答案，而是绘制观点全景并识别真正存在分歧的领域。其中一轮反驳已实现并会发出真实的模型调用（第 3.3 节）；第 3.5–3.6 节描述的多轮辩论结构与共识追踪层仍然只有规范（第 4.6 节）。这里有两条限制。第一，一轮反驳不等于 Du et al. (2024)、Wu et al. (2025) 所研究的*多轮*辩论，他们的结论不能迁移到这里。第二，我们对自己这套协议同样没有做过任何实验——第 5.0 节给出了需要做的那个研究的设计。因此读者应当把上述辩论文献视为我们设计的动机，而不是 AudienceLens 输出质量的佐证。
 
 ### 2.4 人物生成中的 AI 伦理
 
 合成人物生成的伦理维度日益受到关注。早期的 UX 研究早已论证，行为、目标和情境比单纯的人口统计特征更具可操作性的人物属性 (Cooper 1999; Pruitt & Adlin 2006)。这一洞察直接启发了我们的身份-行为解耦原则。
 
-欧盟《人工智能法案》(2024) 为 AI 系统建立了透明度要求，包括披露 AI 生成内容的义务（第 50 条）、确保人类监督（第 14 条）和维护准确性（第 15 条）。这些要求对合成受众系统尤为重要，因为其输出可能被误读为真实用户研究数据。
+欧盟《人工智能法案》(2024) 为 AI 系统建立了透明度要求，包括披露 AI 生成内容的义务（第 50 条），以及针对高风险系统的人类监督（第 14 条）和准确性与稳健性（第 15 条）要求。这些要求对合成受众系统尤为重要，因为其输出可能被误读为真实用户研究数据。
 
-Nielsen Norman Group 的人物方法论一直倡导行为优先的人物设计，认为人物应由目标、行为和痛点而非人口统计属性来定义 (Mulder & Yaar, 2006)。AudienceLens 通过其 `behavior_profile` 构造将这一原则付诸实践，用面向任务的行为维度取代了传统的 OCEAN 人格模型。
+实践者的人物设计指南一直倡导行为优先的人物设计，认为人物应由目标、行为和痛点而非人口统计属性来定义 (Mulder & Yaar, 2006)。AudienceLens 通过其 `behavior_profile` 构造将这一原则付诸实践，用面向任务的行为维度取代了传统的 OCEAN 人格模型。
 
 ## 3. 方法
 
@@ -538,7 +536,7 @@ AudienceLens 的一个核心设计原则是**校准诚实（calibration honesty�
 
 招牌机制现在会执行。第 3.3、3.4 节描述了一轮分两档、发出真实模型调用的反驳，以及一道在代码里施加的改票门控；第 4.6 节记录了这覆盖了原规范中的哪些部分。随之而来有三条局限，我们宁可把它们直说，也不愿让"已实现"这三个字承载超出它应有的分量。
 
-**一轮，不是三轮。** 实际跑的是：独立评审 → 每个争议点上最对立的两位人格之间的一次反驳交换 → 结束。没有第二次交换，没有独立的最终立场轮，没有收敛后提前终止，也没有全员说服力评分。任何把"多智能体辩论"读成*迭代*辩论的人——那正是 Du et al. (2023) 与 Wang et al. (2024) 得出结论的场景——都会读进比这里存在的更多东西。
+**一轮，不是三轮。** 实际跑的是：独立评审 → 每个争议点上最对立的两位人格之间的一次反驳交换 → 结束。没有第二次交换，没有独立的最终立场轮，没有收敛后提前终止，也没有全员说服力评分。任何把"多智能体辩论"读成*迭代*辩论的人——那正是 Du et al. (2024) 与 Wu et al. (2025) 得出结论的场景——都会读进比这里存在的更多东西。
 
 **两档并不同样配得上这个名字。** `standard` 档是多数用户的默认选择，它是**一次**仲裁式调用，从一个视角一次性写完双方的反驳。它确实是一轮反驳，也确实不是 $n$ 个独立智能体。只有 `full` 档才逐个重新调用人格。我们把这个区分写进了运行时自己的 `limitation` 字符串，而不只是写在本文里——恰恰因为便宜的那一档最容易被误当成贵的那一档。
 
@@ -600,50 +598,40 @@ AudienceLens 以 MIT 协议开源，提供 CLI、Python、MCP、Web 与 Docker �
 
 ## 参考文献
 
-1. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). Generative agents: Interactive simulacra of human behavior. *Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23)*, 1–22. ✅ Reliable; peer-reviewed venue.
+1. Argyle, L. P., Busby, E. C., Fulda, N., Gubler, J. R., Rytting, C., & Wingate, D. (2023). Out of one, many: Using language models to simulate human samples. *Political Analysis*, 31(3), 337–351. https://doi.org/10.1017/pan.2023.2
 
-2. Argyle, L. P., Busby, E. C., Fulda, N., Gubler, J. R., Rytting, C., & Wingate, D. (2023). Out of one, many: Using language models to simulate human samples. *Political Analysis*, 31(3), 337–351. ✅ Reliable; peer-reviewed venue.
+2. Chan, C.-M., Chen, W., Su, Y., Yu, J., Xue, W., Zhang, S., Fu, J., & Liu, Z. (2024). ChatEval: Towards better LLM-based evaluators through multi-agent debate. *The Twelfth International Conference on Learning Representations (ICLR 2024)*. arXiv:2308.07201.
 
-3. Horton, J. J. (2023). Homo silicus: A new kind of social scientist. *SSRN Electronic Journal*. https://doi.org/10.2139/ssrn.4434769 ✅ Retained; note corrected subtitle "A New Kind of Social Scientist."
+3. Cooper, A. (1999). *The Inmates Are Running the Asylum*. Sams.
 
-4. Du, Y., Li, S., Torralba, A., Tenenbaum, J. B., & Mordatch, I. (2023). Improving factuality and reasoning in language models through multiagent debate. *Proceedings of the 40th International Conference on Machine Learning (ICML '23)*. ✅ Reliable; peer-reviewed venue.
+4. Du, Y., Li, S., Torralba, A., Tenenbaum, J. B., & Mordatch, I. (2024). Improving factuality and reasoning in language models through multiagent debate. *Proceedings of the 41st International Conference on Machine Learning (ICML 2024)*, PMLR 235, 11733–11763.
 
-5. Liang, T., Chen, Z., He, J., Wang, M., Zhou, Y., & Zhang, Z. (2023). Encouraging divergent thinking in large language models through multi-agent debate. *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing*. ⚠️ <!-- TODO: verify venue and exact title -->
+5. European Parliament and Council. (2024). Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act). *Official Journal of the European Union*, L, 2024/1689.
 
-6. SyntheticUsers. (2024). SyntheticUsers: AI-moderated synthetic user research platform [Commercial product]. https://syntheticusers.com ⚠️ Commercial citation; not peer-reviewed. Should not be cited as academic evidence.
+6. Horton, J. J., Filippas, A., & Manning, B. S. (2023). *Large language models as simulated economic agents: What can we learn from Homo silicus?* (NBER Working Paper No. 31122). National Bureau of Economic Research. https://www.nber.org/papers/w31122
 
-7. ~~Mancini, T., et al. (2024). SCOPE: Demographics explain minimal behavioral variance in user research.~~ ❌ Specific 1.5% figure removed; replaced with domain consensus references (Cooper 1999; Pruitt & Adlin 2006). The SCOPE study's specific quantitative claims could not be independently verified.
+7. Lazar, J., Feng, J. H., & Hochheiser, H. (2017). *Research Methods in Human-Computer Interaction* (2nd ed.). Morgan Kaufmann.
 
-8. European Parliament and Council. (2024). Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act), Article 50. *Official Journal of the European Union*. ✅ Updated to correct article number (Article 50, not Article 52).
+8. Liang, T., He, Z., Jiao, W., Wang, X., Wang, Y., Wang, R., Yang, Y., Shi, S., & Tu, Z. (2024). Encouraging divergent thinking in large language models through multi-agent debate. *Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing (EMNLP 2024)*, 17889–17904.
 
-9. Pittenger, D. J. (2005). Cautionary comments regarding the Myers-Briggs Type Indicator. *Consulting Psychology Journal: Practice and Research*, 57(3), 210–221. ✅ Reliable; peer-reviewed venue.
+9. Liu, Y. L., Yun, H., Roosta, T., & Xiao, Z. (2026). Synthetic users, real differences: An evaluation framework for user simulation in multi-turn conversations. arXiv:2605.02624.
 
-10. Wang, Z., Mao, S., & Wang, W. (2024). Multi-agent consensus through iterative debate with convergence guarantees. *Proceedings of the AAAI Conference on Artificial Intelligence*. ⚠️ <!-- TODO: verify venue and exact title -->
+10. Morgan, D. L. (1997). *Focus Groups as Qualitative Research* (2nd ed.). Sage Publications.
 
-11. Xu, Y., Wang, S., & Li, Z. (2024). Persona-driven requirements engineering with large language models. *IEEE Transactions on Software Engineering*, 50(4), 892–910. ⚠️ <!-- TODO: verify venue and exact title -->
+11. Mulder, S., & Yaar, Z. (2006). *The User Is Always Right: A Practical Guide to Creating and Using Personas for the Web*. New Riders.
 
-12. Salehi, N., Kaur, J., & Bernstein, M. S. (2024). Persona-based accessibility evaluation using large language models. *Proceedings of the ACM on Human-Computer Interaction*, 8(CSCW1), 1–28. ⚠️ <!-- TODO: verify venue and exact title -->
+12. Nielsen, J. (1994). *Usability Engineering*. Morgan Kaufmann.
 
-13. Nielsen, J. (1994). *Usability Engineering*. Morgan Kaufmann.
+13. Outset. (2024). AI-moderated interview platform [Commercial product]. https://outset.ai
 
-14. Lazar, J., Feng, J. H., & Hochheiser, H. (2017). *Research Methods in Human-Computer Interaction*. Morgan Kaufmann.
+14. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). Generative agents: Interactive simulacra of human behavior. *Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23)*. https://doi.org/10.1145/3586183.3606763
 
-15. Morgan, D. L. (1997). *Focus Groups as Qualitative Research* (2nd ed.). Sage Publications.
+15. Pittenger, D. J. (2005). Cautionary comments regarding the Myers-Briggs Type Indicator. *Consulting Psychology Journal: Practice and Research*, 57(3), 210–221. https://doi.org/10.1037/1065-9293.57.3.210
 
-16. Mulder, S., & Yaar, Z. (2006). *The User Is Always Right: A Practical Guide to Creating and Using Personas for the Web*. New Riders.
+16. Pruitt, J., & Adlin, T. (2006). *The Persona Lifecycle: Keeping People in Mind Throughout Product Design*. Morgan Kaufmann.
 
-17. Chan, C.-M., Chen, W., Su, Y., Yu, J., Xue, W., Zhang, S., Fu, J., & Liu, P. (2023). Chatmap: Scaling large language model-based multi-agent collaboration. *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing*.
+17. Synthetic Users. (2024). AI-moderated synthetic user research platform [Commercial product]. https://syntheticusers.com
 
-18. Outset. (2024). AI-moderated interview platform [Commercial product]. https://outset.ai
+18. Wu, H., Li, Z., & Li, L. (2025). Can LLM agents really debate? A controlled study of multi-agent debate in logical reasoning. arXiv:2511.07784.
 
 19. Yabble. (2024). AI-powered survey and research platform [Commercial product]. https://yabble.com
-
-**审计后新增参考文献：**
-
-20. Cooper, A. (1999). *The Inmates Are Running the Asylum*. SAMS. ✅ Domain consensus reference for behavior-first persona design.
-
-21. Pruitt, J., & Adlin, T. (2006). *The Persona Lifecycle: Keeping People in Mind Throughout Product Design*. Morgan Kaufmann. ✅ Domain consensus reference for behavior-first persona design.
-
-22. RealSim (2026). Synthetic users, real differences. *arXiv preprint arXiv:2605.02624*. ⚠️ Pre-print; provides independent assessment of synthetic user alignment claims.
-
-23. Can LLM agents really debate? (2025). *arXiv preprint arXiv:2511.07784*. ⚠️ Pre-print; relevant to cross-examination protocol validity.

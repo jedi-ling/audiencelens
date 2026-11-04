@@ -29,9 +29,9 @@ The release ships 72 behavior-driven personas across 11 YAML packs and 14 task t
 
 ## 1. Introduction
 
-User research is the cornerstone of product development, yet it remains one of the most resource-intensive activities in the design cycle. A single round of moderated usability testing typically requires 2–4 weeks of planning, \$5,000–\$15,000 in participant compensation, and yields results that are difficult to replicate across sessions (Nielsen, 1994; Lazar et al., 2017). Focus groups, while efficient for gathering diverse perspectives, are susceptible to groupthink, anchoring bias, and the influence of dominant voices (Morgan, 1997). Survey-based methods scale more easily but sacrifice depth for breadth, producing statistical aggregates that obscure individual reasoning.
+User research is the cornerstone of product development, yet it remains one of the most resource-intensive activities in the design cycle. Moderated usability testing means recruiting, scheduling and compensating participants, and its small-sample results are hard to replicate across sessions (Nielsen, 1994; Lazar et al., 2017). Focus groups, while efficient for gathering diverse perspectives, are susceptible to groupthink, anchoring bias, and the influence of dominant voices (Morgan, 1997). Survey-based methods scale more easily but sacrifice depth for breadth, producing statistical aggregates that obscure individual reasoning.
 
-The emergence of large language models (LLMs) has opened a new frontier: *synthetic user research*. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Park et al. (2023) showed that generative agents can exhibit believable social behaviors in sandbox environments. Horton (2023) introduced *homo silicus*—computational agents that can serve as experimental subjects in economic studies. Argyle et al. (2023) demonstrated that a single LLM can simulate diverse subpopulations with surprising fidelity, capturing variation in attitudes and behaviors across demographic groups.
+The emergence of large language models (LLMs) has opened a new frontier: *synthetic user research*. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Park et al. (2023) showed that generative agents can exhibit believable social behaviors in sandbox environments. Horton et al. (2023) proposed treating LLMs as *Homo silicus*—implicit computational models of humans that can be placed in economic experiments. Argyle et al. (2023) demonstrated that a single LLM can simulate diverse subpopulations with surprising fidelity, capturing variation in attitudes and behaviors across demographic groups.
 
 However, these approaches share a critical limitation: they treat synthetic user simulation as a *monologue* rather than a *dialogue*. Each persona responds independently, without exposure to opposing viewpoints, without the opportunity to revise their position, and without any mechanism for detecting when consensus is genuine versus superficial. This is fundamentally different from how real focus groups operate—where participants challenge each other's assumptions, shift their views in response to compelling arguments, and sometimes converge on unexpected positions.
 
@@ -69,15 +69,13 @@ The remainder of this paper is organized as follows: Section 2 reviews related w
 
 The foundation of synthetic audience research lies in the ability of LLMs to adopt and maintain consistent personas. Park et al. (2023) introduced generative agents that inhabit a sandbox town, exhibiting emergent social behaviors including relationship formation, event coordination, and information diffusion. Their architecture—comprising memory streams, reflection, and planning—demonstrated that LLM-based agents can maintain behavioral coherence over extended interactions.
 
-Argyle et al. (2023) showed that LLMs can simulate diverse subpopulations when conditioned on demographic profiles, capturing inter-group variation in attitudes and opinions. Their "silicon subjects" approach suggested that LLMs could serve as inexpensive proxies for human survey respondents, though they cautioned against treating synthetic responses as equivalent to real human data.
+Argyle et al. (2023) showed that LLMs can simulate diverse subpopulations when conditioned on demographic profiles, capturing inter-group variation in attitudes and opinions. Their "silicon samples", built by conditioning the model on sociodemographic backstories from real survey participants, suggested that LLMs could serve as inexpensive proxies for human respondents; they named the property that makes this work "algorithmic fidelity" and treated it as something to be demonstrated for each use rather than assumed.
 
-Horton (2023) extended this line of work to economics, introducing *homo silicus*—computational agents that participate in economic experiments. He argued that LLM-based agents could serve as "lossless" compression of human economic behavior, enabling rapid iteration on experimental designs before committing to costly human studies.
-
-More recently, persona simulation has been applied to software engineering contexts. Xu et al. (2024) demonstrated that LLM personas can simulate diverse user perspectives in requirements engineering, while Salehi et al. (2024) used persona-driven evaluation to assess the accessibility of web applications.
+Horton et al. (2023) extended this line of work to economics, proposing that LLMs be treated as *Homo silicus*—implicit computational models of humans that can be given endowments, information and preferences and then placed in economic scenarios. They suggested piloting experimental designs in silico before committing to costly human studies, while stressing that any particular Homo silicus is wrong, even if useful.
 
 ### 2.2 Synthetic User Research
 
-Commercial synthetic user research platforms have emerged to address the cost and speed limitations of traditional methods. **SyntheticUsers** (2024) is a commercial platform offering AI-moderated interviews with synthetic participants. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Their approach uses OCEAN (Big Five) personality models to construct persona profiles and generates interview-style responses. However, SyntheticUsers operates in a single-turn interview paradigm—each persona responds to questions independently, without exposure to other personas' viewpoints.
+Commercial synthetic user research platforms have emerged to address the cost and speed limitations of traditional methods. **SyntheticUsers** (2024) is a commercial platform offering AI-moderated interviews with synthetic participants. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Liu et al. (2026) found that simulated users struggle to reproduce the communication frictions real users bring to multi-turn conversations, so evaluations built on them can look better than real performance. Their approach uses OCEAN (Big Five) personality models to construct persona profiles and generates interview-style responses. However, SyntheticUsers operates in a single-turn interview paradigm—each persona responds to questions independently, without exposure to other personas' viewpoints.
 
 **Outset** takes a hybrid approach, using AI to moderate real human interviews at scale. While this preserves the authenticity of human responses, it does not address the cost and speed limitations that motivate synthetic approaches. **Yabble** offers AI-powered survey analysis but relies on single-turn interactions with demographic-tagged personas, which risks reinforcing stereotypes rather than capturing genuine behavioral diversity.
 
@@ -85,21 +83,21 @@ These platforms share three limitations: (1) no cross-examination between person
 
 ### 2.3 Multi-Agent Debate
 
-Du et al. (2023) demonstrated that multi-agent debate can improve factuality and reasoning in language models. In their framework, multiple LLM instances argue for different positions, with each agent refining its response based on others' arguments. This approach improved performance on mathematical reasoning and factual question-answering tasks, suggesting that adversarial interaction can surface errors that single-agent generation misses.
+Du et al. (2024) demonstrated that multi-agent debate can improve factuality and reasoning in language models. In their framework, several model instances each propose an answer, then read each other's responses and revise their own over several rounds until they reach a common answer. This improved performance on mathematical reasoning and factual question-answering tasks, suggesting that interaction between instances can surface errors that single-agent generation misses.
 
-Liang et al. (2023) extended this work to encourage diversity in multi-agent debate, showing that enforcing distinct perspectives leads to more robust consensus formation. Chan et al. (2023) proposed chatmap for scaling multi-agent collaboration, demonstrating that structured interaction protocols outperform unstructured group chat.
+Liang et al. (2024) targeted a failure mode of self-reflection they call Degeneration-of-Thought—once a model is confident in an answer, it stops producing new ideas—with a framework in which agents argue "tit for tat" and a judge manages the debate. Chan et al. (2024) built ChatEval, a multi-agent referee team that discusses and evaluates generated text, and found that giving every agent the same role description degrades performance.
 
-Wang et al. (2024) introduced a framework for multi-agent consensus through iterative debate, showing that convergence properties depend on the topology of agent interactions and the strength of evidence. Their work highlighted the risk of premature consensus—agents converging too quickly without fully exploring the argument space.
+Wu et al. (2025) ran a controlled study of multi-agent debate on logic puzzles with verifiable answers. Reasoning strength and group diversity were the dominant drivers of debate success; structural parameters such as debate order or confidence visibility gave limited gains; and majority pressure suppressed independent correction.
 
-AudienceLens builds on these insights with a structured rebuttal protocol designed for the audience review domain, where the goal is not to find a single correct answer but to map the landscape of perspectives and identify areas of genuine disagreement. One rebuttal round is implemented and executes real model calls (Section 3.3); the multi-round debate structure and the consensus-tracking layer described in Sections 3.5–3.6 remain specification only (Section 4.6). Two limits on how this should be read. First, one round of rebuttal is not the iterated debate studied by Du et al. (2023) or Wang et al. (2024), and their convergence results do not transfer to it. Second, we have run no experiment on our own protocol either — Section 5.0 states the design of the study that would be needed. Readers should therefore treat the debate literature cited above as motivation for our design, not as evidence about AudienceLens's outputs.
+AudienceLens builds on these insights with a structured rebuttal protocol designed for the audience review domain, where the goal is not to find a single correct answer but to map the landscape of perspectives and identify areas of genuine disagreement. One rebuttal round is implemented and executes real model calls (Section 3.3); the multi-round debate structure and the consensus-tracking layer described in Sections 3.5–3.6 remain specification only (Section 4.6). Two limits on how this should be read. First, one round of rebuttal is not the multi-round debate studied by Du et al. (2024) or Wu et al. (2025), and their findings do not transfer to it. Second, we have run no experiment on our own protocol either — Section 5.0 states the design of the study that would be needed. Readers should therefore treat the debate literature cited above as motivation for our design, not as evidence about AudienceLens's outputs.
 
 ### 2.4 AI Ethics in Persona Generation
 
 The ethical dimensions of synthetic persona generation have received increasing attention. Prior UX research has long argued that behavior, goals, and context are more actionable persona attributes than demographics alone (Cooper 1999; Pruitt & Adlin 2006). This insight directly motivates our identity-behavior decoupling principle.
 
-The EU AI Act (2024) establishes transparency requirements for AI systems, including obligations to disclose when content is AI-generated (Article 50), ensure human oversight (Article 14), and maintain accuracy (Article 15). These requirements are particularly relevant for synthetic audience systems, where outputs could be misinterpreted as real user research data.
+The EU AI Act (2024) establishes transparency requirements for AI systems, including obligations to disclose when content is AI-generated (Article 50) and, for high-risk systems, requirements for human oversight (Article 14) and accuracy and robustness (Article 15). These requirements are particularly relevant for synthetic audience systems, where outputs could be misinterpreted as real user research data.
 
-The Nielsen Norman Group's persona methodology has long advocated for behavior-first persona design, arguing that personas should be defined by goals, behaviors, and pain points rather than demographic attributes (Mulder & Yaar, 2006). AudienceLens operationalizes this principle through its `behavior_profile` construct, which replaces traditional OCEAN-based personality models with task-oriented behavioral dimensions.
+Practitioner persona guides have long advocated for behavior-first persona design, arguing that personas should be defined by goals, behaviors, and pain points rather than demographic attributes (Mulder & Yaar, 2006). AudienceLens operationalizes this principle through its `behavior_profile` construct, which replaces traditional OCEAN-based personality models with task-oriented behavioral dimensions.
 
 ## 3. Method
 
@@ -538,7 +536,7 @@ A core design principle of AudienceLens is **calibration honesty**: the system m
 
 The headline mechanism now executes. Sections 3.3 and 3.4 describe a rebuttal round that issues real model calls in two tiers and a stance-revision gate applied in code; Section 4.6 records which parts of the original specification that covers. Three limitations follow, and we would rather state them plainly than let the word "implemented" carry more weight than it should.
 
-**One round, not three.** What runs is: independent reviews, then one rebuttal exchange between the two most-opposed personas per controversy point, then done. There is no second exchange, no separate final-stance round, no early termination on convergence, and no panel-wide persuasion scoring. Anyone reading "multi-agent debate" as *iterated* debate — the setting in which the results of Du et al. (2023) and Wang et al. (2024) were obtained — will be reading in more than is there.
+**One round, not three.** What runs is: independent reviews, then one rebuttal exchange between the two most-opposed personas per controversy point, then done. There is no second exchange, no separate final-stance round, no early termination on convergence, and no panel-wide persuasion scoring. Anyone reading "multi-agent debate" as *iterated* debate — the setting in which the results of Du et al. (2024) and Wu et al. (2025) were obtained — will be reading in more than is there.
 
 **Two tiers that are not equally deserving of the name.** `standard` mode, which is the default for most users, is a *single* moderated call that writes both sides' rebuttals from one vantage point. It is genuinely a rebuttal round, and it is genuinely not $n$ independent agents. Only `full` mode re-invokes each persona. We have kept this distinction in the runtime's own `limitation` string rather than only in this paper, precisely because the cheaper tier is the one most likely to be mistaken for the expensive one.
 
@@ -600,50 +598,40 @@ AudienceLens is open-source under the MIT license, with CLI, Python, MCP, web, a
 
 ## References
 
-1. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). Generative agents: Interactive simulacra of human behavior. *Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23)*, 1–22. ✅ Reliable; peer-reviewed venue.
+1. Argyle, L. P., Busby, E. C., Fulda, N., Gubler, J. R., Rytting, C., & Wingate, D. (2023). Out of one, many: Using language models to simulate human samples. *Political Analysis*, 31(3), 337–351. https://doi.org/10.1017/pan.2023.2
 
-2. Argyle, L. P., Busby, E. C., Fulda, N., Gubler, J. R., Rytting, C., & Wingate, D. (2023). Out of one, many: Using language models to simulate human samples. *Political Analysis*, 31(3), 337–351. ✅ Reliable; peer-reviewed venue.
+2. Chan, C.-M., Chen, W., Su, Y., Yu, J., Xue, W., Zhang, S., Fu, J., & Liu, Z. (2024). ChatEval: Towards better LLM-based evaluators through multi-agent debate. *The Twelfth International Conference on Learning Representations (ICLR 2024)*. arXiv:2308.07201.
 
-3. Horton, J. J. (2023). Homo silicus: A new kind of social scientist. *SSRN Electronic Journal*. https://doi.org/10.2139/ssrn.4434769 ✅ Retained; note corrected subtitle "A New Kind of Social Scientist."
+3. Cooper, A. (1999). *The Inmates Are Running the Asylum*. Sams.
 
-4. Du, Y., Li, S., Torralba, A., Tenenbaum, J. B., & Mordatch, I. (2023). Improving factuality and reasoning in language models through multiagent debate. *Proceedings of the 40th International Conference on Machine Learning (ICML '23)*. ✅ Reliable; peer-reviewed venue.
+4. Du, Y., Li, S., Torralba, A., Tenenbaum, J. B., & Mordatch, I. (2024). Improving factuality and reasoning in language models through multiagent debate. *Proceedings of the 41st International Conference on Machine Learning (ICML 2024)*, PMLR 235, 11733–11763.
 
-5. Liang, T., Chen, Z., He, J., Wang, M., Zhou, Y., & Zhang, Z. (2023). Encouraging divergent thinking in large language models through multi-agent debate. *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing*. ⚠️ <!-- TODO: verify venue and exact title -->
+5. European Parliament and Council. (2024). Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act). *Official Journal of the European Union*, L, 2024/1689.
 
-6. SyntheticUsers. (2024). SyntheticUsers: AI-moderated synthetic user research platform [Commercial product]. https://syntheticusers.com ⚠️ Commercial citation; not peer-reviewed. Should not be cited as academic evidence.
+6. Horton, J. J., Filippas, A., & Manning, B. S. (2023). *Large language models as simulated economic agents: What can we learn from Homo silicus?* (NBER Working Paper No. 31122). National Bureau of Economic Research. https://www.nber.org/papers/w31122
 
-7. ~~Mancini, T., et al. (2024). SCOPE: Demographics explain minimal behavioral variance in user research.~~ ❌ Specific 1.5% figure removed; replaced with domain consensus references (Cooper 1999; Pruitt & Adlin 2006). The SCOPE study's specific quantitative claims could not be independently verified.
+7. Lazar, J., Feng, J. H., & Hochheiser, H. (2017). *Research Methods in Human-Computer Interaction* (2nd ed.). Morgan Kaufmann.
 
-8. European Parliament and Council. (2024). Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act), Article 50. *Official Journal of the European Union*. ✅ Updated to correct article number (Article 50, not Article 52).
+8. Liang, T., He, Z., Jiao, W., Wang, X., Wang, Y., Wang, R., Yang, Y., Shi, S., & Tu, Z. (2024). Encouraging divergent thinking in large language models through multi-agent debate. *Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing (EMNLP 2024)*, 17889–17904.
 
-9. Pittenger, D. J. (2005). Cautionary comments regarding the Myers-Briggs Type Indicator. *Consulting Psychology Journal: Practice and Research*, 57(3), 210–221. ✅ Reliable; peer-reviewed venue.
+9. Liu, Y. L., Yun, H., Roosta, T., & Xiao, Z. (2026). Synthetic users, real differences: An evaluation framework for user simulation in multi-turn conversations. arXiv:2605.02624.
 
-10. Wang, Z., Mao, S., & Wang, W. (2024). Multi-agent consensus through iterative debate with convergence guarantees. *Proceedings of the AAAI Conference on Artificial Intelligence*. ⚠️ <!-- TODO: verify venue and exact title -->
+10. Morgan, D. L. (1997). *Focus Groups as Qualitative Research* (2nd ed.). Sage Publications.
 
-11. Xu, Y., Wang, S., & Li, Z. (2024). Persona-driven requirements engineering with large language models. *IEEE Transactions on Software Engineering*, 50(4), 892–910. ⚠️ <!-- TODO: verify venue and exact title -->
+11. Mulder, S., & Yaar, Z. (2006). *The User Is Always Right: A Practical Guide to Creating and Using Personas for the Web*. New Riders.
 
-12. Salehi, N., Kaur, J., & Bernstein, M. S. (2024). Persona-based accessibility evaluation using large language models. *Proceedings of the ACM on Human-Computer Interaction*, 8(CSCW1), 1–28. ⚠️ <!-- TODO: verify venue and exact title -->
+12. Nielsen, J. (1994). *Usability Engineering*. Morgan Kaufmann.
 
-13. Nielsen, J. (1994). *Usability Engineering*. Morgan Kaufmann.
+13. Outset. (2024). AI-moderated interview platform [Commercial product]. https://outset.ai
 
-14. Lazar, J., Feng, J. H., & Hochheiser, H. (2017). *Research Methods in Human-Computer Interaction*. Morgan Kaufmann.
+14. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). Generative agents: Interactive simulacra of human behavior. *Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23)*. https://doi.org/10.1145/3586183.3606763
 
-15. Morgan, D. L. (1997). *Focus Groups as Qualitative Research* (2nd ed.). Sage Publications.
+15. Pittenger, D. J. (2005). Cautionary comments regarding the Myers-Briggs Type Indicator. *Consulting Psychology Journal: Practice and Research*, 57(3), 210–221. https://doi.org/10.1037/1065-9293.57.3.210
 
-16. Mulder, S., & Yaar, Z. (2006). *The User Is Always Right: A Practical Guide to Creating and Using Personas for the Web*. New Riders.
+16. Pruitt, J., & Adlin, T. (2006). *The Persona Lifecycle: Keeping People in Mind Throughout Product Design*. Morgan Kaufmann.
 
-17. Chan, C.-M., Chen, W., Su, Y., Yu, J., Xue, W., Zhang, S., Fu, J., & Liu, P. (2023). Chatmap: Scaling large language model-based multi-agent collaboration. *Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing*.
+17. Synthetic Users. (2024). AI-moderated synthetic user research platform [Commercial product]. https://syntheticusers.com
 
-18. Outset. (2024). AI-moderated interview platform [Commercial product]. https://outset.ai
+18. Wu, H., Li, Z., & Li, L. (2025). Can LLM agents really debate? A controlled study of multi-agent debate in logical reasoning. arXiv:2511.07784.
 
 19. Yabble. (2024). AI-powered survey and research platform [Commercial product]. https://yabble.com
-
-**References added per audit:**
-
-20. Cooper, A. (1999). *The Inmates Are Running the Asylum*. SAMS. ✅ Domain consensus reference for behavior-first persona design.
-
-21. Pruitt, J., & Adlin, T. (2006). *The Persona Lifecycle: Keeping People in Mind Throughout Product Design*. Morgan Kaufmann. ✅ Domain consensus reference for behavior-first persona design.
-
-22. RealSim (2026). Synthetic users, real differences. *arXiv preprint arXiv:2605.02624*. ⚠️ Pre-print; provides independent assessment of synthetic user alignment claims.
-
-23. Can LLM agents really debate? (2025). *arXiv preprint arXiv:2511.07784*. ⚠️ Pre-print; relevant to cross-examination protocol validity.
