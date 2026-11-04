@@ -9,7 +9,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB.svg)](pyproject.toml)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](web/frontend/package.json)
 
-English · [中文](README_zh.md)
+English · [中文](README_zh.md) · [日本語](README_ja.md)
 
 </div>
 
