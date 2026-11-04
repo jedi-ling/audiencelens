@@ -44,16 +44,16 @@
 ## アーキテクチャ
 
 ```mermaid
-flowchart LR
-    subgraph Browser
-        FE["Frontend<br/>React 19 + Vite + TypeScript"]
+flowchart TB
+    subgraph Frontend["Frontend"]
+        FE["Web app<br/>React 19 + Vite + TypeScript"]
         AD["Admin panel<br/>React + Vite"]
     end
-    subgraph Backend["FastAPI backend (web/backend)"]
+    subgraph Backend["Backend · FastAPI (web/backend)"]
         API["REST API + WebSocket progress"]
         Q["In-process review queue"]
     end
-    subgraph Engine["Core engine (src/runner, src/harness)"]
+    subgraph Engine["Engine · src/runner, src/harness"]
         PS["Panel selection"]
         PP["Independent persona panels"]
         V["3-layer validation"]
@@ -61,18 +61,20 @@ flowchart LR
         AG["Rule-driven aggregation"]
         EV["8-dimension evaluator<br/>(optional, post-hoc)"]
     end
-    subgraph LLM["LLM providers"]
-        AN["Anthropic (native API)"]
-        OC["OpenAI-compatible<br/>(DeepSeek, Kimi, Qwen, GLM, ...)"]
-        OL["Ollama (local)"]
+    subgraph Providers["Providers & DB"]
+        subgraph LLM["LLM providers"]
+            AN["Anthropic<br/>(native API)"]
+            OC["OpenAI-compatible<br/>(DeepSeek, Kimi, Qwen, GLM, ...)"]
+            OL["Ollama<br/>(local)"]
+        end
+        DB[("SQLite (dev)<br/>PostgreSQL (prod)")]
     end
-    DB[("SQLite (dev)<br/>PostgreSQL (prod)")]
 
     FE --> API
     AD --> API
     API --> Q --> PS --> PP --> V --> CX --> AG --> EV
-    PP --> AN & OC & OL
-    CX --> AN & OC & OL
+    PP --> LLM
+    CX --> LLM
     API --> DB
 ```
 
@@ -183,7 +185,7 @@ python -m pytest tests/ -q                          # コアエンジン
 
 ## 開発について
 
-AudienceLens は Ling Yuanyi が AI 支援開発（Claude Code、Kimi）で構築しました。設計・コードレビュー・検証（テストスイート、`tests/test_public_claims.py` による記載内容のチェック、再現できない結果の撤回を含む）は作者自身が行っています。
+AudienceLens は Ling Yuanyi が AI 支援開発（Claude Code、Codex、Trae、Qoder、Kimi）で構築しました。設計・コードレビュー・検証（テストスイート、`tests/test_public_claims.py` による記載内容のチェック、再現できない結果の撤回を含む）は作者自身が行っています。
 
 ## ライセンス
 

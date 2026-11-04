@@ -38,7 +38,42 @@ standard 档，模型 `claude-sonnet-5-5`，2026-11-04，成本取自应用自�
 
 ## 架构
 
-前端（React 19 + Vite）→ FastAPI 后端（REST + WebSocket 进度）→ 核心引擎（`src/runner/`：面板选择 → 独立人格评审 → 三层校验 → 交叉质询 → 规则聚合；`src/harness/`：可选的 8 维事后评分）→ LLM（Anthropic 原生 / 任意 OpenAI 兼容服务 / 本地 Ollama）；数据库开发用 SQLite、生产用 PostgreSQL。架构图见 [README.md](README.md#architecture)，细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+前端（React 19 + Vite）→ FastAPI 后端（REST + WebSocket 进度）→ 核心引擎（`src/runner/`：面板选择 → 独立人格评审 → 三层校验 → 交叉质询 → 规则聚合；`src/harness/`：可选的 8 维事后评分）→ LLM（Anthropic 原生 / 任意 OpenAI 兼容服务 / 本地 Ollama）；数据库开发用 SQLite、生产用 PostgreSQL。细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend"]
+        FE["Web app<br/>React 19 + Vite + TypeScript"]
+        AD["Admin panel<br/>React + Vite"]
+    end
+    subgraph Backend["Backend · FastAPI (web/backend)"]
+        API["REST API + WebSocket progress"]
+        Q["In-process review queue"]
+    end
+    subgraph Engine["Engine · src/runner, src/harness"]
+        PS["Panel selection"]
+        PP["Independent persona panels"]
+        V["3-layer validation"]
+        CX["Cross-examination<br/>(top-3 disputes)"]
+        AG["Rule-driven aggregation"]
+        EV["8-dimension evaluator<br/>(optional, post-hoc)"]
+    end
+    subgraph Providers["Providers & DB"]
+        subgraph LLM["LLM providers"]
+            AN["Anthropic<br/>(native API)"]
+            OC["OpenAI-compatible<br/>(DeepSeek, Kimi, Qwen, GLM, ...)"]
+            OL["Ollama<br/>(local)"]
+        end
+        DB[("SQLite (dev)<br/>PostgreSQL (prod)")]
+    end
+
+    FE --> API
+    AD --> API
+    API --> Q --> PS --> PP --> V --> CX --> AG --> EV
+    PP --> LLM
+    CX --> LLM
+    API --> DB
+```
 
 规模：11 个人格 Pack 共 72 个人格，14 种任务类型。
 
@@ -129,7 +164,7 @@ python -m pytest tests/ -q
 
 ## 开发说明
 
-AudienceLens 由 Ling Yuanyi 借助 AI 辅助开发（Claude Code、Kimi）完成；设计、代码审阅与验证由作者负责。
+AudienceLens 由 Ling Yuanyi 借助 AI 辅助开发（Claude Code、Codex、Trae、Qoder、Kimi）完成；设计、代码审阅与验证由作者负责。
 
 ## 许可与作者
 

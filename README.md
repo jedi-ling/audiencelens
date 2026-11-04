@@ -53,16 +53,16 @@ semantic backend, is written up in [docs/evaluation/](docs/evaluation/).
 ## Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Browser
-        FE["Frontend<br/>React 19 + Vite + TypeScript"]
+flowchart TB
+    subgraph Frontend["Frontend"]
+        FE["Web app<br/>React 19 + Vite + TypeScript"]
         AD["Admin panel<br/>React + Vite"]
     end
-    subgraph Backend["FastAPI backend (web/backend)"]
+    subgraph Backend["Backend · FastAPI (web/backend)"]
         API["REST API + WebSocket progress"]
         Q["In-process review queue"]
     end
-    subgraph Engine["Core engine (src/runner, src/harness)"]
+    subgraph Engine["Engine · src/runner, src/harness"]
         PS["Panel selection"]
         PP["Independent persona panels"]
         V["3-layer validation"]
@@ -70,18 +70,20 @@ flowchart LR
         AG["Rule-driven aggregation"]
         EV["8-dimension evaluator<br/>(optional, post-hoc)"]
     end
-    subgraph LLM["LLM providers"]
-        AN["Anthropic (native API)"]
-        OC["OpenAI-compatible<br/>(DeepSeek, Kimi, Qwen, GLM, ...)"]
-        OL["Ollama (local)"]
+    subgraph Providers["Providers & DB"]
+        subgraph LLM["LLM providers"]
+            AN["Anthropic<br/>(native API)"]
+            OC["OpenAI-compatible<br/>(DeepSeek, Kimi, Qwen, GLM, ...)"]
+            OL["Ollama<br/>(local)"]
+        end
+        DB[("SQLite (dev)<br/>PostgreSQL (prod)")]
     end
-    DB[("SQLite (dev)<br/>PostgreSQL (prod)")]
 
     FE --> API
     AD --> API
     API --> Q --> PS --> PP --> V --> CX --> AG --> EV
-    PP --> AN & OC & OL
-    CX --> AN & OC & OL
+    PP --> LLM
+    CX --> LLM
     API --> DB
 ```
 
@@ -252,7 +254,7 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 
 ## Development note
 
-AudienceLens was built by Ling Yuanyi with AI-assisted development (Claude Code, Kimi). Design, code review and verification — including the test suites, the claim checks in `tests/test_public_claims.py` and the retraction of unreproducible results — are the author's.
+AudienceLens was built by Ling Yuanyi with AI-assisted development (Claude Code, Codex, Trae, Qoder, Kimi). Design, code review and verification — including the test suites, the claim checks in `tests/test_public_claims.py` and the retraction of unreproducible results — are the author's.
 
 ## License
 
