@@ -1,6 +1,7 @@
 # TLS 部署补全方案（HTTPS 上线）
 
-> 审计对象：`docs/project/release-plan.md` 审计表中「HTTPS/TLS 🔴 缺失」一项。
+> 审计对象：当时的内部发布计划（release-plan，已于 2026-11-04 移出仓库）审计表中「HTTPS/TLS 🔴 缺失」一项。
+> 下文提到的「release-plan」均指那份已移除的内部计划，行号仅作历史记录。
 > 结论先行：**该审计结论已过时** —— Caddy 反代方案（方案 B 的推荐路线）在仓库里已落地大半：
 > `web/docker-compose.prod.yml`、`web/deploy/Caddyfile`、`.env.production.example` 的
 > `FRONTEND_BIND` / `SITE_DOMAIN` 均已就位。剩余工作主要是**补 3 个硬化缺口（HSTS 头、
@@ -18,8 +19,8 @@
 
 | # | release-plan 陈述 | 仓库现状（2026-08 核对） | 结论 |
 |---|---|---|---|
-| 1 | 「HTTPS/TLS 🔴 缺失：nginx 只监听 80，`server_name localhost`，无证书方案」（`docs/project/release-plan.md:11`） | Caddy 方案已落地：`web/docker-compose.prod.yml`（caddy 服务 + 80/443 + caddy-data/config 卷）、`web/deploy/Caddyfile`（`{$SITE_DOMAIN}` → `reverse_proxy frontend:80`）、`web/.env.production.example:57-67` 已补 `FRONTEND_BIND=127.0.0.1:8080` 与 `SITE_DOMAIN`。内层 nginx 仍监听 80（`web/frontend/nginx.conf:2`、`web/admin/nginx.conf:2`），但这在「Caddy 终结 TLS → 转发内层 80」的架构下是设计使然 | **已过时**，应更新为「🟡 半就绪：配置齐备、未上线验证」 |
-| 2 | 「CI/CD 🔴 缺失：`.github/` 只有 issue 模板，无 workflows」（`docs/project/release-plan.md:17`） | `.github/workflows/ci.yml` 已存在，含 5 个作业：skill-consistency / core-engine / backend / backend-postgres / frontend（frontend+admin 矩阵构建，admin 跑 vitest） | **已过时**。CI 测试链齐备，但 release-plan P2 的「构建镜像 → 推 registry → 服务器一键更新 → 冒烟脚本」（第 51-53 行）**未落地** |
+| 1 | 「HTTPS/TLS 🔴 缺失：nginx 只监听 80，`server_name localhost`，无证书方案」 | Caddy 方案已落地：`web/docker-compose.prod.yml`（caddy 服务 + 80/443 + caddy-data/config 卷）、`web/deploy/Caddyfile`（`{$SITE_DOMAIN}` → `reverse_proxy frontend:80`）、`web/.env.production.example:57-67` 已补 `FRONTEND_BIND=127.0.0.1:8080` 与 `SITE_DOMAIN`。内层 nginx 仍监听 80（`web/frontend/nginx.conf:2`、`web/admin/nginx.conf:2`），但这在「Caddy 终结 TLS → 转发内层 80」的架构下是设计使然 | **已过时**，应更新为「🟡 半就绪：配置齐备、未上线验证」 |
+| 2 | 「CI/CD 🔴 缺失：`.github/` 只有 issue 模板，无 workflows」 | `.github/workflows/ci.yml` 已存在，含 5 个作业：skill-consistency / core-engine / backend / backend-postgres / frontend（frontend+admin 矩阵构建，admin 跑 vitest） | **已过时**。CI 测试链齐备，但 release-plan P2 的「构建镜像 → 推 registry → 服务器一键更新 → 冒烟脚本」（第 51-53 行）**未落地** |
 
 ### 1.2 真实存在的 HTTPS/TLS 相关缺口（按严重度排序）
 
@@ -31,7 +32,7 @@
 | G4 | **证书签发的外部硬依赖** | `web/.env.production.example:66-67`（「必须已解析到本机公网 IP，否则签发失败」）；`web/docker-compose.prod.yml:8-9`（Caddy 绑定宿主 80/443） | ① `SITE_DOMAIN` 必须已解析到公网 IP（ACME HTTP-01 需要）；② 宿主 80/443 必须空闲可绑定。任一不满足即签不下来。这是**配置易错点**而非代码缺口 |
 | G5 | **CORS / 邮件链接必须用 `https://` 前缀** | `web/.env.production.example:8`（`AL_CORS_ORIGINS`）、`:48`（`AL_PUBLIC_WEB_URL`）、`:45`（`AL_MAIL_FROM`） | 若误填 `http://app.example.com`：Caddy 会把 http 308 到 https，浏览器实际请求 Origin 是 `https://...`，不在 CORS 白名单 → 前端跨域失败，且报错不明显。后端 `AL_CORS_ORIGINS` 读取实现见 `web/backend/app/config.py:129-135` |
 | G6 | **内层 nginx 无 TLS 能力、`server_name localhost`** | `web/frontend/nginx.conf:2-3`、`web/admin/nginx.conf:2-3` | 架构上由 Caddy 终结 TLS，内层 80 只对容器网络/回环开放，**本身不是必须改的缺口**。但含义要写明：任何人绕过 Caddy 直连 `127.0.0.1:8080`（frontend 绑定）得到的是明文；`server_name localhost` 因是唯一 server 块兜底，不影响 Caddy 转发（Host 透传后仍命中）。可选项：改为 `server_name _;` 更规范，非必需 |
-| G7 | **登录态存 localStorage 而非 cookie** | `web/frontend/src/lib/apiClient.ts:46-51`（token 读写 `localStorage`） | 后端无 `set_cookie`（全仓库搜不到），所以「cookie Secure 标志」检查项**不适用**。但 HTTPS 仍是必需前提：明文 HTTP 下 token 会被中间人直接截获。另：localStorage 对 XSS 开放，后端中间件也未设 `Content-Security-Policy` —— 属可选加固项，不在本次 TLS 范围内 |
+| G7 | **登录态存 localStorage 而非 cookie** | `web/frontend/src/lib/apiClient.ts:46-51`（token 读写 `localStorage`） | 后端无 `set_cookie`（全仓库搜不到），所以「cookie Secure 标志」检查项**不适用**。**2026-11-04 更新：**自访客隔离修复起，后端会设置签名的 HttpOnly 访客 cookie（`SameSite=Lax`，类生产环境下 `Secure`，见 `web/backend/app/main.py` 的 guest cookie 中间件与 `AL_GUEST_COOKIE_SECURE`）；登录 token 仍在 localStorage。但 HTTPS 仍是必需前提：明文 HTTP 下 token 会被中间人直接截获。另：localStorage 对 XSS 开放，后端中间件也未设 `Content-Security-Policy` —— 属可选加固项，不在本次 TLS 范围内 |
 
 > 补充事实（非缺口）：后端类生产自检已在 `web/backend/app/config.py:280-308` 实现 ——
 > CORS/站点地址指向公网主机即按生产对待，`AL_JWT_SECRET` 为默认值时拒绝启动。
@@ -188,7 +189,7 @@ curl -s -D - -o /dev/null -H "Origin: https://app.example.com" https://app.examp
 | C2 | 端口占用 | `ss -ltnp` 中 80/443 无其他进程监听 | 停掉占用服务再 `compose up` |
 | C3 | 证书签发 | 见 3.4 第 1 条：issuer 非内部 CA | 看 `docker compose logs caddy`；见 §5 风险 |
 | C4 | CORS 白名单 | `AL_CORS_ORIGINS` 只含 `https://app.example.com`（`web/.env.production.example:8`），且 curl Origin 回显正确（3.4 第 5 条） | 改 `.env` 后 `compose up -d` 重建 backend |
-| C5 | 登录态传输安全 | 确认登录态走 localStorage（`web/frontend/src/lib/apiClient.ts:46-51`）而非 cookie —— 因此**无 cookie Secure/SameSite 检查项**；HTTPS 全链路是 token 不被中间人截获的前提 | 若未来引入 cookie 会话，须补 Secure + SameSite=Lax |
+| C5 | 登录态传输安全 | 确认登录态走 localStorage（`web/frontend/src/lib/apiClient.ts:46-51`）而非 cookie —— 因此**无 cookie Secure/SameSite 检查项**；HTTPS 全链路是 token 不被中间人截获的前提 | 若未来引入 cookie 会话，须补 Secure + SameSite=Lax。**2026-11-04 更新：**访客 cookie 已存在（签名、HttpOnly、SameSite=Lax），上线时确认响应头里带 `Secure`（`AL_GUEST_COOKIE_SECURE`，类生产环境默认开启） |
 | C6 | HSTS | `curl -sI https://...` 返回 `Strict-Transport-Security` 头；首次上线建议 max-age=300，稳定后调 31536000（3.2） | 补 Caddyfile header 行 |
 | C7 | HTTP→HTTPS 跳转 | `curl -sI http://...` 返回 308（Caddy 默认） | 检查 Caddy 站点块是否绑定正确（`{$SITE_DOMAIN}` 环境变量注入） |
 | C8 | 证书续期机制 | 证书在 `caddy-data` 命名卷（`docker-compose.prod.yml:12-13`），**不要**用 bind mount 存证书但也不要在重启时删卷；`docker compose down` 不影响 caddy-data | 若曾 `docker volume rm`，证书丢失后 Caddy 会自动重新签发，属正常恢复流程 |

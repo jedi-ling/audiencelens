@@ -75,7 +75,7 @@ Horton et al. (2023) extended this line of work to economics, proposing that LLM
 
 ### 2.2 Synthetic User Research
 
-Commercial synthetic user research platforms have emerged to address the cost and speed limitations of traditional methods. **SyntheticUsers** (2024) is a commercial platform offering AI-moderated interviews with synthetic participants. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Liu et al. (2026) found that simulated users struggle to reproduce the communication frictions real users bring to multi-turn conversations, so evaluations built on them can look better than real performance. Their approach uses OCEAN (Big Five) personality models to construct persona profiles and generates interview-style responses. However, SyntheticUsers operates in a single-turn interview paradigm—each persona responds to questions independently, without exposure to other personas' viewpoints.
+Commercial synthetic user research platforms have emerged to address the cost and speed limitations of traditional methods. **SyntheticUsers** (2024) is a commercial platform offering AI-moderated interviews with synthetic participants. Commercial platforms such as SyntheticUsers claim high alignment with real users, but independent validation remains limited. Liu et al. (2026) found that simulated users struggle to reproduce the communication frictions real users bring to multi-turn conversations, so evaluations built on them can look better than real performance.
 
 **Outset** takes a hybrid approach, using AI to moderate real human interviews at scale. While this preserves the authenticity of human responses, it does not address the cost and speed limitations that motivate synthetic approaches. **Yabble** offers AI-powered survey analysis but relies on single-turn interactions with demographic-tagged personas, which risks reinforcing stereotypes rather than capturing genuine behavioral diversity.
 
@@ -170,7 +170,7 @@ All twelve axes are `required` in `src/schemas/persona-schema.json`, which also 
 
 The axis is named `genre_literacy` for every pack, including the non-game ones; there is no separate `domain_literacy` field.
 
-This design departs from the OCEAN (Big Five) personality model used by SyntheticUsers. We argue that `behavior_profile` is better suited for review tasks for four reasons:
+This design departs from the OCEAN (Big Five) personality model. We argue that `behavior_profile` is better suited for review tasks for four reasons:
 
 1. **Task orientation**: Review is a task-oriented behavior, not a social one. OCEAN dimensions like extraversion and agreeableness primarily describe social interaction patterns, which are largely irrelevant when personas evaluate artifacts independently. `behavior_profile` directly models task-relevant behaviors (patience, completion drive, risk tolerance), yielding higher information density per dimension.
 
