@@ -160,7 +160,8 @@ python -m pytest tests/ -q
 - 成本随面板人数增长；
 - 目前不提供平台 Key，只支持自带 Key（BYOK）；
 - 部分人格输出会被校验拦下（把改写标成 direct、或提交残缺），一轮修复能救回不少，但不是全部；
-- 只有一轮反驳，θ 未经校准。
+- 只有一轮反驳，θ 未经校准；
+- 报告目前只生成中文（`SUPPORTED_REPORT_LANGS = zh-CN`）；英文输出需要 [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10 所述的 `output_lang` 链路，尚未实现。
 
 ## 开发说明
 

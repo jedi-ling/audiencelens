@@ -251,6 +251,7 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 - **No platform key is offered.** Hosted use is bring-your-own-key only; the plan / quota / CDK machinery exists in code but is not funded.
 - **Some persona outputs fail validation.** The validator rejects paraphrases labelled `direct` and malformed submissions; one repair turn recovers many of them, not all (see the sample outcomes above).
 - **Single debate round.** Further rounds, early termination and consensus tracking are designed but not implemented; θ is uncalibrated.
+- **Reports are generated in Chinese only for now** (`SUPPORTED_REPORT_LANGS = zh-CN`). English output requires the `output_lang` path described in [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10, which is not yet implemented.
 
 ---
 
