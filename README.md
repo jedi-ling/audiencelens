@@ -23,9 +23,11 @@ English · [中文](README_zh.md) · [日本語](README_ja.md)
 
 ## Screenshots
 
-![Conversational review entry](docs/images/hero.png)
-![Sample reports page](docs/images/samples.png)
-![Review report](docs/images/report.png)
+![Conversational review entry](docs/images/en/hero.png)
+![Sample reports page](docs/images/en/samples.png)
+![Review report](docs/images/en/report.png)
+
+<sub>English UI. The report body is Chinese because the engine currently generates reports in Chinese only.</sub>
 
 ---
 
@@ -249,6 +251,7 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 - **No platform key is offered.** Hosted use is bring-your-own-key only; the plan / quota / CDK machinery exists in code but is not funded.
 - **Some persona outputs fail validation.** The validator rejects paraphrases labelled `direct` and malformed submissions; one repair turn recovers many of them, not all (see the sample outcomes above).
 - **Single debate round.** Further rounds, early termination and consensus tracking are designed but not implemented; θ is uncalibrated.
+- **Reports are generated in Chinese only for now** (`SUPPORTED_REPORT_LANGS = zh-CN`). English output requires the `output_lang` path described in [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10, which is not yet implemented.
 
 ---
 

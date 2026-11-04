@@ -21,9 +21,11 @@
 
 ## スクリーンショット
 
-![対話型のレビュー入力画面](docs/images/hero.png)
-![サンプルレポート一覧](docs/images/samples.png)
-![レビューレポート](docs/images/report.png)
+![対話型のレビュー入力画面](docs/images/en/hero.png)
+![サンプルレポート一覧](docs/images/en/samples.png)
+![レビューレポート](docs/images/en/report.png)
+
+<sub>UI は英語版のスクリーンショットです（日本語 UI は未対応）。レポート本文は中国語です。現在のエンジンは中国語のレポートのみを生成します。</sub>
 
 ---
 
@@ -180,6 +182,7 @@ python -m pytest tests/ -q                          # コアエンジン
 - **プラットフォーム提供のキーはありません。** ホスト環境での利用は BYOK のみです。
 - **一部のペルソナ出力は検証で不合格になります。** 修正ターンを 1 回挟むと多くは回復しますが、すべてではありません。
 - **反論は 1 ラウンドのみ**で、θ はキャリブレーションしていません。
+- **レポートは現在、中国語でのみ生成されます**（`SUPPORTED_REPORT_LANGS = zh-CN`）。英語で出力するには [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10 に記載の `output_lang` 経路が必要ですが、まだ実装されていません。
 
 ---
 
