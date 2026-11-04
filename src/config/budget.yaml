@@ -1,5 +1,8 @@
 version: 0.1.0
 max_cost_per_run_usd: 2.0
+# 交叉质询每次反驳调用的 max_tokens。带自适应思考的模型（Sonnet 5.5 等）思考 token
+# 也算在内，4096 会截断反驳正文；与人格评审同一上限（cli.PERSONA_MAX_TOKENS）。
+cross_exam_max_tokens: 8192
 # 真实 Anthropic 模型 ID——早期版本这里写的是 "claude-sonnet" 这种占位别名，
 # 传给 Anthropic API 会直接 404。见 src/runner/llm_client.py 的调用点。
 #
