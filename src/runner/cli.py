@@ -46,7 +46,7 @@ try:
         render_prompt_split,
         select_model,
     )
-    from .llm_client import is_retryable_error
+    from .llm_client import LLMCallError, is_retryable_error
     from .validator import load_schema, validate_output
 except ImportError:
     from runner.adaptive_panel import recommend_next_persona
@@ -79,7 +79,7 @@ except ImportError:
         render_prompt_split,
         select_model,
     )
-    from runner.llm_client import is_retryable_error
+    from runner.llm_client import LLMCallError, is_retryable_error
     from runner.validator import load_schema, validate_output
 
 SIMULATION_WARNING = (
@@ -310,6 +310,48 @@ def _backoff_sleep(attempt: int, backoff_base_seconds: float) -> None:
     time.sleep(delay + random.uniform(0, backoff_base_seconds))
 
 
+# 争议点去重没有语义模型时，报告里必须如实写出来：词面相似度合并不了换个说法的
+# 同一问题，交叉质询往往一个争议点都凑不出来——报告却只会显示"本次无显著分歧"。
+# 实测见 docs/evaluation/dedup-fallback-finding.md（三份中文样例 0/61 条被合并）。
+DEDUP_LEXICAL_NOTICE = (
+    "语义去重未安装（Semantic dedup not installed — cross-examination may not trigger）："
+    "换个说法的同一问题不会被合并成争议点，交叉质询可能无法触发。"
+)
+
+
+def _issue_dedup_method() -> str:
+    """当前进程里争议点去重实际用的是哪一档：'semantic' 或 'lexical'。"""
+    try:
+        from .similarity import get_issue_similarity
+    except ImportError:
+        from runner.similarity import get_issue_similarity
+    return get_issue_similarity().method
+
+
+# ---- 诊断落盘（默认关闭）----
+# AUDIENCELENS_DEBUG_RUNS=1 时，每位人格每一次尝试的**原始响应**（有没有调用
+# 工具、工具输入、文本块、stop_reason）和校验结论写进仓库根的 .debug/runs/
+# （已 .gitignore）。用来回答"为什么这位人格没过校验"——默认关闭，因为原始
+# 响应里有完整评审内容。绝不写请求头、API key 或 prompt。
+DEBUG_RUNS_ENV = "AUDIENCELENS_DEBUG_RUNS"
+
+
+def _debug_runs_enabled() -> bool:
+    return os.environ.get(DEBUG_RUNS_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _write_debug_attempt(run_dir: Optional[str], persona_id: str, attempt: int, record: dict) -> None:
+    if not run_dir:
+        return
+    try:
+        os.makedirs(run_dir, exist_ok=True)
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", persona_id)
+        with open(os.path.join(run_dir, f"{safe}-attempt{attempt}.json"), "w", encoding="utf-8") as f:
+            json.dump(record, f, ensure_ascii=False, indent=2, default=str)
+    except OSError:
+        pass  # 诊断落盘失败不得影响评审本身
+
+
 def _validation_failure_reason(validation: dict) -> Optional[str]:
     """把 validate_output 的布尔结论翻译成 retry_on / 门控认的失败类型。
 
@@ -328,6 +370,39 @@ def _validation_failure_reason(validation: dict) -> Optional[str]:
     if not validation.get("evidence_grounded"):
         return RETRY_HALLUCINATION
     return None
+
+
+REPAIR_FEEDBACK_MAX_ITEMS = 8
+
+
+def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
+    """重试时回喂给模型的那段话：校验器说了什么，就原样告诉它，并说清楚怎么改。
+
+    不说"请再试一次"这种空话——同一份提示词原样重发，模型大概率交回同样的东西
+    （诊断实测：同一位人格连续 4 次交回同一种残缺的工具输入）。
+    """
+    details = (validation or {}).get("details") or {}
+    if reason == RETRY_HALLUCINATION:
+        quotes = ((details.get("evidence") or {}).get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
+        listed = "\n".join(f"- {str(q)[:160]}" for q in quotes)
+        return (
+            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据在材料原文里"
+            "找不到逐字出处：\n" + listed + "\n\n"
+            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话）。"
+            "概括、改写或你自己的判断请标为 inferred；材料里没有提到的请标为 gap。"
+        )
+    if reason == RETRY_SCHEMA:
+        errors = blocking_schema_errors(((details.get("schema") or {}).get("errors")) or [])
+        listed = "\n".join(f"- {e}" for e in errors[:REPAIR_FEEDBACK_MAX_ITEMS])
+        return (
+            "你上一次的提交没有通过 JSON Schema 校验：\n" + listed + "\n\n"
+            "请按提示词里的输出骨架提交**完整**结果：所有必填字段都要有；evidence 和 "
+            "key_issues 必须是对象数组，不是字符串；不要在字段值里写 <parameter> 之类的标签。"
+        )
+    return (
+        "你上一次的回复里没有可以解析的评审结果。请通过调用提交工具交出完整的评审结果，"
+        "不要用普通文本作答。"
+    )
 
 
 def _validation_error_message(validation: dict, reason: str) -> str:
@@ -438,6 +513,7 @@ def run_cross_exam_stage(
     # 仲裁视角不属于任何人格，没有 model_hint 可依据：用预算配置的默认模型
     # （select_model 对空人格就是返回 default_model，不另写一套选型规则）。
     moderator_model = model_override or select_model({}, budget_config)
+    cross_exam_max_tokens = int(budget_config.get("cross_exam_max_tokens") or PERSONA_MAX_TOKENS)
 
     # usage 的累加必须加锁：multi_agent 反驳档会把下面这个闭包丢进 ThreadPoolExecutor
     # 并发调用（见 cross_exam.run_cross_exam_protocol），而 `usage["calls"] += 1`
@@ -474,6 +550,7 @@ def run_cross_exam_stage(
             model = model_override or select_model(persona, budget_config)
 
         cache_usage: dict = {}
+        response_info: dict = {}
         text, input_tokens, output_tokens = chat_completion(
             model=model,
             prompt=prompt,
@@ -481,6 +558,10 @@ def run_cross_exam_stage(
             provider=provider,
             api_base=api_base,
             usage_details=cache_usage,
+            # 以前这里不传，走 chat_completion 的默认 4096：带自适应思考的模型
+            # （Sonnet 5.5 等）思考 token 也算在 max_tokens 里，反驳正文会被截断。
+            max_tokens=cross_exam_max_tokens,
+            debug_details=response_info,
         )
         # 成本在锁外先算好（纯 CPU、不碰 usage），锁内只做累加，临界区尽量短
         call_cost = estimate_cost(
@@ -490,6 +571,14 @@ def run_cross_exam_stage(
             usage["input_tokens"] += input_tokens
             usage["output_tokens"] += output_tokens
             usage["cost"] += call_cost
+        if response_info.get("stop_reason") == "max_tokens":
+            # 文本档没有 schema 兜底：被截断的反驳照样"返回成功"，下游再解析失败。
+            # 在这里如实标成失败（钱已经记上了），由协议核心写进 failures[] 并回落。
+            raise LLMCallError(
+                f"交叉质询的反驳被 max_tokens（上限 {cross_exam_max_tokens}）截断，"
+                "按失败处理（可调大 budget.yaml 的 cross_exam_max_tokens）",
+                retryable=False,
+            )
         return text, input_tokens, output_tokens
 
     return run_cross_exam_protocol(
@@ -654,11 +743,18 @@ def run_single_persona(
     total_input_tokens = 0
     total_output_tokens = 0
 
+    # 上一次交卷没过校验时的修复信息（上一次的原始响应块 + 校验错误），交给下一次
+    # 调用接成一轮修复对话；传输层错误的重试仍是原样重发（repair 为 None）。
+    repair: Optional[dict] = None
+
     for attempt in range(max_attempts):
         try:
             # 缓存明细走出参：返回的 input_tokens 是真实 token 数（落库/配额用），
             # 缓存折扣只在 estimate_cost 那一步生效，见 persona_agent 的不变式注释。
             cache_usage: dict = {}
+            debug_dir = config.get("debug_run_dir")
+            debug_details: Optional[dict] = {} if debug_dir else None
+            response_blocks: list = []
             raw_output, input_tokens, output_tokens = chat_completion(
                 model=model,
                 prompt=prompt,
@@ -672,6 +768,9 @@ def run_single_persona(
                 # 兼容开 json_object），schema_failure 这类"整次重发"的重试从源头消掉。
                 # 没传 schema（run_panel 的旧统一校验路径）就保持老行为。
                 json_schema=output_schema,
+                debug_details=debug_details,
+                repair=repair,
+                response_blocks=response_blocks,
             )
             cost = estimate_cost(
                 input_tokens, output_tokens, model, budget_config, cache_breakdown=cache_usage
@@ -694,8 +793,13 @@ def run_single_persona(
             # 触发面并不小：max_tokens 截断就足以让花括号不配对，人格 schema 又很大；
             # 第三方 BYOK 模型不守 JSON 格式更是常态。
             if isinstance(output, dict) and output.get("parse_error"):
+                _write_debug_attempt(debug_dir, persona["id"], attempt, {
+                    "persona_id": persona["id"], "attempt": attempt, "model": model,
+                    "response": debug_details, "raw_output": raw_output, "parse_error": True,
+                })
                 if RETRY_SCHEMA in retry_on and attempt < max_attempts - 1:
                     retry_reasons.append(RETRY_SCHEMA)
+                    repair = {"assistant_content": response_blocks, "feedback": _repair_feedback("parse_error", None)}
                     _backoff_sleep(attempt, backoff)
                     continue
                 snippet = str(output.get("raw_output") or "")[:200]
@@ -728,8 +832,20 @@ def run_single_persona(
             if output_schema is not None:
                 validation = validate_output(output, persona, output_schema, artifact_texts)
                 reason = _validation_failure_reason(validation)
+                _write_debug_attempt(debug_dir, persona["id"], attempt, {
+                    "persona_id": persona["id"], "attempt": attempt, "model": model,
+                    "response": debug_details, "raw_output": raw_output,
+                    "validation": validation, "failure_reason": reason,
+                })
                 if reason is not None and reason in retry_on and attempt < max_attempts - 1:
                     retry_reasons.append(reason)
+                    if reason in (RETRY_SCHEMA, RETRY_HALLUCINATION):
+                        repair = {
+                            "assistant_content": response_blocks,
+                            "feedback": _repair_feedback(reason, validation),
+                        }
+                    else:
+                        repair = None
                     _backoff_sleep(attempt, backoff)
                     continue
 
@@ -752,8 +868,13 @@ def run_single_persona(
             # retry_on 里开了 transport_error 且次数没用完才重试；死错一次就返回，
             # 不把"key 配错了"这种该立刻报的错误拖成 N 次重试后才报。
             retryable = is_retryable_error(e)
+            _write_debug_attempt(config.get("debug_run_dir"), persona["id"], attempt, {
+                "persona_id": persona["id"], "attempt": attempt, "model": model,
+                "exception": f"{type(e).__name__}: {e}"[:2000], "retryable": retryable,
+            })
             if retryable and RETRY_TRANSPORT in retry_on and attempt < max_attempts - 1:
                 retry_reasons.append(RETRY_TRANSPORT)
+                repair = None
                 _backoff_sleep(attempt, backoff)
                 continue
             return {
@@ -769,6 +890,47 @@ def run_single_persona(
                 "retries": attempt,
                 "retry_reasons": retry_reasons,
             }
+
+
+def run_panel_from_outputs(
+    task_type: str,
+    artifact_bundle: dict,
+    persona_outputs: List[dict],
+    retries_by_persona: Optional[dict] = None,
+    **kwargs,
+) -> dict:
+    """用已有的人格输出续跑评审：只做争议提取 → 交叉质询 → 聚合 → 渲染 → 降级说明。
+
+    persona_outputs 是**每位人格最后一次尝试**的原始输出（通过和没通过校验的都要给，
+    否则降级说明会漏掉失败的人格）。这里不信任任何旧的校验结论：清掉后由 run_panel
+    用当前的校验器重新校验、重新门控。复用的人格输出不再计费（cost / token 记 0），
+    返回值 cost_summary 里只有这次新发生的调用（交叉质询）。
+
+    其余参数原样交给 run_panel（personas_path / mode / model_override / api_key …）。
+    """
+    results = []
+    for out in persona_outputs:
+        pid = out.get("persona_id")
+        if not pid:
+            raise ValueError("续跑用的人格输出缺 persona_id")
+        results.append({
+            "persona_id": pid,
+            "output": out,
+            "model": kwargs.get("model_override") or "",
+            "cost": 0.0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "error": None,
+            "retries": int((retries_by_persona or {}).get(pid, 0)),
+            "retry_reasons": [],
+        })
+    return run_panel(
+        task_type=task_type,
+        artifact_bundle=artifact_bundle,
+        selected_personas=[r["persona_id"] for r in results],
+        precomputed_persona_results=results,
+        **kwargs,
+    )
 
 
 def run_panel(
@@ -797,6 +959,7 @@ def run_panel(
     adaptive_initial_size: int = 3,
     adaptive_min_score: float = 0.35,
     wide_screen: bool = False,
+    precomputed_persona_results: Optional[List[dict]] = None,
 ) -> dict:
     """progress_callback(done_count, total, persona_id)：每个人格评审完成后
     在 worker 线程内回调一次（线程安全计数）。回调抛异常不影响评审流程。
@@ -1075,6 +1238,10 @@ def run_panel(
     config = {
         "budget": budget_config,
         "persona_prompt_path": persona_prompt_path,
+        "debug_run_dir": (
+            os.path.join(base, ".debug", "runs", time.strftime("%Y%m%d-%H%M%S") + f"-{task_type}")
+            if _debug_runs_enabled() else None
+        ),
     }
 
     # 人格评审彼此独立，是 I/O 密集（等 LLM 返回）任务，用线程池并发。
@@ -1123,7 +1290,19 @@ def run_panel(
             return [f.result() for f in futures]
 
     adaptive_decisions = []
-    if adaptive_enabled:
+    if precomputed_persona_results is not None:
+        # 断点续跑（run_panel_from_outputs）：人格评审已经跑过，这里只接上结果，
+        # 之后的校验门控 / 交叉质询 / 聚合 / 渲染 / 降级说明全部走下面同一条路径。
+        by_id = {r["persona_id"]: r for r in precomputed_persona_results}
+        valid_ids = {p["id"] for p in valid_personas}
+        missing = sorted(pid for pid in by_id if pid not in valid_ids)
+        if missing:
+            raise ValueError(
+                "这些人格不在本次面板里（或被证据预检跳过），不能用来续跑：" + ", ".join(missing)
+            )
+        executed_personas = [p for p in valid_personas if p["id"] in by_id]
+        persona_results = [dict(by_id[p["id"]]) for p in executed_personas]
+    elif adaptive_enabled:
         initial_count = min(adaptive_initial_size, len(valid_personas))
         executed_personas = list(valid_personas[:initial_count])
         persona_results = _run_batch(executed_personas)
@@ -1289,6 +1468,9 @@ def run_panel(
             # 只躺在 JSON 的 limitation 里，读报告的人不会发现这场"辩论"其实没跑成。
             if cross_exam_data.get("failures"):
                 cross_exam_notice = cross_exam_data.get("limitation", "")
+
+    dedup_method = _issue_dedup_method() if cross_exam_enabled else None
+    dedup_notice = DEDUP_LEXICAL_NOTICE if dedup_method == "lexical" else ""
 
     report = aggregate_report(
         persona_outputs,
@@ -1456,6 +1638,8 @@ def run_panel(
 
     # markdown / html 两处横幅都要用，所以在两个分支之外算一次
     panel_notice = (report.get("panel_selection") or {}).get("notice")
+    if dedup_method:
+        report["dedup"] = {"method": dedup_method, "notice": dedup_notice}
 
     markdown = ""
     if report_template_path:
@@ -1464,6 +1648,8 @@ def run_panel(
             markdown = f"> **{SIMULATION_WARNING}**\n\n{markdown}"
         if cross_exam_notice:
             markdown = f"> **⚠️ 交叉质询未完整完成：{cross_exam_notice}**\n\n{markdown}"
+        if dedup_notice:
+            markdown = f"> **⚠️ {dedup_notice}**\n\n{markdown}"
         if budget_notice:
             markdown = f"> **⚠️ {budget_notice}**\n\n{markdown}"
         if panel_notice:
@@ -1490,6 +1676,13 @@ def run_panel(
                 '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
                 'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
                 f"⚠️ 交叉质询未完整完成：{cross_exam_notice}</div>",
+            )
+        if dedup_notice:
+            html = _insert_body_banner(
+                html,
+                '<div style="background:#fef3c7;border:2px solid #d97706;color:#92400e;'
+                'padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">'
+                f"⚠️ {dedup_notice}</div>",
             )
         if panel_notice:
             html = _insert_body_banner(
@@ -1549,6 +1742,8 @@ def run_panel(
             # persona_count 必须是真实成功数：以前算的是 len(persona_results)（把失败的
             # 也算进去），于是"8 个人格"的说法和计费都建立在没跑成的人格上。
             "persona_count": succeeded_count,
+            # 每位人格的重试（修复轮 / 传输层重发）次数之和；钱已经算进 total_cost 了
+            "persona_retries": sum(int(r.get("retries") or 0) for r in persona_results),
             "attempted_count": attempted_count,
             "failed_count": failed_count,
             "skipped_count": skipped_count,

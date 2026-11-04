@@ -15,13 +15,33 @@ WORKDIR /app/web/backend
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# 语义去重（争议点聚类的 embedding 层）。默认关：sentence-transformers 拖 torch，
-# 镜像体积 +2GB 以上——不该由默认安装替所有部署者做这个取舍。
-# 开启：docker compose build --build-arg INSTALL_SEMANTIC_DEDUP=true backend
-# 不开的话引擎自动回落词面相似度，报告里 dedup_method 会如实写 lexical，
-# 报告页也会提示"语义模型未安装"。
-ARG INSTALL_SEMANTIC_DEDUP=false
-RUN if [ "$INSTALL_SEMANTIC_DEDUP" = "true" ]; then       pip install --no-cache-dir sentence-transformers;     fi
+# 语义去重（争议点聚类的 embedding 层）。**默认开**。
+#
+# 为什么改成默认开：不装它时引擎回落词面相似度（SequenceMatcher），换个说法的
+# 同一问题合并不到一起，交叉质询几乎凑不出争议点。三份真实中文评审里词面档
+# 0/61 条被合并、交叉质询一次都没触发；语义档找到 2/6/1 个真争议点
+# （docs/evaluation/dedup-fallback-finding.md）。交叉质询是本产品的核心环节。
+#
+# 两点做法：
+#   · 只装 **CPU 版** torch（下面的 --index-url）。默认的 pip 源会拉 CUDA 版，
+#     镜像多出好几个 GB，而这里只是给几十条议题标题做 embedding，CPU 毫秒级。
+#   · 模型在**构建时**下载进镜像，运行时 HF_HUB_OFFLINE=1 不访问 Hugging Face Hub
+#     ——国内服务器上 huggingface.co 经常连不上，首次评审现下就会失败，引擎
+#     又会悄悄退回词面档。模型名必须与 src/runner/similarity.py 的
+#     SEMANTIC_MODEL_NAME 一致（tests/test_cross_exam_resume.py 盯着）。
+# 版本钉在实测过的组合上（2026-11-04：torch 2.15.0+cpu / sentence-transformers 6.2.0）。
+# 体积影响见 docs/MAINTENANCE.md「语义去重」。
+# 关闭：docker compose build --build-arg INSTALL_SEMANTIC_DEDUP=false backend
+# （关闭后报告会显式提示"语义去重未安装，交叉质询可能无法触发"）。
+ARG INSTALL_SEMANTIC_DEDUP=true
+ARG SEMANTIC_MODEL=BAAI/bge-small-zh-v1.5
+ENV HF_HOME=/opt/hf-cache
+RUN if [ "$INSTALL_SEMANTIC_DEDUP" = "true" ]; then \
+      pip install --no-cache-dir torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu && \
+      pip install --no-cache-dir sentence-transformers==6.2.0 && \
+      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('$SEMANTIC_MODEL')"; \
+    fi
+ENV HF_HUB_OFFLINE=1
 
 COPY app/ ./app/
 COPY run.py .

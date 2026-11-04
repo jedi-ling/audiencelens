@@ -1,0 +1,44 @@
+[
+  {
+    "slug": "saas-pricing-cloud-notes",
+    "title": "选择适合你的方案",
+    "task_type": "pricing_page_review",
+    "persona_pack": "general-consumer",
+    "model_id": "claude-sonnet-5-5",
+    "date": "2026-11-04",
+    "cost_usd": 0.266,
+    "personas_passed": 5,
+    "personas_attempted": 5,
+    "cross_exam_ran": true,
+    "disputes": 3,
+    "dedup_method": "semantic"
+  },
+  {
+    "slug": "startup-pitch-cloud-accounting",
+    "title": "轻账 LiteBooks —— 种子轮融资 BP",
+    "task_type": "pitch_review",
+    "persona_pack": "startup-panel",
+    "model_id": "claude-sonnet-5-5",
+    "date": "2026-11-04",
+    "cost_usd": 0.3693,
+    "personas_passed": 3,
+    "personas_attempted": 6,
+    "cross_exam_ran": true,
+    "disputes": 1,
+    "dedup_method": "semantic"
+  },
+  {
+    "slug": "steam-page-abyss-echo",
+    "title": "深渊回响",
+    "task_type": "steam_page_review",
+    "persona_pack": "game-core",
+    "model_id": "claude-sonnet-5-5",
+    "date": "2026-11-04",
+    "cost_usd": 0.3544,
+    "personas_passed": 4,
+    "personas_attempted": 6,
+    "cross_exam_ran": true,
+    "disputes": 2,
+    "dedup_method": "semantic"
+  }
+]

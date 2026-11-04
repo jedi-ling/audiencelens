@@ -398,6 +398,10 @@ class TestCallbackIsBoundToTheBrowser:
 
     def test_callback_with_a_mismatched_cookie_is_refused(self, client):
         state = _authorize(client)
+        # 先删再设：只 set 会在 jar 里留下两个同名 cookie（服务端设的那个带 domain，
+        # 这里设的不带），哪个被优先读取取决于 HTTP 客户端（httpx 与 httpx2 不同），
+        # 测试就成了碰运气。真实浏览器里同名同域同路径只有一个，这里也只留一个。
+        client.cookies.delete(qq.STATE_COOKIE_NAME)
         client.cookies.set(qq.STATE_COOKIE_NAME, "some-other-browsers-nonce")
 
         r = client.get("/api/auth/qq/callback?code=abc&state=" + state, follow_redirects=False)

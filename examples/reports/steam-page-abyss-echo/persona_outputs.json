@@ -1,0 +1,598 @@
+{
+  "source_run": "20261104-043324-steam_page_review",
+  "note": "Final validated persona outputs behind this sample (input to run_panel_from_outputs). Personas that failed validation are listed by id and verdict only.",
+  "validated": [
+    {
+      "persona_id": "P06-visual-atmosphere-lover",
+      "persona_name": "羽晨",
+      "persona_version": "0.1.0",
+      "task_type": "steam_page_review",
+      "primary_stance": "观望",
+      "confidence": 0.6,
+      "evidence_sufficiency": 0.3,
+      "evidence": [
+        {
+          "content": "文案把视觉定位写得很明确：黑白水墨手绘，全程黑白，仅在关键剧情节点出现血红色点缀。这个色彩体系在静帧里有成立的潜力。",
+          "inference_level": "direct",
+          "source_location": "关于游戏 / 核心特色第2条"
+        },
+        {
+          "content": "材料里没有胶囊图、截图和 GIF，我无法确认前三张图能不能建立辨识度。这是信息缺失，不是负面证据。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "材料里没有预告片，也没提它的存在。节奏、剪辑、音画配合我都无法评判。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "材料完全没提 UI、字体、HUD、地图界面的视觉设计。内测玩家 A 提到希望加小地图，这意味着导航 UI 可能还没成型，加进去时存在破坏水墨气质的风险。",
+          "inference_level": "direct",
+          "source_location": "用户评价 内测玩家 A"
+        },
+        {
+          "content": "材料没有任何音乐或音效描述，只写了无配音、无对话文本。音画互相抬的核心条件无法验证。",
+          "inference_level": "gap",
+          "source_location": "核心特色第4条 / 支持语言"
+        },
+        {
+          "content": "回响死亡机制和无对话环境叙事与水墨黑白的『记忆、深海』气质是一致的。视觉语言和玩法承诺没有明显矛盾，包装过度的风险目前偏低。",
+          "inference_level": "inferred",
+          "source_location": "关于游戏 / 核心特色第1、4条",
+          "inference_basis": "失忆潜水员、深海古城、幽灵回响这些主题，和黑白加血红的克制美学方向一致；但这只是文案层面的推断，还没有画面佐证。"
+        },
+        {
+          "content": "玩家 A 评价『美术风格是真的独特』，玩家 B 说回响机制『起鸡皮疙瘩』。两条都是正面的氛围反馈，但来源是自己的 Discord 内测群，样本很小，也不是第三方的。",
+          "inference_level": "direct",
+          "source_location": "用户评价"
+        },
+        {
+          "content": "『箱庭转来转去容易迷路』加上『中期开始有点重复』，说明氛围在长流程里可能被动线和重复稀释。",
+          "inference_level": "inferred",
+          "source_location": "用户评价 A、B",
+          "inference_basis": "迷路和重复都会打断沉浸感；12-15 小时的流程里这个风险会放大。"
+        },
+        {
+          "content": "整页是纯文字，没有视觉锚点，却在推销『气质』。这本身就是一个错位。",
+          "inference_level": "direct",
+          "source_location": "全文"
+        }
+      ],
+      "scores": {
+        "base": {
+          "clarity": 4,
+          "trust": 2
+        },
+        "task_specific": {
+          "differentiation": 3,
+          "value_for_money": 3,
+          "wishlist_appeal": 3
+        }
+      },
+      "key_issues": [
+        {
+          "severity": "critical",
+          "title": "没有胶囊图、截图和预告片，视觉卖点无从验证",
+          "why_it_matters": "我买的是气质。『黑白水墨加血红点缀』只写在文字里，没有静帧。我的核心规则（前三张图要建立辨识度）因此没法判定，只能观望。",
+          "suggested_fix": "补一张带血红点缀的胶囊图，再放 5 张以上截图。前三张要依次是：标志性水墨场景、回响幽灵的互动瞬间、血红色出现的剧情时刻。"
+        },
+        {
+          "severity": "high",
+          "title": "UI 与导航的视觉方案完全没交代",
+          "why_it_matters": "玩家已经在要小地图。UI 做得不好会直接破坏水墨氛围，而这是我的退出条件之一。",
+          "suggested_fix": "放一张含 HUD、地图界面和字体的截图，说明 UI 是怎样融入水墨风格的，比如用墨迹式地图或极简血条。"
+        },
+        {
+          "severity": "high",
+          "title": "预告片和音频完全缺席",
+          "why_it_matters": "无对话叙事主要靠音画推动。没有声音和剪辑的证据，『回响』的情绪冲击就只是一句宣称。",
+          "suggested_fix": "做一支 60 到 90 秒、以节奏为主的预告片，重点展示回响出现的瞬间和配乐。页面上也写明音乐和音效的方向。"
+        },
+        {
+          "severity": "medium",
+          "title": "氛围可能被迷路和中期重复拖垮",
+          "why_it_matters": "页面自己引用的内测反馈指出了动线和重复问题。氛围完整性要看全流程，而不是只看开头。",
+          "suggested_fix": "说明小地图或导航辅助的计划，以及回响机制在中后期怎样变化，比如不同类型的回响或视觉演变。"
+        },
+        {
+          "severity": "low",
+          "title": "首发团队没有商业发售经验，且只有 Discord 内测的自家好评",
+          "why_it_matters": "这会降低对关键帧稳定性和完成度的信心。",
+          "suggested_fix": "提供公开 Demo 或节日试玩版，让玩家自己看画面是否稳定。"
+        }
+      ],
+      "continue_triggers": [
+        "前三张图里黑白水墨的辨识度和构图成立",
+        "血红色点缀在静帧中有明确记忆点",
+        "预告片节奏克制，音画互相抬",
+        "UI 与水墨风格统一，而不是通用 HUD",
+        "有可试玩的 Demo 能确认关键帧稳定"
+      ],
+      "quit_triggers": [
+        "补上的截图平庸，或像普通黑白滤镜",
+        "UI 是通用样式，破坏水墨气质",
+        "预告片剪辑廉价或只有玩法录屏",
+        "画面有掉帧或关键帧不稳的迹象"
+      ],
+      "first_scan_observations": [
+        "通篇纯文字，没有胶囊图、截图和预告片，我最先找的东西全不在",
+        "『黑白水墨加血红点缀』这个概念一句话就抓人，但只停在文字里",
+        "没有 UI、字体和音频的任何线索",
+        "内测评价里有『美术独特』，也有『迷路、重复』"
+      ],
+      "must_comment_on_check": {
+        "视觉辨识度": true,
+        "UI是否出戏": true,
+        "预告片表达": true,
+        "氛围完整性": true
+      },
+      "missing_information": [
+        "胶囊图和截图",
+        "预告片",
+        "UI/HUD/字体设计",
+        "音乐与音效方向",
+        "小地图和导航方案",
+        "是否有 Demo",
+        "回响机制在中后期的变化"
+      ],
+      "voice_sample": "黑白水墨加一抹血红，光听这句我就心动了。可页面里连一张图都没有，我没法替你想象它有多美。你把画面放出来，我再决定要不要加愿望单。",
+      "meta": {
+        "caveats": [
+          "材料只有文字，没有图片和视频，所有视觉判断都基于文案描述和缺失，不是对实际画面的评价。",
+          "『观望』是因为信息缺失，不是因为有负面证据。核心规则『前三张图』没法判定，既不算触发，也不算通过。",
+          "评分里 trust 偏低，主要因为没有可核验的素材，并不代表质量差。"
+        ],
+        "is_synthetic": true
+      }
+    },
+    {
+      "persona_id": "P10-steam-wishlist-browser",
+      "persona_name": "Mika",
+      "persona_version": "0.1.0",
+      "task_type": "steam_page_review",
+      "primary_stance": "观望",
+      "confidence": 0.6,
+      "evidence_sufficiency": 0.5,
+      "evidence": [
+        {
+          "content": "是一款黑白水墨风格的银河城探索游戏",
+          "inference_level": "direct",
+          "source_location": "关于游戏"
+        },
+        {
+          "content": "死亡不是失败，而是叙事的一部分",
+          "inference_level": "direct",
+          "source_location": "核心特色第1条"
+        },
+        {
+          "content": "箱庭部分转来转去容易迷路，希望能加个小地图。",
+          "inference_level": "direct",
+          "source_location": "用户评价 内测玩家 A"
+        },
+        {
+          "content": "但中期开始有点重复。",
+          "inference_level": "direct",
+          "source_location": "用户评价 内测玩家 B"
+        },
+        {
+          "content": "来自 Discord 内测群",
+          "inference_level": "direct",
+          "source_location": "用户评价标题"
+        },
+        {
+          "content": "我们是一个 4 人小团队，此前从未做过完整发售的商业游戏。",
+          "inference_level": "direct",
+          "source_location": "开发商的话"
+        },
+        {
+          "content": "预计定价：$19.99",
+          "inference_level": "direct",
+          "source_location": "发售信息"
+        },
+        {
+          "content": "预计流程 12-15 小时，支持手柄与键鼠",
+          "inference_level": "direct",
+          "source_location": "核心特色第5条"
+        },
+        {
+          "content": "材料里没有胶囊图、首个 GIF、预告片、截图和 Steam 标签，只有文字。首屏视觉证据未指定。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "Steam Deck 兼容性、Demo、Steam 真实评测未指定。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "文案偏通稿腔，'回响'机制只有文字描述，没有画面证明，我扫一眼记不住它具体怎么玩。",
+          "inference_level": "inferred",
+          "source_location": "核心特色 / 副标题",
+          "inference_basis": "页面只有抽象表述（记忆、深渊、叙事），没有具体玩法场景或数字，所以按我的快评标准判定为缺少证据化卖点。"
+        },
+        {
+          "content": "最低配置 GTX 750 Ti 级别，Deck 大概率能跑，但没有官方验证。",
+          "inference_level": "inferred",
+          "source_location": "系统需求",
+          "inference_basis": "配置要求低，所以掌机性能可能够用；但没有验证信息，只能当推测。"
+        }
+      ],
+      "scores": {
+        "base": {
+          "clarity": 4,
+          "trust": 2
+        },
+        "task_specific": {
+          "differentiation": 3,
+          "value_for_money": 3,
+          "wishlist_appeal": 3
+        }
+      },
+      "key_issues": [
+        {
+          "severity": "critical",
+          "title": "没有首屏视觉证据：无 GIF、预告片、截图",
+          "why_it_matters": "水墨风是最大卖点，但页面只给文字。我 20 秒内看不到'回响'机制长什么样，首图也无从判断，所以点不下去。",
+          "suggested_fix": "首位放一段 15 秒 GIF 或预告：死亡→留下回响幽灵→下一轮与它互动。胶囊图突出黑白水墨加血红点缀。"
+        },
+        {
+          "severity": "high",
+          "title": "可信度不足：内测评价少且只来自内部群，首作团队无发售记录",
+          "why_it_matters": "我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。",
+          "suggested_fix": "放出 Demo 或参加 Steam Next Fest，给开发里程碑和更新节奏；公开已修复的问题，比如加入小地图。"
+        },
+        {
+          "severity": "high",
+          "title": "差异化只靠文字承诺，没有对标",
+          "why_it_matters": "水墨加死亡叙事的组合有辨识度，但银河城赛道拥挤，页面没说清'回响'比同类强在哪里。",
+          "suggested_fix": "一句话写清机制闭环，配一个具体谜题或 Boss 例子；标签要精准，如 银河恶魔城、手绘、剧情丰富。"
+        },
+        {
+          "severity": "medium",
+          "title": "卖点缺少可验证的具体内容",
+          "why_it_matters": "'8 种能力'有数字但没有证明，抽象文案我扫过就忘，转化不成愿望单理由。",
+          "suggested_fix": "补充区域数、Boss 数、回响种类，并标明演示在页面哪里。"
+        }
+      ],
+      "continue_triggers": [
+        "首屏出现 15 秒内能看懂'回响'机制的 GIF 或预告",
+        "有 Demo 或 Next Fest 计划",
+        "Steam 上有真实玩家评价，或有媒体、主播试玩",
+        "小地图或导航问题有明确回应"
+      ],
+      "quit_triggers": [
+        "首图平淡，看不出水墨风的冲击力",
+        "预告片只放抒情画面，没有玩法",
+        "文案继续通稿化，没有证明",
+        "发售日持续跳票，没有开发进展"
+      ],
+      "first_scan_observations": [
+        "定位一句话清楚：黑白水墨银河城加深海失忆",
+        "$19.99 对 12-15 小时流程是合理预期",
+        "材料里完全没有视觉素材，胶囊图、GIF、标签都看不到",
+        "评价只有 Discord 内测的 2 条，而且各带缺点",
+        "首作 4 人团队，既有诚意也有风险"
+      ],
+      "must_comment_on_check": {
+        "20秒转化": true,
+        "首屏证据": true,
+        "可信度": true,
+        "愿望单理由": true
+      },
+      "missing_information": [
+        "胶囊图、预告片、首个 GIF、截图",
+        "Steam 标签",
+        "Demo 或试玩计划",
+        "Steam Deck 兼容性",
+        "回响机制的实际演示",
+        "开发进度和里程碑",
+        "小地图是否会加入"
+      ],
+      "voice_sample": "定位我 20 秒内记住了：水墨银河城加死亡回响。但我一张图一段 GIF 都没看到，2 条内测评价也不够当证据。现在只会观望，等有视觉证明再加愿望单。",
+      "meta": {
+        "caveats": [
+          "材料只有文字，没有视觉素材，所以首屏判断来自信息缺失而非负面证据。",
+          "立场'观望'基于信息缺失，不代表游戏本身不行。",
+          "评审基于模拟的 Persona，不代表真实玩家。"
+        ],
+        "is_synthetic": true
+      }
+    },
+    {
+      "persona_id": "P14-price-sensitive-buyer",
+      "persona_name": "张宁",
+      "persona_version": "0.1.0",
+      "task_type": "steam_page_review",
+      "primary_stance": "观望",
+      "confidence": 0.7,
+      "evidence_sufficiency": 0.5,
+      "evidence": [
+        {
+          "content": "预计定价 $19.99;预计流程 12-15 小时;发售时间为 2027 年第一季度。体量与价格从数字上看大致合理,约 $1.3–1.7/小时。",
+          "inference_level": "direct",
+          "source_location": "发售信息 / 核心特色"
+        },
+        {
+          "content": "页面没有任何 DLC、内购、版本差异或后续付费的说明,既没写“买断即完整”,也没写会有 DLC。付费边界未指定。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "页面没有提到 demo、试玩或 Steam Next Fest 计划,也没有退款或试错空间的说明。",
+          "inference_level": "gap",
+          "source_location": "未指定"
+        },
+        {
+          "content": "唯一的用户评价来自 Discord 内测群,只有两条:A 说箱庭容易迷路、希望加小地图;B 说回响机制中期开始重复。没有人提性价比,样本太小,也不是独立渠道。",
+          "inference_level": "direct",
+          "source_location": "用户评价"
+        },
+        {
+          "content": "开发商自述 4 人团队,此前从未完整发售过商业游戏,开发是业余时间做的。这对 12–15 小时的流程能否兑现、打磨程度如何构成风险。",
+          "inference_level": "direct",
+          "source_location": "开发商的话"
+        },
+        {
+          "content": "“8 种能力”“12-15 小时”是开发者自己的说法,页面没有截图、预告片、实机内容或 Boss 数量等能核验的内容。重复感(玩家 B 的反馈)会稀释 12–15 小时的有效价值。",
+          "inference_level": "inferred",
+          "source_location": "核心特色 + 用户评价 B",
+          "inference_basis": "中期开始重复 → 若总时长靠重复拉长,实际有效内容可能少于标称"
+        },
+        {
+          "content": "页面没有给出可比作品或价格参照。银河城品类中,同价位有很多已验证的作品,买家会拿它们对比,而这页没有给出它凭什么值 $19.99。",
+          "inference_level": "inferred",
+          "source_location": "发售信息",
+          "inference_basis": "银河城品类常见价格带在 $15–25 之间(角色先验),页面没有任何锚点说明"
+        },
+        {
+          "content": "支持简中、英、日的界面与字幕,无配音;无对话文本叙事。最低配置要求较低,3 GB 存储。这些信息清楚,没有隐藏成本。",
+          "inference_level": "direct",
+          "source_location": "发售信息 / 系统需求"
+        }
+      ],
+      "scores": {
+        "base": {
+          "clarity": 3,
+          "trust": 2
+        },
+        "task_specific": {
+          "differentiation": 3,
+          "value_for_money": 3,
+          "wishlist_appeal": 3
+        }
+      },
+      "key_issues": [
+        {
+          "severity": "high",
+          "title": "付费边界完全没写",
+          "why_it_matters": "我的规则是付费点模糊就先观望。页面没说是否买断即完整、有没有 DLC 或内购,我没法判断 $19.99 之后还要不会再掏钱。",
+          "suggested_fix": "在商店页明确写“买断制,无内购,无计划中的付费 DLC”;如果有 DLC 计划,就写清范围和价格区间。"
+        },
+        {
+          "severity": "high",
+          "title": "没有 demo,也没有可核验的内容证据",
+          "why_it_matters": "我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。",
+          "suggested_fix": "发售前上线 demo(建议 30–60 分钟,覆盖回响机制和一次能力解锁);补充实机预告和截图;写明退款政策提示。"
+        },
+        {
+          "severity": "medium",
+          "title": "没有价格锚点,也没说明 $19.99 凭什么",
+          "why_it_matters": "页面没有对比同类作品,也没有拆分内容量(区域数、Boss 数、能力数、结局数),价格是否合理只能靠我自己猜。",
+          "suggested_fix": "列出区域/Boss/收集要素数量和 100% 通关时长;说明 12–15 小时是主线还是全收集;必要时设置首发折扣作为价格锚点。"
+        },
+        {
+          "severity": "medium",
+          "title": "已知的两个体验短板没有回应:迷路与中期重复",
+          "why_it_matters": "这两点直接影响 12–15 小时是否值那个钱。内测玩家 B 说的“中期重复”会让有效内容缩水。",
+          "suggested_fix": "说明已规划的改进(小地图或标记系统、中期内容变化),并在发售前用更新日志公开。"
+        },
+        {
+          "severity": "low",
+          "title": "评价来源单一且样本小",
+          "why_it_matters": "两条 Discord 内测评价不能代表社区共识,我没法判断是否存在“坑钱”声音。",
+          "suggested_fix": "开放更大范围的试玩,收集 Steam 外的独立评价并公开引用。"
+        }
+      ],
+      "continue_triggers": [
+        "页面明确写出买断即完整、无内购、无付费 DLC",
+        "发布 demo 并能在 1 小时内体验到回响机制",
+        "给出区域/Boss/能力数量和主线与全收集时长",
+        "出现独立玩家对性价比的正面反馈",
+        "小地图或导航问题有明确的修复说明"
+      ],
+      "quit_triggers": [
+        "发售后拿未来更新当现有价值来卖",
+        "出现付费结构不透明的情况,例如发售后才宣布付费 DLC",
+        "社区出现中期内容重复、注水的共识",
+        "发售价高于 $19.99 但内容证据仍然不足",
+        "没有 demo 且退款体验差"
+      ],
+      "first_scan_observations": [
+        "先看价格:$19.99,12–15 小时,数字上不算离谱",
+        "找 DLC/内购说明:没有",
+        "找 demo:没有",
+        "看用户评价:只有两条 Discord 内测评价,且都有保留意见",
+        "团队首作、业余时间开发,我会把它当成风险因素"
+      ],
+      "must_comment_on_check": {
+        "值不值": true,
+        "付费边界": true,
+        "观望理由": true,
+        "价格锚点": true
+      },
+      "missing_information": [
+        "是否买断即完整、有无 DLC/内购",
+        "是否有 demo 或试玩计划",
+        "主线与全收集时长的拆分",
+        "区域、Boss、能力等内容量的具体数字",
+        "预告片、实机截图",
+        "发售首周折扣计划",
+        "同类作品对比或价格锚点",
+        "更大范围的独立玩家评价"
+      ],
+      "voice_sample": "$19.99 配 12–15 小时,数字上我不反对,但页面没说买完以后还要不要再掏钱,也没有 demo 让我先试。这些没补上之前,我先观望,不进愿望单也不会买。",
+      "meta": {
+        "caveats": [
+          "本次判断基于信息缺失,而不是已有的负面证据:付费边界和 demo 缺失触发的是“先观望”,不是“不买”。",
+          "核心规则“价格与内容体量不匹配则不买”本次没有被明确触发:$19.99 对 12–15 小时的价格本身可以接受,但内容质量无法核验。",
+          "价格锚点的比较依赖角色先验,未经页面材料验证。",
+          "这是合成评审,不代表真实玩家。"
+        ],
+        "is_synthetic": true
+      }
+    },
+    {
+      "persona_id": "P15-toxic-skeptic-reviewer",
+      "persona_name": "老刀",
+      "persona_version": "0.1.0",
+      "task_type": "steam_page_review",
+      "primary_stance": "观望",
+      "confidence": 0.7,
+      "evidence_sufficiency": 0.4,
+      "evidence": [
+        {
+          "content": "材料里没有任何实机截图、GIF、预告片或视频描述，全是文字卖点。美术风格、回响机制都无法核验。",
+          "inference_level": "direct",
+          "source_location": "整页材料（无媒体素材）"
+        },
+        {
+          "content": "唯一的“用户评价”是 Discord 内测群里的两条匿名引用，是开发者自己挑的。其中一条还说“中期开始有点重复”，另一条说“容易迷路”。这不是 Steam 评测，没有可信度。",
+          "inference_level": "direct",
+          "source_location": "用户评价（早期访问阶段，来自 Discord 内测群）"
+        },
+        {
+          "content": "页面标注“早期访问阶段”，但发售信息写的是“预计发售 2027 年第一季度”。没有说明是否上 EA、现在已有哪些内容、路线图和更新频率。",
+          "inference_level": "direct",
+          "source_location": "用户评价标题 / 发售信息"
+        },
+        {
+          "content": "开发商自曝 4 人业余团队、从未商业发售过、做了两年半。态度诚实，但也意味着没有履约记录。12-15 小时流程和 8 种能力都只是预告。",
+          "inference_level": "direct",
+          "source_location": "开发商的话；核心特色"
+        },
+        {
+          "content": "“独创”死亡机制，但页面没有说明回响怎么运作。幽灵线索如何互动，与《Hades》《死亡循环》《黑暗之魂》血迹的区别在哪里，都没写。内测玩家 B 已说中期重复。",
+          "inference_level": "direct",
+          "source_location": "核心特色第一条；玩家 B 评价"
+        },
+        {
+          "content": "系统需求写得清楚，GTX 750 Ti 的最低配置不高，存储 3GB。但没有帧率目标和分辨率。2D 手绘游戏，优化风险目前看起来低。",
+          "inference_level": "direct",
+          "source_location": "系统需求"
+        },
+        {
+          "content": "定价 $19.99、流程 12-15 小时，但没有实机内容，也没有 demo。这个价位的银河城竞品很多，已有口碑作品，我没有理由为一个没证据的新手团队买单。",
+          "inference_level": "inferred",
+          "source_location": "发售信息",
+          "inference_basis": "价格敏感度高，同价位已有成熟口碑作品，这页没有给出超越它们的证据"
+        },
+        {
+          "content": "“无对话文本”“仅在关键剧情节点出现血红色”“黑白水墨”这些说法没有任何画面支撑。一旦实机不是手绘水墨，会被骂货不对板。",
+          "inference_level": "inferred",
+          "source_location": "核心特色",
+          "inference_basis": "没有图像素材，视觉承诺无法对质；一旦与实机不一致，按规则直接降信任"
+        }
+      ],
+      "scores": {
+        "base": {
+          "clarity": 3,
+          "trust": 2
+        },
+        "task_specific": {
+          "differentiation": 2,
+          "value_for_money": 2,
+          "wishlist_appeal": 2
+        }
+      },
+      "key_issues": [
+        {
+          "severity": "critical",
+          "title": "零实机、零预告，全靠文字吹",
+          "why_it_matters": "我第一眼就找实机，结果没有。“水墨”“血红点缀”“回响”都不能核验，“卖点没有证据，一律先怀疑”被直接触发。这就是最典型的“只有文案”的页面。",
+          "suggested_fix": "首屏放 60 秒以内的纯实机预告，不加 CG 和特效剪辑。再放 5 张以上的实机截图，要覆盖战斗、探索、回响互动和地图。"
+        },
+        {
+          "severity": "high",
+          "title": "EA/正式版状态混乱",
+          "why_it_matters": "页面写“早期访问阶段”，却又预告 2027 Q1 发售，没有 EA 说明、当前内容量、路线图。这符合“EA 装正式版”的差评条件，我倾向打差评。",
+          "suggested_fix": "明确写清楚：是否上 EA、EA 现状、EA 阶段缺什么、预计 EA 多久、价格是否会变、是否承诺 1.0。"
+        },
+        {
+          "severity": "high",
+          "title": "“独创”回响机制没有解释，已被内测反馈打脸",
+          "why_it_matters": "“独创”是个很容易被喷的词。同类死亡叙事机制已有先例，内测玩家 B 又说中期重复。差评会写“独创个寂寞，重复”。",
+          "suggested_fix": "去掉“独创”。用一段 GIF 讲清楚回响怎么起作用，以及它在 12-15 小时里怎么变化。公开说明内测反馈的重复问题怎么改。"
+        },
+        {
+          "severity": "medium",
+          "title": "内测评价是开发者自己挑的，且暴露导航缺陷却没回应",
+          "why_it_matters": "“迷路、希望加小地图”这种问题，页面没说会不会改。团队没有回应，说明对问题装死，这会降低信任。评价来源是 Discord，不是 Steam 评测。",
+          "suggested_fix": "在页面上直接回应：小地图是否加、什么时候加。再放一个公开 demo 或 Steam Next Fest，让真实玩家评价。"
+        },
+        {
+          "severity": "medium",
+          "title": "首作团队的流程与价格承诺缺少依据",
+          "why_it_matters": "12-15 小时和 8 种能力没有任何证据，$19.99 定价缺少内容量的支撑。结果达不到时，会被骂“虚标时长”。",
+          "suggested_fix": "提供 demo 或展示一张能力/区域结构图。把“预计”流程改成区间并说明理由，比如主线和全收集分别多久。"
+        }
+      ],
+      "continue_triggers": [
+        "放出纯实机预告，且画面与文案中的水墨/血红风格一致",
+        "明确 EA 状态、当前内容量与路线图",
+        "提供可玩 demo，并回应迷路/小地图与中期重复问题",
+        "出现来源可查的真实玩家评测或 Next Fest 反馈"
+      ],
+      "quit_triggers": [
+        "上线后实机与宣传的美术风格不一致",
+        "在 EA 阶段却按正式完整版收费",
+        "“独创”机制实际只是普通的幽灵血迹系统",
+        "发售后出现性能/优化差评",
+        "继续用文案代替证据，对导航/重复的反馈装死"
+      ],
+      "first_scan_observations": [
+        "没有预告、没有实机截图，只看到一堆文字",
+        "“用户评价”来自 Discord 内测群，只有两条，且还自带差评点",
+        "写着“早期访问阶段”，却又说 2027 Q1 发售，EA 状态不清",
+        "“独创”“死亡不是失败”这类词，没有任何解释",
+        "系统需求清楚，门槛低",
+        "开发者坦白是第一作的业余团队"
+      ],
+      "must_comment_on_check": {
+        "信任风险": true,
+        "被喷点": true,
+        "虚假宣传感": true,
+        "差评触发器": true
+      },
+      "missing_information": [
+        "实机预告和截图",
+        "Early Access 说明与路线图",
+        "回响机制的具体玩法",
+        "当前可玩内容量或 demo",
+        "小地图/导航问题的处理方案",
+        "Steam 上的真实玩家评测",
+        "语言本地化的质量说明",
+        "开发者公告或更新记录"
+      ],
+      "voice_sample": "文字写得挺好听，实机呢？一帧都没有。就这样还敢叫“独创”，还想要 20 刀？我先不加，等你拿出画面再说。",
+      "meta": {
+        "caveats": [
+          "本评审基于一页纯文字材料，没有任何媒体素材，“观望”源于证据缺失，而非已确认的负面事实。",
+          "老刀是毒舌怀疑型角色，语气偏尖锐，用来暴露可能被喷的点，不代表所有玩家的看法。",
+          "推断条目仅用于价格对比与视觉风险，没有对未提供的系统或内容做补充设想。"
+        ],
+        "is_synthetic": true
+      }
+    }
+  ],
+  "failed": [
+    {
+      "persona_id": "P01-indie-core-operator",
+      "failure_reason": "hallucination"
+    },
+    {
+      "persona_id": "P16-competitor-loyal-veteran",
+      "failure_reason": "hallucination"
+    }
+  ]
+}

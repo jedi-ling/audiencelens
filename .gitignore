@@ -170,3 +170,6 @@ mcp-admin-server/venv/
 # 试点客户数据（材料/报告/成本信封——客户资产，绝不入库）
 pilot-data/
 balatro_api.json
+
+# 诊断落盘（AUDIENCELENS_DEBUG_RUNS=1，见 src/runner/cli.py）：含完整模型原始响应
+.debug/

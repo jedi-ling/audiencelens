@@ -509,6 +509,26 @@ docker compose up -d              # 前端 Nginx + 后端 Uvicorn + 后台面板
 - [ ] 数据库不是 SQLite（多副本会锁死）
 - [ ] 多副本 → 已换外部队列 + Redis 限流（见 §4.4 / §4.5）
 - [ ] `data/` 目录（SQLite + 上传文件）已挂载持久卷
+- [ ] 报告里 `dedup.method` 是 `semantic`（是 `lexical` 说明语义去重没装上，交叉质询多半不会触发）
+
+### 语义去重（争议点合并）
+
+交叉质询只对"不同人格就同一问题给出不同严重度"的议题发起。判断"是不是同一问题"
+靠 `src/runner/similarity.py`：装了 `sentence-transformers` 用中文 embedding 模型
+`BAAI/bge-small-zh-v1.5`（阈值 0.65），没装就回落词面相似度（SequenceMatcher > 0.7）。
+词面档合并不了换个说法的同一问题——三份真实中文评审里 0/61 条被合并，交叉质询一次都
+没触发（`docs/evaluation/dedup-fallback-finding.md`）。所以 backend 镜像**默认开启**：
+
+| | 默认（`INSTALL_SEMANTIC_DEDUP=true`） | 关闭（`=false`） |
+|---|---|---|
+| 安装内容 | CPU 版 torch 2.15.0（`--index-url https://download.pytorch.org/whl/cpu`）+ sentence-transformers 6.2.0 + 构建时预下载的模型 | 无 |
+| 体积影响 | Python 依赖约 **+1.1 GB**（2026-11-04 在同版本 venv 里实测 270 MB → 1,368 MB），模型缓存约 **+93 MB**，合计约 +1.2 GB | 0 |
+| 运行时网络 | 不访问 Hugging Face Hub（`HF_HUB_OFFLINE=1`，模型在 `HF_HOME=/opt/hf-cache`） | — |
+| 报告 | `dedup.method = semantic` | `dedup.method = lexical`，报告 JSON / Markdown / HTML 显式提示"语义去重未安装，交叉质询可能无法触发" |
+
+体积数字是在同版本 Python 虚拟环境里量的，没有在本机构建镜像（本机没装 Docker）；
+镜像层的实际增量请 `docker image ls` 核对。默认 pip 源会拉 **CUDA** 版 torch，体积多出
+好几个 GB——改 Dockerfile 时别把 `--index-url` 去掉。
 
 ---
 
@@ -617,3 +637,11 @@ alembic upgrade head
   数据（爬虫、只看了一眼首页的访客）。需要一个定期任务：删除"游客 cookie 已过期
   （`AL_GUEST_COOKIE_TTL_SECONDS`）且名下没有任何评审 / 对话 / 项目 / 上传 / CDK 流水"的
   游客行。注意不能动有数据的游客——那是别人还没认领的历史。
+- **语义模型缺席时的确定性兜底：议题分类字段。** 词面相似度合并不了中文改写，字符 n-gram
+  Jaccard 也不行（实测只多合并一对，见 `docs/evaluation/dedup-fallback-finding.md`）。方案：
+  人格输出 schema 给每条 key_issue 加一个按任务类型固定取值的 `category`
+  （如 `visual_evidence` / `pricing_clarity` / `trust` / `onboarding` …），没有语义模型时按
+  category + 极性守卫合并。确定、跨语言、零成本；需要同步改 schema、人格提示词和三个技能镜像。
+- **`SEMANTIC_MODEL_NAME` 可配置。** 现在写死在 `src/runner/similarity.py`；英文为主的部署
+  应能换多语言 / 英文模型（env 或 budget.yaml）。改的时候同步 backend Dockerfile 的
+  `SEMANTIC_MODEL` 构建参数（`tests/test_cross_exam_resume.py` 会核对两者一致）。
