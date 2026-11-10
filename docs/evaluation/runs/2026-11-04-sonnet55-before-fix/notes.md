@@ -44,6 +44,11 @@ captured the raw responses:
   translations, and NFKC (full-/half-width) normalisation does not change any verdict, so these
   are **not** normalisation false positives. The 30% threshold was left unchanged.
 
+  *Later note (2026-11-11):* the per-entry rule used in this run (any single fragment found in the
+  material) was replaced by a coverage rule; see [../../grounding-check.md](../../grounding-check.md).
+  "hallucination" here and in the validator output means "`direct` entries not grounded in the
+  material", not a measured hallucination rate.
+
 ## Fix
 
 - One **repair turn** per persona instead of identical re-sends: the previous response is replayed

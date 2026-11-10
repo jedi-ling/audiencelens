@@ -1,8 +1,11 @@
 import json
+import os
 import re
+import unicodedata
 from typing import List, Optional
 
 import jsonschema
+import yaml
 
 
 def load_schema(schema_path: str) -> dict:
@@ -68,28 +71,199 @@ def validate_role_consistency(output: dict, persona: dict) -> dict:
     }
 
 
-def validate_evidence_grounding(output: dict, artifact_texts: List[str]) -> dict:
+GROUNDING_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "grounding.yaml"
+)
+# 人格级门槛，未改动：direct 证据里"未落地"的占比达到 30% 即判该人格未通过。
+MAX_UNGROUNDED_DIRECT_SHARE = 0.3
+
+_grounding_config_cache: Optional[dict] = None
+
+
+def load_grounding_config(path: Optional[str] = None) -> dict:
+    """读 src/config/grounding.yaml（逐条 direct 证据的覆盖率规则参数）。
+
+    参数是在 tests/fixtures/grounding_eval 的 dev 划分上选的，不写死在代码里；
+    缺文件或缺键直接报错——静默回落到某个默认值等于换了一条没人测过的规则。
+    """
+    global _grounding_config_cache
+    if path is None and _grounding_config_cache is not None:
+        return _grounding_config_cache
+    with open(path or GROUNDING_CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    for key in ("min_span_cjk_chars", "min_span_latin_words", "coverage_threshold",
+                "require_numbers_covered", "framing"):
+        if key not in config:
+            raise KeyError(f"grounding config 缺少 {key}")
+    if path is None:
+        _grounding_config_cache = config
+    return config
+
+
+_QUOTE_CHARS = "“”„‟«»「」『』﹁﹂﹃﹄‘’‚‛'`´"
+_DASH_CHARS = "‐‑‒–—―−﹣"
+_NORMALIZE_TABLE = {ord(c): '"' for c in _QUOTE_CHARS}
+_NORMALIZE_TABLE.update({ord(c): "-" for c in _DASH_CHARS})
+
+_CJK = r"぀-ヿ㐀-䶿一-鿿豈-﫿"
+# 数字（含 8,000 / 19.99 这种带分隔符的写法）| 单个 CJK 字 | 非 CJK 的词
+_TOKEN_RE = re.compile(rf"(\d+(?:[.,]\d+)*)|([{_CJK}])|((?:(?![{_CJK}])[^\W\d_])+)")
+
+
+def normalize_grounding_text(text: str) -> str:
+    """NFKC（全角→半角）、统一引号与破折号、大小写折叠、空白压成单个空格。"""
+    text = unicodedata.normalize("NFKC", text or "").translate(_NORMALIZE_TABLE)
+    # NFKC 之后才出现的全角引号也并进来
+    text = text.replace("＂", '"').replace("＇", '"')
+    return re.sub(r"\s+", " ", text.casefold()).strip()
+
+
+def _grounding_tokens(normalized: str) -> List[tuple]:
+    """[(token, kind, start, end)]，kind ∈ n(数字) / c(CJK 字) / w(词)。标点与空白不产生 token。"""
+    out = []
+    for m in _TOKEN_RE.finditer(normalized):
+        kind = "n" if m.group(1) else ("c" if m.group(2) else "w")
+        out.append((m.group(0), kind, m.start(), m.end()))
+    return out
+
+
+def _token_units(kind: str, config: dict) -> float:
+    if kind == "c":
+        return 1.0 / float(config["min_span_cjk_chars"])
+    return 1.0 / float(config["min_span_latin_words"])
+
+
+def _framing_token_count(normalized: str, tokens: List[tuple], config: dict) -> int:
+    """entry 开头那段"页面写着：/ The page says \""引导语占了几个 token；不是引导语则 0。"""
+    framing = config.get("framing") or {}
+    # 词内撇号（devlog's）规范化后也是 "，但它不是引号：两侧都是拉丁字母的不算分隔符。
+    m = re.search(r':|"(?!(?<=[a-z\u00c0-\u024f]")[a-z\u00c0-\u024f])', normalized)
+    cut = m.start() if m else -1
+    if cut <= 0:
+        return 0
+    prefix = normalized[:cut]
+    prefix_tokens = [t for t in tokens if t[3] <= cut]
+    if not prefix_tokens or len(prefix_tokens) == len(tokens):
+        return 0
+    cjk = sum(1 for t in prefix_tokens if t[1] == "c")
+    latin = len(prefix_tokens) - cjk
+    size = cjk / float(framing.get("max_cjk_chars") or 1) + latin / float(framing.get("max_latin_words") or 1)
+    if size > 1.0:
+        return 0
+    if any(cue in prefix for cue in framing.get("cues_cjk") or []):
+        return len(prefix_tokens)
+    for cue in framing.get("cues_latin") or []:
+        if re.search(rf"(?<![^\W\d_]){re.escape(cue)}(?![^\W\d_])", prefix):
+            return len(prefix_tokens)
+    return 0
+
+
+class _MaterialIndex:
+    def __init__(self, artifact_texts: List[str]):
+        self.tokens: List[Optional[str]] = []
+        for text in artifact_texts:
+            if not isinstance(text, str):
+                continue
+            self.tokens.extend(t[0] for t in _grounding_tokens(normalize_grounding_text(text)))
+            self.tokens.append(None)  # 材料之间的哨兵：匹配不能跨材料
+        self.positions: dict = {}
+        for i, tok in enumerate(self.tokens):
+            if tok is not None:
+                self.positions.setdefault(tok, []).append(i)
+
+    def longest_match(self, tokens: List[tuple], start: int) -> int:
+        best = 0
+        n = len(tokens)
+        for p in self.positions.get(tokens[start][0], ()):
+            length = 1
+            while (start + length < n and p + length < len(self.tokens)
+                   and self.tokens[p + length] == tokens[start + length][0]):
+                length += 1
+            if length > best:
+                best = length
+        return best
+
+
+def check_entry_grounding(content, material, config: Optional[dict] = None) -> dict:
+    """单条 direct 证据的覆盖率判定。material：材料文本列表，或一个已建好的 _MaterialIndex。
+
+    返回 grounded / coverage / uncovered（没在材料里找到的片段，规范化后的文本）/
+    uncovered_numbers（落在未覆盖部分的数字）。覆盖率衡量的是"这条有多少是材料原文"，
+    不是"这条说得对不对"。
+    """
+    config = config or load_grounding_config()
+    index = material if isinstance(material, _MaterialIndex) else _MaterialIndex(list(material or []))
+    normalized = normalize_grounding_text(content if isinstance(content, str) else "")
+    tokens = _grounding_tokens(normalized)
+    tokens = tokens[_framing_token_count(normalized, tokens, config):]
+    if not tokens:
+        return {"grounded": False, "coverage": 0.0, "uncovered": [normalized] if normalized else [],
+                "uncovered_numbers": []}
+
+    covered = [False] * len(tokens)
+    i = 0
+    while i < len(tokens):
+        length = index.longest_match(tokens, i)
+        if length and sum(_token_units(t[1], config) for t in tokens[i:i + length]) >= 1.0:
+            for j in range(i, i + length):
+                covered[j] = True
+            i += length
+        else:
+            i += 1
+
+    total = sum(_token_units(t[1], config) for t in tokens)
+    hit = sum(_token_units(t[1], config) for t, c in zip(tokens, covered) if c)
+    coverage = hit / total if total else 0.0
+
+    uncovered, numbers = [], []
+    i = 0
+    while i < len(tokens):
+        if covered[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(tokens) and not covered[j + 1]:
+            j += 1
+        uncovered.append(normalized[tokens[i][2]:tokens[j][3]])
+        numbers.extend(t[0] for t in tokens[i:j + 1] if t[1] == "n")
+        i = j + 1
+
+    grounded = coverage >= float(config["coverage_threshold"])
+    if config.get("require_numbers_covered") and numbers:
+        grounded = False
+    return {"grounded": grounded, "coverage": round(coverage, 4), "uncovered": uncovered,
+            "uncovered_numbers": numbers}
+
+
+def validate_evidence_grounding(output: dict, artifact_texts: List[str], config: Optional[dict] = None) -> dict:
+    """逐条核对 direct 证据是否落在材料原文上（覆盖率规则，参数见 src/config/grounding.yaml）。
+
+    旧规则是"按标点/空白切开后，任意一个长度 > 1 的片段是材料子串就算落地"。两个后果：
+    「一句真引用 + 一句编造」整条通过；英文按空白切词，任何一个词（the、is）都能让整条
+    通过。外部评审指出后改成覆盖率规则，基线与新规则的实测对比见
+    docs/evaluation/grounding-check.md。
+
+    中文引号、破折号、全半角、空白差异在规范化阶段抹平——模型用「CRT风格的像素艺术」
+    这种写法**逐字引用**材料时不能被误判（Balatro 材料下曾 4/6 人格全部误伤）。
+
+    返回里的 `hallucination_risk` 键名为兼容保留，含义是 **direct 证据中未落地条目的占比**
+    （0–1），不是"幻觉概率"：一条如实的改写同样算未落地。
+    """
+    config = config or load_grounding_config()
     evidence = _dict_entries(output.get("evidence", []))
     direct_entries = [e for e in evidence if e.get("inference_level") == "direct"]
+    index = _MaterialIndex(list(artifact_texts or []))
     ungrounded = []
+    details = []
 
     for entry in direct_entries:
         content = entry.get("content", "")
-        # 中文引号/破折号/连接符必须算分隔符：模型用「CRT风格的像素艺术」、
-        # "扑克之旅"+"策略构建" 这种写法**逐字引用**材料时，引号不加进分隔集，
-        # 引号会和词句粘成一个永远匹配不上材料原文的长 token，诚实的引用被
-        # 误判成幻觉（实测：Balatro 材料下 4/6 人格全部误伤）。
-        tokens = [t for t in re.split(r"[\s,，。.!！?？、：:；;()（）\[\]【】「」『』“”‘’《》〈〉—–\-+*]+", content) if len(t) > 1]
-        found = False
-        for token in tokens:
-            for text in artifact_texts:
-                if token in text:
-                    found = True
-                    break
-            if found:
-                break
-        if not found:
+        result = check_entry_grounding(content, index, config)
+        if not result["grounded"]:
             ungrounded.append(content)
+            details.append({"content": content, "coverage": result["coverage"],
+                            "uncovered": result["uncovered"],
+                            "uncovered_numbers": result["uncovered_numbers"]})
 
     total_direct = len(direct_entries)
     if total_direct == 0:
@@ -97,10 +271,12 @@ def validate_evidence_grounding(output: dict, artifact_texts: List[str]) -> dict
     else:
         hallucination_risk = len(ungrounded) / total_direct
 
-    grounded = hallucination_risk < 0.3
+    grounded = hallucination_risk < MAX_UNGROUNDED_DIRECT_SHARE
     return {
         "grounded": grounded,
         "ungrounded_evidence": ungrounded,
+        "ungrounded_details": details,
+        # 兼容键名；含义 = direct 证据中未落地条目的占比，不是幻觉概率。
         "hallucination_risk": hallucination_risk,
     }
 

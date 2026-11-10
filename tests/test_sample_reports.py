@@ -93,3 +93,25 @@ def test_evaluation_runs_are_not_listed_as_samples():
         listed = {item["slug"] for item in json.load(f)}
     assert listed == set(SLUGS)
     assert not any("before-fix" in s for s in listed)
+
+
+def test_grounding_revalidation_note_matches_the_offline_recheck():
+    """meta.json 里那段"旧规则下生成、新规则下复核"的数字必须是脚本算出来的，不是手填的。"""
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import revalidate_samples
+
+    result = revalidate_samples.revalidate()
+    assert set(result) == set(SLUGS)
+    for slug, r in result.items():
+        with open(os.path.join(REPORTS, slug, "meta.json"), encoding="utf-8") as f:
+            note = json.load(f)["grounding_revalidation"]
+        with open(os.path.join(REPORTS, slug, "report.json"), encoding="utf-8") as f:
+            report = json.load(f)
+        assert note["rule_at_generation"] == "any-fragment"
+        assert note["personas_in_report"] == r["personas_in_report"] == report["degradation"]["succeeded_count"]
+        # 旧规则的冻结副本必须复现出"生成时这些人格都过了"——否则副本和当时的规则不是一回事
+        assert note["personas_passing_rule_at_generation"] == r["pass_before"] == r["personas_in_report"]
+        assert note["personas_passing_coverage_rule"] == r["pass_after"]
+        assert note["direct_entries"] == r["direct_entries"]
+        assert note["direct_entries_grounded_rule_at_generation"] == r["grounded_before"]
+        assert note["direct_entries_grounded_coverage_rule"] == r["grounded_after"]

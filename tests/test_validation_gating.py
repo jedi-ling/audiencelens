@@ -168,7 +168,7 @@ class TestGating:
 
         failure = exc.value.failures[0]
         assert failure["failure_reason"] == "hallucination"
-        assert "材料中找不到出处" in failure["error"]
+        assert "不是材料原文的逐字引用" in failure["error"]
 
     def test_valid_output_passes_gating_and_report_visible(self, monkeypatch, no_retry_budget):
         def chat(**kwargs):

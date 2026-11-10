@@ -34,6 +34,8 @@ standard 档，模型 `claude-sonnet-5-5`，2026-11-04，成本取自应用自�
 | [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | $0.27 | 5 位全部 | 3 个争议点，各一轮反驳 |
 | [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | $0.37 | 6 位中 3 位 | 1 个争议点，一轮反驳 |
 
+这三份报告是在旧的证据核对规则下生成的（人格输出对应提交 `de65474`），保持原样。用现在的覆盖率规则离线复核，三份报告里分别只有 4 位中的 1 位、5 位中的 0 位、3 位中的 0 位人格能通过，因为它们的 `direct` 条目大多是改写或“引用 + 评论”，不是引用；新规则下的真实运行还没有测过（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）。
+
 三份反驳都没有改票：置信度最大只变了 2 分，阈值是 15 分。部分人格没通过校验、交叉质询为什么需要语义去重，见 [docs/evaluation/](docs/evaluation/)。
 
 ## 架构
@@ -93,7 +95,7 @@ flowchart TB
 
 1. **先独立、后对质**：避免锚定与从众；代价是没有自然形成的共识，成本随面板人数线性增长。
 2. **改票由代码判定**：可复现、可审计，不再引入一个"LLM 裁判"；代价是 θ=0.15 是工程拍板、未经校准，θ 以下的细微改变会被丢弃（保留在 `suppressed_changes` 里可查）。
-3. **证据分级 + 推断上限**：让读者知道哪些话有原文依据；代价是等级由模型自报，只有 `direct` 会对照原文核查，40% 上限也可能误伤合理输出。
+3. **证据分级 + 推断上限**：让读者知道哪些话有原文依据。`direct` 必须是引用：抹平标点、全半角、大小写和空白之后，条目至少 80% 要被材料里出现过的连续片段覆盖（片段至少 4 个汉字或 3 个英文词），条目里的每个数字也必须落在这样的片段内（`src/config/grounding.yaml`）；`direct` 条目有 30% 及以上未落地，该人格不通过。代价是等级由模型自报，只有 `direct` 会对照原文核查，而且核查的是“是不是引用”，不是“说得对不对”：它分不清如实的评论和编造的细节，也会拒掉如实的改写；40% 上限也可能误伤合理输出。这条覆盖率规则替换了原先“任意一个片段命中就算通过”的规则，那个弱点是外部评审指出的。在一个小规模、按构造方式标注的评测集上，留出集的误放行从 69 条中的 43 条降到 1 条，两条规则各有 27 条中的 1 条误拒（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）。
 
 ## 隐私与伦理
 
@@ -160,6 +162,7 @@ python -m pytest tests/ -q
 - 成本随面板人数增长；
 - 目前不提供平台 Key，只支持自带 Key（BYOK）；
 - 部分人格输出会被校验拦下（把改写标成 direct、或提交残缺），一轮修复能救回不少，但不是全部；
+- 证据核对衡量的是“是不是引用”，不是“说得对不对”：`direct` 条目大部分是材料原文就能通过，没有任何检查保证引用被公平使用，`inferred` 条目也完全不对照材料。规则是在样例生成之后收紧的：样例里的 12 位人格只有 1 位能通过新规则，新规则下修复轮能救回多少还没有测过（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）；
 - 只有一轮反驳，θ 未经校准；
 - 报告目前只生成中文（`SUPPORTED_REPORT_LANGS = zh-CN`）；英文输出需要 [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10 所述的 `output_lang` 链路，尚未实现。
 

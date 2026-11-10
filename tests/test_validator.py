@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 
 import pytest
 
@@ -15,6 +16,8 @@ from runner.validator import (
     load_schema,
     validate_schema,
     validate_role_consistency,
+    check_entry_grounding,
+    load_grounding_config,
     validate_evidence_grounding,
     validate_output,
     check_identity_behavior_decoupling,
@@ -416,11 +419,12 @@ class TestValidateEvidenceGrounding:
     def test_chinese_quoted_verbatim_evidence_is_grounded(self):
         # 回归：模型用「」/""/+/—— 逐字引用材料词组时，引号曾和词句粘成
         # 永远匹配不上的长 token，诚实引用被误判为幻觉（Balatro 材料实测
-        # 4/6 人格被误伤）。引号类符号必须算切词分隔符。
+        # 4/6 人格被误伤）。引号、加号、破折号都不得妨碍匹配。
         output = _make_valid_output()
         output["evidence"] = [
             {"content": "页面明确宣称视觉风格为「CRT风格的像素艺术」", "inference_level": "direct"},
-            {"content": "短描述直接给出核心承诺：“扑克之旅”+“策略构建”——三秒能读到机制核心", "inference_level": "direct"},
+            {"content": "“扑克之旅”+“策略构建”", "inference_level": "direct"},
+            {"content": "短描述写着：“扑克之旅”——“策略构建游戏”", "inference_level": "direct"},
         ]
         artifact_texts = [
             "沉浸于 CRT风格的像素艺术，细节惊人",
@@ -429,6 +433,16 @@ class TestValidateEvidenceGrounding:
         result = validate_evidence_grounding(output, artifact_texts)
         assert result["ungrounded_evidence"] == []
         assert result["grounded"] is True
+
+    def test_quote_followed_by_own_commentary_is_not_a_direct_quote(self):
+        # 覆盖率规则带来的行为变化（有意为之）：同一条里引用之后再接一段自己的评论，
+        # 整条不再算 direct。旧的任意片段规则会因为“扑克之旅”四个字放行整条。
+        # 被点名的是没找到的那一段，引用本身不在其中。
+        entry = "短描述直接给出核心承诺：“扑克之旅”+“策略构建”——三秒能读到机制核心"
+        result = check_entry_grounding(entry, ["Balatro是一场循环不息的扑克之旅。策略构建游戏。"])
+        assert result["grounded"] is False
+        assert any("三秒能读到机制核心" in u for u in result["uncovered"])
+        assert not any("扑克之旅" in u for u in result["uncovered"])
 
     def test_fabricated_quote_still_fails_after_tokenizer_fix(self):
         # 切词放宽不等于放水：材料里不存在的词组，引号拆开也匹配不上。
@@ -441,6 +455,99 @@ class TestValidateEvidenceGrounding:
         assert result["grounded"] is False
         assert result["ungrounded_evidence"] == ["页面宣称「支持多人联机对战」"]
 
+    # ---- 覆盖率规则（外部评审指出任意片段规则的两个洞之后） ----
+
+    def test_probe_true_quote_plus_fabricated_addition_fails(self):
+        # 探针 a：旧规则下"售价68元"一个片段命中就整条通过。
+        material = ["深渊回响是一款卡牌肉鸽游戏，售价68元，首发支持简体中文。"]
+        entry = "售价68元，并且官方承诺永久免费更新全部DLC"
+        output = {"evidence": [{"inference_level": "direct", "content": entry}]}
+        result = validate_evidence_grounding(output, material)
+        assert result["ungrounded_evidence"] == [entry]
+        detail = result["ungrounded_details"][0]
+        assert any("官方承诺永久免费更新" in u for u in detail["uncovered"])
+        assert not any("售价68元" in u for u in detail["uncovered"])
+
+    def test_probe_english_entry_sharing_only_common_words_fails(self):
+        # 探针 b：旧规则按空白切词，"the" / "is" 任何一个词命中就整条通过。
+        material = ["Abyss Echo is a roguelike deck-builder. The price is $14.99 and the demo lasts 40 minutes."]
+        entry = "The developers admit the game is unfinished and refunds are refused"
+        output = {"evidence": [{"inference_level": "direct", "content": entry}]}
+        result = validate_evidence_grounding(output, material)
+        assert result["ungrounded_evidence"] == [entry]
+        assert result["hallucination_risk"] == 1.0
+
+    def test_normalisation_differences_do_not_break_a_quote(self):
+        material = ["预计流程 12-15 小时，支持手柄与键鼠。\nPlanned price: $16.99 — “No combat” and no fail state."]
+        for entry in ("预计流程12-15小时,支持手柄与键鼠",          # 空格、半角逗号
+                      "预计流程 １２-１５ 小时，支持手柄与键鼠",    # 全角数字
+                      "planned price：$16.99",                     # 大小写、全角冒号
+                      'Planned price: $16.99 - "No combat" and no fail state'):  # 引号、破折号
+            assert check_entry_grounding(entry, material)["grounded"] is True, entry
+
+    def test_one_altered_number_fails_even_when_the_rest_is_verbatim(self):
+        material = ["预计下个月开一轮小范围 Discord 内测，名额 50 个，感兴趣的可以在评论区留言"]
+        entry = "预计下个月开一轮小范围 Discord 内测，名额 500 个，感兴趣的可以在评论区留言"
+        result = check_entry_grounding(entry, material)
+        assert result["coverage"] > 0.9
+        assert result["uncovered_numbers"] == ["500"]
+        assert result["grounded"] is False
+
+    def test_framing_is_dropped_but_what_follows_must_still_be_a_quote(self):
+        material = ["Repair and upgrade the lamp, the foghorn and the supply dock in any order"]
+        ok = 'The page says "Repair and upgrade the lamp, the foghorn and the supply dock in any order".'
+        bad = 'The page says "every repair costs real money and cannot be undone".'
+        assert check_entry_grounding(ok, material)["grounded"] is True
+        assert check_entry_grounding(bad, material)["grounded"] is False
+        # 词内撇号不是引号：不能把 "In the devlog" 当成引导语切掉后半句
+        own = "In the devlog's own words: \"Repair and upgrade the lamp, the foghorn and the supply dock in any order\""
+        assert check_entry_grounding(own, material)["grounded"] is True
+
+    def test_short_common_spans_do_not_count(self):
+        # 单个常见词 / 两三个字的巧合命中不构成覆盖
+        assert check_entry_grounding("这个游戏很好玩", ["一款游戏"])["coverage"] == 0.0
+        assert check_entry_grounding("It is the best of the genre", ["It is a game. The end of the road."])["coverage"] == 0.0
+
+    def test_match_does_not_run_across_two_materials(self):
+        result = check_entry_grounding("黑白水墨风格", ["黑白水", "墨风格"])
+        assert result["grounded"] is False
+
+    def test_parameters_come_from_config_not_code(self):
+        config = load_grounding_config()
+        assert set(config) >= {"min_span_cjk_chars", "min_span_latin_words", "coverage_threshold",
+                               "require_numbers_covered", "framing"}
+        entry, material = "黑白水墨风格的游戏，我觉得不错", ["黑白水墨风格的游戏"]
+        strict = dict(config, coverage_threshold=0.95)
+        loose = dict(config, coverage_threshold=0.5)
+        assert check_entry_grounding(entry, material, strict)["grounded"] is False
+        assert check_entry_grounding(entry, material, loose)["grounded"] is True
+
+
+class TestGroundingEvalSet:
+    """tests/fixtures/grounding_eval：集合本身的不变量 + 当前规则在 dev 划分上不得退化。
+
+    只卡 dev。test 划分是留出集，不放进断言里——放进来就等于拿它调参。
+    """
+
+    def test_items_file_matches_builder(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fixtures", "grounding_eval"))
+        import build_set
+        with open(build_set.OUT, encoding="utf-8") as f:
+            assert f.read() == build_set.render()
+
+    def test_dev_split_has_no_scored_errors(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
+        import eval_grounding
+        report = eval_grounding.evaluate(eval_grounding.load_items(), eval_grounding.current_validator, ("dev",))
+        overall = report["dev"]["all scored items"]
+        assert (overall["fp"], overall["fn"]) == (0, 0), overall
+
+    def test_legacy_rule_baseline_is_reproducible(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
+        import eval_grounding
+        report = eval_grounding.evaluate(eval_grounding.load_items(), eval_grounding.legacy_any_fragment, ("dev",))
+        english = report["dev"]["constructed · en"]
+        assert english["false_accept_rate"] == 1.0   # 旧规则：英文未落地条目全部放行
 
 
 class TestValidateOutput:

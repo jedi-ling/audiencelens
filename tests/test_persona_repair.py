@@ -186,3 +186,27 @@ def test_repair_without_previous_blocks_appends_feedback():
 
     msgs = _repair_messages([{"role": "user", "content": "原始提示"}], {"feedback": "请重新提交"})
     assert len(msgs) == 1 and msgs[0]["content"].endswith("请重新提交")
+
+
+def test_hallucination_feedback_names_the_uncovered_part(monkeypatch, persona, budget, schema):
+    # 覆盖率规则：一句真引用后面接一句原文没有的话。回喂里要点名的是**没找到的那一段**，
+    # 而不是只把整条甩回去——模型才知道该删哪半句。
+    half_true = QUOTE_OK + "，并且首发支持四人联机"
+    fake = FakeModel([_valid_output(persona, half_true), _valid_output(persona)])
+    r = _run(monkeypatch, fake, persona, budget, schema)
+
+    feedback = fake.calls[1]["repair"]["feedback"]
+    assert half_true in feedback
+    uncovered_line = next(ln for ln in feedback.splitlines() if ln.strip().startswith("原文里找不到的部分"))
+    assert "首发支持四人联机" in uncovered_line
+    assert QUOTE_OK not in uncovered_line
+    assert r["retry_reasons"] == ["hallucination"]
+    assert cli._validation_failure_reason(r["validation"]) is None
+
+
+def test_true_quote_plus_fabrication_no_longer_passes_grounding():
+    # 外部评审的探针：旧规则下只要有一个片段命中，整条就算落地。
+    out = validate_evidence_grounding(
+        {"evidence": [{"content": QUOTE_OK + "，并且首发支持四人联机", "inference_level": "direct"}]}, [MATERIAL])
+    assert out["grounded"] is False
+    assert out["hallucination_risk"] == 1.0  # 键名兼容保留；含义是未落地条目占比

@@ -856,3 +856,51 @@ class TestParseCrossExamOutput:
     def test_non_string_input_does_not_crash(self):
         assert parse_cross_exam_output(None) == []
         assert parse_cross_exam_output(12345) == []
+
+
+class TestConfidenceRescaleIsVisible:
+    """0–1 之外的置信度照旧按量纲还原，但换算必须留痕（warning + usage 计数）。"""
+
+    def test_values_and_behaviour_unchanged(self):
+        from runner.cross_exam import _coerce_confidence
+        assert _coerce_confidence(0.8) == 0.8
+        assert _coerce_confidence("80%") == 0.8
+        assert _coerce_confidence(8) == 0.8
+        assert _coerce_confidence(85) == 0.85
+        assert _coerce_confidence("0.4") == 0.4
+        assert _coerce_confidence(None, 0.5) == 0.5
+        assert _coerce_confidence(True) is None
+
+    def test_rescale_logs_a_warning_and_in_range_values_do_not(self, caplog):
+        import logging
+        from runner.cross_exam import _coerce_confidence
+        with caplog.at_level(logging.WARNING, logger="runner.cross_exam"):
+            _coerce_confidence(0.8)
+            _coerce_confidence("80%")
+            assert caplog.records == []
+            _coerce_confidence(8)
+            _coerce_confidence(85)
+        messages = [r.getMessage() for r in caplog.records]
+        assert len(messages) == 2
+        assert "0-10" in messages[0] and "0-100" in messages[1]
+
+    def test_rescaled_flag(self):
+        from runner.cross_exam import _confidence_was_rescaled
+        assert _confidence_was_rescaled(8) is True
+        assert _confidence_was_rescaled("72") is True
+        assert _confidence_was_rescaled(0.8) is False
+        assert _confidence_was_rescaled("80%") is False
+        assert _confidence_was_rescaled(None) is False
+
+    def test_run_summary_counts_rescaled_rebuttal_confidences(self, duel_outputs, duel_controversy, sim):
+        clean = run_cross_exam_protocol(
+            duel_outputs, duel_controversy, llm_call=make_llm(moderated_response(b1_conf=0.2)), similarity=sim
+        )
+        assert clean["usage"]["confidence_values_rescaled"] == 0
+        rescaled = run_cross_exam_protocol(
+            duel_outputs, duel_controversy, llm_call=make_llm(moderated_response(b1_conf=20)), similarity=sim
+        )
+        assert rescaled["usage"]["confidence_values_rescaled"] == 1
+        # 行为不变：20 仍按百分制还原成 0.20
+        by_key = {c["persona_key"]: c for c in rescaled["confidence_changes"]}
+        assert by_key["P01"]["after"] == 20

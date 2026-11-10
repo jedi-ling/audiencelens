@@ -29,5 +29,18 @@
   "tokens_in": 72461,
   "tokens_out": 22314,
   "app_commit": "92b277e",
-  "retries": 3
+  "retries": 3,
+  "grounding_revalidation": {
+    "note": "Generated under the earlier any-fragment grounding rule. Re-validated offline with the coverage rule (src/config/grounding.yaml); the report was not regenerated or edited. See docs/evaluation/grounding-check.md.",
+    "rule_at_generation": "any-fragment",
+    "generation_commit": "de65474",
+    "revalidated_on": "2026-11-11",
+    "script": "scripts/revalidate_samples.py",
+    "personas_in_report": 4,
+    "personas_passing_rule_at_generation": 4,
+    "personas_passing_coverage_rule": 1,
+    "direct_entries": 22,
+    "direct_entries_grounded_rule_at_generation": 21,
+    "direct_entries_grounded_coverage_rule": 8
+  }
 }

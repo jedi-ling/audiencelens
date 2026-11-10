@@ -373,6 +373,7 @@ def _validation_failure_reason(validation: dict) -> Optional[str]:
 
 
 REPAIR_FEEDBACK_MAX_ITEMS = 8
+REPAIR_FEEDBACK_MAX_UNCOVERED = 3
 
 
 def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
@@ -383,12 +384,27 @@ def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
     """
     details = (validation or {}).get("details") or {}
     if reason == RETRY_HALLUCINATION:
-        quotes = ((details.get("evidence") or {}).get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
-        listed = "\n".join(f"- {str(q)[:160]}" for q in quotes)
+        evidence = details.get("evidence") or {}
+        quotes = (evidence.get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
+        # 覆盖率规则会给出每条里"没在原文找到的那一段"：告诉模型具体是哪一段，
+        # 它才知道是删掉那段、挪去 inferred，还是整条都不是引用。
+        by_content = {d.get("content"): d for d in (evidence.get("ungrounded_details") or [])
+                      if isinstance(d, dict)}
+        lines = []
+        for q in quotes:
+            lines.append(f"- {str(q)[:160]}")
+            detail = by_content.get(q) or {}
+            parts = [str(u)[:60] for u in (detail.get("uncovered") or []) if str(u).strip()]
+            if parts:
+                shown = "、".join(f"「{u}」" for u in parts[:REPAIR_FEEDBACK_MAX_UNCOVERED])
+                more = "等" if len(parts) > REPAIR_FEEDBACK_MAX_UNCOVERED else ""
+                lines.append(f"  原文里找不到的部分：{shown}{more}")
+        listed = "\n".join(lines)
         return (
-            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据在材料原文里"
-            "找不到逐字出处：\n" + listed + "\n\n"
-            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话）。"
+            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据不是材料原文的"
+            "逐字引用（每条下面列出了原文里找不到的部分）：\n" + listed + "\n\n"
+            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话，"
+            "不要在同一条里追加自己的评论或原文没有的内容）。"
             "概括、改写或你自己的判断请标为 inferred；材料里没有提到的请标为 gap。"
         )
     if reason == RETRY_SCHEMA:
@@ -418,10 +434,11 @@ def _validation_error_message(validation: dict, reason: str) -> str:
         return "校验未通过（role_drift）：" + "; ".join(issues)
     if reason == RETRY_HALLUCINATION:
         evidence = details.get("evidence") or {}
+        # hallucination_risk 是兼容键名，含义是"direct 证据中未落地条目的占比"，不是幻觉概率。
         risk = float(evidence.get("hallucination_risk", 0.0) or 0.0)
         return (
-            f"校验未通过（hallucination）：direct 证据 {risk:.0%} 在材料中找不到出处"
-            "（阈值 30%），疑似幻觉"
+            f"校验未通过（hallucination）：direct 证据中 {risk:.0%} 的条目不是材料原文的逐字引用"
+            "（阈值 30%）"
         )
     return f"校验未通过：{reason}"
 
