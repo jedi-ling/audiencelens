@@ -262,16 +262,19 @@ class TestComputeHallucinationRate:
         from runner.validator import validate_evidence_grounding
         artifact_texts = ["预计流程 12-15 小时，支持手柄与键鼠"]
         evidence = [
+            # quote 是原文（只差空格）、content 是评论：旧口径（整条 content 是子串）会判未落地
             {"content": "流程写得具体，但我存疑", "inference_level": "direct", "quote": "预计流程12-15小时"},
-            {"content": "预计流程 12-15 小时", "inference_level": "direct"},                    # 缺 quote
-            {"content": "看起来靠谱", "inference_level": "direct", "quote": "通关后解锁联机"},     # 编造的 quote
+            {"content": "手柄支持写明了", "inference_level": "direct", "quote": "支持手柄与键鼠"},
+            # content 是原文但没有 quote：旧口径会判落地，现在是未落地
+            {"content": "预计流程 12-15 小时", "inference_level": "direct"},
             {"content": "大概是小团队", "inference_level": "inferred"},
         ]
         persona = _make_persona("p1", evidence=evidence)
         result = compute_hallucination_rate([persona], artifact_texts)
         expected = validate_evidence_grounding(persona, artifact_texts)["hallucination_risk"]
-        assert result["per_persona"]["p1"] == expected == pytest.approx(2 / 3)
-        assert result["high_risk_personas"] == ["p1"]
+        # 旧口径在这组数据上会得出 2/3（前两条"未落地"、第三条"落地"），正好相反
+        assert result["per_persona"]["p1"] == expected == pytest.approx(1 / 3)
+        assert result["high_risk_personas"] == []
 
 
 class TestComputeRerunStability:
