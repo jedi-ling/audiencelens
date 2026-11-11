@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "scripts")]
 
 from eval_grounding import legacy_any_fragment  # noqa: E402
-from runner.validator import MAX_UNGROUNDED_DIRECT_SHARE, check_entry_grounding  # noqa: E402
+from runner.validator import MAX_UNGROUNDED_DIRECT_SHARE, check_direct_entry  # noqa: E402
 
 MATERIALS = {
     "steam-page-abyss-echo": "test-materials/03_steam商店页_深渊回响.md",
@@ -35,10 +35,12 @@ def revalidate():
             data = json.load(f)
         personas, flipped = [], []
         for persona in data["validated"]:
-            direct = [e.get("content", "") for e in persona.get("evidence", [])
-                      if isinstance(e, dict) and e.get("inference_level") == "direct"]
+            entries = [e for e in persona.get("evidence", [])
+                       if isinstance(e, dict) and e.get("inference_level") == "direct"]
+            direct = [e.get("content", "") for e in entries]
             before = [legacy_any_fragment(c, material) for c in direct]
-            after = [check_entry_grounding(c, [material]) for c in direct]
+            # These outputs predate the `quote` field, so the rule falls back to `content`.
+            after = [check_direct_entry(e, [material], allow_content_fallback=True) for e in entries]
             n = len(direct)
             share_before = (before.count(False) / n) if n else 0.0
             share_after = (sum(1 for a in after if not a["grounded"]) / n) if n else 0.0

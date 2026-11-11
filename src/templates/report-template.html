@@ -113,6 +113,10 @@
   .evidence-list{margin-bottom:18px}
   .evidence-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
   .evidence-item{font-size:15px;padding:5px 0;display:flex;align-items:flex-start;gap:8px}
+  .evidence-body{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .evidence-quote{border-left:3px solid var(--cyan);padding:2px 0 2px 10px;color:var(--text);font-style:italic;quotes:"\201C" "\201D"}
+  .evidence-quote::before{content:open-quote}
+  .evidence-quote::after{content:close-quote}
   .evidence-level{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;font-weight:700;white-space:nowrap;margin-top:2px;letter-spacing:0.5px}
   .evidence-level.direct{background:rgba(0,212,170,0.1);color:var(--cyan);border:1px solid rgba(0,212,170,0.2)}
   .evidence-level.inferred{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
@@ -524,7 +528,7 @@
           {% for ev in pn.evidence_top3 %}
           <div class="evidence-item">
             <span class="evidence-level {{ev.level}}">{{ev.level}}</span>
-            <span>{{ev.content}}</span>
+            <span class="evidence-body">{% if ev.quote %}<span class="evidence-quote">{{ev.quote}}</span>{% endif %}<span>{{ev.content}}</span></span>
           </div>
           {% endfor %}
         </div>

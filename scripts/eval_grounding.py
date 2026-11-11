@@ -15,7 +15,11 @@ Scoring, per item: the rule accepts or rejects one `direct` entry against its ma
   recall             grounded items accepted / grounded items
   false-accept rate  not-grounded items accepted / not-grounded items
   false-reject rate  grounded items rejected / grounded items
-Items labelled `mixed` (real quote + commentary) are not scored; their accept rate is listed.
+Items labelled `mixed` (real quote + commentary in one field) and `grounded_by_rule` (real
+quote, fabricated claim in the comment: a known limit) are not scored; their accept rate is listed.
+
+Two item shapes: "content" (the whole entry in `content`, as before the quote field existed;
+checked with the content fallback) and "quote" (`quote` + `content`; only `quote` is checked).
 """
 import argparse
 import itertools
@@ -38,12 +42,22 @@ def legacy_any_fragment(content: str, material: str) -> bool:
     return any(len(t) > 1 and t in material for t in _LEGACY_SPLIT.split(content))
 
 
-def current_validator(content: str, material: str, config=None) -> bool:
-    output = {"evidence": [{"inference_level": "direct", "content": content}]}
-    if config is None:
-        result = validator.validate_evidence_grounding(output, [material])
-    else:
-        result = validator.validate_evidence_grounding(output, [material], config=config)
+def legacy_rule(item: dict) -> bool:
+    """The old validator only ever looked at `content`, whatever other fields an entry had."""
+    return legacy_any_fragment(item["content"], item["_material"])
+
+
+def current_validator(item: dict, config=None) -> bool:
+    """Items in the pre-quote-field shape ("content") are checked the way old stored outputs are
+    (content fallback). Quote-shaped items go through the engine's path: `quote` only, and a
+    missing quote is ungrounded."""
+    entry = {"inference_level": "direct", "content": item["content"]}
+    if "quote" in item:
+        entry["quote"] = item["quote"]
+    result = validator.validate_evidence_grounding(
+        {"evidence": [entry]}, [item["_material"]], config=config,
+        allow_content_fallback=item.get("shape", "content") == "content",
+    )
     return not result["ungrounded_evidence"]
 
 
@@ -88,6 +102,12 @@ def score(rows):
 
 def groups_for(it):
     src, lang = it["source"], it["lang"]
+    if it.get("shape") == "quote":
+        if it["label"] == "grounded_by_rule":
+            return ["quote shape · real quote, fabricated comment (known limit, not scored)"]
+        return ["quote shape · all scored items", f"quote shape · {lang}",
+                f"quote shape · {it['category']} {it['category_name']} · {lang}",
+                f"quote shape · {it['category']} {it['category_name']} · zh+en"]
     out = ["all scored items", f"{src} · all", f"{src} · {lang}"]
     if it["label"] == "mixed":
         return [f"{src} · quote + commentary (mixed, not scored)"]
@@ -106,7 +126,7 @@ def evaluate(items, fn, splits=("dev", "test")):
         for it in items:
             if it["split"] != split:
                 continue
-            accepted = bool(fn(it["content"], it["_material"]))
+            accepted = bool(fn(it))
             for g in groups_for(it):
                 buckets.setdefault(g, []).append((it["label"], accepted))
         report[split] = {g: score(rows) for g, rows in sorted(buckets.items())}
@@ -143,7 +163,7 @@ def sweep(items):
     for cjk, latin, thr, nums in grid:
         cfg = dict(base, min_span_cjk_chars=cjk, min_span_latin_words=latin,
                    coverage_threshold=thr, require_numbers_covered=nums)
-        rep = evaluate(items, lambda c, m: current_validator(c, m, cfg), splits=("dev",))["dev"]
+        rep = evaluate(items, lambda it: current_validator(it, cfg), splits=("dev",))["dev"]
         a, c, r = rep["all scored items"], rep["constructed · all"], rep.get("real · all", {})
         mixed = rep.get("real · quote + commentary (mixed, not scored)", {})
         rows.append({"min_span_cjk_chars": cjk, "min_span_latin_words": latin, "coverage_threshold": thr,
@@ -175,7 +195,7 @@ def main() -> int:
                 json.dump(rows, f, indent=1)
         return 0
 
-    fn = legacy_any_fragment if args.rule == "legacy" else current_validator
+    fn = legacy_rule if args.rule == "legacy" else current_validator
     splits = ("dev", "test") if args.split == "both" else (args.split,)
     report = evaluate(items, fn, splits)
     title = {"legacy": "Any-fragment rule (before)", "validator": "Current validator"}[args.rule]

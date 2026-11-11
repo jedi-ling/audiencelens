@@ -55,7 +55,7 @@ def _valid_json(pid=P01, evidence_content="核心循环说明"):
             "primary_stance": "观望",
             "confidence": 0.6,
             "evidence_sufficiency": 0.7,
-            "evidence": [{"content": evidence_content, "inference_level": "direct"}],
+            "evidence": [{"content": evidence_content, "inference_level": "direct", "quote": evidence_content}],
             "scores": {"base": {"clarity": 3, "trust": 3}, "task_specific": {"overall": 3}},
             "key_issues": [
                 {

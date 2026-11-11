@@ -906,7 +906,7 @@ def _llm_json(
             "primary_stance": "观望",
             "confidence": 0.6,
             "evidence_sufficiency": 0.7,
-            "evidence": [{"content": "核心循环说明", "inference_level": "direct"}],
+            "evidence": [{"content": "核心循环说明", "inference_level": "direct", "quote": "核心循环说明"}],
             "scores": {"base": {"clarity": 3, "trust": 3}, "task_specific": {"overall": 3}},
             "key_issues": [
                 {

@@ -27,9 +27,11 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
 你的核心决策规则："{{primary_decision_rule}}"——基于本次材料，这个条件是否被触发？
 
 [EVIDENCE RULES - 三级标注]
-- [direct] 材料中明确出现的信息 → 必须优先引用，标注 source_location
-- [inferred: 推断依据] 基于角色先验知识和材料线索的合理推断 → 允许但必须写明推断链
-- [gap] 材料中无线索且无法合理推断 → 写"未指定"
+- 一条规则定层级：**能把材料原文一字不差地复制进 `quote`，才是 direct；复制不出来就是 inferred；材料根本没说就是 gap。**
+- [direct] `quote` 必填：从材料里直接复制一段原文，不改写、不概括、不翻译、不拼接两处、不加自己的话；数字照抄。你的观察和解读写在 `content` 里，标注 source_location
+- [inferred: 推断依据] 概括、改写、换算、你自己的判断 → 不填 `quote`，必须在 inference_basis 写明推断链
+- [gap] 材料中无线索且无法合理推断（包括"页面没有提到 X"这类说法）→ 不填 `quote`，写"未指定"
+- 校验器只拿 direct 条目的 `quote` 去和材料逐字比对：`quote` 缺失或对不上原文，这一条就算没有出处
 - 任何 [inferred] 条目不得超过 evidence 总数的 40%
 - 禁止 gap_filling：不得替开发者脑补系统、剧情、联机、商业化细节
 - 必须覆盖 persona.review_output.must_comment_on 中的所有点
@@ -63,7 +65,8 @@ MBTI类型({{mbti}})仅用于修饰你的表达风格和沟通倾向，不得用
   "confidence": 0.0,
   "evidence_sufficiency": 0.0,
   "evidence": [
-    {"content": "<你观察到的具体事实>", "inference_level": "direct|inferred|gap",
+    {"content": "<你的观察或解读>", "inference_level": "direct|inferred|gap",
+     "quote": "<direct 必填：从材料逐字复制的原文片段；inferred / gap 不要这个键>",
      "source_location": "<材料中的位置，没有填 未指定>", "inference_basis": "<inferred 时写推断链，否则空字符串>"}
   ],
   "scores": {{scores_skeleton}},

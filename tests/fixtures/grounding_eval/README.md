@@ -23,13 +23,22 @@ The Chinese materials are the existing fictional ones in `test-materials/` (03, 
 ## Item fields
 
 `id`, `split` (`dev` / `test`), `lang` (`zh` / `en`), `source` (`constructed` / `real`),
-`category` (1–8, or `null` for real mixed items), `category_name`, `label`
-(`grounded` / `not_grounded` / `mixed`), `material` (repo-relative path), `content`
-(the evidence entry). Constructed items may also carry `built_from`, `difference`, `framing`,
+`shape` (`content` / `quote`, see below), `category` (1–8, `q1`–`q8`, or `null` for real mixed
+items), `category_name`, `label` (`grounded` / `not_grounded` / `mixed` / `grounded_by_rule`),
+`material` (repo-relative path), `content`, and for quote-shaped items `quote`.
+
+Two shapes, because the evidence schema changed while this set was in use:
+
+- `shape: "content"` — the whole entry is in `content`, as the model wrote it before the
+  `quote` field existed. Scored the way old stored outputs are re-checked: the rule falls back
+  to `content`.
+- `shape: "quote"` — `quote` (text copied from the material) and `content` (the persona's
+  comment) are separate. Scored the way the engine checks new outputs: only `quote` is
+  compared with the material, and a `direct` entry without one is not grounded. Constructed items may also carry `built_from`, `difference`, `framing`,
 `fabricated_part`. Real items carry `real_kind`, `origin` and
 `accepted_by_rule_at_generation` (what the any-fragment rule said when the run was made).
 
-## Constructed items (160: 8 categories × 2 languages × 10)
+## Constructed items, content shape (160: 8 categories × 2 languages × 10)
 
 Labels follow from how each item is built, and the builder asserts the construction.
 
@@ -46,6 +55,27 @@ Labels follow from how each item is built, and the builder asserts the construct
 
 "Not grounded" always means "should not be accepted as a `direct` (quoted) entry". It does not
 mean the statement is false: several paraphrases and absence claims are true.
+
+## Quote-shaped constructed items (160: 8 categories × 2 languages × 10)
+
+Built from the same hand-written pieces, paired with a comment (or a made-up claim) written for
+the same material.
+
+| # | Category | Label | `quote` | `content` |
+|---|---|---|---|---|
+| q1 | `quote_verbatim_plus_comment` | grounded | verbatim span | a paraphrase with judgement |
+| q2 | `quote_variant_plus_comment` | grounded | verbatim with punctuation / width / case / whitespace changes | a paraphrase with judgement |
+| q3 | `quote_fabricated` | not grounded | a made-up claim | plausible comment |
+| q4 | `quote_half_true` | not grounded | verbatim span + made-up addition | plausible comment |
+| q5 | `quote_number_changed` | not grounded | verbatim span with one figure altered | plausible comment |
+| q6 | `quote_is_paraphrase` | not grounded | a paraphrase with judgement | neutral sentence |
+| q7 | `quote_missing` | not grounded | (absent) | a verbatim span |
+| q8 | `quote_ok_comment_fabricated` | **grounded_by_rule** | verbatim span | a made-up claim |
+
+**q8 is a known limit, not a success case.** The quote is real, the comment asserts something
+the material does not say, and the rule accepts the entry because comments are not
+fact-checked. These 20 items are excluded from the error rates and their accept rate is listed
+separately, so the limit stays visible in every run.
 
 ## Real items (117, all Chinese)
 
@@ -90,7 +120,9 @@ the content. Thresholds and span lengths may only be chosen on dev. Test is repo
   scored metrics.
 - Real items are Chinese only, from one model and three materials. English coverage is
   constructed only.
-- 277 items, with 4–6 per constructed cell in each split: per-category rates move in steps of
+- 437 items, with 4–6 per constructed cell in each split: per-category rates move in steps of
   17–25 points per item. They show direction, not precise rates.
+- There are no real quote-shaped items yet: no model output with a `quote` field existed when
+  the quote-shaped items were added. The quote-shaped numbers are constructed only.
 - The set measures quote matching. It says nothing about whether a grounded entry is true,
   relevant or fairly interpreted.

@@ -24,9 +24,10 @@ stricter there, but a short matching clause still carried any amount of invented
 
 ## The evaluation set
 
-`tests/fixtures/grounding_eval/` (details and limits in its `README.md`): 277 `direct`-style
-entries, each paired with a fictional material and labelled "should be accepted as a quote" or
-not.
+`tests/fixtures/grounding_eval/` (details and limits in its `README.md`). This part of the page
+uses its 277 content-shape items: `direct`-style entries with everything in one field, each
+paired with a fictional material and labelled "should be accepted as a quote" or not. The 160
+quote-shaped items added later are covered in [their own section](#the-quote-field-fixing-the-data-shape-instead-of-loosening-the-rule).
 
 | | Items | dev | test |
 |---|---|---|---|
@@ -189,14 +190,71 @@ What this does and does not show:
 - Moving restatements to `inferred` also pushes against the separate 40% cap on inferred
   evidence, so the two checks now pull on each other.
 
+## The `quote` field: fixing the data shape instead of loosening the rule
+
+The sample re-check above says the rule and the data did not fit: the model wrote the quote and
+its own comment into one field, `content`, and the coverage rule then measured the comment as
+if it were part of the quote. The fix is in the schema, not in the threshold.
+
+- An evidence entry now has an optional `quote` (text copied verbatim from the material) next to
+  `content` (the persona's observation, free text). For `direct` entries `quote` is required:
+  the prompt gives one rule, "direct = you can copy the exact words into `quote`; if you cannot
+  quote it, use inferred; if the material does not say it, use gap".
+- The validator applies the same coverage rule, with the same parameters, **to `quote` only**.
+  A `direct` entry with a missing or empty `quote` is not grounded. `content` is not checked.
+- The repair turn names the entry and says whether its quote was missing or which part of the
+  quote was not found.
+- Outputs stored before the field existed have no `quote`; they are re-checked on `content`
+  (`allow_content_fallback`, off in the engine), so the sample numbers above are unchanged.
+- Reports carry the quote separately (`persona_notes[].evidence_top3_detail`) and render it as a
+  quotation above the comment.
+- The report-level calibration metric named `hallucination` now calls the same function, so the
+  gate and the metric cannot disagree about an entry.
+
+`quote` is not required by the JSON Schema itself. A `direct` entry without it is caught by the
+grounding check, which reports it by name; a schema error would have surfaced as an unrelated
+`schema_failure` and made every stored output schema-invalid.
+
+### Quote-shaped items (constructed, 160)
+
+Parameters were not changed. Counts are false accepts (FA) and false rejects (FR).
+
+| Group | dev: any-fragment | dev: coverage on `quote` | test: any-fragment | test: coverage on `quote` |
+|---|---|---|---|---|
+| All scored quote-shaped items | FA 36/60, FR 12/24 | FA 0/60, FR 0/24 | FA 24/40, FR 8/16 | FA 0/40, FR 0/16 |
+| q1 verbatim quote + comment | FR 6/12 | FR 0/12 | FR 4/8 | FR 0/8 |
+| q2 punctuation-variant quote + comment | FR 6/12 | FR 0/12 | FR 4/8 | FR 0/8 |
+| q3 fabricated quote | FA 6/12 | FA 0/12 | FA 4/8 | FA 0/8 |
+| q4 half-true quote | FA 6/12 | FA 0/12 | FA 4/8 | FA 0/8 |
+| q5 quote with a changed number | FA 6/12 | FA 0/12 | FA 4/8 | FA 0/8 |
+| q6 quote is a paraphrase | FA 6/12 | FA 0/12 | FA 4/8 | FA 0/8 |
+| q7 quote missing | FA 12/12 | FA 0/12 | FA 8/8 | FA 0/8 |
+| q8 real quote, fabricated comment (known limit, not scored) | accepted 7/12 | accepted 12/12 | accepted 4/8 | accepted 8/8 |
+
+The any-fragment column is what the old validator would do with these entries: it never looked
+at `quote`, only at `content`, so its verdict depends on the comment (in English it accepts
+everything; in Chinese almost nothing). The content-shape tables earlier on this page are
+unchanged by this step.
+
+Full tables: `docs/evaluation/grounding/quote-field-coverage-rule.md` and
+`quote-field-any-fragment.md`.
+
+**q8 is the limit to keep in mind.** Splitting the fields makes the check precise about the
+quote and silent about the comment: a real quote with an invented claim beside it passes, 20 of
+20. The earlier coverage-on-content rule rejected some of these by accident and many honest
+entries with them.
+
+**Not measured yet:** whether the model fills `quote` correctly in a live run. That needs model
+calls and is the next step; nothing on this page is evidence about it.
+
 ## Remaining limits
 
 - **Coverage is not truth.** The check says how much of an entry is the material's own text.
   A verbatim quote can still be cherry-picked, taken out of context, or used to support a
   conclusion the material does not support.
-- **Coverage cannot tell commentary from fabrication.** An entry that is 85% quote and 15%
-  invented passes; an entry that is 60% quote and 40% honest comment fails. Below the threshold
-  both are rejected, above it both are accepted. The number check closes this only for figures.
+- **The comment is not checked.** With the `quote` field, `content` is free text: a real quote
+  can sit beside an invented claim and the entry passes (q8 above). Inside `quote`, up to 20% of
+  the text may still be uncovered; the number check closes that only for figures.
 - **The tags are self-reported.** Only entries the model chose to tag `direct` are checked.
   A fabricated claim tagged `inferred` is limited by the 40% cap and nothing else.
 - **No semantic check.** A faithful paraphrase is rejected as `direct`, by design; nothing
@@ -210,9 +268,8 @@ What this does and does not show:
   coverage and fails, as it did before.
 - **Chinese numerals and spelled-out numbers** are not seen by the number check ("三名" vs
   "五名" is caught only through coverage).
-- **Not changed here:** the report-level calibration metric named `hallucination`
-  (`src/runner/calibration.py`) is a separate computation that still tests whether the whole
-  entry is a substring of the material.
+- **Old outputs stay as they are.** The three stored samples predate the `quote` field and are
+  only re-checked on `content`.
 
 ## Reproduce
 
@@ -220,6 +277,6 @@ What this does and does not show:
 python tests/fixtures/grounding_eval/build_set.py --check
 python scripts/eval_grounding.py --rule legacy            # baseline
 python scripts/eval_grounding.py --split dev --sweep      # parameter grid (dev only)
-python scripts/eval_grounding.py                          # current rule
+python scripts/eval_grounding.py                          # current rule, both item shapes
 python scripts/revalidate_samples.py                      # effect on the stored samples
 ```

@@ -385,27 +385,34 @@ def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
     details = (validation or {}).get("details") or {}
     if reason == RETRY_HALLUCINATION:
         evidence = details.get("evidence") or {}
-        quotes = (evidence.get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
-        # 覆盖率规则会给出每条里"没在原文找到的那一段"：告诉模型具体是哪一段，
-        # 它才知道是删掉那段、挪去 inferred，还是整条都不是引用。
-        by_content = {d.get("content"): d for d in (evidence.get("ungrounded_details") or [])
-                      if isinstance(d, dict)}
+        # 逐条点名：是哪一条 evidence、quote 是缺了还是对不上、对不上的是哪一段。
+        # 只甩回一句"没通过"，模型不知道该补 quote、改 quote，还是改标 inferred。
+        entries = [d for d in (evidence.get("ungrounded_details") or []) if isinstance(d, dict)]
+        if not entries:  # 兼容只带 ungrounded_evidence 的旧结构
+            entries = [{"content": q} for q in (evidence.get("ungrounded_evidence") or [])]
         lines = []
-        for q in quotes:
-            lines.append(f"- {str(q)[:160]}")
-            detail = by_content.get(q) or {}
-            parts = [str(u)[:60] for u in (detail.get("uncovered") or []) if str(u).strip()]
+        for d in entries[:REPAIR_FEEDBACK_MAX_ITEMS]:
+            where = f"evidence 第 {d['index'] + 1} 条" if isinstance(d.get("index"), int) else "evidence"
+            lines.append(f"- {where}（content：{str(d.get('content') or '')[:120]}）")
+            if d.get("reason") == "quote_missing":
+                lines.append("  缺少 quote：direct 条目必须在 quote 里放一段从材料逐字复制的原文")
+                continue
+            if d.get("quote"):
+                lines.append(f"  quote：「{str(d['quote'])[:160]}」")
+            parts = [str(u)[:60] for u in (d.get("uncovered") or []) if str(u).strip()]
             if parts:
                 shown = "、".join(f"「{u}」" for u in parts[:REPAIR_FEEDBACK_MAX_UNCOVERED])
                 more = "等" if len(parts) > REPAIR_FEEDBACK_MAX_UNCOVERED else ""
                 lines.append(f"  原文里找不到的部分：{shown}{more}")
+            else:
+                lines.append("  quote 里的数字或文字与原文对不上")
         listed = "\n".join(lines)
         return (
-            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据不是材料原文的"
-            "逐字引用（每条下面列出了原文里找不到的部分）：\n" + listed + "\n\n"
-            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话，"
-            "不要在同一条里追加自己的评论或原文没有的内容）。"
-            "概括、改写或你自己的判断请标为 inferred；材料里没有提到的请标为 gap。"
+            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据，quote 不是材料原文的"
+            "逐字引用：\n" + listed + "\n\n"
+            "规则只有一条：能把材料原文一字不差地复制进 quote，才是 direct（你的观察和评论写在 "
+            "content 里，不要写进 quote）；复制不出来的概括、改写或判断请改标 inferred 并去掉 "
+            "quote；材料里没有提到的请标为 gap。"
         )
     if reason == RETRY_SCHEMA:
         errors = blocking_schema_errors(((details.get("schema") or {}).get("errors")) or [])
@@ -437,7 +444,7 @@ def _validation_error_message(validation: dict, reason: str) -> str:
         # hallucination_risk 是兼容键名，含义是"direct 证据中未落地条目的占比"，不是幻觉概率。
         risk = float(evidence.get("hallucination_risk", 0.0) or 0.0)
         return (
-            f"校验未通过（hallucination）：direct 证据中 {risk:.0%} 的条目不是材料原文的逐字引用"
+            f"校验未通过（hallucination）：direct 证据中 {risk:.0%} 的条目 quote 缺失或不是材料原文的逐字引用"
             "（阈值 30%）"
         )
     return f"校验未通过：{reason}"
@@ -646,6 +653,7 @@ def _build_simulated_output(persona: dict, task_type: str) -> dict:
             {
                 "content": "模拟证据内容",
                 "inference_level": "direct",
+                "quote": "模拟证据内容",
             }
         ],
         "scores": {

@@ -105,6 +105,90 @@ def compute_coverage_score(persona_outputs: List[dict]) -> dict:
 
 
 def compute_hallucination_rate(persona_outputs: List[dict], artifact_texts: List[str]) -> dict:
+    """每位人格的 direct 证据里，**未落地条目的占比**（报告级的校准指标）。
+
+    和校验器是同一个函数、同一份参数（validator.validate_evidence_grounding →
+    src/config/grounding.yaml）：只核对 direct 条目的 quote，缺 quote 算未落地。
+    以前这里是另一套口径——整条 content 必须是材料的子串——同一条证据在门控和校准里
+    会得出两个结论。键名 hallucination 为兼容保留；它不是"幻觉概率"。
+    """
+    from .validator import validate_evidence_grounding
+
+    per_persona = {}
+    high_risk_personas = []
+
+    for index, p in enumerate(persona_outputs):
+        pid = _persona_id(p, index)
+        if not isinstance(p, dict):
+            per_persona[pid] = 0.0
+            continue
+        rate = validate_evidence_grounding(p, artifact_texts)["hallucination_risk"]
+        per_persona[pid] = rate
+        if rate > 0.5:
+            high_risk_personas.append(pid)
+
+    average = sum(per_persona.values()) / len(per_persona) if per_persona else 0.0
+    below_threshold = [pid for pid, rate in per_persona.items() if rate < 0.8]
+
+    return {
+        "per_persona": per_persona,
+        "average": average,
+        "below_threshold": below_threshold,
+    }
+
+
+def compute_coverage_score(persona_outputs: List[dict]) -> dict:
+    issue_sets = {}
+    for index, p in enumerate(persona_outputs):
+        # 只取 dict 形态的 issue 且 title 非空：字符串形态的 issue 会让 issue["title"]
+        # 抛 TypeError（string indices must be integers），实测 {"key_issues": "无重大问题"}
+        titles = set(
+            title
+            for title in (
+                issue.get("title", "") for issue in _dict_items(p.get("key_issues", []))
+            )
+            if isinstance(title, str) and title
+        )
+        issue_sets[_persona_id(p, index)] = titles
+
+    ids = list(issue_sets.keys())
+    pairwise_distances = {}
+
+    if len(ids) < 2:
+        # 覆盖度是"人格之间"的两两距离，n<2 时这个指标在数学上就不存在。
+        # 以前这里返回 0.0，单人格面板的导出件会打印「视角覆盖度 0.0 / 合格线 ≥0.3 /
+        # 未通过」——把"无定义"伪装成"很差"。无定义就得说无定义：值给 None，
+        # 并带 not_applicable 标记让渲染层和 overall_pass 都能识别。
+        return {
+            "pairwise_distances": pairwise_distances,
+            "average_distance": None,
+            "min_distance": None,
+            "not_applicable": True,
+        }
+
+    for id1, id2 in combinations(ids, 2):
+        set1 = issue_sets[id1]
+        set2 = issue_sets[id2]
+        union = set1 | set2
+        if len(union) == 0:
+            distance = 0.0
+        else:
+            intersection = set1 & set2
+            distance = 1.0 - len(intersection) / len(union)
+        pairwise_distances[(id1, id2)] = distance
+
+    distances = list(pairwise_distances.values())
+    average_distance = sum(distances) / len(distances)
+    min_distance = min(distances)
+
+    return {
+        "pairwise_distances": pairwise_distances,
+        "average_distance": average_distance,
+        "min_distance": min_distance,
+    }
+
+
+def compute_hallucination_rate(persona_outputs: List[dict], artifact_texts: List[str]) -> dict:
     per_persona = {}
     high_risk_personas = []
 

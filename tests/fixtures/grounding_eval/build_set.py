@@ -266,6 +266,23 @@ NUMBER_CHANGED = [
      "Open a wider playtest in January with 2,000 keys; sign-ups will be posted on our forum"),
 ]
 
+# ---- quote-shaped items (schema with a separate `quote` field; added 2026-11) ----
+# Built by pairing the hand-written pieces above with a comment (or a fabricated claim) written
+# for the same material. Only `quote` is checked
+# by the rule; `content` is the persona's free-text comment.
+QUOTE_CATEGORIES = {
+    "q1": ("quote_verbatim_plus_comment", "grounded"),
+    "q2": ("quote_variant_plus_comment", "grounded"),
+    "q3": ("quote_fabricated", "not_grounded"),
+    "q4": ("quote_half_true", "not_grounded"),
+    "q5": ("quote_number_changed", "not_grounded"),
+    "q6": ("quote_is_paraphrase", "not_grounded"),
+    "q7": ("quote_missing", "not_grounded"),
+    # Known limit, kept visible: the quote is real but the comment asserts something the
+    # material does not say. The rule accepts it because comments are not fact-checked.
+    "q8": ("quote_ok_comment_fabricated", "grounded_by_rule"),
+}
+
 REAL_KINDS = {
     # real_kind -> (category number or None, label)
     "verbatim": (1, "grounded"),
@@ -322,6 +339,47 @@ def constructed():
     return items
 
 
+def quote_shaped():
+    items = []
+
+    def add(cat, mat, quote, content, **extra):
+        name, label = QUOTE_CATEGORIES[cat]
+        item = {"lang": mat[:2], "source": "constructed", "shape": "quote", "category": cat,
+                "category_name": name, "label": label, "material": MATERIALS[mat], "content": content}
+        if quote is not None:
+            item["quote"] = quote
+        items.append({**item, **extra})
+
+    comments, fabrications, seen = {}, {}, {}
+    for mat, text in PARAPHRASE:
+        comments.setdefault(mat, []).append(text)
+    for mat, text in FABRICATED:
+        fabrications.setdefault(mat, []).append(text)
+
+    def pick(pool, mat, cat):
+        """Cycle through the hand-written texts of the same material, per category."""
+        k = seen.get((cat, mat), 0)
+        seen[(cat, mat)] = k + 1
+        return pool[mat][k % len(pool[mat])]
+
+    for mat, span in VERBATIM:
+        add("q1", mat, span, pick(comments, mat, "q1"))
+    for mat, span, variant, diff in VARIANTS:
+        add("q2", mat, variant, pick(comments, mat, "q2"), built_from=span, difference=diff)
+    for mat, text in FABRICATED:
+        add("q3", mat, text, pick(comments, mat, "q3"))
+    for mat, fragment, addition in HALF_TRUE:
+        add("q4", mat, fragment + addition, pick(comments, mat, "q4"), fabricated_part=addition)
+    for mat, original, altered in NUMBER_CHANGED:
+        add("q5", mat, altered, pick(comments, mat, "q5"), built_from=original)
+    for mat, text in PARAPHRASE:
+        add("q6", mat, text, "这是材料里的说法。" if mat.startswith("zh") else "This is what the material says.")
+    for mat, _framing, span in FRAMED:
+        add("q7", mat, None, span)                                  # verbatim text, but in `content`; no quote
+        add("q8", mat, span, pick(fabrications, mat, "q8"))
+    return items
+
+
 def real():
     items = []
     with open(os.path.join(HERE, "real_items.jsonl"), encoding="utf-8") as f:
@@ -347,18 +405,27 @@ def assign_ids_and_splits(items):
         strata.setdefault((it["source"], it["category_name"], it["lang"]), []).append(it)
     out = []
     for key in sorted(strata):
-        group = sorted(strata[key], key=lambda it: hashlib.sha256(it["content"].encode("utf-8")).hexdigest())
+        group = sorted(strata[key], key=lambda it: hashlib.sha256(
+            (it["content"] + ("\x00" + it.get("quote", "") if it.get("shape") == "quote" else "")).encode("utf-8")
+        ).hexdigest())
         n_dev = int(len(group) * 0.6 + 0.5)
         for i, it in enumerate(group):
             digest = hashlib.sha256(it["content"].encode("utf-8")).hexdigest()[:8]
-            prefix = ("r" if it["source"] == "real" else "c") + (str(it["category"]) if it["category"] else "m")
+            if it.get("shape") == "quote":
+                digest = hashlib.sha256((it["content"] + "\x00" + it.get("quote", "")).encode("utf-8")).hexdigest()[:8]
+                prefix = it["category"]
+            else:
+                prefix = ("r" if it["source"] == "real" else "c") + (str(it["category"]) if it["category"] else "m")
             out.append({"id": f"{prefix}-{it['lang']}-{digest}", "split": "dev" if i < n_dev else "test", **it})
     assert len({it["id"] for it in out}) == len(out)
     return out
 
 
 def render() -> str:
-    items = assign_ids_and_splits(constructed() + real())
+    # shape: "content" = the pre-quote-field shape (the whole entry is in `content`);
+    #        "quote"   = quote and comment in separate fields.
+    old_shape = [{**it, "shape": "content"} for it in constructed() + real()]
+    items = assign_ids_and_splits(old_shape + quote_shaped())
     return "".join(json.dumps(it, ensure_ascii=False) + "\n" for it in items)
 
 

@@ -165,8 +165,12 @@
 {# 这四项以前直接 {{pn.evidence_top3}} 打印 Python 列表 repr，导出的 .md 里长成
    ['xxx', 'yyy'] 这种带引号方括号的样子。数据是真的，但导出件是要发给别人看的。 #}
 - **Top Evidence**:
-{% for e in pn.evidence_top3 %}  - {{e}}
-{% endfor %}
+{% if pn.evidence_top3_detail %}{% for e in pn.evidence_top3_detail %}{% if e.quote %}  - > “{{e.quote}}”
+
+    {{e.content}}
+{% else %}  - {{e.content}}
+{% endif %}{% endfor %}{% else %}{% for e in pn.evidence_top3 %}  - {{e}}
+{% endfor %}{% endif %}
 - **Top Issues**:
 {% for i in pn.top_issues %}  - {{i}}
 {% endfor %}

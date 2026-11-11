@@ -557,6 +557,38 @@ class TestNormalizeShapes:
         assert all(e["inference_level"] == "inferred" for e in out["evidence"])
         assert all(e["inference_basis"] for e in out["evidence"])
 
+    def test_quote_is_its_own_field_not_an_alias_of_content(self):
+        from runner.persona_agent import normalize_persona_output
+
+        out = normalize_persona_output({"evidence": [
+            {"content": "流程长度写得具体", "inference_level": "direct", "quote": " 预计流程 12-15 小时 "},
+            {"inference_level": "direct", "source_quote": "支持手柄与键鼠"},          # 别名；没写 content
+            {"content": "大概率是小团队", "inference_level": "inferred", "quote": "不参与校验"},
+            {"content": "页面写了流程", "inference_level": "direct"},                 # direct 缺 quote：原样留给校验器判
+        ]})
+        ev = out["evidence"]
+        assert ev[0]["content"] == "流程长度写得具体" and ev[0]["quote"] == "预计流程 12-15 小时"
+        # 只给了引用：content 用引用顶上（schema 要求非空），quote 照留
+        assert ev[1]["content"] == ev[1]["quote"] == "支持手柄与键鼠"
+        # inferred / gap 上的 quote 不保留——留着会让读者以为它被核对过
+        assert "quote" not in ev[2]
+        assert "quote" not in ev[3]
+        assert all(set(e) <= {"content", "inference_level", "quote", "source_location", "inference_basis"} for e in ev)
+
+    def test_prompt_states_the_quote_rule_and_schema_carries_the_field(self):
+        import json
+        for name in ("persona-prompt.md", "persona-prompt-shared.md"):
+            with open(os.path.join("src", "templates", name), encoding="utf-8") as f:
+                text = f.read()
+            assert "能把材料原文一字不差地复制进 `quote`，才是 direct" in text
+            assert '"quote": "<direct 必填' in text
+        with open(os.path.join("src", "schemas", "output-schema.json"), encoding="utf-8") as f:
+            item = json.load(f)["properties"]["evidence"]["items"]
+        assert item["properties"]["quote"]["type"] == "string"
+        # 不放进 JSON Schema 的 required：direct 缺 quote 由证据校验按"未落地"处理并点名回喂，
+        # 否则它会先以 schema_failure 的名义出现，旧的已存输出也会整份变成 schema 不合法。
+        assert "quote" not in item["required"]
+
     def test_evidence_whole_value_as_string(self):
         from runner.persona_agent import normalize_persona_output
 

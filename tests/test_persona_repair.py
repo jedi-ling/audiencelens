@@ -50,7 +50,8 @@ def _valid_output(persona, quote=QUOTE_OK):
     out = cli._build_simulated_output(persona, "steam_page_review")
     out.pop("meta", None)
     for ev in out.get("evidence") or []:
-        ev["content"] = quote
+        ev["content"] = "我的观察：" + quote[:12]
+        ev["quote"] = quote
         ev["inference_level"] = "direct"
     return out
 
@@ -153,7 +154,7 @@ def test_retry_config_and_grounding_threshold_unchanged(budget):
     assert set(retry["retry_on"]) == {"transport_error", "schema_failure", "hallucination"}
 
     def evidence(n_bad, n_total=10):
-        items = [{"content": QUOTE_BAD if i < n_bad else QUOTE_OK, "inference_level": "direct"}
+        items = [{"content": "观察", "quote": QUOTE_BAD if i < n_bad else QUOTE_OK, "inference_level": "direct"}
                  for i in range(n_total)]
         return validate_evidence_grounding({"evidence": items}, [MATERIAL])
 
@@ -196,7 +197,8 @@ def test_hallucination_feedback_names_the_uncovered_part(monkeypatch, persona, b
     r = _run(monkeypatch, fake, persona, budget, schema)
 
     feedback = fake.calls[1]["repair"]["feedback"]
-    assert half_true in feedback
+    assert half_true in feedback          # 被点名的是 quote 原文
+    assert "evidence 第 1 条" in feedback  # 并且说清是哪一条
     uncovered_line = next(ln for ln in feedback.splitlines() if ln.strip().startswith("原文里找不到的部分"))
     assert "首发支持四人联机" in uncovered_line
     assert QUOTE_OK not in uncovered_line
@@ -207,6 +209,6 @@ def test_hallucination_feedback_names_the_uncovered_part(monkeypatch, persona, b
 def test_true_quote_plus_fabrication_no_longer_passes_grounding():
     # 外部评审的探针：旧规则下只要有一个片段命中，整条就算落地。
     out = validate_evidence_grounding(
-        {"evidence": [{"content": QUOTE_OK + "，并且首发支持四人联机", "inference_level": "direct"}]}, [MATERIAL])
+        {"evidence": [{"content": "观察", "quote": QUOTE_OK + "，并且首发支持四人联机", "inference_level": "direct"}]}, [MATERIAL])
     assert out["grounded"] is False
     assert out["hallucination_risk"] == 1.0  # 键名兼容保留；含义是未落地条目占比

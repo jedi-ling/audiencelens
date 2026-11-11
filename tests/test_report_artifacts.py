@@ -235,3 +235,56 @@ class TestEndToEndMultiPersona:
 
         assert "校准指标" in result["markdown"]
         assert "<html" in result["html"].lower() or "<div" in result["html"]
+
+
+class TestQuoteIsCarriedIntoTheReport:
+    """direct 证据的 quote（材料原文）要和 content（人格的解读）分开进报告，
+    并在 Markdown / HTML 里先显示引用、再显示评论。"""
+
+    QUOTE = "预计流程 12-15 小时，支持手柄与键鼠"
+    COMMENT = "流程长度写得具体，但四人团队能否兑现存疑"
+
+    def _report(self):
+        out = _make_output("P1", ["导航不清"], [])
+        out["evidence"] = [
+            {"content": self.COMMENT, "inference_level": "direct", "quote": self.QUOTE},
+            {"content": "大概率是小团队", "inference_level": "inferred", "quote": "不该被带出来"},
+            {"content": "页面没提退款", "inference_level": "gap"},
+        ]
+        other = _make_output("P2", ["定价偏高"], [])
+        rules = load_aggregation_rules(RULES_PATH)
+        return aggregate_report([out, other], "concept_review", "测试目标", rules)
+
+    def test_report_json_keeps_strings_and_adds_structured_detail(self):
+        note = next(n for n in self._report()["persona_notes"] if n["persona_id"] == "P1")
+        assert note["evidence_top3"] == [self.COMMENT, "大概率是小团队", "页面没提退款"]  # 旧字段形状不变
+        assert note["evidence_top3_detail"] == [
+            {"content": self.COMMENT, "level": "direct", "quote": self.QUOTE},
+            {"content": "大概率是小团队", "level": "inferred"},   # 非 direct 不带 quote
+            {"content": "页面没提退款", "level": "gap"},
+        ]
+
+    def test_report_with_detail_still_matches_the_report_schema(self):
+        import jsonschema
+        with open(REPORT_SCHEMA_PATH, encoding="utf-8") as f:
+            schema = json.load(f)
+        notes_schema = schema["properties"]["persona_notes"]
+        jsonschema.validate(self._report()["persona_notes"], notes_schema)
+
+    def test_markdown_and_html_show_quote_before_comment(self):
+        report = self._report()
+        md = render_markdown_report(report, REPORT_TEMPLATE_PATH)
+        html = render_html_report(report, HTML_TEMPLATE_PATH)
+        for text in (md, html):
+            assert self.QUOTE in text and self.COMMENT in text
+            assert text.index(self.QUOTE) < text.index(self.COMMENT)
+            assert "不该被带出来" not in text
+        assert 'class="evidence-quote"' in html
+        assert f"> “{self.QUOTE}”" in md
+
+    def test_reports_without_detail_render_as_before(self):
+        report = self._report()
+        for note in report["persona_notes"]:
+            note.pop("evidence_top3_detail")
+        md = render_markdown_report(report, REPORT_TEMPLATE_PATH)
+        assert f"  - {self.COMMENT}" in md and self.QUOTE not in md

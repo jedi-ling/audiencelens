@@ -39,9 +39,9 @@ def _make_valid_output():
         "confidence": 0.8,
         "evidence_sufficiency": 0.7,
         "evidence": [
-            {"content": "画面精美", "inference_level": "direct"},
-            {"content": "价格合理", "inference_level": "direct"},
-            {"content": "玩法机制丰富", "inference_level": "direct"},
+            {"content": "画面精美", "inference_level": "direct", "quote": "画面精美"},
+            {"content": "价格合理", "inference_level": "direct", "quote": "价格合理"},
+            {"content": "玩法机制丰富", "inference_level": "direct", "quote": "玩法机制丰富"},
             {"content": "玩法可能有趣", "inference_level": "inferred"},
         ],
         "scores": {
@@ -367,7 +367,7 @@ class TestValidateRoleConsistency:
             {"content": "可能好玩", "inference_level": "inferred"},
             {"content": "也许不错", "inference_level": "inferred"},
             {"content": "大概还行", "inference_level": "inferred"},
-            {"content": "画面精美", "inference_level": "direct"},
+            {"content": "画面精美", "inference_level": "direct", "quote": "画面精美"},
         ]
         persona = _make_persona()
         result = validate_role_consistency(output, persona)
@@ -396,8 +396,8 @@ class TestValidateEvidenceGrounding:
     def test_partial_grounding(self):
         output = _make_valid_output()
         output["evidence"] = [
-            {"content": "画面精美", "inference_level": "direct"},
-            {"content": "玩法可能有趣", "inference_level": "direct"},
+            {"content": "画面精美", "inference_level": "direct", "quote": "画面精美"},
+            {"content": "玩法可能有趣", "inference_level": "direct", "quote": "玩法可能有趣"},
         ]
         artifact_texts = ["游戏画面精美"]
         result = validate_evidence_grounding(output, artifact_texts)
@@ -422,9 +422,13 @@ class TestValidateEvidenceGrounding:
         # 4/6 人格被误伤）。引号、加号、破折号都不得妨碍匹配。
         output = _make_valid_output()
         output["evidence"] = [
-            {"content": "页面明确宣称视觉风格为「CRT风格的像素艺术」", "inference_level": "direct"},
-            {"content": "“扑克之旅”+“策略构建”", "inference_level": "direct"},
-            {"content": "短描述写着：“扑克之旅”——“策略构建游戏”", "inference_level": "direct"},
+            {"content": "页面明确宣称了视觉风格", "inference_level": "direct",
+             "quote": "「CRT风格的像素艺术」"},
+            # 原始回归用例的形状：两处引用 + 人格自己的评论。评论在 content，引用在 quote。
+            {"content": "短描述直接给出核心承诺：“扑克之旅”+“策略构建”——三秒能读到机制核心",
+             "inference_level": "direct", "quote": "“扑克之旅”+“策略构建”"},
+            {"content": "短描述的原话", "inference_level": "direct",
+             "quote": "短描述写着：“扑克之旅”——“策略构建游戏”"},
         ]
         artifact_texts = [
             "沉浸于 CRT风格的像素艺术，细节惊人",
@@ -448,12 +452,61 @@ class TestValidateEvidenceGrounding:
         # 切词放宽不等于放水：材料里不存在的词组，引号拆开也匹配不上。
         output = _make_valid_output()
         output["evidence"] = [
-            {"content": "页面宣称「支持多人联机对战」", "inference_level": "direct"},
+            {"content": "页面宣称「支持多人联机对战」", "inference_level": "direct", "quote": "页面宣称「支持多人联机对战」"},
         ]
         artifact_texts = ["这是一款单人roguelike卡牌游戏"]
         result = validate_evidence_grounding(output, artifact_texts)
         assert result["grounded"] is False
         assert result["ungrounded_evidence"] == ["页面宣称「支持多人联机对战」"]
+
+    # ---- quote 字段：只核对 quote，content 是自由文本 ----
+
+    def test_only_quote_is_checked_and_content_is_free_text(self):
+        material = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        entry = {"inference_level": "direct", "quote": "预计流程 12-15 小时",
+                 "content": "流程长度写得很具体，但我怀疑一个四人团队撑不撑得起这个体量。"}
+        result = validate_evidence_grounding({"evidence": [entry]}, material)
+        assert result["ungrounded_evidence"] == []
+        assert result["hallucination_risk"] == 0.0
+
+    def test_direct_entry_without_quote_is_ungrounded(self):
+        material = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        for entry in ({"inference_level": "direct", "content": "预计流程 12-15 小时"},
+                      {"inference_level": "direct", "content": "预计流程 12-15 小时", "quote": "  "}):
+            result = validate_evidence_grounding({"evidence": [entry]}, material)
+            assert result["hallucination_risk"] == 1.0
+            detail = result["ungrounded_details"][0]
+            assert detail["reason"] == "quote_missing" and detail["index"] == 0
+
+    def test_fabricated_quote_fails_whatever_the_content_says(self):
+        material = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        entry = {"inference_level": "direct", "quote": "通关后解锁双人合作模式",
+                 "content": "预计流程 12-15 小时，支持手柄与键鼠"}   # content 才是原文，放错了字段
+        detail = validate_evidence_grounding({"evidence": [entry]}, material)["ungrounded_details"][0]
+        assert detail["reason"] == "quote_not_found" and detail["checked"] == "quote"
+
+    def test_known_limit_content_is_not_fact_checked(self):
+        # 已知局限，写成测试免得被当成 bug：quote 是真的，content 里的断言是编的——规则放行。
+        material = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        entry = {"inference_level": "direct", "quote": "预计流程 12-15 小时",
+                 "content": "官方还承诺首发加入四人联机。"}
+        assert validate_evidence_grounding({"evidence": [entry]}, material)["ungrounded_evidence"] == []
+
+    def test_old_outputs_without_quote_fall_back_to_content_only_when_asked(self):
+        material = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        old = {"evidence": [{"inference_level": "direct", "content": "预计流程 12-15 小时，支持手柄与键鼠"}]}
+        assert validate_evidence_grounding(old, material)["hallucination_risk"] == 1.0
+        assert validate_evidence_grounding(old, material, allow_content_fallback=True)["hallucination_risk"] == 0.0
+        # 有 quote 时回落开关不改变任何事：照样只看 quote
+        new = {"evidence": [{"inference_level": "direct", "quote": "不存在的一句话",
+                             "content": "预计流程 12-15 小时，支持手柄与键鼠"}]}
+        assert validate_evidence_grounding(new, material, allow_content_fallback=True)["hallucination_risk"] == 1.0
+
+    def test_inferred_and_gap_entries_need_no_quote(self):
+        out = {"evidence": [{"inference_level": "inferred", "content": "大概率是小团队"},
+                            {"inference_level": "gap", "content": "页面没提退款"}]}
+        result = validate_evidence_grounding(out, ["任意材料"])
+        assert result["grounded"] is True and result["ungrounded_evidence"] == []
 
     # ---- 覆盖率规则（外部评审指出任意片段规则的两个洞之后） ----
 
@@ -461,10 +514,11 @@ class TestValidateEvidenceGrounding:
         # 探针 a：旧规则下"售价68元"一个片段命中就整条通过。
         material = ["深渊回响是一款卡牌肉鸽游戏，售价68元，首发支持简体中文。"]
         entry = "售价68元，并且官方承诺永久免费更新全部DLC"
-        output = {"evidence": [{"inference_level": "direct", "content": entry}]}
+        output = {"evidence": [{"inference_level": "direct", "content": "我的观察", "quote": entry}]}
         result = validate_evidence_grounding(output, material)
-        assert result["ungrounded_evidence"] == [entry]
+        assert result["ungrounded_evidence"] == ["我的观察"]
         detail = result["ungrounded_details"][0]
+        assert detail["quote"] == entry
         assert any("官方承诺永久免费更新" in u for u in detail["uncovered"])
         assert not any("售价68元" in u for u in detail["uncovered"])
 
@@ -472,9 +526,9 @@ class TestValidateEvidenceGrounding:
         # 探针 b：旧规则按空白切词，"the" / "is" 任何一个词命中就整条通过。
         material = ["Abyss Echo is a roguelike deck-builder. The price is $14.99 and the demo lasts 40 minutes."]
         entry = "The developers admit the game is unfinished and refunds are refused"
-        output = {"evidence": [{"inference_level": "direct", "content": entry}]}
+        output = {"evidence": [{"inference_level": "direct", "content": "我的观察", "quote": entry}]}
         result = validate_evidence_grounding(output, material)
-        assert result["ungrounded_evidence"] == [entry]
+        assert result["ungrounded_details"][0]["quote"] == entry
         assert result["hallucination_risk"] == 1.0
 
     def test_normalisation_differences_do_not_break_a_quote(self):
@@ -539,13 +593,14 @@ class TestGroundingEvalSet:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
         import eval_grounding
         report = eval_grounding.evaluate(eval_grounding.load_items(), eval_grounding.current_validator, ("dev",))
-        overall = report["dev"]["all scored items"]
-        assert (overall["fp"], overall["fn"]) == (0, 0), overall
+        for group in ("all scored items", "quote shape · all scored items"):
+            overall = report["dev"][group]
+            assert (overall["fp"], overall["fn"]) == (0, 0), (group, overall)
 
     def test_legacy_rule_baseline_is_reproducible(self):
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "scripts"))
         import eval_grounding
-        report = eval_grounding.evaluate(eval_grounding.load_items(), eval_grounding.legacy_any_fragment, ("dev",))
+        report = eval_grounding.evaluate(eval_grounding.load_items(), eval_grounding.legacy_rule, ("dev",))
         english = report["dev"]["constructed · en"]
         assert english["false_accept_rate"] == 1.0   # 旧规则：英文未落地条目全部放行
 

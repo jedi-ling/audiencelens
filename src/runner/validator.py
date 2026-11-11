@@ -235,37 +235,76 @@ def check_entry_grounding(content, material, config: Optional[dict] = None) -> d
             "uncovered_numbers": numbers}
 
 
-def validate_evidence_grounding(output: dict, artifact_texts: List[str], config: Optional[dict] = None) -> dict:
-    """逐条核对 direct 证据是否落在材料原文上（覆盖率规则，参数见 src/config/grounding.yaml）。
+def check_direct_entry(entry: dict, material, config: Optional[dict] = None,
+                       allow_content_fallback: bool = False) -> dict:
+    """一条 direct 证据是否落地：只核对 `quote`（材料原文的逐字片段），`content` 是人格
+    自己的观察/解读，不核对。
 
-    旧规则是"按标点/空白切开后，任意一个长度 > 1 的片段是材料子串就算落地"。两个后果：
-    「一句真引用 + 一句编造」整条通过；英文按空白切词，任何一个词（the、is）都能让整条
-    通过。外部评审指出后改成覆盖率规则，基线与新规则的实测对比见
-    docs/evaluation/grounding-check.md。
+    - 有 quote：对 quote 跑覆盖率规则（check_entry_grounding，参数同一份 grounding.yaml）。
+    - 没有 / 为空：未落地，reason = "quote_missing"。
+    - allow_content_fallback=True：没有 quote 时退回去核对 content。只给 quote 字段出现
+      之前存下来的旧输出用（examples/ 里 2026-11-04 的样例、评测集里的旧形状条目），
+      引擎的校验路径不开。
 
-    中文引号、破折号、全半角、空白差异在规范化阶段抹平——模型用「CRT风格的像素艺术」
-    这种写法**逐字引用**材料时不能被误判（Balatro 材料下曾 4/6 人格全部误伤）。
+    返回 check_entry_grounding 的字段，外加 checked（"quote" / "content" / "none"）
+    和 reason（None / "quote_missing" / "quote_not_found"）。
+    """
+    quote = entry.get("quote") if isinstance(entry, dict) else None
+    if isinstance(quote, str) and quote.strip():
+        result = check_entry_grounding(quote, material, config)
+        result["checked"] = "quote"
+    elif allow_content_fallback:
+        result = check_entry_grounding(entry.get("content", ""), material, config)
+        result["checked"] = "content"
+    else:
+        return {"grounded": False, "coverage": 0.0, "uncovered": [], "uncovered_numbers": [],
+                "checked": "none", "reason": "quote_missing"}
+    result["reason"] = None if result["grounded"] else "quote_not_found"
+    return result
+
+
+def validate_evidence_grounding(output: dict, artifact_texts: List[str], config: Optional[dict] = None,
+                                allow_content_fallback: bool = False) -> dict:
+    """逐条核对 direct 证据的 `quote` 是否落在材料原文上（覆盖率规则，参数见
+    src/config/grounding.yaml）。direct 条目缺 quote = 未落地。
+
+    两次改动的来由：
+    1. 旧规则是"按标点/空白切开后，任意一个长度 > 1 的片段是材料子串就算落地"——
+       「一句真引用 + 一句编造」整条通过，英文任何一个词（the、is）都能让整条通过。
+       外部评审指出后改成覆盖率规则。
+    2. 覆盖率规则直接套在 content 上时，已发布样例里 12 位人格只有 1 位能过：模型把引用和
+       自己的评论写在同一个字段里。所以把数据形状拆开——quote 放原文、content 放解读——
+       而不是放宽规则。实测见 docs/evaluation/grounding-check.md。
+
+    中文引号、破折号、全半角、空白差异在规范化阶段抹平（Balatro 材料下曾 4/6 人格被误伤）。
+
+    allow_content_fallback：见 check_direct_entry，只用于复核 quote 字段出现之前的旧输出。
 
     返回里的 `hallucination_risk` 键名为兼容保留，含义是 **direct 证据中未落地条目的占比**
-    （0–1），不是"幻觉概率"：一条如实的改写同样算未落地。
+    （0–1），不是"幻觉概率"。content 里说了什么不在这项检查之内。
     """
     config = config or load_grounding_config()
     evidence = _dict_entries(output.get("evidence", []))
-    direct_entries = [e for e in evidence if e.get("inference_level") == "direct"]
     index = _MaterialIndex(list(artifact_texts or []))
     ungrounded = []
     details = []
+    total_direct = 0
 
-    for entry in direct_entries:
+    for position, entry in enumerate(evidence):
+        if entry.get("inference_level") != "direct":
+            continue
+        total_direct += 1
         content = entry.get("content", "")
-        result = check_entry_grounding(content, index, config)
+        result = check_direct_entry(entry, index, config, allow_content_fallback)
         if not result["grounded"]:
             ungrounded.append(content)
-            details.append({"content": content, "coverage": result["coverage"],
+            details.append({"index": position, "content": content,
+                            "quote": entry.get("quote") if isinstance(entry.get("quote"), str) else None,
+                            "checked": result["checked"], "reason": result["reason"],
+                            "coverage": result["coverage"],
                             "uncovered": result["uncovered"],
                             "uncovered_numbers": result["uncovered_numbers"]})
 
-    total_direct = len(direct_entries)
     if total_direct == 0:
         hallucination_risk = 0.0
     else:
