@@ -1,0 +1,32 @@
+{
+  "input_file": "test-materials/04_定价页_云笔记订阅.md",
+  "task_type": "pricing_page_review",
+  "persona_pack": "game-core",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-11",
+  "run_id": "20261111-181503-pricing_page_review",
+  "app_commit": "2a51751",
+  "evidence_schema": "quote-field-v1",
+  "grounding_rule": {
+    "name": "coverage-on-quote",
+    "commit": "2a51751",
+    "config": "src/config/grounding.yaml"
+  },
+  "dedup_method": "semantic",
+  "disputes": 2,
+  "cost_usd": 0.2667,
+  "tokens_in": 77339,
+  "tokens_out": 15060,
+  "retries": 5,
+  "cross_exam_run": {
+    "mode": "moderated_rebuttal",
+    "calls": 1,
+    "cost_usd": 0.0092,
+    "tokens_in": 1044,
+    "tokens_out": 716
+  },
+  "cost_cap_usd": 1.5,
+  "intended_persona_pack": "general-consumer",
+  "note": "Run with the wrong persona pack by mistake (engine default game-core; the generator did not pass personas_path). Not a sample. Kept as grounding evidence only."
+}

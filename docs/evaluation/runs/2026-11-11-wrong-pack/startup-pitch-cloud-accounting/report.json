@@ -1,0 +1,1718 @@
+{
+  "meta": {
+    "task_type": "pitch_review",
+    "target": "轻账 LiteBooks —— 种子轮融资 BP",
+    "generated_at": "2026-11-11T09:17:03.915336+00:00",
+    "is_synthetic": true,
+    "caveats": [
+      "基于合成画像和单份 BP 文本评审，没有核验任何外部数据",
+      "本判断是因信息缺失（缺少对小微向竞品的对比）而观望，不等于产品本身被证伪",
+      "MRR 平均客单价为按材料数字的推算，属推断",
+      "判断只基于一页BP文字，未核验任何数据来源、产品或用户。",
+      "真实竞品名称（代账公司、柠檬云等）是我基于行业常识的补充，材料本身没有提到。",
+      "核心决策规则“说不清target+comp+hook”被部分触发：target和hook清楚，comp不清楚。",
+      "这是合成角色评审，不代表真实投资人意见。",
+      "角色按独立游戏玩家的机制辨识标准评估商业BP，对财务和估值判断有局限。",
+      "首15分钟的判断基于材料缺失，不是对产品体验的负面证据。",
+      "MRR与单户均价为评审者换算，非材料原文。",
+      "这是合成角色评审，不代表真实投资人或用户的意见",
+      "我从买家付费视角出发，不是专业投资人，估值倍数是粗算",
+      "立场「观望」主要来自信息缺失（留存、估值依据、责任条款），不是明确的负面证据",
+      "核心规则「价格与内容体量/质量不匹配则不买」未被明确触发，但也无法确认已通过",
+      "Mika 是按 Steam 愿望单浏览者的视角做的快速判断，不是专业的融资尽调。",
+      "立场“观望”主要来自首屏证据缺失，并非有明确的负面证据。",
+      "对 MRR 与流失率的推算是我的估算，没有材料支撑。",
+      "本评审以内容创作者的传播视角看 B2B SaaS 融资 BP，对财务产品的商业价值判断有限。",
+      "节目效果、clip 密度、直播空窗均基于材料推断，材料没有任何演示信息。",
+      "核心规则'3 分钟内没有可被观众理解的 hook'在本次材料中被触发，但原因是信息缺失，不是负面证据。"
+    ],
+    "build_version": "0.3.0",
+    "persona_pack_version": "game-core@0.1.0"
+  },
+  "executive_summary": {
+    "primary_recommendation": "观望",
+    "release_risk": "critical",
+    "evidence_quality": "weak"
+  },
+  "consensus": {
+    "agreed_points": [],
+    "questioned_points": [
+      "回答不了“为什么不用现有替代品”",
+      "6.2% 月流失率与差异化说法矛盾",
+      "成熟度缺口：税务规则覆盖和合规责任不清",
+      "迁移成本和增长路径没有数据",
+      "竞品框错位，真正的替代方案缺席",
+      "USP泛化，营销钩子缺乏可验证的结果",
+      "没有“只有我们能做到”的机制证据",
+      "核心循环未被留存数据证明",
+      "准确率指标证据过薄",
+      "首次使用体验没有证据",
+      "估值约 55 倍 ARR，缺少定价依据",
+      "准确率和责任边界不清",
+      "价格锚点用错了对手",
+      "¥299 档服务边界模糊，未来功能当现有价值卖",
+      "缺少可视化证明（产品截图、演示、客户证言）",
+      "数据来源和样本不透明",
+      "团队背景无法核验",
+      "没有可传播的 hook 和可演示片段",
+      "留存与获客渠道不清",
+      "关键数字缺来源"
+    ],
+    "shared_concerns": [
+      {
+        "issue": "6.2% 月流失率与差异化说法矛盾",
+        "personas": [
+          "P16-competitor-loyal-veteran",
+          "P13-publisher-scout",
+          "P14-price-sensitive-buyer",
+          "P10-steam-wishlist-browser"
+        ],
+        "persona_count": 4,
+        "is_consensus": false,
+        "title_variants": [
+          "6.2% 月流失率与差异化说法矛盾",
+          "留存和单位经济模型缺失，6.2%月流失偏高",
+          "6.2% 月流失率，和「值回票价」矛盾",
+          "月流失 6.2% 太高，也没有解释"
+        ]
+      },
+      {
+        "issue": "成熟度缺口：税务规则覆盖和合规责任不清",
+        "personas": [
+          "P16-competitor-loyal-veteran",
+          "P13-publisher-scout"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "成熟度缺口：税务规则覆盖和合规责任不清",
+          "税务规则引擎的scope风险和合规责任不明"
+        ]
+      },
+      {
+        "issue": "竞品框错位，真正的替代方案缺席",
+        "personas": [
+          "P13-publisher-scout",
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "竞品框错位，真正的替代方案缺席",
+          "竞品分析只有一个且比较维度错位"
+        ]
+      },
+      {
+        "issue": "回答不了“为什么不用现有替代品”",
+        "personas": [
+          "P16-competitor-loyal-veteran"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "回答不了“为什么不用现有替代品”"
+        ]
+      },
+      {
+        "issue": "迁移成本和增长路径没有数据",
+        "personas": [
+          "P16-competitor-loyal-veteran"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "迁移成本和增长路径没有数据"
+        ]
+      },
+      {
+        "issue": "USP泛化，营销钩子缺乏可验证的结果",
+        "personas": [
+          "P13-publisher-scout"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "USP泛化，营销钩子缺乏可验证的结果"
+        ]
+      },
+      {
+        "issue": "没有“只有我们能做到”的机制证据",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有“只有我们能做到”的机制证据"
+        ]
+      },
+      {
+        "issue": "核心循环未被留存数据证明",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "核心循环未被留存数据证明"
+        ]
+      },
+      {
+        "issue": "准确率指标证据过薄",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "准确率指标证据过薄"
+        ]
+      },
+      {
+        "issue": "首次使用体验没有证据",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "首次使用体验没有证据"
+        ]
+      },
+      {
+        "issue": "估值约 55 倍 ARR，缺少定价依据",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "估值约 55 倍 ARR，缺少定价依据"
+        ]
+      },
+      {
+        "issue": "准确率和责任边界不清",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "准确率和责任边界不清"
+        ]
+      },
+      {
+        "issue": "价格锚点用错了对手",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "价格锚点用错了对手"
+        ]
+      },
+      {
+        "issue": "¥299 档服务边界模糊，未来功能当现有价值卖",
+        "personas": [
+          "P14-price-sensitive-buyer"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "¥299 档服务边界模糊，未来功能当现有价值卖"
+        ]
+      },
+      {
+        "issue": "缺少可视化证明（产品截图、演示、客户证言）",
+        "personas": [
+          "P10-steam-wishlist-browser"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "缺少可视化证明（产品截图、演示、客户证言）"
+        ]
+      },
+      {
+        "issue": "数据来源和样本不透明",
+        "personas": [
+          "P10-steam-wishlist-browser"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "数据来源和样本不透明"
+        ]
+      },
+      {
+        "issue": "团队背景无法核验",
+        "personas": [
+          "P10-steam-wishlist-browser"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "团队背景无法核验"
+        ]
+      },
+      {
+        "issue": "没有可传播的 hook 和可演示片段",
+        "personas": [
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有可传播的 hook 和可演示片段"
+        ]
+      },
+      {
+        "issue": "留存与获客渠道不清",
+        "personas": [
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "留存与获客渠道不清"
+        ]
+      },
+      {
+        "issue": "关键数字缺来源",
+        "personas": [
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "关键数字缺来源"
+        ]
+      }
+    ],
+    "stance_distribution": {
+      "观望": 6
+    },
+    "persona_count": 6,
+    "threshold": 0.7,
+    "min_personas_for_agreement": 5
+  },
+  "major_disagreements": [],
+  "priority_fixes": [
+    {
+      "priority": 1,
+      "issue": "6.2% 月流失率与差异化说法矛盾",
+      "severity": "high",
+      "why_it_matters": "流失说明用户试过之后选择离开，留存才是替代理由最硬的证据。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P13-publisher-scout",
+        "P14-price-sensitive-buyer",
+        "P10-steam-wishlist-browser"
+      ],
+      "suggested_fix": "披露流失用户去向、流失原因、分档和分省份留存曲线，并给出把流失降到 3% 以下的具体措施。",
+      "score": 6.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "6.2% 月流失率与差异化说法矛盾",
+        "留存和单位经济模型缺失，6.2%月流失偏高",
+        "6.2% 月流失率，和「值回票价」矛盾",
+        "月流失 6.2% 太高，也没有解释"
+      ]
+    },
+    {
+      "priority": 2,
+      "issue": "成熟度缺口：税务规则覆盖和合规责任不清",
+      "severity": "high",
+      "why_it_matters": "核心承诺是合规报表，但规则引擎覆盖的省份还不全，94.3% 准确率意味着仍有错账风险，一旦申报出错用户要承担后果。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P13-publisher-scout"
+      ],
+      "suggested_fix": "列出当前已覆盖省份、申报通过率，说明错误责任归属和复核机制，并给出覆盖路线图。",
+      "score": 3.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "成熟度缺口：税务规则覆盖和合规责任不清",
+        "税务规则引擎的scope风险和合规责任不明"
+      ]
+    },
+    {
+      "priority": 3,
+      "issue": "竞品框错位，真正的替代方案缺席",
+      "severity": "high",
+      "why_it_matters": "拿中型企业软件做对比，无法证明小微市场里的差异化。真实的竞争来自代账公司、轻量记账SaaS和平台自带功能，不比较就没法判断定价和份额。",
+      "affected_personas": [
+        "P13-publisher-scout",
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "重做竞品框：列出代账公司、柠檬云类轻量工具、银行与支付平台自带功能，并按价格、接入时间和合规覆盖逐项对比。",
+      "score": 3.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "竞品框错位，真正的替代方案缺席",
+        "竞品分析只有一个且比较维度错位"
+      ]
+    },
+    {
+      "priority": 4,
+      "issue": "回答不了“为什么不用现有替代品”",
+      "severity": "critical",
+      "why_it_matters": "对比对象选错了。真正的竞争是 Excel、代账公司和现有轻量记账工具，BP 全没比较。按我的规则，解释不了为什么不用竞品就算失败。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "suggested_fix": "补一张并排对比表：轻账、小微向竞品、代账服务、Excel，比较价格、准确率、省税务时间、合规覆盖。同时给出用户为什么选轻账的访谈或转化数据。",
+      "score": 2.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "回答不了“为什么不用现有替代品”"
+      ]
+    },
+    {
+      "priority": 5,
+      "issue": "没有“只有我们能做到”的机制证据",
+      "severity": "high",
+      "why_it_matters": "我判断项目的标准是有没有自己的一套东西。现在的差异化只是定位和易用性，大模型加银行流水分类谁都能做。竞品一比就容易显得平庸。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "说明难以复制的东西：税务规则引擎的覆盖和更新机制、流水数据积累形成的分类反馈闭环、与银行或支付渠道的独家接入。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有“只有我们能做到”的机制证据"
+      ]
+    },
+    {
+      "priority": 6,
+      "issue": "核心循环未被留存数据证明",
+      "severity": "high",
+      "why_it_matters": "月流失率6.2%说明‘每月对账出报表’的循环没有把用户留住。内测阶段样本只有217户，增长目标缺少依据。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "提供分月份的同期群留存、流失原因访谈、各档位的流失差异，以及用户每月使用次数。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "核心循环未被留存数据证明"
+      ]
+    },
+    {
+      "priority": 7,
+      "issue": "准确率指标证据过薄",
+      "severity": "high",
+      "why_it_matters": "500笔抽检、94.3%，没有说明样本来源、基线和错误后果。合规报表的错误会让用户承担税务风险。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "公开评测方法，按交易类型拆分准确率，说明人工复核流程和错分责任归属，并与规则法或通用大模型做对比。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "准确率指标证据过薄"
+      ]
+    },
+    {
+      "priority": 8,
+      "issue": "估值约 55 倍 ARR，缺少定价依据",
+      "severity": "high",
+      "why_it_matters": "我对价格和价值是否匹配最敏感。12% 对 300 万的隐含估值约 2500 万，对应 ARR 约 45.6 万，材料没有任何可比交易或增长证据来支撑。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "补充估值依据，包括可比融资、增长曲线和单位经济模型，或者说明估值有谈判空间。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "估值约 55 倍 ARR，缺少定价依据"
+      ]
+    },
+    {
+      "priority": 9,
+      "issue": "准确率和责任边界不清",
+      "severity": "high",
+      "why_it_matters": "94.3% 来自 500 笔抽检，报税场景里剩下 5.7% 的错误可能带来罚款。材料没说谁负责、怎么纠错，付费结构不透明。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "披露样本构成和分类别准确率，写清错账的纠错流程与责任条款，给出人工复核的比例。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "准确率和责任边界不清"
+      ]
+    },
+    {
+      "priority": 10,
+      "issue": "缺少可视化证明（产品截图、演示、客户证言）",
+      "severity": "high",
+      "why_it_matters": "我的判断靠首屏证据。现在只有文字承诺，没有任何一眼能看到的东西，所以我没法点“加愿望单”，也就是没法判断要不要继续跟进。",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "suggested_fix": "在最前面放 30 秒产品演示 GIF，展示银行流水导入到报表导出的完整过程，再附 2-3 条真实客户证言。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "缺少可视化证明（产品截图、演示、客户证言）"
+      ]
+    },
+    {
+      "priority": 11,
+      "issue": "没有可传播的 hook 和可演示片段",
+      "severity": "high",
+      "why_it_matters": "我看的是 3 分钟内观众能不能懂、能不能被吸引。这份 BP 只有数字和文字，没有演示，无法判断产品有没有传播性。这是传播维度的信息缺失，不等于产品本身不行。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "补一个 60 秒演示：从导入流水到报表生成的前后对比，再加上'老板月底对账崩溃 vs 10 分钟搞定'的故事化素材。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有可传播的 hook 和可演示片段"
+      ]
+    },
+    {
+      "priority": 12,
+      "issue": "留存与获客渠道不清",
+      "severity": "high",
+      "why_it_matters": "6.2% 的月流失率偏高，25% 的获客预算没有渠道说明。没有内容或口碑增长路径，增长靠烧钱。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "说明流失原因，补充获客渠道和 CAC，以及是否有创作者、社群或可分享报表等自传播机制。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "留存与获客渠道不清"
+      ]
+    },
+    {
+      "priority": 13,
+      "issue": "迁移成本和增长路径没有数据",
+      "severity": "medium",
+      "why_it_matters": "只说接入 10 分钟，没有谈历史数据迁移、与会计税务衔接。MRR 增长 13 倍却缺少 CAC、渠道、转化数据。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "suggested_fix": "补充历史账导入流程、迁移耗时实测、各渠道 CAC 和回收期。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "迁移成本和增长路径没有数据"
+      ]
+    },
+    {
+      "priority": 14,
+      "issue": "USP泛化，营销钩子缺乏可验证的结果",
+      "severity": "medium",
+      "why_it_matters": "“门槛低、无需会计知识”容易被复制，也不够有说服力，不利于低成本获客。",
+      "affected_personas": [
+        "P13-publisher-scout"
+      ],
+      "suggested_fix": "用内测用户的实测数据（节省小时数、报税通过率、对账时间）做案例，并提出一个可复制的渠道，例如银行或支付平台合作。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "USP泛化，营销钩子缺乏可验证的结果"
+      ]
+    },
+    {
+      "priority": 15,
+      "issue": "首次使用体验没有证据",
+      "severity": "medium",
+      "why_it_matters": "“10分钟接入”是主要卖点，但没有演示或数据证明，也没有说明授权合规。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "附上产品录屏或试用链接，给出首次报表的实测耗时和用户修正次数。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "首次使用体验没有证据"
+      ]
+    },
+    {
+      "priority": 16,
+      "issue": "价格锚点用错了对手",
+      "severity": "medium",
+      "why_it_matters": "拿中型企业的「记账通」做 4 倍对比，不能说明 ¥99/¥299 对小微主划算。真正的替代是 Excel、代账公司和免费工具。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "补一张表，对比代账公司月费、自己对账的工时成本和轻账价格。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "价格锚点用错了对手"
+      ]
+    },
+    {
+      "priority": 17,
+      "issue": "¥299 档服务边界模糊，未来功能当现有价值卖",
+      "severity": "medium",
+      "why_it_matters": "税务顾问答疑没有次数和时效，省份覆盖要靠本轮融资才能做到。付费用户可能买了用不上。",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "suggested_fix": "列出当前已覆盖的省份，写明答疑次数和响应时限，给出试用或退款条款。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "¥299 档服务边界模糊，未来功能当现有价值卖"
+      ]
+    },
+    {
+      "priority": 18,
+      "issue": "数据来源和样本不透明",
+      "severity": "medium",
+      "why_it_matters": "“4800 万”“六成”“94.3%”都没有出处，抽检方也没说明，读起来像通稿，信任度上不去。",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "suggested_fix": "标注数据来源和抽检方法，并给出误分类的影响，例如对报税结果有没有影响。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "数据来源和样本不透明"
+      ]
+    },
+    {
+      "priority": 19,
+      "issue": "团队背景无法核验",
+      "severity": "medium",
+      "why_it_matters": "只写“前某银行”而不写姓名和链接，别人无法核验，团队可信度就只能靠信。",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "suggested_fix": "补上创始人姓名、LinkedIn 或公开履历，并写明注册会计师的具体角色。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "团队背景无法核验"
+      ]
+    },
+    {
+      "priority": 20,
+      "issue": "关键数字缺来源",
+      "severity": "medium",
+      "why_it_matters": "4800 万、六成、8-15 小时、94.3% 都没有出处，样本也只有 500 笔，容易被质疑。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "附上数据来源和抽检方法，并说明 217 个用户的获客渠道。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "关键数字缺来源"
+      ]
+    }
+  ],
+  "persona_notes": [
+    {
+      "persona_id": "P16-competitor-loyal-veteran",
+      "persona_name": "艾德",
+      "stance": "观望",
+      "evidence_top3": [
+        "BP 只拿用友畅捷通、记账通这类面向中型企业的产品做对比，定位避开了正面交锋。但小微主真正的替代品是 Excel、纸质账本，以及面向小微的代账公司和现有轻量记账工具，这些材料都没有比较。",
+        "差异化只列了三个定性卖点，没有和任何同价位产品做功能、价格、准确率的并排对比。",
+        "月流失率 6.2% 说明用户并没有被说服留下来。按此估算，平均生命周期只有 16 个月左右，早期用户就在往别处走。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "BP 只拿用友畅捷通、记账通这类面向中型企业的产品做对比，定位避开了正面交锋。但小微主真正的替代品是 Excel、纸质账本，以及面向小微的代账公司和现有轻量记账工具，这些材料都没有比较。",
+          "level": "direct",
+          "quote": "市面上的财务软件（如用友畅捷通）面向的是有专职\n会计的中型企业，操作复杂度对小微主来说过高。"
+        },
+        {
+          "content": "差异化只列了三个定性卖点，没有和任何同价位产品做功能、价格、准确率的并排对比。",
+          "level": "direct",
+          "quote": "我们的差异化：专注小微、接入门槛低于 10 分钟、无需任何会计知识。"
+        },
+        {
+          "content": "月流失率 6.2% 说明用户并没有被说服留下来。按此估算，平均生命周期只有 16 个月左右，早期用户就在往别处走。",
+          "level": "direct",
+          "quote": "月流失率 6.2%"
+        }
+      ],
+      "top_issues": [
+        "回答不了“为什么不用现有替代品”",
+        "6.2% 月流失率与差异化说法矛盾",
+        "成熟度缺口：税务规则覆盖和合规责任不清",
+        "迁移成本和增长路径没有数据"
+      ],
+      "continue_triggers": [
+        "给出与小微向竞品和代账服务的并排对比，并有明显优于对方的一维",
+        "披露留存和流失原因，且有改善趋势",
+        "给出已覆盖省份的申报通过率，以及错误责任机制",
+        "提供 CAC、渠道、分档数据，证明增长路径可行"
+      ],
+      "quit_triggers": [
+        "解释不了为什么不用小微向竞品或代账公司",
+        "流失率持续在 6% 以上且找不出原因",
+        "税务合规覆盖大幅落后于现有产品",
+        "合规出错时无人负责"
+      ]
+    },
+    {
+      "persona_id": "P13-publisher-scout",
+      "persona_name": "Eva",
+      "stance": "观望",
+      "evidence_top3": [
+        "一句话pitch的target和hook都清楚：对象是10人以下小微企业，hook是用AI从银行流水直接生成合规报表。这一项通过。",
+        "定位有一定聚焦：目标是没有专职会计的小微主。但ICP仍然偏宽，没有按行业、流水规模或开票类型细分。",
+        "竞品框摆得不对。用友畅捷通和记账通都是中型企业产品，它们不是小微主真正的替代方案。真正的对手应该是代账公司、柠檬云这类轻量工具，以及银行或支付宝自带的账务功能。材料没有提到这些，因此无法判断可比性。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "一句话pitch的target和hook都清楚：对象是10人以下小微企业，hook是用AI从银行流水直接生成合规报表。这一项通过。",
+          "level": "direct",
+          "quote": "面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。"
+        },
+        {
+          "content": "定位有一定聚焦：目标是没有专职会计的小微主。但ICP仍然偏宽，没有按行业、流水规模或开票类型细分。",
+          "level": "direct",
+          "quote": "国内约 4800 万小微企业主中，超过六成仍用 Excel 或纸质账本记账"
+        },
+        {
+          "content": "竞品框摆得不对。用友畅捷通和记账通都是中型企业产品，它们不是小微主真正的替代方案。真正的对手应该是代账公司、柠檬云这类轻量工具，以及银行或支付宝自带的账务功能。材料没有提到这些，因此无法判断可比性。",
+          "level": "direct",
+          "quote": "同类产品「记账通」融资至 B 轮，但定位中型企业，客单价是我们的 4 倍。"
+        }
+      ],
+      "top_issues": [
+        "竞品框错位，真正的替代方案缺席",
+        "留存和单位经济模型缺失，6.2%月流失偏高",
+        "税务规则引擎的scope风险和合规责任不明",
+        "USP泛化，营销钩子缺乏可验证的结果"
+      ],
+      "continue_triggers": [
+        "竞品框重做后，能证明相对代账公司和轻量SaaS的差异",
+        "给出分群留存数据和CAC，并显示流失率有下降趋势",
+        "验证至少一个获客成本可控的渠道",
+        "明确ICP，例如某类行业或某种流水规模"
+      ],
+      "quit_triggers": [
+        "获客只靠广撒网，没有聚焦的ICP",
+        "多省税务规则的维护成本远超团队与资金能力",
+        "流失率持续高于6%且无法解释",
+        "准确率无法提升到合规可接受水平"
+      ]
+    },
+    {
+      "persona_id": "P01-indie-core-operator",
+      "persona_name": "林岚",
+      "stance": "观望",
+      "evidence_top3": [
+        "一句话定位清楚：对象是10人以下小微企业，手段是AI从银行流水生成合规报表。核心钩子在15秒内可见，所以决策规则未被触发。但这个钩子是需求描述，不是只有它能做到的机制。",
+        "唯一的技术证据是分类模型准确率 94.3%。抽检样本只有500笔，没有说明来源、是否分账户或行业、错误类型和基线对比。对记账场景，6%的错分对合规报表可能是致命的。",
+        "留存证据偏弱。月流失率6.2%意味着年留存大约46%，对订阅SaaS偏差。这说明核心循环（每月自动对账、报表、申报）还没有把用户留住。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "一句话定位清楚：对象是10人以下小微企业，手段是AI从银行流水生成合规报表。核心钩子在15秒内可见，所以决策规则未被触发。但这个钩子是需求描述，不是只有它能做到的机制。",
+          "level": "direct",
+          "quote": "面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。"
+        },
+        {
+          "content": "唯一的技术证据是分类模型准确率 94.3%。抽检样本只有500笔，没有说明来源、是否分账户或行业、错误类型和基线对比。对记账场景，6%的错分对合规报表可能是致命的。",
+          "level": "direct",
+          "quote": "实测准确率 94.3%（人工抽检 500 笔交易）"
+        },
+        {
+          "content": "留存证据偏弱。月流失率6.2%意味着年留存大约46%，对订阅SaaS偏差。这说明核心循环（每月自动对账、报表、申报）还没有把用户留住。",
+          "level": "direct",
+          "quote": "当前 MRR：¥38,000（内测阶段，217 个付费用户，月流失率 6.2%）"
+        }
+      ],
+      "top_issues": [
+        "没有“只有我们能做到”的机制证据",
+        "核心循环未被留存数据证明",
+        "准确率指标证据过薄",
+        "竞品分析只有一个且比较维度错位",
+        "首次使用体验没有证据"
+      ],
+      "continue_triggers": [
+        "能展示一条别人做不到的机制，例如规则引擎覆盖度或数据反馈闭环",
+        "提供同期群留存数据，显示流失率持续下降",
+        "提供可试用的产品或首次使用的录屏",
+        "公开准确率评测方法，并有错误处理机制"
+      ],
+      "quit_triggers": [
+        "差异化最终只是便宜和易用",
+        "准确率和留存数据无法核实",
+        "竞品分析始终回避平台自带账本和AI记账新进入者"
+      ]
+    },
+    {
+      "persona_id": "P14-price-sensitive-buyer",
+      "persona_name": "张宁",
+      "stance": "观望",
+      "evidence_top3": [
+        "定价有明确数字，但只给价格，没给估值，也没解释为什么这个价位值得小微主付。",
+        "MRR 和付费用户数可以核对，但月流失率偏高，说明用户付费后不觉得值。",
+        "6.2% 的月流失率换算成年留存约 46%（0.938^12≈0.46）。用户平均只付费约 16 个月。这个换算是我自己算的。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "定价有明确数字，但只给价格，没给估值，也没解释为什么这个价位值得小微主付。",
+          "level": "direct",
+          "quote": "订阅制：¥99/月起（连接 1 个账户），¥299/月（多账户 + 税务顾问月度答疑）。"
+        },
+        {
+          "content": "MRR 和付费用户数可以核对，但月流失率偏高，说明用户付费后不觉得值。",
+          "level": "direct",
+          "quote": "当前 MRR：¥38,000（内测阶段，217 个付费用户，月流失率 6.2%）。"
+        },
+        {
+          "content": "6.2% 的月流失率换算成年留存约 46%（0.938^12≈0.46）。用户平均只付费约 16 个月。这个换算是我自己算的。",
+          "level": "inferred"
+        }
+      ],
+      "top_issues": [
+        "估值约 55 倍 ARR，缺少定价依据",
+        "6.2% 月流失率，和「值回票价」矛盾",
+        "准确率和责任边界不清",
+        "价格锚点用错了对手",
+        "¥299 档服务边界模糊，未来功能当现有价值卖"
+      ],
+      "continue_triggers": [
+        "提供同期群留存和流失原因分析，显示流失在下降",
+        "给出代账公司与 Excel 对比的价格价值表",
+        "说明准确率分类别数据和错误责任条款",
+        "给出估值依据和单位经济模型",
+        "提供免费试用或退款保障的细节"
+      ],
+      "quit_triggers": [
+        "流失率持续高于 5% 且无法解释",
+        "把尚未上线的省份规则当现有卖点",
+        "付费套餐和服务边界始终不透明",
+        "没有试错空间，比如没有试用或退款"
+      ]
+    },
+    {
+      "persona_id": "P10-steam-wishlist-browser",
+      "persona_name": "Mika",
+      "stance": "观望",
+      "evidence_top3": [
+        "一句话介绍在 20 秒内讲清对象、动作和产出，核心承诺清楚，没有触发“离开”规则。",
+        "痛点有具体数字，首屏有钩子。但没有标明数据来源。",
+        "准确率 94.3% 是整份材料里最像证据的数字，样本只有 500 笔，也没说是谁抽检的。这个数字有用，但还不够当证明。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "一句话介绍在 20 秒内讲清对象、动作和产出，核心承诺清楚，没有触发“离开”规则。",
+          "level": "direct",
+          "quote": "面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。"
+        },
+        {
+          "content": "痛点有具体数字，首屏有钩子。但没有标明数据来源。",
+          "level": "direct",
+          "quote": "超过六成仍用 Excel 或纸质账本记账，每月花费 8-15 小时在对账与报税准备上"
+        },
+        {
+          "content": "准确率 94.3% 是整份材料里最像证据的数字，样本只有 500 笔，也没说是谁抽检的。这个数字有用，但还不够当证明。",
+          "level": "direct",
+          "quote": "实测准确率 94.3%（人工抽检 500 笔交易）"
+        }
+      ],
+      "top_issues": [
+        "缺少可视化证明（产品截图、演示、客户证言）",
+        "月流失 6.2% 太高，也没有解释",
+        "数据来源和样本不透明",
+        "团队背景无法核验"
+      ],
+      "continue_triggers": [
+        "产品演示 GIF 或可试用链接",
+        "公开的客户证言或留存数据",
+        "可核验的创始人履历",
+        "对流失率的解释和改进计划"
+      ],
+      "quit_triggers": [
+        "数据继续没有来源",
+        "没有任何产品画面",
+        "流失率持续高于 6%",
+        "描述一直像通稿"
+      ]
+    },
+    {
+      "persona_id": "P12-streamer-entertainment-creator",
+      "persona_name": "Ken",
+      "stance": "观望",
+      "evidence_top3": [
+        "一句话介绍清楚，三秒能懂产品是什么、给谁。但这是财务工具，hook 是效率而不是节目效果；对直播观众没有天然的可看性。",
+        "痛点数字有冲击力（每月 8-15 小时），可以做'前后对比'式的短视频 hook，但材料没有来源。",
+        "核心看点是 94.3% 准确率，但只是一个数字，没有演示或可视化。剩下 5.7% 的错分类反而可能是'翻车'素材，但材料没提。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "一句话介绍清楚，三秒能懂产品是什么、给谁。但这是财务工具，hook 是效率而不是节目效果；对直播观众没有天然的可看性。",
+          "level": "direct",
+          "quote": "面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。"
+        },
+        {
+          "content": "痛点数字有冲击力（每月 8-15 小时），可以做'前后对比'式的短视频 hook，但材料没有来源。",
+          "level": "direct",
+          "quote": "每月花费 8-15 小时在对账与报税准备上"
+        },
+        {
+          "content": "核心看点是 94.3% 准确率，但只是一个数字，没有演示或可视化。剩下 5.7% 的错分类反而可能是'翻车'素材，但材料没提。",
+          "level": "direct",
+          "quote": "实测准确率 94.3%（人工抽检 500 笔交易）"
+        }
+      ],
+      "top_issues": [
+        "没有可传播的 hook 和可演示片段",
+        "留存与获客渠道不清",
+        "关键数字缺来源"
+      ],
+      "continue_triggers": [
+        "有 60 秒可看的产品演示",
+        "有明确的内容或创作者获客渠道",
+        "流失率下降且有留存数据"
+      ],
+      "quit_triggers": [
+        "没有任何演示或可视化素材",
+        "获客只靠烧钱投放",
+        "流失率持续高于 6%"
+      ]
+    }
+  ],
+  "evidence_profile": {
+    "total": 55,
+    "direct": 41,
+    "inferred": 10,
+    "gap": 4,
+    "inferred_ratio": 0.182,
+    "threshold": 0.4,
+    "per_persona": [
+      {
+        "persona_id": "P16-competitor-loyal-veteran",
+        "direct": 7,
+        "inferred": 2,
+        "gap": 0,
+        "total": 9,
+        "inferred_ratio": 0.222
+      },
+      {
+        "persona_id": "P13-publisher-scout",
+        "direct": 7,
+        "inferred": 1,
+        "gap": 1,
+        "total": 9,
+        "inferred_ratio": 0.111
+      },
+      {
+        "persona_id": "P01-indie-core-operator",
+        "direct": 8,
+        "inferred": 2,
+        "gap": 0,
+        "total": 10,
+        "inferred_ratio": 0.2
+      },
+      {
+        "persona_id": "P14-price-sensitive-buyer",
+        "direct": 7,
+        "inferred": 3,
+        "gap": 1,
+        "total": 11,
+        "inferred_ratio": 0.273
+      },
+      {
+        "persona_id": "P10-steam-wishlist-browser",
+        "direct": 6,
+        "inferred": 1,
+        "gap": 1,
+        "total": 8,
+        "inferred_ratio": 0.125
+      },
+      {
+        "persona_id": "P12-streamer-entertainment-creator",
+        "direct": 6,
+        "inferred": 1,
+        "gap": 1,
+        "total": 8,
+        "inferred_ratio": 0.125
+      }
+    ]
+  },
+  "dimension_scores": [
+    {
+      "dim": "clarity",
+      "avg": 4.0,
+      "min": 4.0,
+      "max": 4.0,
+      "count": 6
+    },
+    {
+      "dim": "trust",
+      "avg": 2.67,
+      "min": 2.0,
+      "max": 3.0,
+      "count": 6
+    },
+    {
+      "dim": "market_potential",
+      "avg": 3.0,
+      "min": 3.0,
+      "max": 3.0,
+      "count": 6
+    },
+    {
+      "dim": "team_credibility",
+      "avg": 3.0,
+      "min": 3.0,
+      "max": 3.0,
+      "count": 6
+    },
+    {
+      "dim": "evidence_quality",
+      "avg": 2.17,
+      "min": 2.0,
+      "max": 3.0,
+      "count": 6
+    }
+  ],
+  "information_gaps": [
+    "与小微向竞品、代账服务的并排对比",
+    "流失原因和留存曲线",
+    "已覆盖省份和申报通过率",
+    "获客渠道、CAC 和回收期",
+    "套餐分档的用户比例",
+    "历史数据迁移方案",
+    "错账责任条款",
+    "获客渠道与CAC",
+    "分群留存曲线与流失原因",
+    "市场规模的数据来源（4800万、六成）",
+    "真实竞品（代账公司、轻量SaaS）的对比",
+    "估值依据",
+    "准确率的基线对比与错误处理责任",
+    "创始人履历的可核验细节",
+    "分省上线路线图与边际成本",
+    "规则引擎目前覆盖的省份和更新机制",
+    "同期群留存和各档位用户占比",
+    "准确率评测的样本构成和错误类型",
+    "获客渠道和CAC",
+    "产品演示或截图",
+    "团队成员可核验的履历",
+    "银行和支付平台接入的授权和合规方式",
+    "市场规模数据来源和可服务市场推算",
+    "代账公司和免费工具的价格对比",
+    "同期群留存与流失原因",
+    "CAC 与回收期",
+    "准确率样本构成与错误责任条款",
+    "¥299 档答疑次数与时效",
+    "已覆盖的省份清单",
+    "「4800 万」「六成」的数据来源",
+    "是否有试用或退款",
+    "产品截图或演示",
+    "客户证言或案例",
+    "月留存曲线",
+    "数据来源和抽检方",
+    "团队成员姓名和可核验履历",
+    "获客成本和渠道",
+    "税务规则引擎的合规验证",
+    "获客渠道和 CAC",
+    "流失原因",
+    "数据来源",
+    "217 个用户的构成"
+  ],
+  "next_human_test": {
+    "suggested_tasks": [],
+    "recruit_types": [
+      "27-40 · 北美 · 核心老兵 · PC/Console · genre-veteran",
+      "31-45 · 欧洲 · 商业视角 · PC/Console/MobileMarket · broad-market",
+      "25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim",
+      "24-40 · 中国大陆 · 中核消费型 · PC/Mobile · broad",
+      "23-35 · 北美城市 · 平台重度浏览 · PC/SteamDeck · wide-variety",
+      "21-34 · 北美/全球直播社区 · 核心 · PC · party/sandbox/co-op-chaos"
+    ],
+    "recruit_types_basis": "本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议",
+    "next_materials": [
+      "补充材料：与小微向竞品、代账服务的并排对比",
+      "补充材料：流失原因和留存曲线",
+      "补充材料：已覆盖省份和申报通过率",
+      "补充材料：获客渠道、CAC 和回收期",
+      "补充材料：套餐分档的用户比例",
+      "补充材料：历史数据迁移方案",
+      "补充材料：错账责任条款",
+      "补充材料：获客渠道与CAC",
+      "补充材料：分群留存曲线与流失原因",
+      "补充材料：市场规模的数据来源（4800万、六成）",
+      "补充材料：真实竞品（代账公司、轻量SaaS）的对比",
+      "补充材料：估值依据",
+      "补充材料：准确率的基线对比与错误处理责任",
+      "补充材料：创始人履历的可核验细节",
+      "补充材料：分省上线路线图与边际成本",
+      "补充材料：规则引擎目前覆盖的省份和更新机制",
+      "补充材料：同期群留存和各档位用户占比",
+      "补充材料：准确率评测的样本构成和错误类型",
+      "补充材料：获客渠道和CAC",
+      "补充材料：产品演示或截图",
+      "补充材料：团队成员可核验的履历",
+      "补充材料：银行和支付平台接入的授权和合规方式",
+      "补充材料：市场规模数据来源和可服务市场推算",
+      "补充材料：代账公司和免费工具的价格对比",
+      "补充材料：同期群留存与流失原因",
+      "补充材料：CAC 与回收期",
+      "补充材料：准确率样本构成与错误责任条款",
+      "补充材料：¥299 档答疑次数与时效",
+      "补充材料：已覆盖的省份清单",
+      "补充材料：「4800 万」「六成」的数据来源",
+      "补充材料：是否有试用或退款",
+      "补充材料：产品截图或演示",
+      "补充材料：客户证言或案例",
+      "补充材料：月留存曲线",
+      "补充材料：数据来源和抽检方",
+      "补充材料：团队成员姓名和可核验履历",
+      "补充材料：获客成本和渠道",
+      "补充材料：税务规则引擎的合规验证",
+      "补充材料：获客渠道和 CAC",
+      "补充材料：流失原因",
+      "补充材料：数据来源",
+      "补充材料：217 个用户的构成"
+    ]
+  },
+  "cross_examination": {
+    "mode": "moderated_rebuttal",
+    "is_live_debate": true,
+    "requested_mode": "moderated_rebuttal",
+    "limitation": "本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。",
+    "threshold": 0.15,
+    "threshold_source": "rules-dict",
+    "allow_stance_update": true,
+    "rounds": [
+      {
+        "round_num": 1,
+        "is_current": true
+      }
+    ],
+    "disputes": [
+      {
+        "point_id": "C1",
+        "topic": "成熟度缺口：税务规则覆盖和合规责任不清",
+        "pro_args": [
+          {
+            "argument_id": "A1",
+            "point": "核心承诺是合规报表，但规则引擎覆盖的省份还不全，94.3% 准确率意味着仍有错账风险，一旦申报出错用户要承担后果。",
+            "persona_id": "艾德",
+            "persona_key": "P16-competitor-loyal-veteran",
+            "severity": "high",
+            "rebuttal": "这是 A1 对 B1 的反驳。B1 把重点放在维护成本随省份数线性增长，这是规模化阶段的经济性问题，而 A1 担心的是当前阶段用户申报出错要自担后果，两者的紧迫程度不同。B1 自己也承认责任归属不清是硬风险，实际上印证了 A1 的核心判断，只给 medium 与此矛盾。B1 的「线性增长」也只是推测，没有数据支撑，而且线性增长并不必然成为问题，关键看单省边际成本。不过 B1 提出的规则更新机制确实补充了 A1 缺少的长期维度。A1 的论据没有被推翻，所以保持原立场与置信度。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B1",
+            "point": "多省份规则会持续变化，维护成本可能随省份数线性增长。94.3%准确率下出错的责任归属不清，这对合规产品是硬风险。",
+            "persona_id": "Eva",
+            "persona_key": "P13-publisher-scout",
+            "severity": "medium",
+            "rebuttal": "这是 B1 对 A1 的反驳。A1 从 94.3% 的准确率直接推出申报出错、用户承担后果，中间跳了几步：94.3% 是什么口径（字段级、单笔还是整张报表）、是否经过人工复核、错误是否在申报前被拦截，这些都没有说明，所以 high 的严重度缺少事实依据。A1 的整改要求（省份清单、通过率、复核机制、路线图）基本是信息披露，说明问题可以通过补材料解决，与 high 级别的结构性缺陷不太匹配。A1 也没有触及规则持续变化带来的长期可持续性问题。但 A1 指出覆盖不全与合规承诺之间存在落差，这一点成立，所以 B1 保留 medium 立场，置信度略降。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      },
+      {
+        "point_id": "C2",
+        "topic": "竞品框错位，真正的替代方案缺席",
+        "pro_args": [
+          {
+            "argument_id": "A2",
+            "point": "拿中型企业软件做对比，无法证明小微市场里的差异化。真实的竞争来自代账公司、轻量记账SaaS和平台自带功能，不比较就没法判断定价和份额。",
+            "persona_id": "Eva",
+            "persona_key": "P13-publisher-scout",
+            "severity": "high",
+            "rebuttal": "这是 A2 对 B2 的反驳。B2 的清单里已经有支付平台账本、银行工具、代账公司，与 A2 的方向一致，分歧只在严重度。但 B2 把问题当作补一张对比表就能解决，低估了竞品框错位的影响：拿中型企业软件对比会误导定价与份额判断，使整个市场定位论证站不住，不只是缺少一张表。B2 还要求解释「代账公司低价服务为何不是替代品」，这说明它也认为代账公司是关键替代方案，与 medium 的判断有些矛盾。B2 提到的 AI 记账创业公司是有价值的补充，但没有改变 A2 的核心判断，所以保持原立场与置信度。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B2",
+            "point": "只拿记账通对比客单价，没有和真正的竞争对手比较：支付平台自带账本、银行财务工具、代账公司以及其他AI记账创业公司。",
+            "persona_id": "林岚",
+            "persona_key": "P01-indie-core-operator",
+            "severity": "medium",
+            "rebuttal": "这是 B2 对 A2 的反驳。A2 说「无法证明差异化」「没法判断定价和份额」，但没有说明现有材料中哪些结论因此失效，影响范围可能被放大。竞品框错位是可以通过补充对比修正的信息缺口，不是产品本身的缺陷，所以 high 偏高。A2 的竞品清单也漏掉了其他 AI 记账创业公司，这是最直接的同类竞争者，而且按价格、接入时间和合规覆盖对比，没有包含获客方式，这一点对小微市场很关键。不过 A2 指出的问题确实比单纯缺一张表严重：对比对象错位会影响定价与份额判断。B2 因此保持 medium，置信度小幅下调。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      }
+    ],
+    "vote_changes": [],
+    "suppressed_changes": [],
+    "confidence_changes": [
+      {
+        "persona_id": "艾德",
+        "persona_key": "P16-competitor-loyal-veteran",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Eva",
+        "persona_key": "P13-publisher-scout",
+        "before": 70,
+        "after": 70,
+        "delta": 0,
+        "confidence_before": 0.7,
+        "confidence_after": 0.7
+      },
+      {
+        "persona_id": "林岚",
+        "persona_key": "P01-indie-core-operator",
+        "before": 60,
+        "after": 57,
+        "delta": -3,
+        "confidence_before": 0.6,
+        "confidence_after": 0.57
+      },
+      {
+        "persona_id": "张宁",
+        "persona_key": "P14-price-sensitive-buyer",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Mika",
+        "persona_key": "P10-steam-wishlist-browser",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Ken",
+        "persona_key": "P12-streamer-entertainment-creator",
+        "before": 50,
+        "after": 50,
+        "delta": 0,
+        "confidence_before": 0.5,
+        "confidence_after": 0.5
+      }
+    ],
+    "failures": [],
+    "usage": {
+      "calls": 1,
+      "input_tokens": 1526,
+      "output_tokens": 1316,
+      "token_counts_available": true,
+      "confidence_values_rescaled": 0
+    }
+  },
+  "compliance": {
+    "status": "通过",
+    "status_class": "pass",
+    "ethics_score": 100,
+    "score_class": "high",
+    "recommended_steps": [
+      "结果可供参考，但仍建议人工抽检"
+    ],
+    "scope": "identity_behavior_decoupling",
+    "scope_label": "身份-行为解耦检查",
+    "violation_count": 0
+  },
+  "predictions": [
+    {
+      "prediction_id": "PRED-001",
+      "type": "intervention_hypothesis",
+      "claim": "修复“6.2% 月流失率与差异化说法矛盾”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "6.2% 月流失率与差异化说法矛盾",
+      "intervention": "披露流失用户去向、流失原因、分档和分省份留存曲线，并给出把流失降到 3% 以下的具体措施。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.75,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P13-publisher-scout",
+        "P14-price-sensitive-buyer",
+        "P10-steam-wishlist-browser"
+      ],
+      "evidence": "流失说明用户试过之后选择离开，留存才是替代理由最硬的证据。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-002",
+      "type": "intervention_hypothesis",
+      "claim": "修复“成熟度缺口：税务规则覆盖和合规责任不清”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "成熟度缺口：税务规则覆盖和合规责任不清",
+      "intervention": "列出当前已覆盖省份、申报通过率，说明错误责任归属和复核机制，并给出覆盖路线图。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.7,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P13-publisher-scout"
+      ],
+      "evidence": "核心承诺是合规报表，但规则引擎覆盖的省份还不全，94.3% 准确率意味着仍有错账风险，一旦申报出错用户要承担后果。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-003",
+      "type": "intervention_hypothesis",
+      "claim": "修复“竞品框错位，真正的替代方案缺席”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "竞品框错位，真正的替代方案缺席",
+      "intervention": "重做竞品框：列出代账公司、柠檬云类轻量工具、银行与支付平台自带功能，并按价格、接入时间和合规覆盖逐项对比。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.7,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P13-publisher-scout",
+        "P01-indie-core-operator"
+      ],
+      "evidence": "拿中型企业软件做对比，无法证明小微市场里的差异化。真实的竞争来自代账公司、轻量记账SaaS和平台自带功能，不比较就没法判断定价和份额。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-004",
+      "type": "intervention_hypothesis",
+      "claim": "修复“回答不了“为什么不用现有替代品””后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "回答不了“为什么不用现有替代品”",
+      "intervention": "补一张并排对比表：轻账、小微向竞品、代账服务、Excel，比较价格、准确率、省税务时间、合规覆盖。同时给出用户为什么选轻账的访谈或转化数据。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "critical",
+      "confidence": 0.775,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "evidence": "对比对象选错了。真正的竞争是 Excel、代账公司和现有轻量记账工具，BP 全没比较。按我的规则，解释不了为什么不用竞品就算失败。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-005",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有“只有我们能做到”的机制证据”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "没有“只有我们能做到”的机制证据",
+      "intervention": "说明难以复制的东西：税务规则引擎的覆盖和更新机制、流水数据积累形成的分类反馈闭环、与银行或支付渠道的独家接入。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "我判断项目的标准是有没有自己的一套东西。现在的差异化只是定位和易用性，大模型加银行流水分类谁都能做。竞品一比就容易显得平庸。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-006",
+      "type": "intervention_hypothesis",
+      "claim": "修复“核心循环未被留存数据证明”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "核心循环未被留存数据证明",
+      "intervention": "提供分月份的同期群留存、流失原因访谈、各档位的流失差异，以及用户每月使用次数。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "月流失率6.2%说明‘每月对账出报表’的循环没有把用户留住。内测阶段样本只有217户，增长目标缺少依据。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-007",
+      "type": "intervention_hypothesis",
+      "claim": "修复“准确率指标证据过薄”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "准确率指标证据过薄",
+      "intervention": "公开评测方法，按交易类型拆分准确率，说明人工复核流程和错分责任归属，并与规则法或通用大模型做对比。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "500笔抽检、94.3%，没有说明样本来源、基线和错误后果。合规报表的错误会让用户承担税务风险。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-008",
+      "type": "intervention_hypothesis",
+      "claim": "修复“估值约 55 倍 ARR，缺少定价依据”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "估值约 55 倍 ARR，缺少定价依据",
+      "intervention": "补充估值依据，包括可比融资、增长曲线和单位经济模型，或者说明估值有谈判空间。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "我对价格和价值是否匹配最敏感。12% 对 300 万的隐含估值约 2500 万，对应 ARR 约 45.6 万，材料没有任何可比交易或增长证据来支撑。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-009",
+      "type": "intervention_hypothesis",
+      "claim": "修复“准确率和责任边界不清”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "准确率和责任边界不清",
+      "intervention": "披露样本构成和分类别准确率，写清错账的纠错流程与责任条款，给出人工复核的比例。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "94.3% 来自 500 笔抽检，报税场景里剩下 5.7% 的错误可能带来罚款。材料没说谁负责、怎么纠错，付费结构不透明。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-010",
+      "type": "intervention_hypothesis",
+      "claim": "修复“缺少可视化证明（产品截图、演示、客户证言）”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "缺少可视化证明（产品截图、演示、客户证言）",
+      "intervention": "在最前面放 30 秒产品演示 GIF，展示银行流水导入到报表导出的完整过程，再附 2-3 条真实客户证言。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "evidence": "我的判断靠首屏证据。现在只有文字承诺，没有任何一眼能看到的东西，所以我没法点“加愿望单”，也就是没法判断要不要继续跟进。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-011",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有可传播的 hook 和可演示片段”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "没有可传播的 hook 和可演示片段",
+      "intervention": "补一个 60 秒演示：从导入流水到报表生成的前后对比，再加上'老板月底对账崩溃 vs 10 分钟搞定'的故事化素材。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "我看的是 3 分钟内观众能不能懂、能不能被吸引。这份 BP 只有数字和文字，没有演示，无法判断产品有没有传播性。这是传播维度的信息缺失，不等于产品本身不行。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-012",
+      "type": "intervention_hypothesis",
+      "claim": "修复“留存与获客渠道不清”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "留存与获客渠道不清",
+      "intervention": "说明流失原因，补充获客渠道和 CAC，以及是否有创作者、社群或可分享报表等自传播机制。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.675,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "6.2% 的月流失率偏高，25% 的获客预算没有渠道说明。没有内容或口碑增长路径，增长靠烧钱。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-013",
+      "type": "intervention_hypothesis",
+      "claim": "修复“迁移成本和增长路径没有数据”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "迁移成本和增长路径没有数据",
+      "intervention": "补充历史账导入流程、迁移耗时实测、各渠道 CAC 和回收期。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "evidence": "只说接入 10 分钟，没有谈历史数据迁移、与会计税务衔接。MRR 增长 13 倍却缺少 CAC、渠道、转化数据。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-014",
+      "type": "intervention_hypothesis",
+      "claim": "修复“USP泛化，营销钩子缺乏可验证的结果”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "USP泛化，营销钩子缺乏可验证的结果",
+      "intervention": "用内测用户的实测数据（节省小时数、报税通过率、对账时间）做案例，并提出一个可复制的渠道，例如银行或支付平台合作。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P13-publisher-scout"
+      ],
+      "evidence": "“门槛低、无需会计知识”容易被复制，也不够有说服力，不利于低成本获客。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-015",
+      "type": "intervention_hypothesis",
+      "claim": "修复“首次使用体验没有证据”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "首次使用体验没有证据",
+      "intervention": "附上产品录屏或试用链接，给出首次报表的实测耗时和用户修正次数。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "“10分钟接入”是主要卖点，但没有演示或数据证明，也没有说明授权合规。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-016",
+      "type": "intervention_hypothesis",
+      "claim": "修复“价格锚点用错了对手”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "价格锚点用错了对手",
+      "intervention": "补一张表，对比代账公司月费、自己对账的工时成本和轻账价格。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "拿中型企业的「记账通」做 4 倍对比，不能说明 ¥99/¥299 对小微主划算。真正的替代是 Excel、代账公司和免费工具。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-017",
+      "type": "intervention_hypothesis",
+      "claim": "修复“¥299 档服务边界模糊，未来功能当现有价值卖”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "¥299 档服务边界模糊，未来功能当现有价值卖",
+      "intervention": "列出当前已覆盖的省份，写明答疑次数和响应时限，给出试用或退款条款。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P14-price-sensitive-buyer"
+      ],
+      "evidence": "税务顾问答疑没有次数和时效，省份覆盖要靠本轮融资才能做到。付费用户可能买了用不上。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-018",
+      "type": "intervention_hypothesis",
+      "claim": "修复“数据来源和样本不透明”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "数据来源和样本不透明",
+      "intervention": "标注数据来源和抽检方法，并给出误分类的影响，例如对报税结果有没有影响。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "evidence": "“4800 万”“六成”“94.3%”都没有出处，抽检方也没说明，读起来像通稿，信任度上不去。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-019",
+      "type": "intervention_hypothesis",
+      "claim": "修复“团队背景无法核验”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "团队背景无法核验",
+      "intervention": "补上创始人姓名、LinkedIn 或公开履历，并写明注册会计师的具体角色。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P10-steam-wishlist-browser"
+      ],
+      "evidence": "只写“前某银行”而不写姓名和链接，别人无法核验，团队可信度就只能靠信。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-020",
+      "type": "intervention_hypothesis",
+      "claim": "修复“关键数字缺来源”后，qualified_followup_rate 相较当前版本将提高",
+      "issue": "关键数字缺来源",
+      "intervention": "附上数据来源和抽检方法，并说明 217 个用户的获客渠道。",
+      "target_metric": "qualified_followup_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.qualified_followup_rate > control.qualified_followup_rate",
+      "verification_window": "30d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.575,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "4800 万、六成、8-15 小时、94.3% 都没有出处，样本也只有 500 笔，容易被质疑。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    }
+  ],
+  "adaptive_panel": {
+    "requested": false,
+    "enabled": false,
+    "disabled_reason": null,
+    "method": "fixed_panel",
+    "initial_size": null,
+    "eligible_personas": 6,
+    "executed_personas": 6,
+    "saved_persona_calls": 0,
+    "min_score": null,
+    "decisions": [],
+    "limitation": null
+  },
+  "degradation": {
+    "degraded": false,
+    "attempted_count": 6,
+    "succeeded_count": 6,
+    "failed_count": 0,
+    "failed_personas": [],
+    "notice": ""
+  },
+  "abstentions": [],
+  "validation": {
+    "retry": {
+      "max_retries": 1,
+      "retry_on": [
+        "transport_error",
+        "schema_failure",
+        "hallucination"
+      ],
+      "unknown_retry_on": [],
+      "backoff_base_seconds": 1.0
+    },
+    "gated_out": []
+  },
+  "budget": {
+    "max_cost_per_run_usd": 1.5,
+    "persona_cost_usd": 0.363464,
+    "exceeded": false,
+    "skipped_stages": [],
+    "notice": ""
+  },
+  "dedup": {
+    "method": "semantic",
+    "notice": ""
+  }
+}

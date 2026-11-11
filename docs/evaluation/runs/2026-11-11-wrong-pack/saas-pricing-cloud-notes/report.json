@@ -1,0 +1,1379 @@
+{
+  "meta": {
+    "task_type": "pricing_page_review",
+    "target": "选择适合你的方案",
+    "generated_at": "2026-11-11T09:15:37.243913+00:00",
+    "is_synthetic": true,
+    "caveats": [
+      "仅基于定价页文本，无法核实产品实际成熟度、同步稳定性和社区规模",
+      "观望立场主要源于信息缺失（迁移、成熟度未说明），而非页面存在明确负面证据",
+      "对比表数据为页面自述，未经第三方验证",
+      "材料只有定价页文字，没有截图、视频或产品本身，对独特性和核心循环的判断主要来自缺失证据。",
+      "本评审由合成角色生成，基于“观望/信息不足”的立场，并非对产品负面证据的结论。",
+      "“15 秒内看不到核心钩子”的触发结论基于页面缺少定位和演示，不代表产品本身没有独特机制。",
+      "这是定价页评审，上手时间和单局时长是按“看懂页面和做决定要多久”“一次使用要花多久”来类比的，不是真实游戏体验。",
+      "小禾是轻度用户，不代表重度笔记用户或团队的判断。",
+      "材料没提供手机端界面和实际使用数据，相关判断只基于文字。",
+      "评审对象是定价页而不是游戏或内容产品，节目效果、clip密度、观众可读性、直播空窗这四项只能通过推断和缺口来评，不是直接证据。",
+      "核心规则“3分钟内没有可被观众理解的hook”在本材料里被触发，但这是由信息缺失造成，不是负面证据。",
+      "我的评判基于传播视角，不代表普通笔记用户的付费意愿。",
+      "材料是笔记软件定价页，与动作游戏人格的关注点不匹配，手感、判定、镜头、难度来源四项均无材料可判断，观望基于信息缺失而非负面证据",
+      "价格与权益的评分仅基于页面文字，未核验竞品数据"
+    ],
+    "build_version": "0.3.0",
+    "persona_pack_version": "game-core@0.1.0"
+  },
+  "executive_summary": {
+    "primary_recommendation": "观望",
+    "release_risk": "critical",
+    "evidence_quality": "weak"
+  },
+  "consensus": {
+    "agreed_points": [],
+    "questioned_points": [
+      "没有回答“为什么不用我现在的竞品”",
+      "迁移成本完全没交代",
+      "成熟度与社区基础无任何佐证",
+      "没有一句话说清“只有它能做到”的钩子",
+      "高级功能只列名词，没有核心循环证据",
+      "免费版的首 15 分钟体验不明确",
+      "团队版“联系销售”不透明",
+      "免费版撞到上限会怎样没讲",
+      "专业版功能名词太多，噪声大",
+      "没有说明能不能先试用专业版",
+      "没有可被观众理解的hook或演示",
+      "没有创作者或分享场景的权益",
+      "竞品对比对象匿名且只挑有利项",
+      "我关心的手感、判定、镜头、难度来源，这页一项都没有",
+      "AI 摘要和同步没写用量上限与超量规则"
+    ],
+    "shared_concerns": [
+      {
+        "issue": "没有回答“为什么不用我现在的竞品”",
+        "personas": [
+          "P16-competitor-loyal-veteran",
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "没有回答“为什么不用我现在的竞品”",
+          "竞品对比只比规格，且没有具名"
+        ]
+      },
+      {
+        "issue": "团队版“联系销售”不透明",
+        "personas": [
+          "P01-indie-core-operator",
+          "P03-challenge-hunter"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "团队版“联系销售”不透明",
+          "团队版只有联系销售，没有公开试用或演示入口"
+        ]
+      },
+      {
+        "issue": "没有说明能不能先试用专业版",
+        "personas": [
+          "P07-casual-mobile-dropin",
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "没有说明能不能先试用专业版",
+          "免费版只能 1 台设备，手机和电脑切换不明确",
+          "没有免费试用专业版的说明"
+        ]
+      },
+      {
+        "issue": "竞品对比对象匿名且只挑有利项",
+        "personas": [
+          "P12-streamer-entertainment-creator",
+          "P03-challenge-hunter"
+        ],
+        "persona_count": 2,
+        "is_consensus": false,
+        "title_variants": [
+          "竞品对比对象匿名且只挑有利项",
+          "竞品对比匿名且只挑有利维度"
+        ]
+      },
+      {
+        "issue": "迁移成本完全没交代",
+        "personas": [
+          "P16-competitor-loyal-veteran"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "迁移成本完全没交代",
+          "免费版和试用不足以做迁移验证"
+        ]
+      },
+      {
+        "issue": "成熟度与社区基础无任何佐证",
+        "personas": [
+          "P16-competitor-loyal-veteran"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "成熟度与社区基础无任何佐证"
+        ]
+      },
+      {
+        "issue": "没有一句话说清“只有它能做到”的钩子",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有一句话说清“只有它能做到”的钩子"
+        ]
+      },
+      {
+        "issue": "高级功能只列名词，没有核心循环证据",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "高级功能只列名词，没有核心循环证据"
+        ]
+      },
+      {
+        "issue": "免费版的首 15 分钟体验不明确",
+        "personas": [
+          "P01-indie-core-operator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "免费版的首 15 分钟体验不明确"
+        ]
+      },
+      {
+        "issue": "免费版撞到上限会怎样没讲",
+        "personas": [
+          "P07-casual-mobile-dropin"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "免费版撞到上限会怎样没讲"
+        ]
+      },
+      {
+        "issue": "专业版功能名词太多，噪声大",
+        "personas": [
+          "P07-casual-mobile-dropin"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "专业版功能名词太多，噪声大"
+        ]
+      },
+      {
+        "issue": "没有可被观众理解的hook或演示",
+        "personas": [
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有可被观众理解的hook或演示"
+        ]
+      },
+      {
+        "issue": "没有创作者或分享场景的权益",
+        "personas": [
+          "P12-streamer-entertainment-creator"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "没有创作者或分享场景的权益"
+        ]
+      },
+      {
+        "issue": "我关心的手感、判定、镜头、难度来源，这页一项都没有",
+        "personas": [
+          "P03-challenge-hunter"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "我关心的手感、判定、镜头、难度来源，这页一项都没有"
+        ]
+      },
+      {
+        "issue": "AI 摘要和同步没写用量上限与超量规则",
+        "personas": [
+          "P03-challenge-hunter"
+        ],
+        "persona_count": 1,
+        "is_consensus": false,
+        "title_variants": [
+          "AI 摘要和同步没写用量上限与超量规则"
+        ]
+      }
+    ],
+    "stance_distribution": {
+      "观望": 5
+    },
+    "persona_count": 5,
+    "threshold": 0.7,
+    "min_personas_for_agreement": 4
+  },
+  "major_disagreements": [],
+  "priority_fixes": [
+    {
+      "priority": 1,
+      "issue": "没有回答“为什么不用我现在的竞品”",
+      "severity": "high",
+      "why_it_matters": "页面只拿价格和文件上限当理由，对比对象还匿名。我已经在用成熟产品，这点价差抵不过重新学习和搬数据的成本，所以替代理由不成立。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "点名主流竞品，并加上功能、同步稳定性、搜索、生态的真实对比。再写清楚‘哪类用户换过来最划算’。",
+      "score": 3.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有回答“为什么不用我现在的竞品”",
+        "竞品对比只比规格，且没有具名"
+      ]
+    },
+    {
+      "priority": 2,
+      "issue": "没有说明能不能先试用专业版",
+      "severity": "medium",
+      "why_it_matters": "我对价格敏感，没试过不会直接掏钱，一个月 ¥19 对我也不算小。",
+      "affected_personas": [
+        "P07-casual-mobile-dropin",
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "提供 7 到 14 天免费试用，并在按钮旁标明。",
+      "score": 2.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有说明能不能先试用专业版",
+        "免费版只能 1 台设备，手机和电脑切换不明确",
+        "没有免费试用专业版的说明"
+      ]
+    },
+    {
+      "priority": 3,
+      "issue": "竞品对比对象匿名且只挑有利项",
+      "severity": "medium",
+      "why_it_matters": "无法核验，可信度打折。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator",
+        "P03-challenge-hunter"
+      ],
+      "suggested_fix": "写出竞品真名、核对日期和数据来源，并加入自己不占优的维度。",
+      "score": 2.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "竞品对比对象匿名且只挑有利项",
+        "竞品对比匿名且只挑有利维度"
+      ]
+    },
+    {
+      "priority": 4,
+      "issue": "迁移成本完全没交代",
+      "severity": "high",
+      "why_it_matters": "从成熟笔记工具搬家，最怕丢格式、丢链接、丢历史。页面只讲导出（离开），没讲导入（进来）。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "suggested_fix": "提供主流竞品的一键导入、格式保真说明和迁移指南，并给出专业版的限时试用，方便用真实数据验证。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "迁移成本完全没交代",
+        "免费版和试用不足以做迁移验证"
+      ]
+    },
+    {
+      "priority": 5,
+      "issue": "没有一句话说清“只有它能做到”的钩子",
+      "severity": "high",
+      "why_it_matters": "我判断产品先看有没有自己的一套东西。页面只有价格和功能清单，核心钩子在 15 秒内看不到，我不会为它加愿望单，也不会付费。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "在价格表上方加一句定位，并配 1 个能展示独有机制的 GIF 或截图，例如双向链接、白板和 AI 摘要如何形成同一个工作流。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有一句话说清“只有它能做到”的钩子"
+      ]
+    },
+    {
+      "priority": 6,
+      "issue": "免费版撞到上限会怎样没讲",
+      "severity": "high",
+      "why_it_matters": "我是轻度用户，大概率长期用免费版。不知道笔记满 200 篇后是不能写还是被逼付费，心里没底，就不敢放心把东西存进去。",
+      "affected_personas": [
+        "P07-casual-mobile-dropin"
+      ],
+      "suggested_fix": "在免费版下面加一句：满 200 篇后仍可查看和导出，只是不能新建；并加上进度提示。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "免费版撞到上限会怎样没讲"
+      ]
+    },
+    {
+      "priority": 7,
+      "issue": "没有可被观众理解的hook或演示",
+      "severity": "high",
+      "why_it_matters": "我的核心规则是3分钟内要有观众能懂的hook。页面全是文字清单，没有动图、截图或演示，观众可读性和节目效果都无从判断，我没法判断它适不适合拿来直播或做内容。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "在专业版旁加一段15-30秒的白板/双向链接/AI摘要演示动图，让人一眼看到成品效果。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有可被观众理解的hook或演示"
+      ]
+    },
+    {
+      "priority": 8,
+      "issue": "我关心的手感、判定、镜头、难度来源，这页一项都没有",
+      "severity": "high",
+      "why_it_matters": "我的决策规则是看不出实机判定与节奏就不买。这是笔记软件定价页，这些信息本来就不会出现，所以我无法按自己的标准判断，只能观望。这是信息缺失，不是产品差。",
+      "affected_personas": [
+        "P03-challenge-hunter"
+      ],
+      "suggested_fix": "如果目标用户包含我这类人，需要补实机演示。若只是笔记产品，应交给匹配的评审人格。",
+      "score": 1.5,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "我关心的手感、判定、镜头、难度来源，这页一项都没有"
+      ]
+    },
+    {
+      "priority": 9,
+      "issue": "成熟度与社区基础无任何佐证",
+      "severity": "medium",
+      "why_it_matters": "双向链接、白板、AI 摘要在竞品里已是成熟功能。没有用户规模、上线时间、更新日志，我会把它当半成品。",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "suggested_fix": "展示用户数、版本更新频率、公开路线图、社区规模和客户案例。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "成熟度与社区基础无任何佐证"
+      ]
+    },
+    {
+      "priority": 10,
+      "issue": "高级功能只列名词，没有核心循环证据",
+      "severity": "medium",
+      "why_it_matters": "双向链接、白板和 AI 摘要在同类产品里都常见。页面没有展示它们如何互相配合，我无法判断是真的整合还是功能堆砌。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "提供一段 30 秒演示或一个真实案例，展示从记录到链接再到摘要的完整流程。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "高级功能只列名词，没有核心循环证据"
+      ]
+    },
+    {
+      "priority": 11,
+      "issue": "免费版的首 15 分钟体验不明确",
+      "severity": "medium",
+      "why_it_matters": "免费版是我试用的入口。页面没说免费版有没有双向链接和白板，我无法判断免费版能不能看到核心体验。",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "suggested_fix": "标明各功能在免费版是否可用，并提供免费试用高级版的入口。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "免费版的首 15 分钟体验不明确"
+      ]
+    },
+    {
+      "priority": 12,
+      "issue": "专业版功能名词太多，噪声大",
+      "severity": "medium",
+      "why_it_matters": "双向链接、白板、AI 摘要我看不懂，也不知道对我有啥用。认知负担一高我就想关页面。",
+      "affected_personas": [
+        "P07-casual-mobile-dropin"
+      ],
+      "suggested_fix": "每个高级功能配一句大白话和一个小图，或只突出两三个最有用的卖点。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "专业版功能名词太多，噪声大"
+      ]
+    },
+    {
+      "priority": 13,
+      "issue": "没有创作者或分享场景的权益",
+      "severity": "medium",
+      "why_it_matters": "页面没提到分享、公开页面或发布功能，也没有创作者合作方案，传播属性无法评估。",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "suggested_fix": "增加公开分享链接、模板导出或创作者合作计划的说明。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "没有创作者或分享场景的权益"
+      ]
+    },
+    {
+      "priority": 14,
+      "issue": "AI 摘要和同步没写用量上限与超量规则",
+      "severity": "medium",
+      "why_it_matters": "页面主打无限，但 AI 功能通常有成本。超量会限速、收费还是停用，没有说明，容易变成隐藏限制。",
+      "affected_personas": [
+        "P03-challenge-hunter"
+      ],
+      "suggested_fix": "在专业版里写明 AI 摘要每月额度和超量处理方式。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "AI 摘要和同步没写用量上限与超量规则"
+      ]
+    },
+    {
+      "priority": 15,
+      "issue": "团队版“联系销售”不透明",
+      "severity": "low",
+      "why_it_matters": "价格已经公开，按钮却是“联系销售”，让人怀疑有隐藏的折扣或条款。",
+      "affected_personas": [
+        "P01-indie-core-operator",
+        "P03-challenge-hunter"
+      ],
+      "suggested_fix": "增加自助试用，或说明联系销售的目的。",
+      "score": 1.0,
+      "dedup_method": "semantic",
+      "title_variants": [
+        "团队版“联系销售”不透明",
+        "团队版只有联系销售，没有公开试用或演示入口"
+      ]
+    }
+  ],
+  "persona_notes": [
+    {
+      "persona_id": "P16-competitor-loyal-veteran",
+      "persona_name": "艾德",
+      "stance": "观望",
+      "evidence_top3": [
+        "页面有竞品对比表，起价更低，说明作者知道竞品存在，价格这一维是明确的替代理由之一。",
+        "单文件上限 200MB 是对比表里数字上的明显优势，但只是附件容量，不是核心笔记体验的差异。",
+        "对比对象匿名（某笔记 Pro、某文档 Plus），没有点名头部竞品，我无法核对，也不知道是否包含我正在用的那个。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "页面有竞品对比表，起价更低，说明作者知道竞品存在，价格这一维是明确的替代理由之一。",
+          "level": "direct",
+          "quote": "| 起价 | ¥14/月 | ¥25/月 | ¥30/月 |"
+        },
+        {
+          "content": "单文件上限 200MB 是对比表里数字上的明显优势，但只是附件容量，不是核心笔记体验的差异。",
+          "level": "direct",
+          "quote": "| 单文件上限 | 200MB | 50MB | 100MB |"
+        },
+        {
+          "content": "对比对象匿名（某笔记 Pro、某文档 Plus），没有点名头部竞品，我无法核对，也不知道是否包含我正在用的那个。",
+          "level": "direct",
+          "quote": "| | 我们 | 某笔记 Pro | 某文档 Plus |"
+        }
+      ],
+      "top_issues": [
+        "没有回答“为什么不用我现在的竞品”",
+        "迁移成本完全没交代",
+        "成熟度与社区基础无任何佐证",
+        "免费版和试用不足以做迁移验证"
+      ],
+      "continue_triggers": [
+        "点名对比头部竞品，并在某一维度明显更优",
+        "提供一键导入和格式保真验证",
+        "有专业版试用期，能用真实数据评估",
+        "公开成熟度证据：用户数、更新日志、路线图"
+      ],
+      "quit_triggers": [
+        "核心笔记体验全面不如现有竞品",
+        "社区和生态明显薄弱",
+        "迁移要手工搬运且会丢链接、格式"
+      ]
+    },
+    {
+      "persona_id": "P01-indie-core-operator",
+      "persona_name": "林岚",
+      "stance": "观望",
+      "evidence_top3": [
+        "页面开头是一句泛化的定位，没有说明这个笔记产品相对同类的核心钩子。15 秒内看不到“只有它能做到”的东西，决策规则被触发。",
+        "专业版的差异化功能只是列了一串名词。双向链接和白板在同类产品里很常见，AI 摘要也一样。页面没有说明这些功能怎么互相配合，也没有演示。",
+        "竞品对比表里，我们真正领先的只有附件上限（200MB 对 50MB 和 100MB）和导出格式。这些都是规格数字，不是机制上的独特性。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "页面开头是一句泛化的定位，没有说明这个笔记产品相对同类的核心钩子。15 秒内看不到“只有它能做到”的东西，决策规则被触发。",
+          "level": "direct",
+          "quote": "三种方案，随时可以升级或降级，无隐藏费用"
+        },
+        {
+          "content": "专业版的差异化功能只是列了一串名词。双向链接和白板在同类产品里很常见，AI 摘要也一样。页面没有说明这些功能怎么互相配合，也没有演示。",
+          "level": "direct",
+          "quote": "高级编辑器（双向链接、白板、AI 摘要）"
+        },
+        {
+          "content": "竞品对比表里，我们真正领先的只有附件上限（200MB 对 50MB 和 100MB）和导出格式。这些都是规格数字，不是机制上的独特性。",
+          "level": "direct",
+          "quote": "| 单文件上限 | 200MB | 50MB | 100MB |"
+        }
+      ],
+      "top_issues": [
+        "没有一句话说清“只有它能做到”的钩子",
+        "竞品对比只比规格，且没有具名",
+        "高级功能只列名词，没有核心循环证据",
+        "免费版的首 15 分钟体验不明确",
+        "团队版“联系销售”不透明"
+      ],
+      "continue_triggers": [
+        "页面补上一句话定位和展示独有机制的 GIF 或演示",
+        "竞品具名且对比项涉及机制差异",
+        "免费版明确包含能体验核心功能的部分",
+        "AI 摘要等功能有真实效果展示"
+      ],
+      "quit_triggers": [
+        "卖点始终说不清，只剩价格和规格比较",
+        "与具名竞品一比没有独特之处",
+        "高级功能被证明只是常见功能的堆砌"
+      ]
+    },
+    {
+      "persona_id": "P07-casual-mobile-dropin",
+      "persona_name": "小禾",
+      "stance": "观望",
+      "evidence_top3": [
+        "开头一句话就把三档讲清楚了，还说能随时升降级，扫一眼就懂，两分钟规则没被触发。",
+        "每档都有一句话说适合谁，我能很快对号入座。我是轻度用户，免费版就是给我的。",
+        "免费版限制是 200 篇笔记和只能 1 台设备同步。我不知道自己手机加平板会不会马上撞墙，这点不好判断。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "开头一句话就把三档讲清楚了，还说能随时升降级，扫一眼就懂，两分钟规则没被触发。",
+          "level": "direct",
+          "quote": "三种方案，随时可以升级或降级，无隐藏费用"
+        },
+        {
+          "content": "每档都有一句话说适合谁，我能很快对号入座。我是轻度用户，免费版就是给我的。",
+          "level": "direct",
+          "quote": "适合个人轻度使用"
+        },
+        {
+          "content": "免费版限制是 200 篇笔记和只能 1 台设备同步。我不知道自己手机加平板会不会马上撞墙，这点不好判断。",
+          "level": "direct",
+          "quote": "仅支持 1 台设备同步"
+        }
+      ],
+      "top_issues": [
+        "免费版撞到上限会怎样没讲",
+        "专业版功能名词太多，噪声大",
+        "没有说明能不能先试用专业版",
+        "免费版只能 1 台设备，手机和电脑切换不明确"
+      ],
+      "continue_triggers": [
+        "免费版限制和超限后果讲清楚",
+        "有免费试用专业版",
+        "高级功能有大白话说明",
+        "手机端体验有简单说明"
+      ],
+      "quit_triggers": [
+        "要先联系销售才知道价格",
+        "免费版突然被限制或逼付费",
+        "退款流程繁琐",
+        "功能名词一堆看不懂"
+      ]
+    },
+    {
+      "persona_id": "P12-streamer-entertainment-creator",
+      "persona_name": "Ken",
+      "stance": "观望",
+      "evidence_top3": [
+        "专业版明确面向自由职业者，创作者可能落在这一档；档位定位清楚。但页面没有任何面向直播/内容创作的场景说明。",
+        "年付折扣和价格换算清楚，¥168/年约 ¥14/月，价格层面一眼能懂。",
+        "高级编辑器里有白板和双向链接，白板理论上可以做直播时给观众看的画面，但页面只是列了功能名，没有任何展示或截图。这是我的推断，不是材料承诺。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "专业版明确面向自由职业者，创作者可能落在这一档；档位定位清楚。但页面没有任何面向直播/内容创作的场景说明。",
+          "level": "direct",
+          "quote": "适合重度笔记用户和自由职业者"
+        },
+        {
+          "content": "年付折扣和价格换算清楚，¥168/年约 ¥14/月，价格层面一眼能懂。",
+          "level": "direct",
+          "quote": "¥19 / 月，或 ¥168 / 年（约 ¥14/月）"
+        },
+        {
+          "content": "高级编辑器里有白板和双向链接，白板理论上可以做直播时给观众看的画面，但页面只是列了功能名，没有任何展示或截图。这是我的推断，不是材料承诺。",
+          "level": "inferred"
+        }
+      ],
+      "top_issues": [
+        "没有可被观众理解的hook或演示",
+        "没有免费试用专业版的说明",
+        "没有创作者或分享场景的权益",
+        "竞品对比对象匿名且只挑有利项"
+      ],
+      "continue_triggers": [
+        "页面加入专业版功能的演示动图或视频",
+        "提供专业版免费试用",
+        "有创作者分享/发布功能或合作计划"
+      ],
+      "quit_triggers": [
+        "完全没有可视化内容，只有文字清单",
+        "试用和演示都没有，只能直接付费",
+        "没有任何适合对外展示的功能"
+      ]
+    },
+    {
+      "persona_id": "P03-challenge-hunter",
+      "persona_name": "韩岳",
+      "stance": "观望",
+      "evidence_top3": [
+        "这是笔记软件定价页，不是动作游戏。手感、判定、镜头、难度来源在材料里都没有对应内容。核心规则（实机看不出判定逻辑与节奏就不买）被触发，但原因是材料缺失，不是负面证据。",
+        "价格结构清楚：三档，专业版月付与年付都标了价格。",
+        "免费版限制明确：笔记数量、设备数都有上限，可以先试用再决定。"
+      ],
+      "evidence_top3_detail": [
+        {
+          "content": "这是笔记软件定价页，不是动作游戏。手感、判定、镜头、难度来源在材料里都没有对应内容。核心规则（实机看不出判定逻辑与节奏就不买）被触发，但原因是材料缺失，不是负面证据。",
+          "level": "gap"
+        },
+        {
+          "content": "价格结构清楚：三档，专业版月付与年付都标了价格。",
+          "level": "direct",
+          "quote": "¥19 / 月，或 ¥168 / 年（约 ¥14/月）"
+        },
+        {
+          "content": "免费版限制明确：笔记数量、设备数都有上限，可以先试用再决定。",
+          "level": "direct",
+          "quote": "仅支持 1 台设备同步"
+        }
+      ],
+      "top_issues": [
+        "我关心的手感、判定、镜头、难度来源，这页一项都没有",
+        "AI 摘要和同步没写用量上限与超量规则",
+        "竞品对比匿名且只挑有利维度",
+        "团队版只有联系销售，没有公开试用或演示入口"
+      ],
+      "continue_triggers": [
+        "有可核验的实机演示或试用",
+        "AI 摘要用量规则写清楚",
+        "竞品对比能核实"
+      ],
+      "quit_triggers": [
+        "需要走销售才能知道真实价格",
+        "免费版有隐性限制或被强制升级",
+        "出现输入延迟或卡顿的实测反馈"
+      ]
+    }
+  ],
+  "evidence_profile": {
+    "total": 44,
+    "direct": 33,
+    "inferred": 5,
+    "gap": 6,
+    "inferred_ratio": 0.114,
+    "threshold": 0.4,
+    "per_persona": [
+      {
+        "persona_id": "P16-competitor-loyal-veteran",
+        "direct": 9,
+        "inferred": 1,
+        "gap": 1,
+        "total": 11,
+        "inferred_ratio": 0.091
+      },
+      {
+        "persona_id": "P01-indie-core-operator",
+        "direct": 7,
+        "inferred": 1,
+        "gap": 1,
+        "total": 9,
+        "inferred_ratio": 0.111
+      },
+      {
+        "persona_id": "P07-casual-mobile-dropin",
+        "direct": 8,
+        "inferred": 1,
+        "gap": 2,
+        "total": 11,
+        "inferred_ratio": 0.091
+      },
+      {
+        "persona_id": "P12-streamer-entertainment-creator",
+        "direct": 4,
+        "inferred": 1,
+        "gap": 1,
+        "total": 6,
+        "inferred_ratio": 0.167
+      },
+      {
+        "persona_id": "P03-challenge-hunter",
+        "direct": 5,
+        "inferred": 1,
+        "gap": 1,
+        "total": 7,
+        "inferred_ratio": 0.143
+      }
+    ]
+  },
+  "dimension_scores": [
+    {
+      "dim": "clarity",
+      "avg": 4.0,
+      "min": 4.0,
+      "max": 4.0,
+      "count": 5
+    },
+    {
+      "dim": "trust",
+      "avg": 3.0,
+      "min": 3.0,
+      "max": 3.0,
+      "count": 5
+    },
+    {
+      "dim": "value_for_money",
+      "avg": 3.2,
+      "min": 3.0,
+      "max": 4.0,
+      "count": 5
+    },
+    {
+      "dim": "pricing_clarity",
+      "avg": 4.0,
+      "min": 4.0,
+      "max": 4.0,
+      "count": 5
+    },
+    {
+      "dim": "trust_signals",
+      "avg": 3.8,
+      "min": 3.0,
+      "max": 4.0,
+      "count": 5
+    }
+  ],
+  "information_gaps": [
+    "点名的头部竞品对比",
+    "从其他笔记软件的导入工具和格式保真度",
+    "专业版试用期",
+    "用户规模、上线时间、更新频率、路线图",
+    "社区和插件生态规模",
+    "AI 摘要的具体能力和用量限制",
+    "产品的核心定位和独有机制",
+    "产品截图、GIF 或演示",
+    "具名竞品和对比日期",
+    "免费版是否包含双向链接和白板",
+    "AI 摘要的实际效果和数据处理方式",
+    "是否有高级版免费试用",
+    "免费版超过 200 篇笔记后的处理方式",
+    "是否有专业版免费试用",
+    "设备同步数量的计算口径",
+    "手机端体验和离线使用细节",
+    "单局时长不适用，页面没有对应内容；我按“一次使用要花多久上手和下单”来理解",
+    "专业版功能的演示或截图",
+    "免费试用政策",
+    "分享/公开发布功能的说明",
+    "AI摘要的用量上限",
+    "白板画面是否适合直播展示",
+    "竞品对比的具体对象和数据时间",
+    "手感、判定、镜头、难度来源：材料未指定，因为这是笔记软件定价页",
+    "AI 摘要的用量上限",
+    "专业版同步与编辑的实际延迟表现",
+    "退款的具体计算方式和流程",
+    "团队版的实际价格与合同条款"
+  ],
+  "next_human_test": {
+    "suggested_tasks": [],
+    "recruit_types": [
+      "27-40 · 北美 · 核心老兵 · PC/Console · genre-veteran",
+      "25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim",
+      "22-35 · 东南亚城市 · 轻度 · Mobile/Switch · puzzle/sim/cozy",
+      "21-34 · 北美/全球直播社区 · 核心 · PC · party/sandbox/co-op-chaos",
+      "22-30 · 东亚都市 · 核心 · PC/PS5 · character-action/soulslike/roguelite-action"
+    ],
+    "recruit_types_basis": "本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议",
+    "next_materials": [
+      "补充材料：点名的头部竞品对比",
+      "补充材料：从其他笔记软件的导入工具和格式保真度",
+      "补充材料：专业版试用期",
+      "补充材料：用户规模、上线时间、更新频率、路线图",
+      "补充材料：社区和插件生态规模",
+      "补充材料：AI 摘要的具体能力和用量限制",
+      "补充材料：产品的核心定位和独有机制",
+      "补充材料：产品截图、GIF 或演示",
+      "补充材料：具名竞品和对比日期",
+      "补充材料：免费版是否包含双向链接和白板",
+      "补充材料：AI 摘要的实际效果和数据处理方式",
+      "补充材料：是否有高级版免费试用",
+      "补充材料：免费版超过 200 篇笔记后的处理方式",
+      "补充材料：是否有专业版免费试用",
+      "补充材料：设备同步数量的计算口径",
+      "补充材料：手机端体验和离线使用细节",
+      "补充材料：单局时长不适用，页面没有对应内容；我按“一次使用要花多久上手和下单”来理解",
+      "补充材料：专业版功能的演示或截图",
+      "补充材料：免费试用政策",
+      "补充材料：分享/公开发布功能的说明",
+      "补充材料：AI摘要的用量上限",
+      "补充材料：白板画面是否适合直播展示",
+      "补充材料：竞品对比的具体对象和数据时间",
+      "补充材料：手感、判定、镜头、难度来源：材料未指定，因为这是笔记软件定价页",
+      "补充材料：AI 摘要的用量上限",
+      "补充材料：专业版同步与编辑的实际延迟表现",
+      "补充材料：退款的具体计算方式和流程",
+      "补充材料：团队版的实际价格与合同条款"
+    ]
+  },
+  "cross_examination": {
+    "mode": "moderated_rebuttal",
+    "is_live_debate": true,
+    "requested_mode": "moderated_rebuttal",
+    "limitation": "本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。",
+    "threshold": 0.15,
+    "threshold_source": "rules-dict",
+    "allow_stance_update": true,
+    "rounds": [
+      {
+        "round_num": 1,
+        "is_current": true
+      }
+    ],
+    "disputes": [
+      {
+        "point_id": "C1",
+        "topic": "竞品对比对象匿名且只挑有利项",
+        "pro_args": [
+          {
+            "argument_id": "A1",
+            "point": "无法核验，可信度打折。",
+            "persona_id": "韩岳",
+            "persona_key": "P03-challenge-hunter",
+            "severity": "medium",
+            "rebuttal": "这是对 B1 的反驳（站在 A 的位置）：B1 只点出“没法核验、传播时容易被质疑”，把问题归为传播层面的小麻烦，却没有处理“只挑有利项”这一半。匿名对象加上选择性维度，会让读者无法判断结论是否被刻意挑选，伤害的是论证本身的可信度，而不只是被质疑的风险。B1 的处理方式只补竞品名、时间和口径，没有要求加入自己不占优的维度，所以即使照做，选择性呈现的问题仍然存在。把严重度定为 low 低估了影响。不过 B1 也有成立之处：若这段对比只是辅助说明，不是核心卖点，影响确实有限。A1 的“可信度打折”没有说明打折幅度，也没有说明对比在整体文案中的权重，因此我不提高置信度，维持观望。"
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B1",
+            "point": "“某笔记 Pro”“某文档 Plus”没法核验，传播时容易被质疑。",
+            "persona_id": "Ken",
+            "persona_key": "P12-streamer-entertainment-creator",
+            "severity": "low",
+            "rebuttal": "这是对 A1 的反驳（站在 B 的位置）：A1 的论据只有一句“无法核验，可信度打折”，没有给出具体后果，也没有证明“只挑有利项”的指控成立。文中没有对比表或数据，无法确认究竟是否漏掉了不利维度，这一点只是推测。把严重度定为 medium 需要更多依据，比如对比在文案中的位置、受众是否会据此做决策。A1 要求加入自己不占优的维度，对营销类文案来说标准偏高，未必是必须修复项。不过 A1 指出的选择性呈现风险确有道理，匿名对象确实让这种风险无法排除，B1 的修改建议也没有覆盖这一点。我没有被完全说服，保持观望，置信度不变。"
+          }
+        ],
+        "rebuttal_status": "ok",
+        "rebuttal_error": ""
+      },
+      {
+        "point_id": "C2",
+        "topic": "没有说明能不能先试用专业版",
+        "pro_args": [
+          {
+            "argument_id": "A2",
+            "point": "我平时用手机碎片时间记东西，单设备限制会不会影响我，页面没说清楚。",
+            "persona_id": "小禾",
+            "persona_key": "P07-casual-mobile-dropin",
+            "severity": "medium",
+            "rebuttal": ""
+          }
+        ],
+        "con_args": [
+          {
+            "argument_id": "B2",
+            "point": "我平时用手机碎片时间记东西，单设备限制会不会影响我，页面没说清楚。",
+            "persona_id": "小禾",
+            "persona_key": "P07-casual-mobile-dropin",
+            "severity": "medium",
+            "rebuttal": ""
+          }
+        ],
+        "rebuttal_status": "skipped",
+        "rebuttal_error": "该议题只有一位人格提出，没有对立方可反驳"
+      }
+    ],
+    "vote_changes": [],
+    "suppressed_changes": [],
+    "confidence_changes": [
+      {
+        "persona_id": "艾德",
+        "persona_key": "P16-competitor-loyal-veteran",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "林岚",
+        "persona_key": "P01-indie-core-operator",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "小禾",
+        "persona_key": "P07-casual-mobile-dropin",
+        "before": 60,
+        "after": 60,
+        "delta": 0,
+        "confidence_before": 0.6,
+        "confidence_after": 0.6
+      },
+      {
+        "persona_id": "Ken",
+        "persona_key": "P12-streamer-entertainment-creator",
+        "before": 50,
+        "after": 50,
+        "delta": 0,
+        "confidence_before": 0.5,
+        "confidence_after": 0.5
+      },
+      {
+        "persona_id": "韩岳",
+        "persona_key": "P03-challenge-hunter",
+        "before": 50,
+        "after": 50,
+        "delta": 0,
+        "confidence_before": 0.5,
+        "confidence_after": 0.5
+      }
+    ],
+    "failures": [],
+    "usage": {
+      "calls": 1,
+      "input_tokens": 1044,
+      "output_tokens": 716,
+      "token_counts_available": true,
+      "confidence_values_rescaled": 0
+    }
+  },
+  "compliance": {
+    "status": "通过",
+    "status_class": "pass",
+    "ethics_score": 100,
+    "score_class": "high",
+    "recommended_steps": [
+      "结果可供参考，但仍建议人工抽检"
+    ],
+    "scope": "identity_behavior_decoupling",
+    "scope_label": "身份-行为解耦检查",
+    "violation_count": 0
+  },
+  "predictions": [
+    {
+      "prediction_id": "PRED-001",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有回答“为什么不用我现在的竞品””后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有回答“为什么不用我现在的竞品”",
+      "intervention": "点名主流竞品，并加上功能、同步稳定性、搜索、生态的真实对比。再写清楚‘哪类用户换过来最划算’。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.71,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran",
+        "P01-indie-core-operator"
+      ],
+      "evidence": "页面只拿价格和文件上限当理由，对比对象还匿名。我已经在用成熟产品，这点价差抵不过重新学习和搬数据的成本，所以替代理由不成立。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-002",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有说明能不能先试用专业版”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有说明能不能先试用专业版",
+      "intervention": "提供 7 到 14 天免费试用，并在按钮旁标明。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.61,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P07-casual-mobile-dropin",
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "我对价格敏感，没试过不会直接掏钱，一个月 ¥19 对我也不算小。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-003",
+      "type": "intervention_hypothesis",
+      "claim": "修复“竞品对比对象匿名且只挑有利项”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "竞品对比对象匿名且只挑有利项",
+      "intervention": "写出竞品真名、核对日期和数据来源，并加入自己不占优的维度。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.61,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator",
+        "P03-challenge-hunter"
+      ],
+      "evidence": "无法核验，可信度打折。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-004",
+      "type": "intervention_hypothesis",
+      "claim": "修复“迁移成本完全没交代”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "迁移成本完全没交代",
+      "intervention": "提供主流竞品的一键导入、格式保真说明和迁移指南，并给出专业版的限时试用，方便用真实数据验证。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.68,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "evidence": "从成熟笔记工具搬家，最怕丢格式、丢链接、丢历史。页面只讲导出（离开），没讲导入（进来）。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-005",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有一句话说清“只有它能做到”的钩子”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有一句话说清“只有它能做到”的钩子",
+      "intervention": "在价格表上方加一句定位，并配 1 个能展示独有机制的 GIF 或截图，例如双向链接、白板和 AI 摘要如何形成同一个工作流。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.68,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "我判断产品先看有没有自己的一套东西。页面只有价格和功能清单，核心钩子在 15 秒内看不到，我不会为它加愿望单，也不会付费。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-006",
+      "type": "intervention_hypothesis",
+      "claim": "修复“免费版撞到上限会怎样没讲”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "免费版撞到上限会怎样没讲",
+      "intervention": "在免费版下面加一句：满 200 篇后仍可查看和导出，只是不能新建；并加上进度提示。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.68,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P07-casual-mobile-dropin"
+      ],
+      "evidence": "我是轻度用户，大概率长期用免费版。不知道笔记满 200 篇后是不能写还是被逼付费，心里没底，就不敢放心把东西存进去。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-007",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有可被观众理解的hook或演示”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有可被观众理解的hook或演示",
+      "intervention": "在专业版旁加一段15-30秒的白板/双向链接/AI摘要演示动图，让人一眼看到成品效果。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.68,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "我的核心规则是3分钟内要有观众能懂的hook。页面全是文字清单，没有动图、截图或演示，观众可读性和节目效果都无从判断，我没法判断它适不适合拿来直播或做内容。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-008",
+      "type": "intervention_hypothesis",
+      "claim": "修复“我关心的手感、判定、镜头、难度来源，这页一项都没有”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "我关心的手感、判定、镜头、难度来源，这页一项都没有",
+      "intervention": "如果目标用户包含我这类人，需要补实机演示。若只是笔记产品，应交给匹配的评审人格。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "high",
+      "confidence": 0.68,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P03-challenge-hunter"
+      ],
+      "evidence": "我的决策规则是看不出实机判定与节奏就不买。这是笔记软件定价页，这些信息本来就不会出现，所以我无法按自己的标准判断，只能观望。这是信息缺失，不是产品差。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-009",
+      "type": "intervention_hypothesis",
+      "claim": "修复“成熟度与社区基础无任何佐证”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "成熟度与社区基础无任何佐证",
+      "intervention": "展示用户数、版本更新频率、公开路线图、社区规模和客户案例。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P16-competitor-loyal-veteran"
+      ],
+      "evidence": "双向链接、白板、AI 摘要在竞品里已是成熟功能。没有用户规模、上线时间、更新日志，我会把它当半成品。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-010",
+      "type": "intervention_hypothesis",
+      "claim": "修复“高级功能只列名词，没有核心循环证据”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "高级功能只列名词，没有核心循环证据",
+      "intervention": "提供一段 30 秒演示或一个真实案例，展示从记录到链接再到摘要的完整流程。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "双向链接、白板和 AI 摘要在同类产品里都常见。页面没有展示它们如何互相配合，我无法判断是真的整合还是功能堆砌。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-011",
+      "type": "intervention_hypothesis",
+      "claim": "修复“免费版的首 15 分钟体验不明确”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "免费版的首 15 分钟体验不明确",
+      "intervention": "标明各功能在免费版是否可用，并提供免费试用高级版的入口。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator"
+      ],
+      "evidence": "免费版是我试用的入口。页面没说免费版有没有双向链接和白板，我无法判断免费版能不能看到核心体验。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-012",
+      "type": "intervention_hypothesis",
+      "claim": "修复“专业版功能名词太多，噪声大”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "专业版功能名词太多，噪声大",
+      "intervention": "每个高级功能配一句大白话和一个小图，或只突出两三个最有用的卖点。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P07-casual-mobile-dropin"
+      ],
+      "evidence": "双向链接、白板、AI 摘要我看不懂，也不知道对我有啥用。认知负担一高我就想关页面。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-013",
+      "type": "intervention_hypothesis",
+      "claim": "修复“没有创作者或分享场景的权益”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "没有创作者或分享场景的权益",
+      "intervention": "增加公开分享链接、模板导出或创作者合作计划的说明。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P12-streamer-entertainment-creator"
+      ],
+      "evidence": "页面没提到分享、公开页面或发布功能，也没有创作者合作方案，传播属性无法评估。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-014",
+      "type": "intervention_hypothesis",
+      "claim": "修复“AI 摘要和同步没写用量上限与超量规则”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "AI 摘要和同步没写用量上限与超量规则",
+      "intervention": "在专业版里写明 AI 摘要每月额度和超量处理方式。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "medium",
+      "confidence": 0.58,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P03-challenge-hunter"
+      ],
+      "evidence": "页面主打无限，但 AI 功能通常有成本。超量会限速、收费还是停用，没有说明，容易变成隐藏限制。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    },
+    {
+      "prediction_id": "PRED-015",
+      "type": "intervention_hypothesis",
+      "claim": "修复“团队版“联系销售”不透明”后，paid_conversion_rate 相较当前版本将提高",
+      "issue": "团队版“联系销售”不透明",
+      "intervention": "增加自助试用，或说明联系销售的目的。",
+      "target_metric": "paid_conversion_rate",
+      "direction": "increase",
+      "comparison": "treatment_vs_current_control",
+      "success_criterion": "treatment.paid_conversion_rate > control.paid_conversion_rate",
+      "verification_window": "14d",
+      "verification_method": "controlled_comparison",
+      "severity": "low",
+      "confidence": 0.51,
+      "confidence_basis": "synthetic_panel_heuristic_not_empirically_calibrated",
+      "affected_personas": [
+        "P01-indie-core-operator",
+        "P03-challenge-hunter"
+      ],
+      "evidence": "价格已经公开，按钮却是“联系销售”，让人怀疑有隐藏的折扣或条款。",
+      "status": "pending_verification",
+      "is_synthetic": true
+    }
+  ],
+  "adaptive_panel": {
+    "requested": false,
+    "enabled": false,
+    "disabled_reason": null,
+    "method": "fixed_panel",
+    "initial_size": null,
+    "eligible_personas": 5,
+    "executed_personas": 5,
+    "saved_persona_calls": 0,
+    "min_score": null,
+    "decisions": [],
+    "limitation": null
+  },
+  "degradation": {
+    "degraded": false,
+    "attempted_count": 5,
+    "succeeded_count": 5,
+    "failed_count": 0,
+    "failed_personas": [],
+    "notice": ""
+  },
+  "abstentions": [],
+  "validation": {
+    "retry": {
+      "max_retries": 1,
+      "retry_on": [
+        "transport_error",
+        "schema_failure",
+        "hallucination"
+      ],
+      "unknown_retry_on": [],
+      "backoff_base_seconds": 1.0
+    },
+    "gated_out": []
+  },
+  "budget": {
+    "max_cost_per_run_usd": 1.5,
+    "persona_cost_usd": 0.257433,
+    "exceeded": false,
+    "skipped_stages": [],
+    "notice": ""
+  },
+  "panel_selection": {
+    "requested": [],
+    "matched": [],
+    "missing": [],
+    "truncated_by_mode": [],
+    "fell_back_to_auto": false,
+    "selection_method": "affinity_fallback",
+    "notice": "本次人格包没有为该任务类型配置专属面板名单，参与评审的人格是按任务亲和度从包内自动挑选的（不是策展过的面板）。"
+  },
+  "dedup": {
+    "method": "semantic",
+    "notice": ""
+  }
+}

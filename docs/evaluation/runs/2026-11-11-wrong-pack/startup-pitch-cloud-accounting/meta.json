@@ -1,0 +1,32 @@
+{
+  "input_file": "test-materials/02_创业BP_云会计SaaS.pdf",
+  "task_type": "pitch_review",
+  "persona_pack": "game-core",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-11",
+  "run_id": "20261111-181555-pitch_review",
+  "app_commit": "2a51751",
+  "evidence_schema": "quote-field-v1",
+  "grounding_rule": {
+    "name": "coverage-on-quote",
+    "commit": "2a51751",
+    "config": "src/config/grounding.yaml"
+  },
+  "dedup_method": "semantic",
+  "disputes": 2,
+  "cost_usd": 0.3797,
+  "tokens_in": 84031,
+  "tokens_out": 24627,
+  "retries": 5,
+  "cross_exam_run": {
+    "mode": "moderated_rebuttal",
+    "calls": 1,
+    "cost_usd": 0.0162,
+    "tokens_in": 1526,
+    "tokens_out": 1316
+  },
+  "cost_cap_usd": 1.5,
+  "intended_persona_pack": "startup-panel",
+  "note": "Run with the wrong persona pack by mistake (engine default game-core; the generator did not pass personas_path). Not a sample. Kept as grounding evidence only."
+}
