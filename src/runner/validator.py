@@ -13,10 +13,45 @@ def load_schema(schema_path: str) -> dict:
         return json.load(f)
 
 
+# evidence / key_issues 必须是对象数组。模型的工具输入损坏时，这里会变成一段字符串，
+# 里面是工具调用标记（<invoke …>、<parameter name="content">…）而不是数据。
+MALFORMED_LIST_FIELDS = ("evidence", "key_issues")
+_TOOL_MARKUP_RE = re.compile(r"</?\s*(?:antml:)?(?:invoke|parameter|function_calls|tool_use|tool_call)\b", re.IGNORECASE)
+
+
+def is_tool_markup_string(value) -> bool:
+    """这个值是不是"本该是列表、却是一段工具调用标记字符串"。
+
+    只认带标记的字符串：模型把整个字段写成一句普通的话（"整体就一句话"）是另一回事，
+    归一化会把它包成一条证据，信息没丢。带标记的字符串里没有可用的内容，包成一条
+    inferred 证据只会把"工具输入坏了"伪装成"推断过度"（2026-11-11 实测：P15 因此被判
+    role_drift，而 role_drift 不重试）。
+    """
+    return isinstance(value, str) and bool(_TOOL_MARKUP_RE.search(value))
+
+
+def malformed_list_field_errors(output: dict) -> List[str]:
+    """给 MALFORMED_LIST_FIELDS 里形状损坏的字段各出一条具体的 schema 错误。"""
+    errors = []
+    for field in MALFORMED_LIST_FIELDS:
+        if is_tool_markup_string((output or {}).get(field)):
+            errors.append(
+                f"{field}: 收到的是一段含工具调用标记的字符串，不是对象数组——工具输入格式损坏，"
+                "请把它作为 JSON 数组重新提交，字段值里不要出现 <invoke> / <parameter> 之类的标签"
+            )
+    return errors
+
+
 def validate_schema(output: dict, schema: dict) -> dict:
     validator = jsonschema.Draft7Validator(schema)
     errors = sorted(validator.iter_errors(output), key=lambda e: list(e.path))
     error_messages = [f"{'.'.join(str(p) for p in e.absolute_path)}: {e.message}" for e in errors]
+    specific = malformed_list_field_errors(output) if isinstance(output, dict) else []
+    if specific:
+        # jsonschema 对这些字段报的是 "evidence: '<整段标记>' is not of type 'array'"——把原串
+        # 回显一遍对谁都没用；换成一句说清楚发生了什么的话，放在最前面。
+        damaged = {m.split(":", 1)[0] for m in specific}
+        error_messages = specific + [m for m in error_messages if m.split(":", 1)[0] not in damaged]
     return {"valid": len(error_messages) == 0, "errors": error_messages}
 
 

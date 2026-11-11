@@ -212,3 +212,74 @@ def test_true_quote_plus_fabrication_no_longer_passes_grounding():
         {"evidence": [{"content": "观察", "quote": QUOTE_OK + "，并且首发支持四人联机", "inference_level": "direct"}]}, [MATERIAL])
     assert out["grounded"] is False
     assert out["hallucination_risk"] == 1.0  # 键名兼容保留；含义是未落地条目占比
+
+
+# ---- 工具输入损坏：evidence 是一段工具调用标记字符串，不是列表（2026-11-11 实测 P15） ----
+
+MARKUP_EVIDENCE = '\n<invoke name="x"></invoke>\n'
+
+
+def test_markup_string_evidence_is_schema_failure_not_role_drift(persona, schema):
+    broken = _valid_output(persona)
+    broken["evidence"] = MARKUP_EVIDENCE
+    from runner.persona_agent import normalize_persona_output
+
+    out = normalize_persona_output(copy.deepcopy(broken))
+    assert out["evidence"] == MARKUP_EVIDENCE, "不得被归一化成一条 inferred 证据"
+    v = cli.validate_output(out, persona, schema, [MATERIAL])
+    assert cli._validation_failure_reason(v) == "schema_failure"
+    errors = v["details"]["schema"]["errors"]
+    assert errors[0].startswith("evidence: 收到的是一段含工具调用标记的字符串")
+    assert not any("is not of type" in e and e.startswith("evidence") for e in errors), "不回显那段标记"
+    assert "<invoke" not in errors[0].split("——")[0]
+
+
+def test_markup_string_evidence_gets_the_normal_repair_turn(monkeypatch, persona, budget, schema):
+    broken = _valid_output(persona)
+    broken["evidence"] = MARKUP_EVIDENCE
+    fake = FakeModel([broken, _valid_output(persona)])
+    r = _run(monkeypatch, fake, persona, budget, schema)
+
+    assert len(fake.calls) == 2
+    assert r["retry_reasons"] == ["schema_failure"]
+    feedback = fake.calls[1]["repair"]["feedback"]
+    assert "evidence: 收到的是一段含工具调用标记的字符串" in feedback
+    assert cli._validation_failure_reason(r["validation"]) is None
+
+
+def test_markup_string_key_issues_is_handled_the_same_way(persona, schema):
+    broken = _valid_output(persona)
+    broken["key_issues"] = '<parameter name="title">标题</parameter>'
+    from runner.persona_agent import normalize_persona_output
+
+    v = cli.validate_output(normalize_persona_output(broken), persona, schema, [MATERIAL])
+    assert cli._validation_failure_reason(v) == "schema_failure"
+    assert any(e.startswith("key_issues: 收到的是一段含工具调用标记的字符串") for e in v["details"]["schema"]["errors"])
+
+
+def test_plain_sentence_evidence_is_still_wrapped_not_rejected():
+    # 只有带工具调用标记的字符串才算"损坏"。整个字段写成一句普通的话仍按原口径包成一条证据。
+    from runner.persona_agent import normalize_persona_output
+
+    out = normalize_persona_output({"evidence": "整体就一句话"})
+    assert out["evidence"][0]["content"] == "整体就一句话"
+    assert out["evidence"][0]["inference_level"] == "inferred"
+
+
+def test_well_formed_over_inferred_output_is_still_role_drift(monkeypatch, persona, budget, schema):
+    # 40% 上限和 role_drift 的口径不动：形状完好、但推断确实过多的答卷照旧是 role_drift，
+    # 而且照旧不重试（retry_on 里没有 role_drift）。
+    over = _valid_output(persona)
+    over["evidence"] = (
+        [{"content": "观察", "quote": QUOTE_OK, "inference_level": "direct"}]
+        + [{"content": f"推断 {i}", "inference_level": "inferred", "inference_basis": "经验"} for i in range(4)]
+    )
+    v = cli.validate_output(copy.deepcopy(over), persona, schema, [MATERIAL])
+    assert cli.blocking_schema_errors(v["details"]["schema"]["errors"]) == []
+    assert cli._validation_failure_reason(v) == "role_drift"
+    assert any("推断过度" in issue for issue in v["details"]["role"]["issues"])
+
+    fake = FakeModel([over, _valid_output(persona)])
+    r = _run(monkeypatch, fake, persona, budget, schema)
+    assert len(fake.calls) == 1, "role_drift 不在 retry_on 里，不应触发修复轮"
+    assert cli._validation_failure_reason(r["validation"]) == "role_drift"

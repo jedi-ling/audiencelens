@@ -861,9 +861,14 @@ def normalize_persona_output(output: dict) -> dict:
                 output[canonical] = output[alias]
                 break
 
-    if "evidence" in output:
+    # 工具输入损坏（字段值是一段 <invoke>/<parameter> 标记字符串）时**不归一化**：
+    # 原样留给 schema 校验判 schema_failure 并走修复轮。包成一条 inferred 证据会把它
+    # 伪装成"推断过度"（role_drift，不重试）。
+    from .validator import is_tool_markup_string
+
+    if "evidence" in output and not is_tool_markup_string(output["evidence"]):
         output["evidence"] = _normalize_evidence(output["evidence"])
-    if "key_issues" in output:
+    if "key_issues" in output and not is_tool_markup_string(output["key_issues"]):
         output["key_issues"] = _normalize_key_issues(output["key_issues"])
     if "must_comment_on_check" in output:
         output["must_comment_on_check"] = _normalize_must_comment_check(
