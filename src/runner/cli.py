@@ -169,9 +169,9 @@ def _rebuttal_persona_card(persona: dict) -> str:
 
 # 单一注册表：见 runner/task_types.py（这里 re-export 保持既有导入路径不破）
 try:
-    from .task_types import VALID_TASK_TYPES
+    from .task_types import VALID_TASK_TYPES, default_personas_path, pack_mismatch_warning
 except ImportError:
-    from runner.task_types import VALID_TASK_TYPES
+    from runner.task_types import VALID_TASK_TYPES, default_personas_path, pack_mismatch_warning
 
 
 class AllPersonasFailedError(RuntimeError):
@@ -1025,7 +1025,13 @@ def run_panel(
 
     base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if personas_path is None:
-        personas_path = os.path.join(base, "src", "personas", "game-core.yaml")
+        # 没指定人格包：按任务类型取登记的默认包，不再一律回落到 game-core
+        # （见 task_types.DEFAULT_PACK_BY_TASK_TYPE 的说明）。没登记的类型直接报错。
+        personas_path = default_personas_path(task_type, os.path.join(base, "src", "personas"))
+    else:
+        _mismatch = pack_mismatch_warning(task_type, personas_path)
+        if _mismatch:
+            logging.getLogger("audiencelens").warning(_mismatch)
     if presets_path is None:
         presets_path = os.path.join(base, "src", "presets", "panel-presets.yaml")
     if budget_path is None:
@@ -1807,7 +1813,8 @@ def main():
 
     src_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    personas_path = args.personas or os.path.join(src_root, "personas", "game-core.yaml")
+    # 不传 --personas 时交给 run_panel 按任务类型取默认包
+    personas_path = args.personas or None
     presets_path = args.presets or os.path.join(src_root, "presets", "panel-presets.yaml")
     rules_path = os.path.join(src_root, "config", "aggregation-rules.yaml")
     budget_path = os.path.join(src_root, "config", "budget.yaml")
