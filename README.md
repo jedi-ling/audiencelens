@@ -35,24 +35,26 @@ English · [中文](README_zh.md) · [日本語](README_ja.md)
 
 Real engine runs on fictional product material, saved exactly as generated — no manual edits
 (`examples/reports/`; also browsable on the app's `/samples` page). Standard depth, model
-`claude-sonnet-5-5`, 2026-11-04; cost is the app's own accounting. The persona panels ran first;
-cross-examination was then run on those same validated outputs with semantic de-duplication
-(`runner.cli.run_panel_from_outputs`) — each folder's `meta.json` records both steps and
-`persona_outputs.json` holds the validated inputs, so the cross-exam step is reproducible from the repo.
+`claude-sonnet-5-5`, 2026-11-11 and 2026-11-12, semantic de-duplication on; cost is the app's own
+accounting. Each folder's `meta.json` records the run and `persona_outputs.json` holds the
+validated persona outputs.
 
-| Report | Input | Cost | Personas passed | Cross-examination |
-|---|---|---|---|---|
-| [Steam store page — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` (`steam_page_review`, `game-core`) | $0.35 | 4 of 6 | 2 disputes, one rebuttal round each |
-| [SaaS pricing page — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` (`pricing_page_review`, `general-consumer`) | $0.27 | 5 of 5 | 3 disputes, one rebuttal round each |
-| [Startup pitch — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` (`pitch_review`, `startup-panel`) | $0.37 | 3 of 6 | 1 dispute, one rebuttal round |
+| Report | Input | Personas passed | `direct` entries grounded | Cross-examination | Cost |
+|---|---|---|---|---|---|
+| [Steam store page — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` (`steam_page_review`, `game-core`) | 4 of 6 | 25 of 25 | 2 disputes, one rebuttal round each | $0.35 |
+| [SaaS pricing page — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` (`pricing_page_review`, `general-consumer`) | 5 of 5 | 36 of 36 | 3 disputes, one rebuttal round each | $0.30 |
+| [Startup pitch — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` (`pitch_review`, `startup-panel`) | 6 of 6 | 42 of 42 | 3 disputes, one rebuttal round each | $0.51 |
 
-These reports were generated under the earlier grounding rule (persona outputs at commit `de65474`)
-and are kept unchanged. Re-validated offline with the current coverage rule, 1 of 4, 0 of 5 and
-0 of 3 of their personas would pass it, because most of their `direct` entries are restatements or
-quotes with commentary rather than quotes; a live run under the new rule has not been measured yet
-([docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)).
+The Steam sample was generated at commit `af4e8c8`, the other two after the fix that resolves the persona pack from the task type (`939e8ca`); for the pitch sample, cross-examination was run as a second step on the same validated outputs (`runner.cli.run_panel_from_outputs`).
 
-No vote changed in any rebuttal: the largest confidence movement was 2 points against the
+"Grounded" means the entry's `quote` is text from the material; the comment written beside it is
+not checked. The two Steam personas that did not pass were lost to malformed tool input, not to
+the grounding check. Three runs on one model are not a pass rate. The first samples (2026-11-04,
+before evidence entries had a `quote` field) are kept as evidence in
+[docs/evaluation/runs/2026-11-04-pre-quote-field/](docs/evaluation/runs/2026-11-04-pre-quote-field/notes.md);
+the before/after comparison is in [docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md).
+
+No vote changed in any rebuttal: the largest confidence movement was 8 points against the
 15-point threshold. Why some personas fail validation, and why cross-examination needed the
 semantic backend, is written up in [docs/evaluation/](docs/evaluation/).
 
@@ -256,7 +258,8 @@ An early demo example ("Cyber Scavenger") was **retracted** because its numbers 
 - **Cost scales with panel size.** Each persona is a separate model call, and `full` mode adds one rebuttal call per involved persona.
 - **No platform key is offered.** Hosted use is bring-your-own-key only; the plan / quota / CDK machinery exists in code but is not funded.
 - **Some persona outputs fail validation.** The validator rejects paraphrases labelled `direct` and malformed submissions; one repair turn recovers many of them, not all (see the sample outcomes above).
-- **The grounding check measures quoting, not truth.** A `direct` entry passes when its `quote` is the material's own words; nothing checks the comment written beside it or that the quote is used fairly, and `inferred` entries are not checked against the material at all. The rule was tightened after the samples were made: only 1 of their 12 personas would pass it, and how well the repair turn recovers under the new rule has not been measured ([docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)).
+- **The grounding check measures quoting, not truth.** A `direct` entry passes when its `quote` is the material's own words; nothing checks the comment written beside it or that the quote is used fairly, and `inferred` entries are not checked against the material at all. In five live runs on one model, all 177 `direct` entries from the personas that passed carried a quote the rule accepts; that is a handful of runs, not a rate ([docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)).
+- **Malformed tool input still costs repair turns and personas.** In those five runs, 22 repair turns were spent on submissions with damaged structure, and 2 of 28 personas were lost to it.
 - **Single debate round.** Further rounds, early termination and consensus tracking are designed but not implemented; θ is uncalibrated.
 - **Reports are generated in Chinese only for now** (`SUPPORTED_REPORT_LANGS = zh-CN`). English output requires the `output_lang` path described in [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10, which is not yet implemented.
 

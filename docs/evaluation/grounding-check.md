@@ -1,6 +1,7 @@
 # Evidence grounding check: from "any fragment" to coverage
 
-2026-11-11. No model was called for anything on this page.
+2026-11-11, updated 2026-11-12. The evaluation-set numbers on this page involve no model calls.
+The [live runs](#live-runs-2026-11-11-and-2026-11-12) section reports five real engine runs.
 
 ## The problem
 
@@ -40,7 +41,8 @@ quote-shaped items added later are covered in [their own section](#the-quote-fie
   claim; fabricated; one number changed (not grounded). Labels follow from construction, and
   the builder asserts the construction.
 - **Real** entries are what `claude-sonnet-5-5` wrote on 2026-11-04 for the three sample
-  reviews: every `direct` entry in `examples/reports/*/persona_outputs.json` (84) and the entries
+  reviews (now in `docs/evaluation/runs/2026-11-04-pre-quote-field/`): every `direct` entry in
+  their `persona_outputs.json` (84) and the entries
   the validator flagged in those runs (33). Each was read against its material by one person.
 - **Mixed** real entries reproduce an exact quote and then add substantial commentary. Whether
   that is a `direct` entry is a policy question, so they are left out of the error rates and
@@ -160,10 +162,12 @@ The two test errors:
   small rewordings (84% covered). It was labelled a restatement; the rule sees a quote.
   No parameter was changed for it.
 
-## Effect on the stored sample reports
+## Effect on the sample reports of 2026-11-04
 
-The three sample reports were generated under the old rule and are **not** regenerated or
-edited. `scripts/revalidate_samples.py` re-checks their stored persona outputs offline:
+The three sample reports published at the time were generated under the old rule. They were
+not edited; `scripts/revalidate_samples.py` re-checks their stored persona outputs offline.
+(They have since been replaced as samples and are kept in
+`docs/evaluation/runs/2026-11-04-pre-quote-field/`.)
 
 | Sample | Personas in the report | Pass grounding, old rule | Pass grounding, coverage rule | `direct` entries grounded, old → new |
 |---|---|---|---|---|
@@ -171,7 +175,7 @@ edited. `scripts/revalidate_samples.py` re-checks their stored persona outputs o
 | saas-pricing-cloud-notes | 5 | 5 | 0 | 38/41 → 0/41 |
 | startup-pitch-cloud-accounting | 3 | 3 | 0 | 16/21 → 1/21 |
 
-**Only 1 of the 12 personas in the published samples would pass the new rule as written.**
+**Only 1 of the 12 personas in those samples would pass the new rule as written.**
 The reason is visible in the real items: of the 84 `direct` entries in the samples, 8 are
 quotes. The rest are accurate-looking restatements, quotes with commentary attached, and
 statements about what the page does not say. The old rule let almost all of them through; the
@@ -182,13 +186,8 @@ What this does and does not show:
 
 - It shows how the model used the `direct` tag under the old rule, with a repair prompt that
   only fired for a few entries.
-- It does **not** show what a live run under the new rule would produce. In a live run a
-  failing persona gets one repair turn that now names the uncovered part of each entry, and
-  the model can re-tag restatements as `inferred`. How often that succeeds has not been
-  measured, because this change made no model calls. Until it is measured, expect more repair
-  turns (each one is billed) and possibly more excluded personas than the samples show.
-- Moving restatements to `inferred` also pushes against the separate 40% cap on inferred
-  evidence, so the two checks now pull on each other.
+- It does **not** show what a live run under a stricter rule produces. That was measured
+  later, after the data shape was changed: see the next two sections.
 
 ## The `quote` field: fixing the data shape instead of loosening the rule
 
@@ -207,7 +206,11 @@ if it were part of the quote. The fix is in the schema, not in the threshold.
 - Outputs stored before the field existed have no `quote`; they are re-checked on `content`
   (`allow_content_fallback`, off in the engine), so the sample numbers above are unchanged.
 - Reports carry the quote separately (`persona_notes[].evidence_top3_detail`) and render it as a
-  quotation above the comment.
+  quotation above the comment. One caveat for the HTML report: the template's stylesheet had
+  three unclosed rules, dating from the first commits, that left the whole persona section
+  unstyled in a browser. That was fixed on 2026-11-12, after the current samples were generated,
+  so their stored `report.html` files still show that section as plain text. The Markdown
+  reports show the quotations as block quotes.
 - The report-level calibration metric named `hallucination` now calls the same function, so the
   gate and the metric cannot disagree about an entry.
 
@@ -244,8 +247,81 @@ quote and silent about the comment: a real quote with an invented claim beside i
 20. The earlier coverage-on-content rule rejected some of these by accident and many honest
 entries with them.
 
-**Not measured yet:** whether the model fills `quote` correctly in a live run. That needs model
-calls and is the next step; nothing on this page is evidence about it.
+Whether the model actually fills `quote` with exact text is a separate question that the
+constructed items cannot answer. The next section reports what happened in live runs.
+
+## Live runs (2026-11-11 and 2026-11-12)
+
+Five real engine runs with the `quote` field and the coverage rule on `quote`: standard depth,
+`claude-sonnet-5-5`, semantic de-duplication on, cross-examination on, no hand edits. Three are
+the current samples in `examples/reports/`. Two were run with the wrong persona pack by mistake
+and are kept only as evidence (`docs/evaluation/runs/2026-11-11-wrong-pack/`).
+
+### The three samples, before and after
+
+"Before" is the 2026-11-04 sample of the same material; "after" is the current sample.
+
+| | Steam store page | SaaS pricing page | Startup pitch |
+|---|---|---|---|
+| **Before** — personas passed (rule at the time) | 4 of 6 | 5 of 5 | 3 of 6 |
+| Before — failures | 2 grounding | – | 2 grounding, 1 schema |
+| Before — of those, pass coverage on `content` | 1 of 4 | 0 of 5 | 0 of 3 |
+| Before — `direct` entries grounded, old rule → coverage on `content` | 21/22 → 8/22 | 38/41 → 0/41 | 16/21 → 1/21 |
+| Before — repair turns / cost | 3 / $0.35 | 2 / $0.27 | 5 / $0.37 |
+| **After** — personas passed | **4 of 6** | **5 of 5** | **6 of 6** |
+| After — failures | 1 schema, 1 role drift (both malformed tool input) | – | – |
+| After — `direct` entries grounded (coverage on `quote`) | **25/25** | **36/36** | **42/42** |
+| After — `direct` / `inferred` / `gap` entries | 25 / 4 / 6 | 36 / 9 / 4 | 42 / 12 / 5 |
+| After — shares | 71% / 11% / 17% | 73% / 18% / 8% | 71% / 20% / 8% |
+| After — highest inferred share of one persona (cap 40%) | 12% | 25% | 25% |
+| After — repair turns, all for schema failures | 4 | 4 | 4 |
+| After — disputes cross-examined | 2 | 3 | 3 |
+| After — cost | $0.35 | $0.30 | $0.51 |
+
+Notes on reading this table:
+
+- **It is not a controlled comparison.** Between "before" and "after" the schema, the prompt
+  and the validator all changed, and so did two unrelated things: a list field that arrives as
+  tool-call markup is now a schema failure with a repair turn (after the Steam run, before the
+  other two), and the persona pack is resolved from the task type. The pitch sample going from
+  3 of 6 to 6 of 6 cannot be attributed to the `quote` field alone.
+- The Steam sample was generated at commit `af4e8c8`, the other two at `939e8ca`. For the pitch
+  sample the persona stage reached the cost cap set for that run, so the engine skipped
+  cross-examination; it was run afterwards on the same six validated outputs
+  (`run_panel_from_outputs`). That is why it costs more than the others.
+- The two Steam personas that failed did not fail on grounding. One submission had its fields
+  scattered and then came back incomplete; the other's `evidence` was a string of tool-call
+  markup, which at that commit was read as "100% inferred".
+- In every run, on every attempt whose evidence could be parsed, the ungrounded share was 0.
+  The grounding check never rejected anything.
+
+### All five runs
+
+| Run | Persona pack | Personas passed | `direct` entries grounded | Repair turns (all schema failures) |
+|---|---|---|---|---|
+| Steam store page (sample) | game-core | 4 of 6 | 25/25 | 4 |
+| SaaS pricing page (sample) | general-consumer | 5 of 5 | 36/36 | 4 |
+| Startup pitch (sample) | startup-panel | 6 of 6 | 42/42 | 4 |
+| SaaS pricing page (wrong pack, evidence only) | game-core | 5 of 5 | 33/33 | 5 |
+| Startup pitch (wrong pack, evidence only) | game-core | 6 of 6 | 41/41 | 5 |
+| **Total** | | **26 of 28** | **177/177** | **22** |
+
+The wrong-pack runs say nothing useful about the materials (game personas reviewing a pricing
+page and a pitch), but they are real output under the same schema, so they count for the one
+question asked here: when told to copy exact words into `quote`, did the model do it? In these
+runs, yes, for every `direct` entry of every persona that passed.
+
+### What these runs do not show
+
+- **This is five runs on one model, three materials, one language. It is not a rate.** Nothing
+  here says how often another model, another material or the same model on another day would
+  put a paraphrase into `quote`.
+- **The comments beside the quotes were not fact-checked**, by the rule or by anyone. 177
+  grounded quotes means 177 accurate quotations, not 177 accurate observations.
+- **Malformed tool input is still the main cost.** All 22 repair turns went to submissions with
+  damaged structure, and both lost personas were lost to it. The `quote` field does nothing
+  about that.
+- The counts cover personas that passed. The two that failed contributed no evidence entries.
 
 ## Remaining limits
 
@@ -268,7 +344,9 @@ calls and is the next step; nothing on this page is evidence about it.
   coverage and fails, as it did before.
 - **Chinese numerals and spelled-out numbers** are not seen by the number check ("三名" vs
   "五名" is caught only through coverage).
-- **Old outputs stay as they are.** The three stored samples predate the `quote` field and are
+- **Live evidence is thin.** Five runs, one model: see [what these runs do not
+  show](#what-these-runs-do-not-show).
+- **Old outputs stay as they are.** The 2026-11-04 samples predate the `quote` field and are
   only re-checked on `content`.
 
 ## Reproduce
@@ -278,5 +356,5 @@ python tests/fixtures/grounding_eval/build_set.py --check
 python scripts/eval_grounding.py --rule legacy            # baseline
 python scripts/eval_grounding.py --split dev --sweep      # parameter grid (dev only)
 python scripts/eval_grounding.py                          # current rule, both item shapes
-python scripts/revalidate_samples.py                      # effect on the stored samples
+python scripts/revalidate_samples.py                      # current samples (quote) and the archived ones
 ```

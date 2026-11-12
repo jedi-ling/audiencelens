@@ -13,8 +13,12 @@ import subprocess
 import sys
 
 import pytest
+import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "src"))
+from runner.task_types import default_pack_for_task_type  # noqa: E402
+
 REPORTS = os.path.join(ROOT, "examples", "reports")
 SLUGS = sorted(
     d for d in os.listdir(REPORTS) if os.path.isfile(os.path.join(REPORTS, d, "meta.json"))
@@ -22,9 +26,12 @@ SLUGS = sorted(
 META_KEYS = {
     "input_file", "task_type", "persona_pack", "depth", "model_id", "date",
     "cost_usd", "tokens_in", "tokens_out", "app_commit", "retries",
-    # 交叉质询是从已有人格输出续跑的（runner.cli.run_panel_from_outputs），出处要写清
-    "persona_outputs_from", "cross_exam_run", "dedup_method", "disputes",
+    "cross_exam_run", "dedup_method", "disputes",
+    # 证据 schema 版本、生成时的核对规则、以及离线复核出来的落地数
+    "evidence_schema", "grounding_rule", "grounding",
 }
+# 一份样例要么是一次跑完的（记 run_id），要么是"人格评审一次 + 交叉质询续跑一次"
+# （runner.cli.run_panel_from_outputs，记 persona_outputs_from）。出处必须写清是哪一种。
 FORBIDDEN = [
     re.compile(r"sk-ant-[A-Za-z0-9_-]{10,}"),
     re.compile(r"/home/[a-z]"),
@@ -57,9 +64,23 @@ def test_sample_is_complete(slug):
     cross = report.get("cross_examination") or {}
     assert meta["disputes"] == len(cross.get("disputes") or [])
     assert meta["dedup_method"] == (report.get("dedup") or {}).get("method")
-    assert meta["cost_usd"] == pytest.approx(
-        meta["persona_outputs_from"]["cost_usd"] + meta["cross_exam_run"]["cost_usd"], abs=1e-4
+    if "persona_outputs_from" in meta:
+        assert meta["cost_usd"] == pytest.approx(
+            meta["persona_outputs_from"]["cost_usd"] + meta["cross_exam_run"]["cost_usd"], abs=1e-4
+        )
+        assert meta["cross_exam_run"]["method"] == "runner.cli.run_panel_from_outputs"
+    else:
+        assert meta.get("run_id"), "单次运行的样例必须记 run_id"
+        assert 0 < meta["cross_exam_run"]["cost_usd"] < meta["cost_usd"]
+    assert meta["persona_pack"] == default_pack_for_task_type(meta["task_type"]), (
+        "样例用的人格包必须是该任务类型登记的默认包（用错包的运行放 docs/evaluation/runs/）"
     )
+    with open(os.path.join(ROOT, "src", "personas", f"{meta['persona_pack']}.yaml"), encoding="utf-8") as f:
+        pack_ids = {p["id"] for p in yaml.safe_load(f)["personas"]}
+    with open(os.path.join(folder, "persona_outputs.json"), encoding="utf-8") as f:
+        persona_file = json.load(f)
+    ran = {o["persona_id"] for o in persona_file["validated"]} | {x["persona_id"] for x in persona_file["failed"]}
+    assert ran and ran <= pack_ids, ran - pack_ids
     with open(os.path.join(folder, "persona_outputs.json"), encoding="utf-8") as f:
         persona_file = json.load(f)
     assert persona_file["validated"], "续跑的输入必须随仓库提交，才能复现"
@@ -95,21 +116,40 @@ def test_evaluation_runs_are_not_listed_as_samples():
     assert not any("before-fix" in s for s in listed)
 
 
-def test_grounding_revalidation_note_matches_the_offline_recheck():
-    """meta.json 里那段"旧规则下生成、新规则下复核"的数字必须是脚本算出来的，不是手填的。"""
+def test_sample_grounding_numbers_match_the_offline_recheck():
+    """meta.json 里的落地数（README 表格引用的就是它）必须是脚本算出来的，不是手填的。"""
     sys.path.insert(0, os.path.join(ROOT, "scripts"))
     import revalidate_samples
 
-    result = revalidate_samples.revalidate()
+    result = revalidate_samples.current_samples()
     assert set(result) == set(SLUGS)
     for slug, r in result.items():
         with open(os.path.join(REPORTS, slug, "meta.json"), encoding="utf-8") as f:
-            note = json.load(f)["grounding_revalidation"]
+            note = json.load(f)["grounding"]
         with open(os.path.join(REPORTS, slug, "report.json"), encoding="utf-8") as f:
             report = json.load(f)
+        for key in ("personas_passed", "personas_attempted", "direct_entries", "inferred_entries",
+                    "gap_entries", "direct_entries_with_quote", "direct_entries_grounded"):
+            assert note[key] == r[key], (slug, key)
+        assert note["personas_passed"] == report["degradation"]["succeeded_count"]
+        assert note["personas_attempted"] == report["degradation"]["attempted_count"]
+        # 发布的样例：每条 direct 证据都带 quote，且 quote 过得了当前规则
+        assert r["direct_entries"] == r["direct_entries_with_quote"] == r["direct_entries_grounded"] > 0
+
+
+def test_archived_pre_quote_samples_keep_their_recorded_recheck():
+    """2026-11-04 的旧样例已移到 docs/evaluation/runs/ 当证据；它们 meta 里那段
+    "旧规则下生成、覆盖率规则下复核"的数字仍须和脚本一致。"""
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import revalidate_samples
+
+    archived = os.path.join(ROOT, revalidate_samples.ARCHIVED_DIR)
+    result = revalidate_samples.revalidate()
+    assert set(result) == set(SLUGS)
+    for slug, r in result.items():
+        with open(os.path.join(archived, slug, "meta.json"), encoding="utf-8") as f:
+            note = json.load(f)["grounding_revalidation"]
         assert note["rule_at_generation"] == "any-fragment"
-        assert note["personas_in_report"] == r["personas_in_report"] == report["degradation"]["succeeded_count"]
-        # 旧规则的冻结副本必须复现出"生成时这些人格都过了"——否则副本和当时的规则不是一回事
         assert note["personas_passing_rule_at_generation"] == r["pass_before"] == r["personas_in_report"]
         assert note["personas_passing_coverage_rule"] == r["pass_after"]
         assert note["direct_entries"] == r["direct_entries"]

@@ -26,17 +26,19 @@
 ## 样例报告
 
 对虚构产品材料的真实引擎运行结果，原样保存、没有手工修改（`examples/reports/`，也可以在应用的 `/samples` 页浏览）。
-standard 档，模型 `claude-sonnet-5-5`，2026-11-04，成本取自应用自己的计费。先跑人格评审，再用语义去重在同一批通过校验的人格输出上续跑交叉质询（`runner.cli.run_panel_from_outputs`）；`meta.json` 记录两步的出处，`persona_outputs.json` 存了续跑的输入，交叉质询这一步可以从仓库复现。
+standard 档，模型 `claude-sonnet-5-5`，2026-11-11 与 2026-11-12，开启语义去重，成本取自应用自己的计费。每个目录的 `meta.json` 记录运行出处，`persona_outputs.json` 存了通过校验的人格输出。
 
-| 报告 | 输入 | 成本 | 通过校验的人格 | 交叉质询 |
-|---|---|---|---|---|
-| [Steam 商店页 — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` | $0.35 | 6 位中 4 位 | 2 个争议点，各一轮反驳 |
-| [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | $0.27 | 5 位全部 | 3 个争议点，各一轮反驳 |
-| [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | $0.37 | 6 位中 3 位 | 1 个争议点，一轮反驳 |
+| 报告 | 输入 | 通过校验的人格 | 落地的 `direct` 条目 | 交叉质询 | 成本 |
+|---|---|---|---|---|---|
+| [Steam 商店页 — 深渊回响](examples/reports/steam-page-abyss-echo/report.md) | `test-materials/03_steam商店页_深渊回响.md` | 6 位中 4 位 | 25 条全部 | 2 个争议点，各一轮反驳 | $0.35 |
+| [SaaS 定价页 — 云笔记订阅](examples/reports/saas-pricing-cloud-notes/report.md) | `test-materials/04_定价页_云笔记订阅.md` | 5 位全部 | 36 条全部 | 3 个争议点，各一轮反驳 | $0.30 |
+| [创业 BP — 轻账 LiteBooks](examples/reports/startup-pitch-cloud-accounting/report.md) | `test-materials/02_创业BP_云会计SaaS.pdf` | 6 位全部 | 42 条全部 | 3 个争议点，各一轮反驳 | $0.51 |
 
-这三份报告是在旧的证据核对规则下生成的（人格输出对应提交 `de65474`），保持原样。用现在的覆盖率规则离线复核，三份报告里分别只有 4 位中的 1 位、5 位中的 0 位、3 位中的 0 位人格能通过，因为它们的 `direct` 条目大多是改写或“引用 + 评论”，不是引用；新规则下的真实运行还没有测过（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）。
+Steam 样例生成于提交 `af4e8c8`，另外两份生成于“按任务类型解析人格包”的修复（`939e8ca`）之后；创业 BP 样例的交叉质询是在同一批通过校验的输出上作为第二步续跑的（`runner.cli.run_panel_from_outputs`）。
 
-三份反驳都没有改票：置信度最大只变了 2 分，阈值是 15 分。部分人格没通过校验、交叉质询为什么需要语义去重，见 [docs/evaluation/](docs/evaluation/)。
+“落地”指条目的 `quote` 是材料原文；旁边的评论不核对。Steam 样例里没通过的两位人格是败在工具输入格式损坏上，不是败在证据核对上。一个模型上的三次运行不是通过率。最早的一批样例（2026-11-04，证据条目还没有 `quote` 字段）作为证据保留在 [docs/evaluation/runs/2026-11-04-pre-quote-field/](docs/evaluation/runs/2026-11-04-pre-quote-field/notes.md)，前后对比见 [docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)。
+
+三份反驳都没有改票：置信度最大只变了 8 分，阈值是 15 分。部分人格没通过校验、交叉质询为什么需要语义去重，见 [docs/evaluation/](docs/evaluation/)。
 
 ## 架构
 
@@ -162,7 +164,8 @@ python -m pytest tests/ -q
 - 成本随面板人数增长；
 - 目前不提供平台 Key，只支持自带 Key（BYOK）；
 - 部分人格输出会被校验拦下（把改写标成 direct、或提交残缺），一轮修复能救回不少，但不是全部；
-- 证据核对衡量的是“是不是引用”，不是“说得对不对”：`direct` 条目的 `quote` 是材料原文就能通过，旁边的评论不核对，也没有任何检查保证引用被公平使用，`inferred` 条目完全不对照材料。规则是在样例生成之后收紧的：样例里的 12 位人格只有 1 位能通过新规则，新规则下修复轮能救回多少还没有测过（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）；
+- 证据核对衡量的是“是不是引用”，不是“说得对不对”：`direct` 条目的 `quote` 是材料原文就能通过，旁边的评论不核对，也没有任何检查保证引用被公平使用，`inferred` 条目完全不对照材料。在同一个模型上的五次真实运行里，通过校验的人格给出的 177 条 `direct` 证据，quote 全部通过规则；这只是几次运行，不是比率（[docs/evaluation/grounding-check.md](docs/evaluation/grounding-check.md)）；
+- 工具输入格式损坏仍然会消耗修复轮、损失人格：上述五次运行里有 22 次修复轮花在结构损坏的提交上，28 位人格中有 2 位因此出局；
 - 只有一轮反驳，θ 未经校准；
 - 报告目前只生成中文（`SUPPORTED_REPORT_LANGS = zh-CN`）；英文输出需要 [docs/I18N_CONTRACT.md](docs/I18N_CONTRACT.md) §10 所述的 `output_lang` 链路，尚未实现。
 

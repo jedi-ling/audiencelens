@@ -81,7 +81,9 @@ separately, so the limit stays visible in every run.
 
 Entries the model actually wrote on 2026-11-04 (claude-sonnet-5-5) for the three sample reviews:
 
-- **84** — every `direct` entry in `examples/reports/*/persona_outputs.json`.
+- **84** — every `direct` entry in the three sample reports of that date
+  (`docs/evaluation/runs/2026-11-04-pre-quote-field/*/persona_outputs.json`; they were the
+  published samples until 2026-11-12).
 - **33** — entries the validator flagged as ungrounded in the same runs and in the diagnostic
   re-run described in `docs/evaluation/runs/2026-11-04-sonnet55-before-fix/notes.md`. That
   folder records only the percentages, not the quote text, so these come from the local debug

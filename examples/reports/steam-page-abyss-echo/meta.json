@@ -4,43 +4,36 @@
   "persona_pack": "game-core",
   "depth": "standard",
   "model_id": "claude-sonnet-5-5",
-  "date": "2026-11-04",
-  "persona_outputs_from": {
-    "run_id": "20261104-043324-steam_page_review",
-    "date": "2026-11-04",
-    "commit": "de65474",
-    "cost_usd": 0.3373,
-    "tokens_in": 71036,
-    "tokens_out": 20884,
-    "retries": 3
-  },
-  "cross_exam_run": {
-    "date": "2026-11-04",
-    "commit": "92b277e",
-    "cost_usd": 0.0171,
-    "calls": 1,
-    "tokens_in": 1425,
-    "tokens_out": 1430,
-    "mode": "moderated_rebuttal"
+  "date": "2026-11-11",
+  "run_id": "20261111-180655-steam_page_review",
+  "app_commit": "af4e8c8",
+  "evidence_schema": "quote-field-v1",
+  "grounding_rule": {
+    "name": "coverage-on-quote",
+    "commit": "af4e8c8",
+    "config": "src/config/grounding.yaml"
   },
   "dedup_method": "semantic",
   "disputes": 2,
-  "cost_usd": 0.3544,
-  "tokens_in": 72461,
-  "tokens_out": 22314,
-  "app_commit": "92b277e",
-  "retries": 3,
-  "grounding_revalidation": {
-    "note": "Generated under the earlier any-fragment grounding rule. Re-validated offline with the coverage rule (src/config/grounding.yaml); the report was not regenerated or edited. See docs/evaluation/grounding-check.md.",
-    "rule_at_generation": "any-fragment",
-    "generation_commit": "de65474",
-    "revalidated_on": "2026-11-11",
-    "script": "scripts/revalidate_samples.py",
-    "personas_in_report": 4,
-    "personas_passing_rule_at_generation": 4,
-    "personas_passing_coverage_rule": 1,
-    "direct_entries": 22,
-    "direct_entries_grounded_rule_at_generation": 21,
-    "direct_entries_grounded_coverage_rule": 8
+  "cost_usd": 0.3541,
+  "tokens_in": 86358,
+  "tokens_out": 20669,
+  "retries": 4,
+  "cross_exam_run": {
+    "mode": "moderated_rebuttal",
+    "calls": 1,
+    "cost_usd": 0.0171,
+    "tokens_in": 1493,
+    "tokens_out": 1414
+  },
+  "grounding": {
+    "personas_passed": 4,
+    "personas_attempted": 6,
+    "direct_entries": 25,
+    "inferred_entries": 4,
+    "gap_entries": 6,
+    "direct_entries_with_quote": 25,
+    "direct_entries_grounded": 25,
+    "checked_by": "scripts/revalidate_samples.py (quote only; same rule as the engine)"
   }
 }

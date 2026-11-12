@@ -288,3 +288,34 @@ class TestQuoteIsCarriedIntoTheReport:
             note.pop("evidence_top3_detail")
         md = render_markdown_report(report, REPORT_TEMPLATE_PATH)
         assert f"  - {self.COMMENT}" in md and self.QUOTE not in md
+
+
+class TestHtmlTemplateStylesheetIsWellFormed:
+    """report-template.html 的样式表曾有三处被一段粘贴进来的 `.stance-persona{…}` 截断，
+    花括号不配平：第一处之后的所有规则都被吞进一条嵌套规则里，"评审员评论"整段
+    （人格卡片、证据层级徽标、引用块）在浏览器里是无样式的纯文本。HTML 里类名都在，
+    所以只断言"类名出现"的测试发现不了。"""
+
+    def _css(self, path):
+        with open(path, encoding="utf-8") as f:
+            html = f.read()
+        return html[html.index("<style>") + len("<style>"):html.index("</style>")]
+
+    def test_braces_balance_and_never_nest_deeper_than_a_media_block(self):
+        for path in (HTML_TEMPLATE_PATH,
+                     os.path.join(PROJECT_ROOT, ".agents", "skills", "synthetic-playtest", "templates", "report-template.html")):
+            depth = deepest = 0
+            for ch in self._css(path):
+                if ch == "{":
+                    depth += 1
+                    deepest = max(deepest, depth)
+                elif ch == "}":
+                    depth -= 1
+                    assert depth >= 0, path
+            assert depth == 0, f"{path}: 样式表花括号不配平（差 {depth}）"
+            assert deepest <= 2, f"{path}: 出现了 @media 之外的嵌套规则"
+
+    def test_quote_rule_is_a_top_level_rule(self):
+        css = self._css(HTML_TEMPLATE_PATH)
+        before = css[:css.index(".evidence-quote{")]
+        assert before.count("{") == before.count("}")

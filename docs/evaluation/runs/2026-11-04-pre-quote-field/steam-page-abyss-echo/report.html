@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AudienceLens · 深渊回响</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+  :root{--bg:#0c0e14;--surface:#141828;--surface-raised:#1a1f32;--surface-glow:#202540;--border:#3d4866;--border-glow:#505a80;--text:#e8eaf0;--text-secondary:#c4cce0;--text-muted:#a8b4cc;--accent:#ff6b35;--accent-dim:#c44a20;--accent-glow:rgba(255,107,53,0.15);--cyan:#00d4aa;--cyan-dim:#00a885;--cyan-glow:rgba(0,212,170,0.12);--amber:#ffb347;--amber-dim:#cc8f38;--amber-glow:rgba(255,179,71,0.12);--magenta:#e056fd;--magenta-dim:#b03fc8;--magenta-glow:rgba(224,86,253,0.12);--blue:#4facfe;--blue-dim:#3d8acc;--green:#00d26a;--green-dim:#00a855;--red:#ff4757;--red-dim:#cc3846;--radius:16px;--radius-sm:10px;--radius-xs:6px;--font-mono:'Space Mono','SF Mono','Fira Code',monospace;--font-sans:'Noto Sans SC',-apple-system,sans-serif;--font-serif:'Noto Serif SC',Georgia,serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:var(--font-sans);background:var(--bg);font-size:15px;color:var(--text);line-height:1.65;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,107,53,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,107,53,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+  body::after{content:'';position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:1}
+  .container{max-width:900px;margin:0 auto;padding:40px 20px 100px;position:relative;z-index:2}
+  .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--magenta));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:14px;font-weight:700;color:#fff;text-shadow:0 0 8px rgba(255,255,255,0.3)}
+  .brand-icon-img{background:none;object-fit:contain;padding:2px}
+  .brand-text{font-family:var(--font-mono);font-size:15px;font-weight:700;letter-spacing:1px;color:var(--text)}
+  .brand-text span{color:var(--accent)}
+  .synthetic-chip{font-family:var(--font-mono);font-size:14px;color:var(--red);border:1px solid rgba(255,71,87,0.3);padding:3px 10px;border-radius:20px;background:rgba(255,71,87,0.06);letter-spacing:0.5px}
+  .post-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:36px 32px 28px;margin-bottom:12px;position:relative;overflow:hidden}
+  .post-header::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--magenta),var(--cyan));box-shadow:0 0 20px rgba(255,107,53,0.3)}
+  .post-header::after{content:'';position:absolute;top:-50%;right:-20%;width:400px;height:400px;background:radial-gradient(circle,var(--accent-glow),transparent 70%);pointer-events:none}
+  .post-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent-glow);color:var(--accent);font-family:var(--font-mono);font-size:14px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:14px;border:1px solid rgba(255,107,53,0.2);letter-spacing:0.5px;text-transform:uppercase}
+  .post-badge::before{content:'';width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 6px var(--accent);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 6px var(--accent)}50%{opacity:0.5;box-shadow:0 0 2px var(--accent)}}
+  .post-title{font-family:var(--font-serif);font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.3;color:var(--text)}
+  .post-meta{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:20px}
+  .post-meta span{display:inline-flex;align-items:center;gap:5px}
+  .post-meta .sep{color:var(--border-glow)}
+  .summary-hud{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+  .hud-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px 18px;position:relative;overflow:hidden;transition:border-color 0.3s,transform 0.3s}
+  .hud-card:hover{border-color:var(--border-glow);transform:translateY(-2px)}
+  .hud-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0.6}
+  .hud-card.rec::before{background:linear-gradient(90deg,var(--accent),var(--magenta))}
+  .hud-card.risk::before{background:linear-gradient(90deg,var(--red),var(--amber))}
+  .hud-card.evidence::before{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .hud-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .hud-value{font-family:var(--font-serif);font-size:18px;font-weight:700;line-height:1.3}
+  .hud-value.rec{color:var(--text)}
+  .hud-value.risk-low{color:var(--green);text-shadow:0 0 12px rgba(0,210,106,0.2)}
+  .hud-value.risk-medium{color:var(--amber);text-shadow:0 0 12px rgba(255,179,71,0.2)}
+  .hud-value.risk-high{color:var(--red);text-shadow:0 0 12px rgba(255,71,87,0.2)}
+  .hud-value.risk-critical{color:var(--red);text-shadow:0 0 16px rgba(255,71,87,0.3);animation:critical-pulse 1.5s ease-in-out infinite}
+  @keyframes critical-pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+  .hud-value.evidence-strong{color:var(--cyan)}
+  .hud-value.evidence-medium{color:var(--blue)}
+  .hud-value.evidence-weak{color:var(--amber)}
+  .hud-value.evidence-insufficient{color:var(--red)}
+  .section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:24px 28px;margin-bottom:12px;position:relative}
+  .section-card::before{content:'';position:absolute;top:0;left:28px;width:40px;height:2px;background:linear-gradient(90deg,var(--accent),transparent)}
+  .section-title{font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px;letter-spacing:1px;text-transform:uppercase}
+  .section-title .icon{font-size:14px;filter:drop-shadow(0 0 4px var(--accent-glow))}
+  .point-list{list-style:none}
+  .point-list li{padding:8px 0;font-size:15px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;transition:padding-left 0.2s}
+  .point-list li:hover{padding-left:4px}
+  .point-list li:last-child{border-bottom:none}
+  .point-list li .dot{width:7px;height:7px;border-radius:50%;margin-top:7px;flex-shrink:0;box-shadow:0 0 6px currentColor}
+  .point-list.agree .dot{background:var(--green);color:var(--green)}
+  .point-list.question .dot{background:var(--amber);color:var(--amber)}
+  .point-list.gap .dot{background:var(--red);color:var(--red)}
+  .disagreement-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px;margin-bottom:10px;position:relative;overflow:hidden}
+  .disagreement-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--red),var(--amber))}
+  .disagreement-card:last-child{margin-bottom:0}
+  .disagreement-topic{font-family:var(--font-serif);font-size:15px;font-weight:700;margin-bottom:10px;padding-left:8px}
+  .stance-row{display:flex;align-items:center;gap:10px;padding:5px 0 5px 8px;font-size:15px}
+  .stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .stance-text{color:var(--text);flex:1}
+  .disagreement-resolution{margin-top:10px;margin-left:8px;font-size:14px;color:var(--cyan);padding:10px 14px;background:var(--cyan-glow);border-radius:var(--radius-xs);border-left:2px solid var(--cyan);font-family:var(--font-mono)}
+  .fix-table{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
+  .fix-table th{text-align:left;padding:10px 12px;color:var(--text-secondary);font-family:var(--font-mono);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;border-bottom:1px solid var(--border)}
+  .fix-table td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top}
+  .fix-table tr:last-child td{border-bottom:none}
+  .fix-table tr:hover td{background:var(--surface-raised)}
+  .severity-badge{display:inline-block;padding:2px 10px;border-radius:4px;font-family:var(--font-mono);font-size:14px;font-weight:700;letter-spacing:0.5px}
+  .severity-badge.low{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.2)}
+  .severity-badge.medium{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
+  .severity-badge.high{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .severity-badge.critical{background:rgba(255,71,87,0.15);color:var(--red);border:1px solid rgba(255,71,87,0.3);animation:critical-pulse 1.5s ease-in-out infinite}
+  .comment-thread{margin-top:12px}
+  .comment-thread .section-title{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .comment{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden;transition:border-color 0.3s,box-shadow 0.3s;position:relative}
+  .comment::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--accent),var(--magenta));opacity:0;transition:opacity 0.3s}
+  .comment:hover{border-color:var(--border-glow);box-shadow:0 0 30px rgba(255,107,53,0.05)}
+  .comment:hover::before{opacity:1}
+  .comment-top{display:flex;align-items:center;gap:14px;padding:18px 24px 0}
+  .avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:18px;font-weight:700;color:#fff;flex-shrink:0;position:relative;border:2px solid rgba(255,255,255,0.1);box-shadow:0 0 16px rgba(0,0,0,0.3)}
+  .comment-user-info{flex:1;min-width:0}
+  .comment-username{font-family:var(--font-serif);font-weight:700;font-size:15px}
+  .comment-archetype{font-family:var(--font-mono);font-size:14px;color:var(--text-secondary);letter-spacing:0.5px}
+  .stance-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:20px;font-family:var(--font-mono);font-size:15px;font-weight:700;white-space:nowrap;letter-spacing:0.5px}
+  .stance-tag.positive{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.25)}
+  .stance-tag.neutral{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.25)}
+  .stance-tag.negative{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.25)}
+  .stance-tag::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .comment-body{padding:14px 24px 20px;font-size:15px}
+  .voice-sample{background:var(--surface-raised);border-left:3px solid var(--accent);padding:12px 18px;border-radius:0 var(--radius-xs) var(--radius-xs) 0;font-family:var(--font-serif);font-style:italic;font-size:15px;margin-bottom:18px;color:var(--text);position:relative}
+  .voice-sample::before{content:'\201C';position:absolute;top:-4px;left:10px;font-size:36px;color:var(--accent);opacity:0.3;font-family:Georgia,serif;line-height:1}
+  .scores-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+  .score-item{background:var(--surface-raised);border-radius:var(--radius-xs);padding:12px 14px;border:1px solid var(--border)}
+  .score-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .score-bar-wrap{display:flex;align-items:center;gap:10px}
+  .score-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;position:relative}
+  .score-bar-fill{height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);position:relative}
+  .score-bar-fill::after{content:'';position:absolute;top:0;right:0;width:20px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15))}
+  .score-bar-fill.s1{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .score-bar-fill.s2{background:linear-gradient(90deg,var(--red),var(--amber))}
+  .score-bar-fill.s3{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .score-bar-fill.s4{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+  .score-bar-fill.s5{background:linear-gradient(90deg,var(--cyan),var(--green))}
+  .score-num{font-family:var(--font-mono);font-size:14px;font-weight:700;min-width:18px;text-align:right}
+  .evidence-list{margin-bottom:18px}
+  .evidence-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .evidence-item{font-size:15px;padding:5px 0;display:flex;align-items:flex-start;gap:8px}
+  .evidence-level{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;font-weight:700;white-space:nowrap;margin-top:2px;letter-spacing:0.5px}
+  .evidence-level.direct{background:rgba(0,212,170,0.1);color:var(--cyan);border:1px solid rgba(0,212,170,0.2)}
+  .evidence-level.inferred{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
+  .evidence-level.gap{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .issues-list{margin-bottom:18px}
+  .issues-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .issue-item{background:var(--surface-raised);border-radius:var(--radius-xs);padding:12px 14px;margin-bottom:8px;border:1px solid var(--border);transition:border-color 0.2s}
+  .issue-item:hover{border-color:var(--border-glow)}
+  .issue-item:last-child{margin-bottom:0}
+  .issue-title-row{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+  .issue-title{font-size:15px;font-weight:700}
+  .issue-why{font-size:14px;color:#b8bdd0;line-height:1.5}
+  .issue-fix{font-size:14px;color:var(--cyan);margin-top:6px;font-family:var(--font-mono);padding-left:12px;border-left:2px solid var(--cyan)}
+  .triggers-row{display:flex;gap:20px;flex-wrap:wrap;.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .trigger-group{flex:1;min-width:200px}
+  .trigger-group .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+  .trigger-group.continue .sub-title{color:var(--green)}
+  .trigger-group.quit .sub-title{color:var(--red)}
+  .trigger-tag{display:inline-block;padding:3px 10px;border-radius:4px;font-size:15px;margin:3px;font-family:var(--font-mono);transition:transform 0.15s}
+  .trigger-tag:hover{transform:scale(1.05)}
+  .trigger-tag.continue{background:rgba(0,210,106,0.08);color:var(--green);border:1px solid rgba(0,210,106,0.15)}
+  .trigger-tag.quit{background:rgba(255,71,87,0.08);color:var(--red);border:1px solid rgba(255,71,87,0.15)}
+  .next-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .next-step-card{background:var(--surface-raised);border-radius:var(--radius-xs);padding:16px 18px;border:1px solid var(--border);transition:border-color 0.2s}
+  .next-step-card:hover{border-color:var(--border-glow)}
+  .next-step-card .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+  .next-step-card ul{list-style:none;font-size:15px}
+  .next-step-card ul li{padding:4px 0;padding-left:16px;position:relative;color:#b8bdd0}
+  .next-step-card ul li::before{content:'>';position:absolute;left:0;color:var(--accent);font-family:var(--font-mono);font-size:14px}
+  .report-footer{text-align:center;padding:36px 0;font-family:var(--font-mono);font-size:15px;color:var(--text);border-top:1px solid var(--border);margin-top:32px;letter-spacing:0.5px}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .post-header,.hud-card,.section-card,.comment{animation:fadeInUp 0.6s ease-out both}
+  .hud-card:nth-child(1){animation-delay:0.1s}
+  .hud-card:nth-child(2){animation-delay:0.2s}
+  .hud-card:nth-child(3){animation-delay:0.3s}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--border-glow)}
+  .hud-card.harness::before{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .hud-card.grounding::before{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .hud-card.divergence::before{background:linear-gradient(90deg,var(--magenta),var(--amber))}
+  .validation-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:14px;font-weight:700;padding:3px 10px;border-radius:4px;margin-top:6px;letter-spacing:0.5px}
+  .validation-status.pass{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.25)}
+  .validation-status.fail{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.25)}
+  .validation-status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .hud-sub{font-family:var(--font-mono);font-size:15px;color:var(--text);margin-top:4px}
+  .round-indicator{display:flex;gap:4px;margin-bottom:18px}
+  .round-step{flex:1;display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);transition:border-color 0.3s,color 0.3s}
+  .round-step.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+  .round-step .step-num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;background:var(--border);color:var(--text-secondary);flex-shrink:0}
+  .round-step.active .step-num{background:var(--accent);color:#fff;box-shadow:0 0 8px rgba(255,107,53,0.3)}
+  .round-connector{width:20px;height:2px;background:var(--border);flex-shrink:0;align-self:center}
+  .debate-card{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);margin-bottom:12px;overflow:hidden;transition:border-color 0.2s}
+  .debate-card:hover{border-color:var(--border-glow)}
+  .debate-card:last-child{margin-bottom:0}
+  .debate-topic{padding:12px 18px;font-family:var(--font-serif);font-size:14px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .debate-topic::before{content:'\2694';font-size:15px}
+  .debate-sides{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .debate-side{padding:14px 18px;position:relative}
+  .debate-side.pro{border-right:1px solid var(--border)}
+  .debate-side-label{font-family:var(--font-mono);font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .debate-side.pro .debate-side-label{color:var(--green)}
+  .debate-side.con .debate-side-label{color:var(--red)}
+  .debate-arg{font-size:14px;color:var(--text);line-height:1.6;margin-bottom:6px;padding-left:10px;border-left:2px solid var(--border)}
+  .debate-side.pro .debate-arg{border-left-color:rgba(0,210,106,0.3)}
+  .debate-side.con .debate-arg{border-left-color:rgba(255,71,87,0.3)}
+  .debate-arg-persona{font-family:var(--font-mono);font-size:15px;color:var(--accent);margin-top:2px}
+  .vote-change-list{margin-top:14px}
+  .vote-change-item{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);margin-bottom:8px;font-size:15px}
+  .vote-change-item:last-child{margin-bottom:0}
+  .vc-persona{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);min-width:70px}
+  .vc-arrow{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary)}
+  .vc-before{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
+  .vc-after{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.2)}
+  .vc-reason{font-size:14px;color:var(--text-secondary);flex:1;padding-left:10px;border-left:2px solid var(--amber)}
+  .confidence-chart{margin-top:16px}
+  .confidence-chart .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  .conf-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .conf-bar-label{font-family:var(--font-mono);font-size:14px;color:var(--text);min-width:90px;text-align:right}
+  .conf-bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;position:relative}
+  .conf-bar-fill{height:100%;border-radius:4px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);position:relative}
+  .conf-bar-fill::after{content:'';position:absolute;top:0;right:0;width:16px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12))}
+  .conf-bar-fill.high{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .conf-bar-fill.medium{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .conf-bar-fill.low{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .conf-bar-num{font-family:var(--font-mono);font-size:15px;font-weight:700;min-width:32px}
+  .conf-delta{font-family:var(--font-mono);font-size:14px;margin-left:4px}
+  .conf-delta.up{color:var(--green)}
+  .conf-delta.down{color:var(--red)}
+  .conf-delta.same{color:var(--text-secondary)}
+  .compliance-banner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-top:12px;position:relative;overflow:hidden}
+  .compliance-banner::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .compliance-banner::after{content:'';position:absolute;top:-30%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(255,71,87,0.04),transparent 70%);pointer-events:none}
+  .compliance-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .compliance-title{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:8px;letter-spacing:1px;text-transform:uppercase}
+  .compliance-title::before{content:'';width:8px;height:8px;background:var(--red);border-radius:50%;box-shadow:0 0 8px var(--red);animation:pulse 2s ease-in-out infinite}
+  .compliance-status{font-family:var(--font-mono);font-size:15px;font-weight:700;padding:5px 16px;border-radius:4px;letter-spacing:1px}
+  .compliance-status.pass{background:rgba(0,210,106,0.1);color:var(--green);border:1px solid rgba(0,210,106,0.3)}
+  .compliance-status.needs-revision{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.3)}
+  .compliance-status.rejected{background:rgba(255,71,87,0.12);color:var(--red);border:1px solid rgba(255,71,87,0.35);animation:critical-pulse 1.5s ease-in-out infinite}
+  .compliance-body{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .compliance-score-block{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px}
+  .compliance-score-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+  .compliance-score-value{font-family:var(--font-serif);font-size:32px;font-weight:700;line-height:1}
+  .compliance-score-value.score-high{color:var(--green);text-shadow:0 0 16px rgba(0,210,106,0.2)}
+  .compliance-score-value.score-medium{color:var(--amber);text-shadow:0 0 16px rgba(255,179,71,0.2)}
+  .compliance-score-value.score-low{color:var(--red);text-shadow:0 0 16px rgba(255,71,87,0.2)}
+  .compliance-score-bar{margin-top:10px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+  .compliance-score-bar-fill{height:100%;border-radius:2px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1)}
+  .compliance-score-bar-fill.high{background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .compliance-score-bar-fill.medium{background:linear-gradient(90deg,var(--amber),var(--amber-dim))}
+  .compliance-score-bar-fill.low{background:linear-gradient(90deg,var(--red),var(--red-dim))}
+  .compliance-steps-block{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xs);padding:18px 20px}
+  .compliance-steps-label{font-family:var(--font-mono);font-size:15px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+  .compliance-steps-list{list-style:none}
+  .compliance-steps-list li{padding:4px 0;padding-left:18px;position:relative;font-size:15px;color:var(--text-secondary)}
+  .compliance-steps-list li::before{content:'\25C7';position:absolute;left:0;color:var(--cyan);font-size:14px}
+  .compliance-ai-notice{margin-top:16px;padding:12px 18px;background:rgba(255,71,87,0.05);border:1px solid rgba(255,71,87,0.15);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--red);display:flex;align-items:center;gap:8px}
+  .compliance-ai-notice::before{content:'\26A0';font-size:14px}
+  @media(max-width:640px){.container{padding:20px 12px 60px}.post-header{padding:24px 18px 20px}.post-title{font-size:22px}.summary-hud{grid-template-columns:1fr}.comment-top{flex-wrap:wrap}.scores-grid{grid-template-columns:1fr 1fr}.fix-table{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}.fix-table th,.fix-table td{padding:8px}.triggers-row{flex-direction:column}.debate-sides{grid-template-columns:1fr}.debate-side.pro{border-right:none;border-bottom:1px solid var(--border)}.compliance-body{grid-template-columns:1fr}.round-indicator{flex-wrap:wrap}.round-step{min-width:calc(50% - 2px)}.round-connector{display:none}.vote-change-item{flex-wrap:wrap}}
+  /* 「浏览器打印生成 PDF」的专用样式。原页面是深色主题——原样打印会整页黑底
+     铺满，要么被浏览器默认策略吞掉背景色变成白底白字看不见，要么真按深色印
+     出来废掉一墨盒。打印场景要的是"能读、省墨"，不是还原网页视觉效果。 */
+  @media print{
+    body::before,body::after{display:none}
+    body{background:#fff;color:#1a1a1a}
+    .container{max-width:100%;padding:16px 8px}
+    .post-header,.hud-card,.section-card,.compliance-steps-block{background:#fff;border-color:#ccc;box-shadow:none}
+    .post-header::before,.post-header::after{display:none}
+    .post-title,.section-title,.brand-text,.hud-value.rec{color:#1a1a1a}
+    .post-meta,.hud-label,.compliance-steps-label,.point-list li{color:#444}
+    .post-badge::before{animation:none}
+    .hud-value.risk-critical{animation:none}
+    .section-card,.post-header,.hud-card{break-inside:avoid}
+    a{color:#1a1a1a;text-decoration:underline}
+  }
+</style>
+</head>
+<body><div style="background:#fee2e2;border:2px solid #dc2626;color:#991b1b;padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">⚠️ 本次有 2 位人格未能完成评审，以下结论仅基于 4 位人格的输出。未完成的人格：P01-indie-core-operator、P16-competitor-loyal-veteran</div>
+<div class="container">
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="brand">
+      
+      <img class="brand-icon brand-icon-img" src="data:image/png;base64,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" alt="AudienceLens">
+      
+      <div class="brand-text">Audience<span>Lens</span></div>
+    </div>
+    <div class="synthetic-chip">AI 模拟评审 · 非真人数据</div>
+  </div>
+
+  <!-- Post Header -->
+  <div class="post-header">
+    <div class="post-badge">玩家模拟评审报告</div>
+    <h1 class="post-title">深渊回响</h1>
+    <div class="post-meta">
+      <span>📅 2026-11-04T01:20:00.170931+00:00</span>
+      <span class="sep">|</span>
+      <span>👤 4 位模拟评审员</span>
+      <span class="sep">|</span>
+      
+      <span>📦 v0.3.0</span>
+      <span class="sep">|</span><span>🎭 game-core@0.1.0</span>
+    </div>
+  </div>
+
+  <!-- Summary HUD -->
+  <div class="summary-hud">
+    <div class="hud-card rec">
+      <div class="hud-label">综合建议</div>
+      <div class="hud-value rec">观望</div>
+    </div>
+    <div class="hud-card risk">
+      <div class="hud-label">风险等级</div>
+      <div class="hud-value risk-critical">critical</div>
+    </div>
+    <div class="hud-card evidence">
+      <div class="hud-label">证据充分度</div>
+      <div class="hud-value evidence-weak">weak</div>
+    </div>
+  </div>
+
+  <!-- 校准指标 -->
+  
+  
+
+  <!-- 证据构成：报告自身的可信度记账（口径与 validator 一致），不是产品得分。
+       刻意没有任何加权综合分。 -->
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚖️</span> 证据构成（共 37 条）</div>
+    <div style="font-size:13px;margin-bottom:8px">
+      直接观察 <b>22</b> · 合理推断 <b>8</b> · 信息缺口 <b>7</b>
+      ｜ 推断占比 22%（上限 40%）
+    </div>
+    
+    <table style="font-size:12px;width:100%">
+      <tr><th style="text-align:left">维度</th><th>均分（1-5）</th><th>区间</th><th>人数</th></tr>
+      
+      <tr><td>clarity</td><td style="text-align:center">3.5</td><td style="text-align:center">3.0–4.0</td><td style="text-align:center">4</td></tr>
+      
+      <tr><td>trust</td><td style="text-align:center">2.0</td><td style="text-align:center">2.0–2.0</td><td style="text-align:center">4</td></tr>
+      
+      <tr><td>differentiation</td><td style="text-align:center">2.75</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">4</td></tr>
+      
+      <tr><td>value_for_money</td><td style="text-align:center">2.75</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">4</td></tr>
+      
+      <tr><td>wishlist_appeal</td><td style="text-align:center">2.75</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">4</td></tr>
+      
+    </table>
+    
+  </div>
+  
+
+  
+
+  
+
+  
+
+  <!-- Consensus -->
+  <div class="section-card">
+    
+    <div class="section-title"><span class="icon">🤝</span> 共识（按议题）</div>
+    
+    <div style="font-size:12px;opacity:.8;margin-bottom:10px">
+      判定口径：同一议题被 ≥3/4 位人格各自独立提出。
+    </div>
+    
+    <div class="sub-title">多数 persona 共同提出的议题</div>
+    
+    <ul class="point-list agree">
+      
+      <li><span class="dot"></span>首发团队没有商业发售经验，且只有 Discord 内测的自家好评</li>
+      
+    </ul>
+    
+    
+    
+    <div class="sub-title" style="margin-top:12px">仅个别 persona 提出的议题</div>
+    <ul class="point-list question">
+      
+      <li><span class="dot"></span>没有胶囊图、截图和预告片，视觉卖点无从验证</li>
+      
+      <li><span class="dot"></span>UI 与导航的视觉方案完全没交代</li>
+      
+      <li><span class="dot"></span>预告片和音频完全缺席</li>
+      
+      <li><span class="dot"></span>氛围可能被迷路和中期重复拖垮</li>
+      
+      <li><span class="dot"></span>差异化只靠文字承诺，没有对标</li>
+      
+      <li><span class="dot"></span>卖点缺少可验证的具体内容</li>
+      
+      <li><span class="dot"></span>付费边界完全没写</li>
+      
+      <li><span class="dot"></span>没有价格锚点,也没说明 $19.99 凭什么</li>
+      
+      <li><span class="dot"></span>评价来源单一且样本小</li>
+      
+      <li><span class="dot"></span>零实机、零预告，全靠文字吹</li>
+      
+      <li><span class="dot"></span>EA/正式版状态混乱</li>
+      
+      <li><span class="dot"></span>“独创”回响机制没有解释，已被内测反馈打脸</li>
+      
+    </ul>
+    
+  </div>
+
+  <!-- Major Disagreements -->
+  
+
+  <!-- Priority Fixes -->
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🔧</span> 优先修复</div>
+    <table class="fix-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>问题</th>
+          <th>严重度</th>
+          <th>影响方</th>
+          <th>建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">1</td>
+          <td style="font-weight:600;">首发团队没有商业发售经验，且只有 Discord 内测的自家好评</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P06-visual-atmosphere-lover, P10-steam-wishlist-browser, P15-toxic-skeptic-reviewer</td>
+          <td style="color:var(--text-secondary);">放出 Demo 或参加 Steam Next Fest，给开发里程碑和更新节奏；公开已修复的问题，比如加入小地图。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">2</td>
+          <td style="font-weight:600;">没有胶囊图、截图和预告片，视觉卖点无从验证</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P06-visual-atmosphere-lover, P10-steam-wishlist-browser</td>
+          <td style="color:var(--text-secondary);">补一张带血红点缀的胶囊图，再放 5 张以上截图。前三张要依次是：标志性水墨场景、回响幽灵的互动瞬间、血红色出现的剧情时刻。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">3</td>
+          <td style="font-weight:600;">卖点缺少可验证的具体内容</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P10-steam-wishlist-browser, P14-price-sensitive-buyer</td>
+          <td style="color:var(--text-secondary);">发售前上线 demo(建议 30–60 分钟,覆盖回响机制和一次能力解锁);补充实机预告和截图;写明退款政策提示。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">4</td>
+          <td style="font-weight:600;">零实机、零预告，全靠文字吹</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P15-toxic-skeptic-reviewer</td>
+          <td style="color:var(--text-secondary);">首屏放 60 秒以内的纯实机预告，不加 CG 和特效剪辑。再放 5 张以上的实机截图，要覆盖战斗、探索、回响互动和地图。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">5</td>
+          <td style="font-weight:600;">氛围可能被迷路和中期重复拖垮</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P06-visual-atmosphere-lover, P14-price-sensitive-buyer</td>
+          <td style="color:var(--text-secondary);">说明小地图或导航辅助的计划，以及回响机制在中后期怎样变化，比如不同类型的回响或视觉演变。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">6</td>
+          <td style="font-weight:600;">UI 与导航的视觉方案完全没交代</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P06-visual-atmosphere-lover</td>
+          <td style="color:var(--text-secondary);">放一张含 HUD、地图界面和字体的截图，说明 UI 是怎样融入水墨风格的，比如用墨迹式地图或极简血条。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">7</td>
+          <td style="font-weight:600;">预告片和音频完全缺席</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P06-visual-atmosphere-lover</td>
+          <td style="color:var(--text-secondary);">做一支 60 到 90 秒、以节奏为主的预告片，重点展示回响出现的瞬间和配乐。页面上也写明音乐和音效的方向。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">8</td>
+          <td style="font-weight:600;">差异化只靠文字承诺，没有对标</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P10-steam-wishlist-browser</td>
+          <td style="color:var(--text-secondary);">一句话写清机制闭环，配一个具体谜题或 Boss 例子；标签要精准，如 银河恶魔城、手绘、剧情丰富。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">9</td>
+          <td style="font-weight:600;">付费边界完全没写</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P14-price-sensitive-buyer</td>
+          <td style="color:var(--text-secondary);">在商店页明确写“买断制,无内购,无计划中的付费 DLC”;如果有 DLC 计划,就写清范围和价格区间。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">10</td>
+          <td style="font-weight:600;">EA/正式版状态混乱</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P15-toxic-skeptic-reviewer</td>
+          <td style="color:var(--text-secondary);">明确写清楚：是否上 EA、EA 现状、EA 阶段缺什么、预计 EA 多久、价格是否会变、是否承诺 1.0。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">11</td>
+          <td style="font-weight:600;">“独创”回响机制没有解释，已被内测反馈打脸</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P15-toxic-skeptic-reviewer</td>
+          <td style="color:var(--text-secondary);">去掉“独创”。用一段 GIF 讲清楚回响怎么起作用，以及它在 12-15 小时里怎么变化。公开说明内测反馈的重复问题怎么改。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">12</td>
+          <td style="font-weight:600;">没有价格锚点,也没说明 $19.99 凭什么</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P14-price-sensitive-buyer</td>
+          <td style="color:var(--text-secondary);">列出区域/Boss/收集要素数量和 100% 通关时长;说明 12–15 小时是主线还是全收集;必要时设置首发折扣作为价格锚点。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">13</td>
+          <td style="font-weight:600;">评价来源单一且样本小</td>
+          <td><span class="severity-badge low">low</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P14-price-sensitive-buyer</td>
+          <td style="color:var(--text-secondary);">开放更大范围的试玩,收集 Steam 外的独立评价并公开引用。</td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </div>
+  
+
+  <!-- Persona Comments Thread -->
+  <div class="comment-thread">
+    <div class="section-title"><span class="icon">💬</span> 评审员评论 (4)</div>
+
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(167, 65%, 55%)">羽</div>
+        <div class="comment-user-info">
+          <div class="comment-username">羽晨</div>
+          <div class="comment-archetype">P06-visual-atmosphere-lover</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">黑白水墨加一抹血红，光听这句我就心动了。可页面里连一张图都没有，我没法替你想象它有多美。你把画面放出来，我再决定要不要加愿望单。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">differentiation</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">wishlist_appeal</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>文案把视觉定位写得很明确：黑白水墨手绘，全程黑白，仅在关键剧情节点出现血红色点缀。这个色彩体系在静帧里有成立的潜力。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level gap">gap</span>
+            <span>材料里没有胶囊图、截图和 GIF，我无法确认前三张图能不能建立辨识度。这是信息缺失，不是负面证据。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level gap">gap</span>
+            <span>材料里没有预告片，也没提它的存在。节奏、剪辑、音画配合我都无法评判。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">没有胶囊图、截图和预告片，视觉卖点无从验证</span>
+            </div>
+            <div class="issue-why">我买的是气质。『黑白水墨加血红点缀』只写在文字里，没有静帧。我的核心规则（前三张图要建立辨识度）因此没法判定，只能观望。</div>
+            
+            <div class="issue-fix">补一张带血红点缀的胶囊图，再放 5 张以上截图。前三张要依次是：标志性水墨场景、回响幽灵的互动瞬间、血红色出现的剧情时刻。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">UI 与导航的视觉方案完全没交代</span>
+            </div>
+            <div class="issue-why">玩家已经在要小地图。UI 做得不好会直接破坏水墨氛围，而这是我的退出条件之一。</div>
+            
+            <div class="issue-fix">放一张含 HUD、地图界面和字体的截图，说明 UI 是怎样融入水墨风格的，比如用墨迹式地图或极简血条。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">预告片和音频完全缺席</span>
+            </div>
+            <div class="issue-why">无对话叙事主要靠音画推动。没有声音和剪辑的证据，『回响』的情绪冲击就只是一句宣称。</div>
+            
+            <div class="issue-fix">做一支 60 到 90 秒、以节奏为主的预告片，重点展示回响出现的瞬间和配乐。页面上也写明音乐和音效的方向。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">前三张图里黑白水墨的辨识度和构图成立</span>
+            
+            <span class="trigger-tag continue">血红色点缀在静帧中有明确记忆点</span>
+            
+            <span class="trigger-tag continue">预告片节奏克制，音画互相抬</span>
+            
+            <span class="trigger-tag continue">UI 与水墨风格统一，而不是通用 HUD</span>
+            
+            <span class="trigger-tag continue">有可试玩的 Demo 能确认关键帧稳定</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">补上的截图平庸，或像普通黑白滤镜</span>
+            
+            <span class="trigger-tag quit">UI 是通用样式，破坏水墨气质</span>
+            
+            <span class="trigger-tag quit">预告片剪辑廉价或只有玩法录屏</span>
+            
+            <span class="trigger-tag quit">画面有掉帧或关键帧不稳的迹象</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(72, 65%, 55%)">M</div>
+        <div class="comment-user-info">
+          <div class="comment-username">Mika</div>
+          <div class="comment-archetype">P10-steam-wishlist-browser</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">定位我 20 秒内记住了：水墨银河城加死亡回响。但我一张图一段 GIF 都没看到，2 条内测评价也不够当证据。现在只会观望，等有视觉证明再加愿望单。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">differentiation</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">wishlist_appeal</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>是一款黑白水墨风格的银河城探索游戏</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>死亡不是失败，而是叙事的一部分</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>箱庭部分转来转去容易迷路，希望能加个小地图。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">没有首屏视觉证据：无 GIF、预告片、截图</span>
+            </div>
+            <div class="issue-why">水墨风是最大卖点，但页面只给文字。我 20 秒内看不到'回响'机制长什么样，首图也无从判断，所以点不下去。</div>
+            
+            <div class="issue-fix">首位放一段 15 秒 GIF 或预告：死亡→留下回响幽灵→下一轮与它互动。胶囊图突出黑白水墨加血红点缀。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">可信度不足：内测评价少且只来自内部群，首作团队无发售记录</span>
+            </div>
+            <div class="issue-why">我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。</div>
+            
+            <div class="issue-fix">放出 Demo 或参加 Steam Next Fest，给开发里程碑和更新节奏；公开已修复的问题，比如加入小地图。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">差异化只靠文字承诺，没有对标</span>
+            </div>
+            <div class="issue-why">水墨加死亡叙事的组合有辨识度，但银河城赛道拥挤，页面没说清'回响'比同类强在哪里。</div>
+            
+            <div class="issue-fix">一句话写清机制闭环，配一个具体谜题或 Boss 例子；标签要精准，如 银河恶魔城、手绘、剧情丰富。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">首屏出现 15 秒内能看懂'回响'机制的 GIF 或预告</span>
+            
+            <span class="trigger-tag continue">有 Demo 或 Next Fest 计划</span>
+            
+            <span class="trigger-tag continue">Steam 上有真实玩家评价，或有媒体、主播试玩</span>
+            
+            <span class="trigger-tag continue">小地图或导航问题有明确回应</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">首图平淡，看不出水墨风的冲击力</span>
+            
+            <span class="trigger-tag quit">预告片只放抒情画面，没有玩法</span>
+            
+            <span class="trigger-tag quit">文案继续通稿化，没有证明</span>
+            
+            <span class="trigger-tag quit">发售日持续跳票，没有开发进展</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(354, 65%, 55%)">张</div>
+        <div class="comment-user-info">
+          <div class="comment-username">张宁</div>
+          <div class="comment-archetype">P14-price-sensitive-buyer</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">$19.99 配 12–15 小时,数字上我不反对,但页面没说买完以后还要不要再掏钱,也没有 demo 让我先试。这些没补上之前,我先观望,不进愿望单也不会买。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">differentiation</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">wishlist_appeal</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>预计定价 $19.99;预计流程 12-15 小时;发售时间为 2027 年第一季度。体量与价格从数字上看大致合理,约 $1.3–1.7/小时。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level gap">gap</span>
+            <span>页面没有任何 DLC、内购、版本差异或后续付费的说明,既没写“买断即完整”,也没写会有 DLC。付费边界未指定。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level gap">gap</span>
+            <span>页面没有提到 demo、试玩或 Steam Next Fest 计划,也没有退款或试错空间的说明。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">付费边界完全没写</span>
+            </div>
+            <div class="issue-why">我的规则是付费点模糊就先观望。页面没说是否买断即完整、有没有 DLC 或内购,我没法判断 $19.99 之后还要不会再掏钱。</div>
+            
+            <div class="issue-fix">在商店页明确写“买断制,无内购,无计划中的付费 DLC”;如果有 DLC 计划,就写清范围和价格区间。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">没有 demo,也没有可核验的内容证据</span>
+            </div>
+            <div class="issue-why">我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。</div>
+            
+            <div class="issue-fix">发售前上线 demo(建议 30–60 分钟,覆盖回响机制和一次能力解锁);补充实机预告和截图;写明退款政策提示。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge medium">medium</span>
+              <span class="issue-title">没有价格锚点,也没说明 $19.99 凭什么</span>
+            </div>
+            <div class="issue-why">页面没有对比同类作品,也没有拆分内容量(区域数、Boss 数、能力数、结局数),价格是否合理只能靠我自己猜。</div>
+            
+            <div class="issue-fix">列出区域/Boss/收集要素数量和 100% 通关时长;说明 12–15 小时是主线还是全收集;必要时设置首发折扣作为价格锚点。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">页面明确写出买断即完整、无内购、无付费 DLC</span>
+            
+            <span class="trigger-tag continue">发布 demo 并能在 1 小时内体验到回响机制</span>
+            
+            <span class="trigger-tag continue">给出区域/Boss/能力数量和主线与全收集时长</span>
+            
+            <span class="trigger-tag continue">出现独立玩家对性价比的正面反馈</span>
+            
+            <span class="trigger-tag continue">小地图或导航问题有明确的修复说明</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">发售后拿未来更新当现有价值来卖</span>
+            
+            <span class="trigger-tag quit">出现付费结构不透明的情况,例如发售后才宣布付费 DLC</span>
+            
+            <span class="trigger-tag quit">社区出现中期内容重复、注水的共识</span>
+            
+            <span class="trigger-tag quit">发售价高于 $19.99 但内容证据仍然不足</span>
+            
+            <span class="trigger-tag quit">没有 demo 且退款体验差</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(290, 65%, 55%)">老</div>
+        <div class="comment-user-info">
+          <div class="comment-username">老刀</div>
+          <div class="comment-archetype">P15-toxic-skeptic-reviewer</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">文字写得挺好听，实机呢？一帧都没有。就这样还敢叫“独创”，还想要 20 刀？我先不加，等你拿出画面再说。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">differentiation</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">value_for_money</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">wishlist_appeal</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>材料里没有任何实机截图、GIF、预告片或视频描述，全是文字卖点。美术风格、回响机制都无法核验。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>唯一的“用户评价”是 Discord 内测群里的两条匿名引用，是开发者自己挑的。其中一条还说“中期开始有点重复”，另一条说“容易迷路”。这不是 Steam 评测，没有可信度。</span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span>页面标注“早期访问阶段”，但发售信息写的是“预计发售 2027 年第一季度”。没有说明是否上 EA、现在已有哪些内容、路线图和更新频率。</span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">零实机、零预告，全靠文字吹</span>
+            </div>
+            <div class="issue-why">我第一眼就找实机，结果没有。“水墨”“血红点缀”“回响”都不能核验，“卖点没有证据，一律先怀疑”被直接触发。这就是最典型的“只有文案”的页面。</div>
+            
+            <div class="issue-fix">首屏放 60 秒以内的纯实机预告，不加 CG 和特效剪辑。再放 5 张以上的实机截图，要覆盖战斗、探索、回响互动和地图。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">EA/正式版状态混乱</span>
+            </div>
+            <div class="issue-why">页面写“早期访问阶段”，却又预告 2027 Q1 发售，没有 EA 说明、当前内容量、路线图。这符合“EA 装正式版”的差评条件，我倾向打差评。</div>
+            
+            <div class="issue-fix">明确写清楚：是否上 EA、EA 现状、EA 阶段缺什么、预计 EA 多久、价格是否会变、是否承诺 1.0。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">“独创”回响机制没有解释，已被内测反馈打脸</span>
+            </div>
+            <div class="issue-why">“独创”是个很容易被喷的词。同类死亡叙事机制已有先例，内测玩家 B 又说中期重复。差评会写“独创个寂寞，重复”。</div>
+            
+            <div class="issue-fix">去掉“独创”。用一段 GIF 讲清楚回响怎么起作用，以及它在 12-15 小时里怎么变化。公开说明内测反馈的重复问题怎么改。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">放出纯实机预告，且画面与文案中的水墨/血红风格一致</span>
+            
+            <span class="trigger-tag continue">明确 EA 状态、当前内容量与路线图</span>
+            
+            <span class="trigger-tag continue">提供可玩 demo，并回应迷路/小地图与中期重复问题</span>
+            
+            <span class="trigger-tag continue">出现来源可查的真实玩家评测或 Next Fest 反馈</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">上线后实机与宣传的美术风格不一致</span>
+            
+            <span class="trigger-tag quit">在 EA 阶段却按正式完整版收费</span>
+            
+            <span class="trigger-tag quit">“独创”机制实际只是普通的幽灵血迹系统</span>
+            
+            <span class="trigger-tag quit">发售后出现性能/优化差评</span>
+            
+            <span class="trigger-tag quit">继续用文案代替证据，对导航/重复的反馈装死</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- Cross-Examination Record -->
+  
+  <div class="section-card">
+    
+    
+    <div class="section-title"><span class="icon">⚔️</span> 交叉质询（仲裁式反驳：一次调用代双方各写一轮，非各自独立发言）</div>
+    
+
+    
+    
+    <div style="border:1px solid var(--border,#334155);background:rgba(148,163,184,.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;opacity:.9;">
+      本环节执行了**一次仲裁式反驳轮**（1 次模型调用）：由主持人视角代双方各写一轮反驳并给出更新后的立场，**不是每个人格各自独立重新发言**。改票由代码比较反驳前后的立场与置信度判定，置信度变化需达到阈值 θ=0.15。
+    </div>
+    
+
+    
+    
+
+    
+    <div class="round-indicator">
+      
+      <div class="round-step active">
+        <span class="step-num">1</span>
+        <span>Round 1</span>
+      </div>
+      
+      
+    </div>
+    
+
+    
+    
+    <div class="debate-card">
+      <div class="debate-topic">首发团队没有商业发售经验，且只有 Discord 内测的自家好评</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">我的规则是信任不足就不点，即使概念不错。2 条内测评价不能当社会证明，还都指出了迷路和中期重复的缺陷。<div class="debate-arg-persona">— Mika</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">这会降低对关键帧稳定性和完成度的信心。<div class="debate-arg-persona">— 羽晨</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="debate-card">
+      <div class="debate-topic">卖点缺少可验证的具体内容</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">我风险承受低,又缺少试错空间。新团队首作,12–15 小时只是口头承诺,我没法在花钱前验证。<div class="debate-arg-persona">— 张宁</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">'8 种能力'有数字但没有证明，抽象文案我扫过就忘，转化不成愿望单理由。<div class="debate-arg-persona">— Mika</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    
+
+    
+
+    
+    <div class="confidence-chart">
+      <div class="sub-title">置信度变化</div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">羽晨</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:58%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">58%</span>
+        
+        <span class="conf-delta down">-2%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">Mika</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:60%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">张宁</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:70%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">70%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">老刀</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:70%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">70%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+    </div>
+    
+
+  </div>
+  
+
+  <!-- 可证伪预测：判断闭环的入口。必须在 information_gaps 的条件块**之外**——
+       第一版误插进了那个条件里面，信息缺口为空时整块预测跟着消失，
+       而这两件事毫无关系。（注意：HTML 注释里不能写字面量 Jinja 标签，
+       Jinja 不认 HTML 注释，会把它当成真标签解析并报未闭合错误。） -->
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🎯</span> 可证伪预测</div>
+    
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“首发团队没有商业发售经验，且只有 Discord 内测的自家好评”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 76% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“没有胶囊图、截图和预告片，视觉卖点无从验证”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 82% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“卖点缺少可验证的具体内容”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 72% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“零实机、零预告，全靠文字吹”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 79% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“氛围可能被迷路和中期重复拖垮”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 62% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“UI 与导航的视觉方案完全没交代”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“预告片和音频完全缺席”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“差异化只靠文字承诺，没有对标”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“付费边界完全没写”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“EA/正式版状态混乱”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复““独创”回响机制没有解释，已被内测反馈打脸”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 69% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“没有价格锚点,也没说明 $19.99 凭什么”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 59% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“评价来源单一且样本小”后，wishlist_add_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：wishlist_add_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.wishlist_add_rate > control.wishlist_add_rate</div>
+      <div style="opacity:.8">验证窗口：14d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 49% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:12px;opacity:.8;margin-top:6px">
+      <b>如何证伪</b>：窗口内判定标准未达成，即该条判断被证伪。回填「没发生」后，
+      它不再进入同项目下一次评审的上下文。
+    </div>
+    
+  </div>
+
+  <!-- Information Gaps -->
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🕳️</span> 信息缺口</div>
+    <ul class="point-list gap">
+      
+      <li><span class="dot"></span>胶囊图和截图</li>
+      
+      <li><span class="dot"></span>预告片</li>
+      
+      <li><span class="dot"></span>UI/HUD/字体设计</li>
+      
+      <li><span class="dot"></span>音乐与音效方向</li>
+      
+      <li><span class="dot"></span>小地图和导航方案</li>
+      
+      <li><span class="dot"></span>是否有 Demo</li>
+      
+      <li><span class="dot"></span>回响机制在中后期的变化</li>
+      
+      <li><span class="dot"></span>胶囊图、预告片、首个 GIF、截图</li>
+      
+      <li><span class="dot"></span>Steam 标签</li>
+      
+      <li><span class="dot"></span>Demo 或试玩计划</li>
+      
+      <li><span class="dot"></span>Steam Deck 兼容性</li>
+      
+      <li><span class="dot"></span>回响机制的实际演示</li>
+      
+      <li><span class="dot"></span>开发进度和里程碑</li>
+      
+      <li><span class="dot"></span>小地图是否会加入</li>
+      
+      <li><span class="dot"></span>是否买断即完整、有无 DLC/内购</li>
+      
+      <li><span class="dot"></span>是否有 demo 或试玩计划</li>
+      
+      <li><span class="dot"></span>主线与全收集时长的拆分</li>
+      
+      <li><span class="dot"></span>区域、Boss、能力等内容量的具体数字</li>
+      
+      <li><span class="dot"></span>预告片、实机截图</li>
+      
+      <li><span class="dot"></span>发售首周折扣计划</li>
+      
+      <li><span class="dot"></span>同类作品对比或价格锚点</li>
+      
+      <li><span class="dot"></span>更大范围的独立玩家评价</li>
+      
+      <li><span class="dot"></span>实机预告和截图</li>
+      
+      <li><span class="dot"></span>Early Access 说明与路线图</li>
+      
+      <li><span class="dot"></span>回响机制的具体玩法</li>
+      
+      <li><span class="dot"></span>当前可玩内容量或 demo</li>
+      
+      <li><span class="dot"></span>小地图/导航问题的处理方案</li>
+      
+      <li><span class="dot"></span>Steam 上的真实玩家评测</li>
+      
+      <li><span class="dot"></span>语言本地化的质量说明</li>
+      
+      <li><span class="dot"></span>开发者公告或更新记录</li>
+      
+    </ul>
+  </div>
+  
+
+  <!-- Next Human Test -->
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">🧪</span> 下一步真人测试建议</div>
+    <div class="next-steps">
+      
+      
+      
+      <div class="next-step-card">
+        <div class="sub-title">本次面板覆盖的受众特征</div>
+        
+        <div style="font-size:12px;opacity:.8;margin-bottom:6px">本次面板覆盖的受众特征（取自人格档案的真实属性），可据此筛选同类真人受访者；这不是引擎推断出的招募建议</div>
+        
+        <ul>
+          
+          <li>25-32 · 中国华东 · 核心 · PC/Switch · roguelite/metroidvania/immersive-sim</li>
+          
+          <li>20-30 · 日本/台湾文化圈 · 核心 · PC/Switch · artsy-indie/cozy/walking-sim</li>
+          
+          <li>23-35 · 北美城市 · 平台重度浏览 · PC/SteamDeck · wide-variety</li>
+          
+          <li>24-40 · 中国大陆 · 中核消费型 · PC/Mobile · broad</li>
+          
+          <li>22-40 · 全球平台评论生态 · 老平台用户 · PC · broad-but-cynical</li>
+          
+          <li>27-40 · 北美 · 核心老兵 · PC/Console · genre-veteran</li>
+          
+        </ul>
+      </div>
+      
+      
+      <div class="next-step-card">
+        <div class="sub-title">需要补充的材料</div>
+        <ul>
+          
+          <li>补充材料：胶囊图和截图</li>
+          
+          <li>补充材料：预告片</li>
+          
+          <li>补充材料：UI/HUD/字体设计</li>
+          
+          <li>补充材料：音乐与音效方向</li>
+          
+          <li>补充材料：小地图和导航方案</li>
+          
+          <li>补充材料：是否有 Demo</li>
+          
+          <li>补充材料：回响机制在中后期的变化</li>
+          
+          <li>补充材料：胶囊图、预告片、首个 GIF、截图</li>
+          
+          <li>补充材料：Steam 标签</li>
+          
+          <li>补充材料：Demo 或试玩计划</li>
+          
+          <li>补充材料：Steam Deck 兼容性</li>
+          
+          <li>补充材料：回响机制的实际演示</li>
+          
+          <li>补充材料：开发进度和里程碑</li>
+          
+          <li>补充材料：小地图是否会加入</li>
+          
+          <li>补充材料：是否买断即完整、有无 DLC/内购</li>
+          
+          <li>补充材料：是否有 demo 或试玩计划</li>
+          
+          <li>补充材料：主线与全收集时长的拆分</li>
+          
+          <li>补充材料：区域、Boss、能力等内容量的具体数字</li>
+          
+          <li>补充材料：预告片、实机截图</li>
+          
+          <li>补充材料：发售首周折扣计划</li>
+          
+          <li>补充材料：同类作品对比或价格锚点</li>
+          
+          <li>补充材料：更大范围的独立玩家评价</li>
+          
+          <li>补充材料：实机预告和截图</li>
+          
+          <li>补充材料：Early Access 说明与路线图</li>
+          
+          <li>补充材料：回响机制的具体玩法</li>
+          
+          <li>补充材料：当前可玩内容量或 demo</li>
+          
+          <li>补充材料：小地图/导航问题的处理方案</li>
+          
+          <li>补充材料：Steam 上的真实玩家评测</li>
+          
+          <li>补充材料：语言本地化的质量说明</li>
+          
+          <li>补充材料：开发者公告或更新记录</li>
+          
+        </ul>
+      </div>
+      
+    </div>
+  </div>
+  
+
+
+  <!-- Limitations & Caveats -->
+  
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚠️</span> 各人格声明的限制条件</div>
+    <ul class="point-list question">
+      
+      <li><span class="dot"></span>材料只有文字，没有图片和视频，所有视觉判断都基于文案描述和缺失，不是对实际画面的评价。</li>
+      
+      <li><span class="dot"></span>『观望』是因为信息缺失，不是因为有负面证据。核心规则『前三张图』没法判定，既不算触发，也不算通过。</li>
+      
+      <li><span class="dot"></span>评分里 trust 偏低，主要因为没有可核验的素材，并不代表质量差。</li>
+      
+      <li><span class="dot"></span>材料只有文字，没有视觉素材，所以首屏判断来自信息缺失而非负面证据。</li>
+      
+      <li><span class="dot"></span>立场'观望'基于信息缺失，不代表游戏本身不行。</li>
+      
+      <li><span class="dot"></span>评审基于模拟的 Persona，不代表真实玩家。</li>
+      
+      <li><span class="dot"></span>本次判断基于信息缺失,而不是已有的负面证据:付费边界和 demo 缺失触发的是“先观望”,不是“不买”。</li>
+      
+      <li><span class="dot"></span>核心规则“价格与内容体量不匹配则不买”本次没有被明确触发:$19.99 对 12–15 小时的价格本身可以接受,但内容质量无法核验。</li>
+      
+      <li><span class="dot"></span>价格锚点的比较依赖角色先验,未经页面材料验证。</li>
+      
+      <li><span class="dot"></span>这是合成评审,不代表真实玩家。</li>
+      
+      <li><span class="dot"></span>本评审基于一页纯文字材料，没有任何媒体素材，“观望”源于证据缺失，而非已确认的负面事实。</li>
+      
+      <li><span class="dot"></span>老刀是毒舌怀疑型角色，语气偏尖锐，用来暴露可能被喷的点，不代表所有玩家的看法。</li>
+      
+      <li><span class="dot"></span>推断条目仅用于价格对比与视觉风险，没有对未提供的系统或内容做补充设想。</li>
+      
+    </ul>
+  </div>
+  
+
+  <!-- Compliance Banner -->
+  
+  <div class="compliance-banner">
+    <div class="compliance-header">
+      <div class="compliance-title">AI 生成声明</div>
+      <div class="compliance-status pass">通过</div>
+    </div>
+    <div class="compliance-body">
+      
+      <div class="compliance-score-block">
+        <div class="compliance-score-label">身份-行为解耦检查</div>
+        <div class="compliance-score-value score-high">0 项违规</div>
+        <div style="font-size:12px;opacity:.8;margin-top:8px">
+          得分 100（= 100 − 10 × 违规条数）。
+          本项<b>只</b>检查人格是否把身份直接当成行为理由，不覆盖隐私、刻板印象、材料合规等其它维度。
+        </div>
+      </div>
+      <div class="compliance-steps-block">
+        <div class="compliance-steps-label">推荐真人验证步骤</div>
+        <ul class="compliance-steps-list">
+          
+          <li>结果可供参考，但仍建议人工抽检</li>
+          
+        </ul>
+      </div>
+    </div>
+    <div class="compliance-ai-notice">本报告全部由 AI 人格模拟生成，非真人研究数据。任何决策前须经过真人验证。</div>
+  </div>
+  
+
+  <!-- Footer -->
+  <div class="report-footer">
+    Generated by AudienceLens 玩家模拟评审 · 本报告由 AI 人格生成，非真人研究数据
+  </div>
+
+</div>
+</body>
+</html>
