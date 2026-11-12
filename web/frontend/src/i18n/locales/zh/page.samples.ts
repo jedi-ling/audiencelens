@@ -10,7 +10,7 @@ export default {
   'meta.title': '样例报告',
   'header.title': '样例报告',
   'header.desc':
-    '下面几份报告由 AudienceLens 引擎对虚构的产品材料真实运行生成，原样保存，没有手工修改。点开可以看到完整的 HTML 报告。',
+    '下面几份报告由 AudienceLens 引擎对虚构的产品材料真实运行生成，模型输出没有改动（HTML 报告只在一次 CSS 修复后更新过样式表）。点开可以看到完整的 HTML 报告。',
   'notice.desc':
     '这些都是 AI 合成评审，不是真实用户研究。没通过校验的人格不计入结论，报告顶部会如实标出。',
   'load.pending': '正在加载样例列表…',

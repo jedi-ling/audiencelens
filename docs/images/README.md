@@ -7,7 +7,7 @@ The app has no Japanese UI yet, so the Japanese README shows the English screens
 |---|---|---|
 | `hero.png` | homepage (conversational review entry), `/?lang=en` | same page, `/?lang=zh` |
 | `samples.png` | `/samples?lang=en` | `/samples?lang=zh` |
-| `report.png` | top of the stored sample report `examples/reports/steam-page-abyss-echo/report.html`, exactly as generated | same file (byte-identical) |
+| `report.png` | stored sample report `examples/reports/steam-page-abyss-echo/report.html`, scrolled to the first persona card so the quotation-above-comment layout is visible | same file (byte-identical) |
 
 `report.png` is the same image in both folders. The report text is model output in Chinese:
 the engine currently generates reports in Chinese only (`SUPPORTED_REPORT_LANGS = ("zh-CN",)`,
@@ -19,8 +19,7 @@ instance in single-user mode, with no API key loaded into the web process. Both 
 enabled at build time with `VITE_AL_LOCALES=zh,en` and selected with `?lang=`. The app ships a
 single (dark) theme.
 
-`report.png` shows the top of the report only. The persona section further down, where each
-`direct` entry's quotation appears above the comment, is not in the screenshot: the stored
-`report.html` files were generated with a stylesheet bug that leaves that section unstyled
-(fixed in `src/templates/report-template.html` for later runs; the stored files are kept as
-generated). The Markdown reports (`report.md`) show the quotations as block quotes.
+`report.png` is a 1440×900 crop of a full-height capture of that report, starting just above the
+first persona card. The stored `report.html` files had only their `<style>` block replaced after
+a CSS fix (the generated stylesheet left the persona section unstyled); everything else in them
+is byte-identical to what the engine generated, and each sample's `meta.json` records that.

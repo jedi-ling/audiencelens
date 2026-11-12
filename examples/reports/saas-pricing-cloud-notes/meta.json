@@ -35,5 +35,13 @@
     "direct_entries_with_quote": 36,
     "direct_entries_grounded": 36,
     "checked_by": "scripts/revalidate_samples.py (quote only; same rule as the engine)"
+  },
+  "stylesheet_updated": {
+    "what": "Only the <style> block of report.html was replaced with the stylesheet of the fixed template. Everything outside <style> is byte-identical to the file the engine generated; report.json, report.md and persona_outputs.json are untouched.",
+    "reason": "The template's stylesheet had three unclosed CSS rules that left the persona section unstyled in a browser.",
+    "template_fix_commit": "4986b39",
+    "date": "2026-11-12",
+    "generated_html_sha256": "f385c62710cc5e349a059b8afcb6559610b1fb32b33b3c2e5ce3895f063c6084",
+    "outside_style_sha256": "5dc0b1c3ec9d3ad8b810e85c897ef155743dd72ad672176ce8785e6a7c88cf36"
   }
 }

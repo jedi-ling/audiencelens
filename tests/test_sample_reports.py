@@ -155,3 +155,34 @@ def test_archived_pre_quote_samples_keep_their_recorded_recheck():
         assert note["direct_entries"] == r["direct_entries"]
         assert note["direct_entries_grounded_rule_at_generation"] == r["grounded_before"]
         assert note["direct_entries_grounded_coverage_rule"] == r["grounded_after"]
+
+
+def _outside_style(html: str) -> str:
+    assert html.count("<style>") == 1 and html.count("</style>") == 1
+    a = html.index("<style>")
+    b = html.index("</style>") + len("</style>")
+    return html[:a] + html[b:]
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_only_the_stylesheet_of_report_html_was_replaced(slug):
+    """样例的 report.html 在生成之后只换过 <style> 块（模板的 CSS 花括号不配平，修了之后把
+    修好的样式表换进去）。<style> 之外的一切必须和引擎生成的那份逐字节相同——
+    meta.json 记着生成件 <style> 之外部分的哈希，这里重算比对。模型输出没有被动过。"""
+    import hashlib
+
+    folder = os.path.join(REPORTS, slug)
+    with open(os.path.join(folder, "meta.json"), encoding="utf-8") as f:
+        note = json.load(f)["stylesheet_updated"]
+    with open(os.path.join(folder, "report.html"), "rb") as f:
+        raw = f.read()
+    html = raw.decode("utf-8")
+    assert hashlib.sha256(_outside_style(html).encode("utf-8")).hexdigest() == note["outside_style_sha256"]
+    # 整份文件确实和生成件不同（换过样式表），而且换进去的样式表花括号是配平的
+    assert hashlib.sha256(raw).hexdigest() != note["generated_html_sha256"]
+    css = html[html.index("<style>"):html.index("</style>")]
+    assert css.count("{") == css.count("}")
+    assert note["template_fix_commit"] and note["reason"]
+    # 前端那份拷贝必须是同一个文件
+    with open(os.path.join(ROOT, "web", "frontend", "public", "sample-reports", slug, "report.html"), "rb") as f:
+        assert f.read() == raw

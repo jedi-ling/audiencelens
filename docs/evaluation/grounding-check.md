@@ -208,9 +208,10 @@ if it were part of the quote. The fix is in the schema, not in the threshold.
 - Reports carry the quote separately (`persona_notes[].evidence_top3_detail`) and render it as a
   quotation above the comment. One caveat for the HTML report: the template's stylesheet had
   three unclosed rules, dating from the first commits, that left the whole persona section
-  unstyled in a browser. That was fixed on 2026-11-12, after the current samples were generated,
-  so their stored `report.html` files still show that section as plain text. The Markdown
-  reports show the quotations as block quotes.
+  unstyled in a browser. That was fixed on 2026-11-12, after the current samples were generated.
+  Their stored `report.html` files then had only the `<style>` block replaced with the fixed
+  stylesheet; everything outside it is byte-identical to the generated file (hashes in each
+  `meta.json`, checked by a test). The Markdown reports show the quotations as block quotes.
 - The report-level calibration metric named `hallucination` now calls the same function, so the
   gate and the metric cannot disagree about an entry.
 

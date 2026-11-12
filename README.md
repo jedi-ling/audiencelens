@@ -33,7 +33,8 @@ English · [中文](README_zh.md) · [日本語](README_ja.md)
 
 ## Sample reports
 
-Real engine runs on fictional product material, saved exactly as generated — no manual edits
+Real engine runs on fictional product material. The model output is unedited; the stylesheet of
+each `report.html` was updated after a CSS fix, and nothing else in the files was changed
 (`examples/reports/`; also browsable on the app's `/samples` page). Standard depth, model
 `claude-sonnet-5-5`, 2026-11-11 and 2026-11-12, semantic de-duplication on; cost is the app's own
 accounting. Each folder's `meta.json` records the run and `persona_outputs.json` holds the

@@ -4,7 +4,7 @@ export default {
   'meta.title': 'Sample reports',
   'header.title': 'Sample reports',
   'header.desc':
-    'Each report below was produced by a real AudienceLens engine run on fictional product material and saved as-is, with no manual edits. Open one to see the full HTML report.',
+    'Each report below was produced by a real AudienceLens engine run on fictional product material and the model output is unedited (only the stylesheet of the HTML report was updated after a CSS fix). Open one to see the full HTML report.',
   'notice.desc':
     'These are AI-generated synthetic reviews, not real user research. Personas that failed validation are left out of the conclusions, and the report says so at the top.',
   'load.pending': 'Loading the sample list…',
