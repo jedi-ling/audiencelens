@@ -588,9 +588,18 @@ def aggregate_report(
 
     persona_notes = []
     for p in persona_outputs:
-        top_evidence = [
-            e.get("content", "") for e in p.get("evidence", []) if isinstance(e, dict)
-        ][:3]
+        _top_entries = [e for e in p.get("evidence", []) if isinstance(e, dict)][:3]
+        top_evidence = [e.get("content", "") for e in _top_entries]
+        # 结构化版本：把 quote（材料原文）和 content（人格的解读）分开带进报告，
+        # 渲染时先引用后评论。evidence_top3 保持字符串数组不变，老的读法不受影响。
+        top_evidence_detail = []
+        for e in _top_entries:
+            _level = e.get("inference_level")
+            _detail = {"content": e.get("content", ""),
+                       "level": _level if _level in ("direct", "inferred", "gap") else "inferred"}
+            if _level == "direct" and isinstance(e.get("quote"), str) and e["quote"].strip():
+                _detail["quote"] = e["quote"]
+            top_evidence_detail.append(_detail)
         top_issues = [
             i.get("title", "") for i in p.get("key_issues", []) if isinstance(i, dict)
         ]
@@ -599,6 +608,7 @@ def aggregate_report(
             "persona_name": p.get("persona_name", p.get("persona_id", "")),
             "stance": p.get("primary_stance", "观望"),
             "evidence_top3": top_evidence,
+            "evidence_top3_detail": top_evidence_detail,
             "top_issues": top_issues,
             "continue_triggers": p.get("continue_triggers", []),
             "quit_triggers": p.get("quit_triggers", []),
@@ -818,7 +828,11 @@ def render_html_report(report: dict, template_path: str) -> str:
                 evidence_top3.append({
                     "content": ev.get("content", ""),
                     "level": ev.get("inference_level", "inferred"),
+                    "quote": ev.get("quote", "") if ev.get("inference_level") == "direct" else "",
                 })
+        elif isinstance(pn.get("evidence_top3_detail"), list) and pn["evidence_top3_detail"]:
+            # 没有原始人格输出（从已存报告重渲染）时，结构化版本里带着 quote
+            evidence_top3.extend(ev for ev in pn["evidence_top3_detail"] if isinstance(ev, dict))
         elif isinstance(pn.get("evidence_top3"), list):
             for ev in pn["evidence_top3"]:
                 if isinstance(ev, dict):

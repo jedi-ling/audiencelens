@@ -1170,7 +1170,8 @@ def expected_catalog_keys() -> set[str]:
 2. primary_stance：只能填给定枚举里的中文原词。它是聚类键不是显示文本——
    换个说法就会静默打散共识与分歧统计。
 3. must_comment_on_check 的键：逐字照抄 PERSONA CARD 里的原文。
-4. evidence[].source_quote：材料原文的逐字片段，语种 = 材料语种（source_lang），不翻译。
+4. evidence[].quote：材料原文的逐字片段，语种 = 材料语种（source_lang），不翻译。
+   （字段已于 2026-11 落地，名字是 `quote`；本文早期写作 `source_quote`，归一化时仍收这个别名。）
 5. 其余散文（evidence[].content / key_issues.* / voice_sample / missing_information /
    meta.caveats）：跟 output_lang。
 ```
@@ -1283,7 +1284,7 @@ persona_overlays:              # mapping，键是人格 id
 
 | # | 门 | 不做的后果 |
 |---|---|---|
-| 1 | `validate_evidence_grounding` 改判 `source_quote` 逐字命中 | 英文证据 + 中文材料 = 零命中 → `hallucination_risk=1.0` → 全员 `gated_out` → `AllPersonasFailedError`，而报错说的是"疑似幻觉"，与真因毫无关系 |
+| 1 | `validate_evidence_grounding` 改判 `quote` 逐字命中（**已做**，2026-11：direct 条目只核对 `quote`，见 docs/evaluation/grounding-check.md；跨语种引用仍然零命中，这一门只算开了一半） | 英文证据 + 中文材料 = 零命中 → `hallucination_risk=1.0` → 全员 `gated_out` → `AllPersonasFailedError`，而报错说的是"疑似幻觉"，与真因毫无关系 |
 | 2 | 英文极性词表 + 英文 embedding 模型 | `price too high` 与 `price too low` 被合并进同一聚类——**正好把产品的核心价值（暴露分歧）算反**，且不报错 |
 | 3 | `_IDENTITY_BEHAVIOR_PATTERN` 的英文版 | `compliance.ethics_score` 恒 100、`status` 恒"通过"——**伪装成通过的检查** |
 | 4 | `ethics_service.STEREOTYPE_PATTERNS` 的英文版 | 同上，"零违规、满分通过"是最危险的假绿 |

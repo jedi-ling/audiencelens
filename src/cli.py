@@ -21,6 +21,7 @@ import click
 import yaml
 
 from runner import cli as runner_cli
+from runner.task_types import default_personas_path
 
 try:
     from rich.console import Console
@@ -403,7 +404,7 @@ def stereotype_eval(use_llm):
 @main.command()
 @click.argument("task_type")
 @click.argument("artifact", type=click.Path(exists=True))
-@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML 路径（默认 game-core）")
+@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML 路径（默认按任务类型取，见 runner/task_types.py）")
 @click.option("--limit", type=int, default=4, help="参与实验的人格数量")
 @click.option("--model", default="claude-haiku-4-5-20251001", help="实验用模型")
 @click.option("--conditions", default="full,no_behavior,bare", help="逗号分隔的实验条件")
@@ -420,7 +421,7 @@ def ablation(task_type, artifact, personas, limit, model, conditions, output_pat
     from runner.panel_selector import load_personas
 
     artifact_bundle = runner_cli.load_artifact_bundle(artifact)
-    personas_path = personas or str(PROJECT_ROOT / "personas" / "game-core.yaml")
+    personas_path = personas or default_personas_path(task_type, str(PROJECT_ROOT / "personas"))
     persona_prompt_path = str(PROJECT_ROOT / "templates" / "persona-prompt.md")
 
     all_personas = load_personas(personas_path)
@@ -473,7 +474,7 @@ def ablation(task_type, artifact, personas, limit, model, conditions, output_pat
 @main.command("cross-exam-ablation")
 @click.argument("task_type")
 @click.argument("artifact", type=click.Path(exists=True))
-@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML 路径（默认 game-core）")
+@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML 路径（默认按任务类型取，见 runner/task_types.py）")
 @click.option("--panel", default=None, help="逗号分隔的人格 id，固定面板；不传则按 task_type 自动选人")
 @click.option("--conditions", default="none,moderated,multi_agent", help="逗号分隔的实验条件（必须含 none 基线）")
 @click.option("--output", "output_path", type=click.Path(), default=None, help="结果 JSON 输出路径")
@@ -548,7 +549,7 @@ def cross_exam_ablation(task_type, artifact, personas, panel, conditions, output
 @main.command("identity-invariance")
 @click.argument("task_type")
 @click.argument("artifact", type=click.Path(exists=True))
-@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML path (default: game-core)")
+@click.option("--personas", type=click.Path(exists=True), default=None, help="Persona YAML path (default: the pack registered for the task type)")
 @click.option("--limit", type=int, default=None, help="Maximum personas to audit; default is all")
 @click.option("--output", "output_path", type=click.Path(), default=None, help="JSON output path")
 def identity_invariance(task_type, artifact, personas, limit, output_path):
@@ -558,7 +559,7 @@ def identity_invariance(task_type, artifact, personas, limit, output_path):
     from runner.persona_agent import render_prompt
 
     artifact_bundle = runner_cli.load_artifact_bundle(artifact)
-    personas_path = personas or str(PROJECT_ROOT / "personas" / "game-core.yaml")
+    personas_path = personas or default_personas_path(task_type, str(PROJECT_ROOT / "personas"))
     persona_prompt_path = str(PROJECT_ROOT / "templates" / "persona-prompt.md")
     panel = load_personas(personas_path)
     if limit is not None:

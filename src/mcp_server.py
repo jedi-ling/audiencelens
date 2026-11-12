@@ -44,10 +44,13 @@ def run_synthetic_review(
     task_type: str,
     artifact: str,
     mode: str = "standard",
-    personas_pack: str = "game-core",
+    personas_pack: str = "",
     allow_simulation: bool = False,
 ) -> dict:
     """运行一次多人格合成观众评审，返回结构化报告（共识 / 分歧 / 优先级修复 / 风险 / 校准）。
+
+    personas_pack 留空时按任务类型取登记的默认人格包（定价页 → general-consumer，
+    创业项目 → startup-panel，游戏类 → game-core）。
 
     artifact 可以是：材料文件路径、JSON 字符串、或直接粘贴的纯文本材料。
     评审使用真实 LLM；若 server 未配置 ANTHROPIC_API_KEY 且未显式允许模拟，将返回提示而非占位数据。
@@ -56,7 +59,7 @@ def run_synthetic_review(
         task_type=task_type,
         artifact=artifact,
         mode=mode,
-        personas_pack=personas_pack,
+        personas_pack=personas_pack or None,
         allow_simulation=allow_simulation,
     )
 

@@ -247,9 +247,11 @@ def run_cross_exam_ablation(
     """
     try:
         from runner import cli as runner_cli
+        from runner.task_types import default_personas_path
         from runner.aggregator import aggregate_report, load_aggregation_rules
     except ImportError:
         from src.runner import cli as runner_cli
+        from src.runner.task_types import default_personas_path
         from src.runner.aggregator import aggregate_report, load_aggregation_rules
 
     effective_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -267,7 +269,7 @@ def run_cross_exam_ablation(
         )
 
     base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    personas_path = personas_path or os.path.join(base, "src", "personas", "game-core.yaml")
+    personas_path = personas_path or default_personas_path(task_type, os.path.join(base, "src", "personas"))
     rules_path = os.path.join(base, "src", "config", "aggregation-rules.yaml")
     budget_path = os.path.join(base, "src", "config", "budget.yaml")
     template_path = os.path.join(base, "src", "templates", "cross-exam-prompt.md")

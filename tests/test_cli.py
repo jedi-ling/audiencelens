@@ -906,7 +906,7 @@ def _llm_json(
             "primary_stance": "观望",
             "confidence": 0.6,
             "evidence_sufficiency": 0.7,
-            "evidence": [{"content": "核心循环说明", "inference_level": "direct"}],
+            "evidence": [{"content": "核心循环说明", "inference_level": "direct", "quote": "核心循环说明"}],
             "scores": {"base": {"clarity": 3, "trust": 3}, "task_specific": {"overall": 3}},
             "key_issues": [
                 {
@@ -1766,3 +1766,65 @@ class TestPanelFillsToModeCapacity:
         panel_selection = result["report"].get("panel_selection") or {}
         assert panel_selection.get("selection_method") != "affinity_fallback"
         assert "亲和度" not in (panel_selection.get("notice") or "")
+
+
+class TestDefaultPackComesFromTheTaskType:
+    """没传人格包时，run_panel 按任务类型取登记的默认包，不再一律回落到 game-core。
+
+    回落到 game-core 的后果是"评定价页"被悄悄塞给游戏玩家人格，报告照常生成。
+    生成样例报告时因此出过两次错（2026-11-04、2026-11-11）。
+    """
+
+    def _run(self, task_type, **kwargs):
+        bundle = {"title": "测试材料", "materials": [{"type": "text", "text": "一段足够长的材料文本。" * 20}]}
+        return run_panel(task_type=task_type, artifact_bundle=bundle, mode="quick", **kwargs)
+
+    def test_every_task_type_has_a_registered_pack_that_exists(self):
+        from runner.task_types import DEFAULT_PACK_BY_TASK_TYPE, VALID_TASK_TYPES
+        assert set(DEFAULT_PACK_BY_TASK_TYPE) == set(VALID_TASK_TYPES)
+        for pack in set(DEFAULT_PACK_BY_TASK_TYPE.values()):
+            assert os.path.isfile(os.path.join(PROJECT_ROOT, "src", "personas", f"{pack}.yaml")), pack
+
+    def test_pricing_and_pitch_resolve_without_a_pack(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        for task_type, pack in (("pricing_page_review", "general-consumer"), ("pitch_review", "startup-panel"),
+                                ("steam_page_review", "game-core")):
+            result = self._run(task_type)
+            with open(os.path.join(PROJECT_ROOT, "src", "personas", f"{pack}.yaml"), encoding="utf-8") as f:
+                pack_ids = {p["id"] for p in yaml.safe_load(f)["personas"]}
+            panel_ids = {p["id"] for p in result["panel_personas"]}
+            assert panel_ids and panel_ids <= pack_ids, (task_type, panel_ids - pack_ids)
+
+    def test_unregistered_task_type_raises_instead_of_falling_back(self, monkeypatch):
+        import runner.cli as cli_module
+        from runner import task_types
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(cli_module, "VALID_TASK_TYPES", list(cli_module.VALID_TASK_TYPES) + ["brand_new_review"])
+        with pytest.raises(ValueError, match="没有登记默认人格包"):
+            self._run("brand_new_review")
+        with pytest.raises(ValueError, match="没有登记默认人格包"):
+            task_types.default_pack_for_task_type("brand_new_review")
+
+    def test_explicit_mismatched_pack_warns_but_runs(self, monkeypatch, caplog):
+        import logging
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        game_core = os.path.join(PROJECT_ROOT, "src", "personas", "game-core.yaml")
+        with caplog.at_level(logging.WARNING, logger="audiencelens"):
+            result = self._run("pricing_page_review", personas_path=game_core)
+        assert result["panel_personas"], "不是错误：照样跑"
+        assert any("general-consumer" in r.getMessage() and "game-core" in r.getMessage() for r in caplog.records)
+
+    def test_explicit_matching_pack_does_not_warn(self, monkeypatch, caplog):
+        import logging
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        pack = os.path.join(PROJECT_ROOT, "src", "personas", "general-consumer.yaml")
+        with caplog.at_level(logging.WARNING, logger="audiencelens"):
+            self._run("pricing_page_review", personas_path=pack)
+        assert not any("登记的默认包" in r.getMessage() for r in caplog.records)
+
+    def test_backend_reads_the_same_mapping(self):
+        backend = os.path.join(PROJECT_ROOT, "web", "backend", "app", "services", "intent_service.py")
+        with open(backend, encoding="utf-8") as f:
+            source = f.read()
+        assert "from runner.task_types import DEFAULT_PACK_BY_TASK_TYPE" in source
+        assert "DEFAULT_PACK_BY_TASK_TYPE = {" not in source, "后端不得再自己维护一份映射"

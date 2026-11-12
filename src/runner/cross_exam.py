@@ -17,6 +17,7 @@
 import concurrent.futures
 import inspect
 import json
+import logging
 import os
 import re
 import threading
@@ -24,6 +25,8 @@ from typing import Callable, List, Optional
 
 import yaml
 from jinja2 import Template
+
+logger = logging.getLogger(__name__)
 
 try:
     from .similarity import get_issue_similarity
@@ -93,15 +96,10 @@ def _coerce_str(value) -> str:
     return str(value)
 
 
-def _coerce_confidence(value, default: Optional[float] = None) -> Optional[float]:
-    """置信度归一到 0-1 的 float。
-
-    与 persona_agent._coerce_ratio 同一套口径（"0.8" / "80%" / 8 都收），这里独立
-    实现是为了不让协议核心依赖 persona_agent（aggregator 对 SEVERITY_MAP 也是这么做的）。
-    取不到时返回 default（默认 None，表示"模型没给"，由调用方决定当作不变还是失败）。
-    """
+def _parse_confidence(value):
+    """(归一到 0-1 的置信度 | None, 换算时假定的量纲 "0-10" / "0-100" | None)。"""
     if isinstance(value, bool):
-        return default
+        return None, None
     if isinstance(value, (int, float)):
         num = float(value)
     elif isinstance(value, str):
@@ -109,17 +107,46 @@ def _coerce_confidence(value, default: Optional[float] = None) -> Optional[float
         try:
             num = float(text)
         except ValueError:
-            return default
+            return None, None
         if value.strip().endswith("%"):
             num /= 100.0
     else:
-        return default
+        return None, None
+    scale = None
     if 1.0 < num <= 10.0:
         # 模型有时按十分制/百分制给：按比例还原，而不是直接夹到 1.0（夹会伪造出巨大 delta）
         num /= 10.0
+        scale = "0-10"
     elif num > 10.0:
         num /= 100.0
-    return max(0.0, min(1.0, num))
+        scale = "0-100"
+    return max(0.0, min(1.0, num)), scale
+
+
+def _confidence_was_rescaled(value) -> bool:
+    return _parse_confidence(value)[1] is not None
+
+
+def _coerce_confidence(value, default: Optional[float] = None) -> Optional[float]:
+    """置信度归一到 0-1 的 float。
+
+    与 persona_agent._coerce_ratio 同一套口径（"0.8" / "80%" / 8 都收），这里独立
+    实现是为了不让协议核心依赖 persona_agent（aggregator 对 SEVERITY_MAP 也是这么做的）。
+    取不到时返回 default（默认 None，表示"模型没给"，由调用方决定当作不变还是失败）。
+
+    0–1 之外的裸数字按量纲猜着还原（(1,10] 当十分制，>10 当百分制）。这个猜测有歧义：
+    8 可能是十分制的 0.8，也可能是百分制的 0.08；而 θ 判定吃的正是这个值。行为保持不变，
+    但每次换算都打一条 warning，交叉质询的 usage 里也会记 confidence_values_rescaled。
+    """
+    num, scale = _parse_confidence(value)
+    if num is None:
+        return default
+    if scale:
+        logger.warning(
+            "cross-exam confidence %r is outside 0-1; rescaled to %.2f (assumed a %s scale)",
+            value, num, scale,
+        )
+    return num
 
 
 def load_cross_exam_rules(rules: Optional[dict] = None, rules_path: Optional[str] = None) -> dict:
@@ -668,6 +695,7 @@ def _normalize_rebuttal_items(parsed, debates: List[dict]) -> dict:
             "rebuttal": _coerce_str(_pick(item, _REBUTTAL_TEXT_KEYS) or ""),
             "stance_after_raw": stance_raw,
             "confidence_after": _coerce_confidence(_pick(item, _CONF_KEYS)),
+            "confidence_rescaled": _confidence_was_rescaled(_pick(item, _CONF_KEYS)),
         }
 
     for entry in parsed or []:
@@ -976,6 +1004,7 @@ def run_cross_exam_protocol(
                         "rebuttal": _coerce_str(_pick(first, _REBUTTAL_TEXT_KEYS) or ""),
                         "stance_after_raw": _coerce_str(_pick(first, _STANCE_KEYS) or ""),
                         "confidence_after": _coerce_confidence(_pick(first, _CONF_KEYS)),
+                        "confidence_rescaled": _confidence_was_rescaled(_pick(first, _CONF_KEYS)),
                     }}
                 return single, None
             except Exception as e:
@@ -1005,6 +1034,9 @@ def run_cross_exam_protocol(
     # ---- 按实际结果定 mode，绝不无条件置 True ----
     live_ran = bool(updates)
     final_mode = requested_mode if (requested_mode in LIVE_MODES and live_ran) else MODE_DERIVED
+
+    # 反驳里有几个置信度是按量纲猜着换算回 0-1 的（见 _coerce_confidence）：让歧义看得见。
+    usage["confidence_values_rescaled"] = sum(1 for u in updates.values() if u.get("confidence_rescaled"))
 
     # ---- 逐条判定改票 / 置信度变化 ----
     vote_changes = []

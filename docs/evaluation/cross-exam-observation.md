@@ -1,7 +1,9 @@
 # Observation: cross-examination changed no vote in the three samples
 
 Date: 2026-11-04 · Model: `claude-sonnet-5-5` · Mode: `standard` (one moderated rebuttal call)
-Data: `cross_examination` in each `examples/reports/*/report.json`. No new runs were made for this note.
+Data: `cross_examination` in each `report.json` of the 2026-11-04 samples, now kept in `docs/evaluation/runs/2026-11-04-pre-quote-field/`. No new runs were made for this note.
+
+*Later note (2026-11-12):* the samples were regenerated with a new evidence schema. In the three new reports (`examples/reports/`) cross-examination again changed no vote: 8 disputes, all rebuttals parsed, largest confidence movement 8 points (θ is 15), no stance text changed. The table and hypotheses below describe the 2026-11-04 runs.
 
 ## What the reports record
 

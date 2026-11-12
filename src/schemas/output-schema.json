@@ -82,16 +82,20 @@
           "content": {
             "type": "string",
             "minLength": 1,
-            "description": "证据内容"
+            "description": "你的观察或解读，自由文本。direct 条目的原文引用写在 quote 里，不要写在这里"
           },
           "inference_level": {
             "type": "string",
             "enum": ["direct", "inferred", "gap"],
             "description": "推断层级：直接/推断/缺口"
           },
+          "quote": {
+            "type": "string",
+            "description": "材料原文的逐字片段，直接复制、不改写、不翻译（语种 = 材料语种）。inference_level 为 direct 时必填；校验器只拿这个字段去对照材料。inferred / gap 不填。"
+          },
           "source_location": {
             "type": "string",
-            "description": "来源位置（direct 时建议填写）"
+            "description": "quote 在材料中的位置（direct 时建议填写）"
           },
           "inference_basis": {
             "type": "string",

@@ -28,7 +28,7 @@ def _make_persona(
         "confidence": 0.8,
         "evidence_sufficiency": 0.7,
         "evidence": evidence if evidence is not None else [
-            {"content": "UI is clear", "inference_level": "direct"},
+            {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
         ],
         "scores": {
             "base": {"clarity": 4, "trust": 3},
@@ -194,7 +194,7 @@ class TestComputeHallucinationRate:
         artifact_texts = ["The UI is clear and responsive."]
         personas = [
             _make_persona("p1", evidence=[
-                {"content": "UI is clear", "inference_level": "direct"},
+                {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
             ]),
         ]
         result = compute_hallucination_rate(personas, artifact_texts)
@@ -206,7 +206,7 @@ class TestComputeHallucinationRate:
         artifact_texts = ["The game runs at 60fps."]
         personas = [
             _make_persona("p1", evidence=[
-                {"content": "The game crashes every 5 minutes", "inference_level": "direct"},
+                {"content": "The game crashes every 5 minutes", "inference_level": "direct", "quote": "The game crashes every 5 minutes"},
             ]),
         ]
         result = compute_hallucination_rate(personas, artifact_texts)
@@ -217,8 +217,8 @@ class TestComputeHallucinationRate:
         artifact_texts = ["The UI is clear and responsive."]
         personas = [
             _make_persona("p1", evidence=[
-                {"content": "UI is clear", "inference_level": "direct"},
-                {"content": "Game crashes often", "inference_level": "direct"},
+                {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
+                {"content": "Game crashes often", "inference_level": "direct", "quote": "Game crashes often"},
             ]),
         ]
         result = compute_hallucination_rate(personas, artifact_texts)
@@ -229,7 +229,7 @@ class TestComputeHallucinationRate:
         personas = [
             _make_persona("p1", evidence=[
                 {"content": "Players might enjoy the combat", "inference_level": "inferred"},
-                {"content": "Game runs at 60fps", "inference_level": "direct"},
+                {"content": "Game runs at 60fps", "inference_level": "direct", "quote": "Game runs at 60fps"},
             ]),
         ]
         result = compute_hallucination_rate(personas, artifact_texts)
@@ -249,11 +249,32 @@ class TestComputeHallucinationRate:
         artifact_texts = []
         personas = [
             _make_persona("p1", evidence=[
-                {"content": "UI is clear", "inference_level": "direct"},
+                {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
             ]),
         ]
         result = compute_hallucination_rate(personas, artifact_texts)
         assert result["per_persona"]["p1"] == 1.0
+
+
+    def test_same_verdict_as_the_validator(self):
+        # 校准指标和门控必须是同一个函数：以前这里要求整条 content 是材料子串，
+        # 同一条证据在两处会得出两个结论。
+        from runner.validator import validate_evidence_grounding
+        artifact_texts = ["预计流程 12-15 小时，支持手柄与键鼠"]
+        evidence = [
+            # quote 是原文（只差空格）、content 是评论：旧口径（整条 content 是子串）会判未落地
+            {"content": "流程写得具体，但我存疑", "inference_level": "direct", "quote": "预计流程12-15小时"},
+            {"content": "手柄支持写明了", "inference_level": "direct", "quote": "支持手柄与键鼠"},
+            # content 是原文但没有 quote：旧口径会判落地，现在是未落地
+            {"content": "预计流程 12-15 小时", "inference_level": "direct"},
+            {"content": "大概是小团队", "inference_level": "inferred"},
+        ]
+        persona = _make_persona("p1", evidence=evidence)
+        result = compute_hallucination_rate([persona], artifact_texts)
+        expected = validate_evidence_grounding(persona, artifact_texts)["hallucination_risk"]
+        # 旧口径在这组数据上会得出 2/3（前两条"未落地"、第三条"落地"），正好相反
+        assert result["per_persona"]["p1"] == expected == pytest.approx(1 / 3)
+        assert result["high_risk_personas"] == []
 
 
 class TestComputeRerunStability:
@@ -429,12 +450,12 @@ class TestOffSchemaInputDoesNotCrash:
             _make_persona("p1", must_comment_on_check={"a": True, "b": True}, key_issues=[
                 {"severity": "high", "title": "Bug A", "why_it_matters": "bad", "suggested_fix": "fix"},
             ], evidence=[
-                {"content": "UI is clear", "inference_level": "direct"},
+                {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
             ]),
             _make_persona("p2", must_comment_on_check={"a": True, "b": True}, key_issues=[
                 {"severity": "high", "title": "Bug B", "why_it_matters": "bad", "suggested_fix": "fix"},
             ], evidence=[
-                {"content": "UI is clear", "inference_level": "direct"},
+                {"content": "UI is clear", "inference_level": "direct", "quote": "UI is clear"},
             ]),
         ]
         result = run_calibration_check(personas, artifact_texts=artifact_texts)

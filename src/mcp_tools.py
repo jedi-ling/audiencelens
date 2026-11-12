@@ -7,6 +7,7 @@ mcp_server.py 用 FastMCP 把这些函数包成 AI 可调用的工具。
 import json
 import os
 import sys
+from typing import Optional
 
 _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.dirname(_SRC_DIR)
@@ -150,7 +151,7 @@ def run_synthetic_review(
     task_type: str,
     artifact: str,
     mode: str = "standard",
-    personas_pack: str = "game-core",
+    personas_pack: Optional[str] = None,
     allow_simulation: bool = False,
 ) -> dict:
     """运行一次合成观众评审，返回结构化报告。
@@ -159,7 +160,8 @@ def run_synthetic_review(
         task_type: 评审任务类型，见 list_task_types
         artifact: 材料（文件路径 / JSON 字符串 / 纯文本）
         mode: quick | standard | full
-        personas_pack: 人格包名，见 list_persona_packs
+        personas_pack: 人格包名，见 list_persona_packs。不传则按任务类型取登记的默认包
+            （定价页 → general-consumer，创业项目 → startup-panel，游戏类 → game-core）
         allow_simulation: 无 API key 时是否允许返回带警告的模拟占位数据
 
     Returns:
@@ -172,7 +174,7 @@ def run_synthetic_review(
         }
     if mode not in VALID_MODES:
         return {"error": f"未知模式: {mode}。可用: {', '.join(VALID_MODES)}"}
-    if personas_pack not in PERSONA_PACKS:
+    if personas_pack is not None and personas_pack not in PERSONA_PACKS:
         return {"error": f"未知人格包: {personas_pack}。可用: {', '.join(PERSONA_PACKS)}"}
 
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
@@ -184,7 +186,9 @@ def run_synthetic_review(
     except (ValueError, FileNotFoundError) as e:
         return {"error": f"材料解析失败: {e}"}
 
-    personas_path = os.path.join(_SRC_DIR, "personas", f"{personas_pack}.yaml")
+    # 不传人格包时交给 run_panel 按任务类型解析（以前这里默认 game-core，
+    # MCP 客户端评定价页会被悄悄塞给游戏玩家人格）。
+    personas_path = os.path.join(_SRC_DIR, "personas", f"{personas_pack}.yaml") if personas_pack else None
     # mode 必须真的传下去。以前上面校验完 mode 合法性就把它丢了，run_panel 收到 None
     # 走全量流程：不截人数、交叉质询和校准全跑。也就是 MCP 客户端选 quick 想省钱，
     # 实际按最贵的档在花，而且没有任何地方看得出来。

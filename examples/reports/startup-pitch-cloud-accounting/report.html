@@ -79,7 +79,6 @@
   .severity-badge.high{background:rgba(255,71,87,0.1);color:var(--red);border:1px solid rgba(255,71,87,0.2)}
   .severity-badge.critical{background:rgba(255,71,87,0.15);color:var(--red);border:1px solid rgba(255,71,87,0.3);animation:critical-pulse 1.5s ease-in-out infinite}
   .comment-thread{margin-top:12px}
-  .comment-thread .section-title{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
   .comment{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden;transition:border-color 0.3s,box-shadow 0.3s;position:relative}
   .comment::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--accent),var(--magenta));opacity:0;transition:opacity 0.3s}
   .comment:hover{border-color:var(--border-glow);box-shadow:0 0 30px rgba(255,107,53,0.05)}
@@ -113,6 +112,10 @@
   .evidence-list{margin-bottom:18px}
   .evidence-list .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
   .evidence-item{font-size:15px;padding:5px 0;display:flex;align-items:flex-start;gap:8px}
+  .evidence-body{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .evidence-quote{border-left:3px solid var(--cyan);padding:2px 0 2px 10px;color:var(--text);font-style:italic;quotes:"\201C" "\201D"}
+  .evidence-quote::before{content:open-quote}
+  .evidence-quote::after{content:close-quote}
   .evidence-level{font-family:var(--font-mono);font-size:15px;padding:2px 8px;border-radius:3px;font-weight:700;white-space:nowrap;margin-top:2px;letter-spacing:0.5px}
   .evidence-level.direct{background:rgba(0,212,170,0.1);color:var(--cyan);border:1px solid rgba(0,212,170,0.2)}
   .evidence-level.inferred{background:rgba(255,179,71,0.1);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
@@ -126,7 +129,7 @@
   .issue-title{font-size:15px;font-weight:700}
   .issue-why{font-size:14px;color:#b8bdd0;line-height:1.5}
   .issue-fix{font-size:14px;color:var(--cyan);margin-top:6px;font-family:var(--font-mono);padding-left:12px;border-left:2px solid var(--cyan)}
-  .triggers-row{display:flex;gap:20px;flex-wrap:wrap;.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}
+  .triggers-row{display:flex;gap:20px;flex-wrap:wrap}
   .trigger-group{flex:1;min-width:200px}
   .trigger-group .sub-title{font-family:var(--font-mono);font-size:15px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
   .trigger-group.continue .sub-title{color:var(--green)}
@@ -233,7 +236,7 @@
   .compliance-steps-list li::before{content:'\25C7';position:absolute;left:0;color:var(--cyan);font-size:14px}
   .compliance-ai-notice{margin-top:16px;padding:12px 18px;background:rgba(255,71,87,0.05);border:1px solid rgba(255,71,87,0.15);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:15px;color:var(--red);display:flex;align-items:center;gap:8px}
   .compliance-ai-notice::before{content:'\26A0';font-size:14px}
-  @media(max-width:640px){.container{padding:20px 12px 60px}.post-header{padding:24px 18px 20px}.post-title{font-size:22px}.summary-hud{grid-template-columns:1fr}.comment-top{flex-wrap:wrap}.scores-grid{grid-template-columns:1fr 1fr}.fix-table{.stance-persona{font-family:var(--font-mono);font-weight:700;min-width:70px;color:var(--text-secondary);font-size:14px}.fix-table th,.fix-table td{padding:8px}.triggers-row{flex-direction:column}.debate-sides{grid-template-columns:1fr}.debate-side.pro{border-right:none;border-bottom:1px solid var(--border)}.compliance-body{grid-template-columns:1fr}.round-indicator{flex-wrap:wrap}.round-step{min-width:calc(50% - 2px)}.round-connector{display:none}.vote-change-item{flex-wrap:wrap}}
+  @media(max-width:640px){.container{padding:20px 12px 60px}.post-header{padding:24px 18px 20px}.post-title{font-size:22px}.summary-hud{grid-template-columns:1fr}.comment-top{flex-wrap:wrap}.scores-grid{grid-template-columns:1fr 1fr}.fix-table th,.fix-table td{padding:8px}.triggers-row{flex-direction:column}.debate-sides{grid-template-columns:1fr}.debate-side.pro{border-right:none;border-bottom:1px solid var(--border)}.compliance-body{grid-template-columns:1fr}.round-indicator{flex-wrap:wrap}.round-step{min-width:calc(50% - 2px)}.round-connector{display:none}.vote-change-item{flex-wrap:wrap}}
   /* 「浏览器打印生成 PDF」的专用样式。原页面是深色主题——原样打印会整页黑底
      铺满，要么被浏览器默认策略吞掉背景色变成白底白字看不见，要么真按深色印
      出来废掉一墨盒。打印场景要的是"能读、省墨"，不是还原网页视觉效果。 */
@@ -252,7 +255,7 @@
   }
 </style>
 </head>
-<body><div style="background:#fee2e2;border:2px solid #dc2626;color:#991b1b;padding:12px 16px;margin:8px;border-radius:8px;font-weight:bold;">⚠️ 本次有 3 位人格未能完成评审，以下结论仅基于 3 位人格的输出。未完成的人格：P54-angel-investor、P55-vc-associate、P59-incubator-screener</div>
+<body>
 <div class="container">
 
   <!-- Top Bar -->
@@ -271,9 +274,9 @@
     <div class="post-badge">玩家模拟评审报告</div>
     <h1 class="post-title">轻账 LiteBooks —— 种子轮融资 BP</h1>
     <div class="post-meta">
-      <span>📅 2026-11-04T01:21:28.825726+00:00</span>
+      <span>📅 2026-11-11T23:07:33.601888+00:00</span>
       <span class="sep">|</span>
-      <span>👤 3 位模拟评审员</span>
+      <span>👤 6 位模拟评审员</span>
       <span class="sep">|</span>
       
       <span>📦 v0.3.0</span>
@@ -305,24 +308,24 @@
        刻意没有任何加权综合分。 -->
   
   <div class="section-card">
-    <div class="section-title"><span class="icon">⚖️</span> 证据构成（共 28 条）</div>
+    <div class="section-title"><span class="icon">⚖️</span> 证据构成（共 59 条）</div>
     <div style="font-size:13px;margin-bottom:8px">
-      直接观察 <b>21</b> · 合理推断 <b>5</b> · 信息缺口 <b>2</b>
-      ｜ 推断占比 18%（上限 40%）
+      直接观察 <b>42</b> · 合理推断 <b>12</b> · 信息缺口 <b>5</b>
+      ｜ 推断占比 20%（上限 40%）
     </div>
     
     <table style="font-size:12px;width:100%">
       <tr><th style="text-align:left">维度</th><th>均分（1-5）</th><th>区间</th><th>人数</th></tr>
       
-      <tr><td>clarity</td><td style="text-align:center">4.0</td><td style="text-align:center">4.0–4.0</td><td style="text-align:center">3</td></tr>
+      <tr><td>clarity</td><td style="text-align:center">3.83</td><td style="text-align:center">3.0–4.0</td><td style="text-align:center">6</td></tr>
       
-      <tr><td>trust</td><td style="text-align:center">2.33</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">3</td></tr>
+      <tr><td>trust</td><td style="text-align:center">2.33</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">6</td></tr>
       
-      <tr><td>market_potential</td><td style="text-align:center">3.0</td><td style="text-align:center">3.0–3.0</td><td style="text-align:center">3</td></tr>
+      <tr><td>market_potential</td><td style="text-align:center">2.83</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">6</td></tr>
       
-      <tr><td>team_credibility</td><td style="text-align:center">3.33</td><td style="text-align:center">3.0–4.0</td><td style="text-align:center">3</td></tr>
+      <tr><td>team_credibility</td><td style="text-align:center">3.0</td><td style="text-align:center">3.0–3.0</td><td style="text-align:center">6</td></tr>
       
-      <tr><td>evidence_quality</td><td style="text-align:center">2.33</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">3</td></tr>
+      <tr><td>evidence_quality</td><td style="text-align:center">2.33</td><td style="text-align:center">2.0–3.0</td><td style="text-align:center">6</td></tr>
       
     </table>
     
@@ -341,55 +344,126 @@
     <div class="section-title"><span class="icon">🤝</span> 共识（按议题）</div>
     
     <div style="font-size:12px;opacity:.8;margin-bottom:10px">
-      判定口径：同一议题被 ≥3/3 位人格各自独立提出。
+      判定口径：同一议题被 ≥5/6 位人格各自独立提出。
     </div>
     
     <div class="sub-title">多数 persona 共同提出的议题</div>
     
-    <div style="font-size:12px;opacity:.8">本次没有任何议题达到共识门槛。</div>
+    <ul class="point-list agree">
+      
+      <li><span class="dot"></span>月流失率6.2%没有解释，会拖垮增长故事</li>
+      
+    </ul>
     
     
     
     <div class="sub-title" style="margin-top:12px">仅个别 persona 提出的议题</div>
     <ul class="point-list question">
       
-      <li><span class="dot"></span>“微调模型”是否构成壁垒无法判断，大概率是第三方模型的浅封装</li>
+      <li><span class="dot"></span>没讲清'为什么是你们'——只有履历，没有亲身痛点或信息优势</li>
       
-      <li><span class="dot"></span>没有可演示的产品，demo 可信度为零</li>
+      <li><span class="dot"></span>冷启动与获客路径空白</li>
       
-      <li><span class="dot"></span>准确率指标的评测方法薄弱</li>
+      <li><span class="dot"></span>独特认知缺位，竞品分析单薄</li>
       
-      <li><span class="dot"></span>银行与支付流水接入方式和合规风险不明</li>
+      <li><span class="dot"></span>准确率与合规风险、数据接入风险未交代</li>
       
-      <li><span class="dot"></span>税务规则引擎的扩展成本和技术债没有讲</li>
+      <li><span class="dot"></span>市场规模只有企业数，没有 ¥ 金额的自下而上测算</li>
       
-      <li><span class="dot"></span>团队工程证明不足</li>
+      <li><span class="dot"></span>资金用途与增长目标不匹配</li>
       
-      <li><span class="dot"></span>月流失率6.2%说明付费后留不住人，却没解释原因</li>
+      <li><span class="dot"></span>技术壁垒描述空洞，无法判断是否为第三方 API 浅封装</li>
       
-      <li><span class="dot"></span>没有和小微主真实在用的替代方案比较</li>
+      <li><span class="dot"></span>94.3% 准确率的验证方法不可核验</li>
       
-      <li><span class="dot"></span>没有免费体验或试用，价值要先付费才能看到</li>
+      <li><span class="dot"></span>没有可演示的产品，demo 可信度无从判断</li>
       
-      <li><span class="dot"></span>准确率5.7%的错误如何兜底没说明</li>
+      <li><span class="dot"></span>没有和小微主真正的替代方案对比</li>
       
-      <li><span class="dot"></span>缺少真实用户案例和口碑</li>
+      <li><span class="dot"></span>10分钟上手和试用体验缺证据</li>
       
-      <li><span class="dot"></span>最强主张「94.3% 准确率可出合规报表」证据薄弱，且没有错误兜底</li>
+      <li><span class="dot"></span>没写要孵化器的什么资源</li>
       
-      <li><span class="dot"></span>材料前后矛盾：无需会计知识 vs 税务顾问答疑 vs 省份覆盖未完成</li>
+      <li><span class="dot"></span>关键数字无来源或可核验口径</li>
       
-      <li><span class="dot"></span>市场数据无出处，竞争分析遗漏了真正的替代方案</li>
+      <li><span class="dot"></span>团队投入度与分工未说明</li>
       
-      <li><span class="dot"></span>整份 BP 没有风险与短板栏</li>
+      <li><span class="dot"></span>核心主张「合规报表」只靠 500 笔抽检背书，且错误率约 5.7%</li>
       
-      <li><span class="dot"></span>估值（投后约 2500 万，约 55 倍 ARR）与竞品融资论据缺乏逻辑</li>
+      <li><span class="dot"></span>估值约 55 倍 ARR，且留存数据糟糕</li>
+      
+      <li><span class="dot"></span>18 个月 13 倍增长缺少获客与渠道论证</li>
+      
+      <li><span class="dot"></span>完全没有风险与短板栏，竞争分析口径混乱</li>
+      
+      <li><span class="dot"></span>材料前后矛盾：「无需会计知识」与 CPA 答疑、「合规」与省份未覆盖</li>
+      
+      <li><span class="dot"></span>市场规模数据无出处，创始人背景不可核验</li>
       
     </ul>
     
   </div>
 
   <!-- Major Disagreements -->
+  
+  <div class="section-card">
+    <div class="section-title"><span class="icon">⚡</span> 重大分歧</div>
+    
+    <div class="disagreement-card">
+      <div class="disagreement-topic">月流失率6.2%没有解释，会拖垮增长故事</div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P54-angel-investor</span>
+        <span class="stance-text">观望 — 月流失率6.2%没有解释，会拖垮增长故事: 年化留存约一半，意味着漏桶。217用户靠内测圈子拉来的话，规模化后的数字会更差。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P55-vc-associate</span>
+        <span class="stance-text">观望 — 单位经济缺失，6.2% 月流失显示留存偏弱: 年留存约 46%，LTV 约 ¥2,800 营收，CAC 和毛利都没披露。无法判断每投 ¥1 获客能否回收，13 倍增长目标就没有依据。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P57-tech-dd-engineer</span>
+        <span class="stance-text">观望 — 6.2% 月流失率未解释，可能是技术质量信号: 若流失来自分类错误或接入失败，则 94.3% 的说法与实际体验不符，单位经济也难成立。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P58-early-adopter-customer</span>
+        <span class="stance-text">观望 — 月流失率6.2%没有解释: 付费用户走得快，说明上手后价值不稳，我不想当小白鼠。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P59-incubator-screener</span>
+        <span class="stance-text">值得跟进 — 月流失率 6.2% 未被回应，增长目标与留存矛盾: 初筛看阶段证据是否撑得住目标。6.2% 月流失下 18 个月做到 MRR ¥50万 需要极大获客量，材料没给 CAC 和渠道。</span>
+      </div>
+      
+      
+      
+    </div>
+    
+    <div class="disagreement-card">
+      <div class="disagreement-topic">独特认知缺位，竞品分析单薄</div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P54-angel-investor</span>
+        <span class="stance-text">观望 — 独特认知缺位，竞品分析单薄: 'AI+小微记账'是同质化叙述，只对比了B轮的中型产品，没有对比代账公司、金蝶等本土替代方案，看不出反常识判断。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P55-vc-associate</span>
+        <span class="stance-text">观望 — 竞品分析只列弱不列强: 只对标中型企业的记账通，回避了面向小微的直接竞品、代账公司、银行/支付平台自带功能。「4 倍客单价」与自家定价也对不上。</span>
+      </div>
+      
+      <div class="stance-row">
+        <span class="stance-persona">P59-incubator-screener</span>
+        <span class="stance-text">值得跟进 — 竞品对比单薄，仅一个对手: 小微记账赛道有不少轻量竞品，只拿中型企业产品对比削弱差异化论证。</span>
+      </div>
+      
+      
+      
+    </div>
+    
+  </div>
   
 
   <!-- Priority Fixes -->
@@ -410,130 +484,170 @@
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">1</td>
-          <td style="font-weight:600;">月流失率6.2%说明付费后留不住人，却没解释原因</td>
+          <td style="font-weight:600;">月流失率6.2%没有解释，会拖垮增长故事</td>
           <td><span class="severity-badge critical">critical</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P58-early-adopter-customer, P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">给出流失原因拆解、分群留存曲线、各渠道 CAC 和回收期；把融资用途重新对齐到「先降流失、再放量」，并给出增长模型。</td>
+          <td style="font-size:11px;color:var(--text-secondary);">P54-angel-investor, P55-vc-associate, P57-tech-dd-engineer, P58-early-adopter-customer, P59-incubator-screener</td>
+          <td style="color:var(--text-secondary);">补充 CAC、分渠道转化、毛利率（含大模型调用和税务顾问人力成本）、按月 cohort 留存和 MRR 月度曲线，并拆解流失原因。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">2</td>
-          <td style="font-weight:600;">“微调模型”是否构成壁垒无法判断，大概率是第三方模型的浅封装</td>
-          <td><span class="severity-badge critical">critical</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">披露基座模型、微调数据量与标注来源、自有标注数据积累速度，以及脱离第三方 API 后的效果。另给出规则引擎与模型各自承担的分类比例。</td>
+          <td style="font-weight:600;">准确率与合规风险、数据接入风险未交代</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P54-angel-investor, P55-vc-associate, P57-tech-dd-engineer, P58-early-adopter-customer</td>
+          <td style="color:var(--text-secondary);">说明各数据源的接入方式（官方开放接口/聚合商/文件上传）、授权协议、数据存储与安全合规方案。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">3</td>
-          <td style="font-weight:600;">最强主张「94.3% 准确率可出合规报表」证据薄弱，且没有错误兜底</td>
-          <td><span class="severity-badge critical">critical</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">公开抽样方法、样本来源和分类别准确率，给出置信区间；补上错误率对报表的影响测算、人工复核流程和责任条款，最好有第三方或 CPA 背书。</td>
+          <td style="font-weight:600;">独特认知缺位，竞品分析单薄</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P54-angel-investor, P55-vc-associate, P59-incubator-screener</td>
+          <td style="color:var(--text-secondary);">增加直接竞品对比表（价格、功能、获客方式、份额），并说明为什么银行和支付平台做不了这件事。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">4</td>
-          <td style="font-weight:600;">没有可演示的产品，demo 可信度为零</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">现场用客户脱敏的真实流水跑一遍全流程。同时提供 MRR 的支付后台截图，以及按分类、按行业拆分的错误案例。</td>
+          <td style="font-weight:600;">没讲清'为什么是你们'——只有履历，没有亲身痛点或信息优势</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P54-angel-investor</td>
+          <td style="color:var(--text-secondary);">补一段创始人故事：在银行具体见到过什么小微客户行为/数据，为什么现有方案做不好，为什么银行流水是切入口。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">5</td>
-          <td style="font-weight:600;">准确率指标的评测方法薄弱</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">给出分层抽样的评测集、分类别的精确率和召回率，以及低置信度交易的人工复核流程和错误对报表的影响。</td>
+          <td style="font-weight:600;">市场规模只有企业数，没有 ¥ 金额的自下而上测算</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P55-vc-associate</td>
+          <td style="color:var(--text-secondary);">按「10 人以下且有银行对公账户的企业数 × 可触达比例 × 转化率 × ¥175 ARPU」重算 TAM/SAM/SOM，并给出数据来源。重算不了就 pass。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">6</td>
-          <td style="font-weight:600;">银行与支付流水接入方式和合规风险不明</td>
-          <td><span class="severity-badge high">high</span></td>
+          <td style="font-weight:600;">技术壁垒描述空洞，无法判断是否为第三方 API 浅封装</td>
+          <td><span class="severity-badge critical">critical</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">说明各渠道的接入方式、已签约的数据合作方、授权与数据安全方案，以及接口失效时的降级路径。</td>
+          <td style="color:var(--text-secondary);">补充架构图：底座模型来源、微调数据量与来源、是否自托管、单笔推理成本、换底座模型的迁移成本；说明规则引擎与模型如何分工。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">7</td>
-          <td style="font-weight:600;">没有和小微主真实在用的替代方案比较</td>
-          <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P58-early-adopter-customer</td>
-          <td style="color:var(--text-secondary);">用一张表对比：自己用Excel、代账公司（月费约多少）、轻账，列出时间、成本、出错风险。</td>
+          <td style="font-weight:600;">核心主张「合规报表」只靠 500 笔抽检背书，且错误率约 5.7%</td>
+          <td><span class="severity-badge critical">critical</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
+          <td style="color:var(--text-secondary);">公开抽检方法（样本来源、是否与训练集隔离、第三方复核）。给出报表级而非逐笔的准确率、按交易类型分层的错误分布，以及出错后的人工复核流程和责任条款。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">8</td>
-          <td style="font-weight:600;">材料前后矛盾：无需会计知识 vs 税务顾问答疑 vs 省份覆盖未完成</td>
-          <td><span class="severity-badge high">high</span></td>
+          <td style="font-weight:600;">估值约 55 倍 ARR，且留存数据糟糕</td>
+          <td><span class="severity-badge critical">critical</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">列出已支持的省份和税种；说明顾问答疑的人力成本、用户使用率和毛利；修正「一键合规」的表述。</td>
+          <td style="color:var(--text-secondary);">补齐按月的同期群留存、LTV、CAC、回本周期和毛利（含 CPA 人工成本）。解释流失原因（倒闭、换产品、报税季后弃用）并说明估值依据，或主动下调估值。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">9</td>
-          <td style="font-weight:600;">市场数据无出处，竞争分析遗漏了真正的替代方案</td>
+          <td style="font-weight:600;">冷启动与获客路径空白</td>
           <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">补上数据出处，把代理记账和其他低价 SaaS 加入竞品对比（价格、功能、服务），并用用户访谈证明为什么选你。</td>
+          <td style="font-size:11px;color:var(--text-secondary);">P54-angel-investor</td>
+          <td style="color:var(--text-secondary);">披露217个用户的来源构成、各渠道CAC、回本周期，并给出18个月的用户增长拆解。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">10</td>
-          <td style="font-weight:600;">整份 BP 没有风险与短板栏</td>
+          <td style="font-weight:600;">资金用途与增长目标不匹配</td>
           <td><span class="severity-badge high">high</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">增加「风险与未解决问题」章节：列出前五大风险、现有对策和仍无答案的问题。</td>
+          <td style="font-size:11px;color:var(--text-secondary);">P55-vc-associate</td>
+          <td style="color:var(--text-secondary);">画出「资金→获客渠道→新增用户→MRR」的链条，给出月度里程碑和跑道，说明省份规则覆盖对转化或留存的量化影响。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">11</td>
-          <td style="font-weight:600;">税务规则引擎的扩展成本和技术债没有讲</td>
-          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-weight:600;">94.3% 准确率的验证方法不可核验</td>
+          <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">说明规则的表示方式、更新流程、测试覆盖，以及新增一个省份的人天成本。</td>
+          <td style="color:var(--text-secondary);">公布评测集构成、按类别的混淆矩阵、置信区间、错误案例，以及低置信度交易的人工复核机制；提供可重复运行的评测。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">12</td>
-          <td style="font-weight:600;">团队工程证明不足</td>
-          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-weight:600;">没有可演示的产品，demo 可信度无从判断</td>
+          <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P57-tech-dd-engineer</td>
-          <td style="color:var(--text-secondary);">列出技术负责人的过往系统、开源或代码贡献，以及模型方向的具体负责人。</td>
+          <td style="color:var(--text-secondary);">提供现场演示：用我给的脱敏真实流水跑一遍分类和报表生成，并给出内测环境访问。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">13</td>
-          <td style="font-weight:600;">没有免费体验或试用，价值要先付费才能看到</td>
-          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-weight:600;">没有和小微主真正的替代方案对比</td>
+          <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P58-early-adopter-customer</td>
-          <td style="color:var(--text-secondary);">提供14天试用或免费导入一个月流水并出报表预览，让用户五分钟内看到自己的利润表。</td>
+          <td style="color:var(--text-secondary);">做一张对比表：Excel、代账公司、轻账的月成本、每月耗时、出错风险。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">14</td>
-          <td style="font-weight:600;">准确率5.7%的错误如何兜底没说明</td>
-          <td><span class="severity-badge medium">medium</span></td>
-          <td style="font-size:11px;color:var(--text-secondary);">P58-early-adopter-customer</td>
-          <td style="color:var(--text-secondary);">说明低置信度交易的人工复核提示、CPA审核环节和错报责任条款。</td>
+          <td style="font-weight:600;">没写要孵化器的什么资源</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P59-incubator-screener</td>
+          <td style="color:var(--text-secondary);">增加一栏：具体需要的渠道、税务/监管、代账机构资源或导师。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">15</td>
-          <td style="font-weight:600;">估值（投后约 2500 万，约 55 倍 ARR）与竞品融资论据缺乏逻辑</td>
-          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-weight:600;">18 个月 13 倍增长缺少获客与渠道论证</td>
+          <td><span class="severity-badge high">high</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
-          <td style="color:var(--text-secondary);">提供可比交易和估值逻辑，不要用定位不同的公司作论据，或明确承认两者差异。</td>
+          <td style="color:var(--text-secondary);">给出分渠道的获客测试数据与 CAC，写出月度用户增长与流失的模型，并说明谁来负责增长。</td>
         </tr>
         
         <tr>
           <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">16</td>
-          <td style="font-weight:600;">缺少真实用户案例和口碑</td>
-          <td><span class="severity-badge low">low</span></td>
+          <td style="font-weight:600;">完全没有风险与短板栏，竞争分析口径混乱</td>
+          <td><span class="severity-badge high">high</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
+          <td style="color:var(--text-secondary);">增加风险与未解问题栏，至少列出前五大风险及应对措施。竞争分析要纳入代理记账公司、柠檬云类产品和银行/支付平台自带功能，并比价格与功能。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">17</td>
+          <td style="font-weight:600;">10分钟上手和试用体验缺证据</td>
+          <td><span class="severity-badge medium">medium</span></td>
           <td style="font-size:11px;color:var(--text-secondary);">P58-early-adopter-customer</td>
-          <td style="color:var(--text-secondary);">附2-3个付费用户的行业、节省时间和续费月数。</td>
+          <td style="color:var(--text-secondary);">提供演示视频、免费试用或先导入一个月流水看报表，并说明数据安全。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">18</td>
+          <td style="font-weight:600;">关键数字无来源或可核验口径</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P59-incubator-screener</td>
+          <td style="color:var(--text-secondary);">标注来源，附抽检方法与第三方复核，附付费客户的可验证信息（可匿名）。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">19</td>
+          <td style="font-weight:600;">团队投入度与分工未说明</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P59-incubator-screener</td>
+          <td style="color:var(--text-secondary);">写明全职情况、股权结构、CPA 的角色及创始人到岗时间。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">20</td>
+          <td style="font-weight:600;">材料前后矛盾：「无需会计知识」与 CPA 答疑、「合规」与省份未覆盖</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
+          <td style="color:var(--text-secondary);">明确列出当前已覆盖的省份、各档用户人均消耗的 CPA 工时，以及全自动与人工介入各占多少。</td>
+        </tr>
+        
+        <tr>
+          <td style="font-family:var(--font-mono);color:var(--text-muted);font-size:11px;">21</td>
+          <td style="font-weight:600;">市场规模数据无出处，创始人背景不可核验</td>
+          <td><span class="severity-badge medium">medium</span></td>
+          <td style="font-size:11px;color:var(--text-secondary);">P61-devils-advocate</td>
+          <td style="color:var(--text-secondary);">标注数据来源（统计公报、第三方调研或自己的用户访谈），拆出真正可付费的 SAM。补充公司名、职位、具体项目与可联系的背调对象。</td>
         </tr>
         
       </tbody>
@@ -543,12 +657,326 @@
 
   <!-- Persona Comments Thread -->
   <div class="comment-thread">
-    <div class="section-title"><span class="icon">💬</span> 评审员评论 (3)</div>
+    <div class="section-title"><span class="icon">💬</span> 评审员评论 (6)</div>
 
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(282, 65%, 55%)">郑</div>
+        <div class="avatar" style="background:hsl(172, 65%, 55%)">沈</div>
+        <div class="comment-user-info">
+          <div class="comment-username">沈一舟</div>
+          <div class="comment-archetype">P54-angel-investor</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">数字我看到了，217个付费用户算数，但6.2%的月流失让我皱眉。履历和赛道对得上，可BP没告诉我你们看到了什么别人没看到的——这个得当面聊，聊不清我就不往下走了。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">market_potential</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">team_credibility</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">evidence_quality</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。</span><span>一句话定位清楚：对象（10人以下小微）、手段（AI从银行流水）、产出（合规报表）都有。三分钟内能懂，但是'AI记账'赛道很拥挤，这句话本身没有独特认知。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">创始人前某银行小微金融部产品经理，联合创始人前字节跳动财务系统工程师。</span><span>创始人背景与赛道有相关性：银行小微金融产品经理接触过小微客户和银行流水；联创做过财务系统。但材料只罗列履历，没有写'为什么是你们来做'，也没有写出亲身经历的痛点。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">当前 MRR：¥38,000（内测阶段，217 个付费用户，月流失率 6.2%）。</span><span>有真实付费用户和MRR，是加分项。这是本BP最硬的证据，超过一般种子轮。</span></span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">没讲清'为什么是你们'——只有履历，没有亲身痛点或信息优势</span>
+            </div>
+            <div class="issue-why">我投的是人。银行小微金融PM和字节财务系统工程师与赛道相关，但BP没有说他们看到了别人没看到的什么。按我的规则，这点答不上就是放弃条件；材料没写不等于没有，所以只能观望，等创始人当面回答。</div>
+            
+            <div class="issue-fix">补一段创始人故事：在银行具体见到过什么小微客户行为/数据，为什么现有方案做不好，为什么银行流水是切入口。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">月流失率6.2%没有解释，会拖垮增长故事</span>
+            </div>
+            <div class="issue-why">年化留存约一半，意味着漏桶。217用户靠内测圈子拉来的话，规模化后的数字会更差。</div>
+            
+            <div class="issue-fix">给出分群留存（按套餐/行业/来源）、流失原因访谈，以及已验证的改善动作。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">冷启动与获客路径空白</span>
+            </div>
+            <div class="issue-why">没有渠道、CAC、LTV、转化率，无法判断¥75万获客预算能买到什么，也无法判断50万MRR目标是否可达。</div>
+            
+            <div class="issue-fix">披露217个用户的来源构成、各渠道CAC、回本周期，并给出18个月的用户增长拆解。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">创始人当面能讲出银行小微金融经历里的具体洞察，答问比BP好</span>
+            
+            <span class="trigger-tag continue">能给出217个付费用户的来源与留存分群数据</span>
+            
+            <span class="trigger-tag continue">能解释6.2%流失并展示改善趋势</span>
+            
+            <span class="trigger-tag continue">能说清为何小微主不用代账公司而选轻账</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">创始人讲不清为什么是自己来做</span>
+            
+            <span class="trigger-tag quit">获客全靠创始人个人关系或内测圈子，无法复制</span>
+            
+            <span class="trigger-tag quit">流失率无法改善且无解释</span>
+            
+            <span class="trigger-tag quit">银行数据接入存在合规障碍</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(211, 65%, 55%)">林</div>
+        <div class="comment-user-info">
+          <div class="comment-username">林可</div>
+          <div class="comment-archetype">P55-vc-associate</div>
+        </div>
+        <span class="stance-tag neutral">观望</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">市场规模是拍出来的，我要的是 ¥ 金额和算式，不是 4800 万这个数。6.2% 的月流失加上没有 CAC，我没法向合伙人解释钱怎么变成 13 倍增长，这次先观望。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">market_potential</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">team_credibility</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">evidence_quality</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">国内约 4800 万小微企业主中，超过六成仍用 Excel 或纸质账本记账</span><span>市场只给了企业数量和占比，没有 ¥ 金额的 TAM/SAM/SOM。没有 ARPU×可触达企业数的测算，也没有拆分 10 人以下的口径。这是自上而下的拍数，决策规则被触发。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">当前 MRR：¥38,000（内测阶段，217 个付费用户，月流失率 6.2%）。</span><span>唯一的经营数据是一个时点的 MRR。没有增长曲线，没有按月的新增和流失，没有 CAC 和毛利。217 个用户来自内测，渠道和样本偏差未知。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level inferred">inferred</span>
+            <span class="evidence-body"><span>MRR÷用户数≈¥175，高于 ¥99 起步价，说明多数用户在高价档或多账户。但档位分布没披露。月流失 6.2% 意味着平均寿命约 16 个月，年留存约 46%。LTV 只有约 ¥2,800 营收，还没扣毛利。对 SaaS 来说这个留存偏弱，与「刚需」的叙事不符。</span></span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">市场规模只有企业数，没有 ¥ 金额的自下而上测算</span>
+            </div>
+            <div class="issue-why">只给 4800 万和六成，没有付费意愿、ARPU 和可触达比例。核心规则被触发，无法向 IC 说明天花板，也无法判断 ¥50 万 MRR 只占多少份额。</div>
+            
+            <div class="issue-fix">按「10 人以下且有银行对公账户的企业数 × 可触达比例 × 转化率 × ¥175 ARPU」重算 TAM/SAM/SOM，并给出数据来源。重算不了就 pass。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge critical">critical</span>
+              <span class="issue-title">单位经济缺失，6.2% 月流失显示留存偏弱</span>
+            </div>
+            <div class="issue-why">年留存约 46%，LTV 约 ¥2,800 营收，CAC 和毛利都没披露。无法判断每投 ¥1 获客能否回收，13 倍增长目标就没有依据。</div>
+            
+            <div class="issue-fix">补充 CAC、分渠道转化、毛利率（含大模型调用和税务顾问人力成本）、按月 cohort 留存和 MRR 月度曲线，并拆解流失原因。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">资金用途与增长目标不匹配</span>
+            </div>
+            <div class="issue-why">60% 投研发，仅 25%（约 ¥75 万）投获客，却要在 18 个月增长约 13 倍。反推要求 CAC 约 ¥175 以内，没有任何数据支持。</div>
+            
+            <div class="issue-fix">画出「资金→获客渠道→新增用户→MRR」的链条，给出月度里程碑和跑道，说明省份规则覆盖对转化或留存的量化影响。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">给出自下而上的 TAM/SAM/SOM，数据有来源，口径讲得通</span>
+            
+            <span class="trigger-tag continue">提供 cohort 留存、月度 MRR 曲线和 CAC/毛利，证明单位经济成立</span>
+            
+            <span class="trigger-tag continue">给出资金→获客→MRR 的分阶段里程碑，并说明估值依据</span>
+            
+            <span class="trigger-tag continue">补充强势竞品对比，创始人和团队可背调</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">市场规模重算不了，只能给自上而下的数字</span>
+            
+            <span class="trigger-tag quit">CAC、毛利、留存曲线被拒绝披露或回避</span>
+            
+            <span class="trigger-tag quit">月流失一直在 6% 以上，且找不到改善路径</span>
+            
+            <span class="trigger-tag quit">竞品分析继续只列弱势对手</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(354, 65%, 55%)">郑</div>
         <div class="comment-user-info">
           <div class="comment-username">郑北</div>
           <div class="comment-archetype">P57-tech-dd-engineer</div>
@@ -558,7 +986,7 @@
       <div class="comment-body">
 
         
-        <div class="voice-sample">你说的“微调模型”，我现在分不清它是资产还是一层 API 皮。拿真实流水现场跑一遍，再告诉我新增一个省要多少人天，我才谈得上判断壁垒。</div>
+        <div class="voice-sample">就一句'微调后的流水分类模型'，我没法判断你们是在训练模型，还是在给别人的 API 套壳。别讲 94.3%，把评测集和 demo 拿出来，我现场跑一遍。</div>
         
 
         
@@ -567,8 +995,8 @@
           <div class="score-item">
             <div class="score-label">clarity</div>
             <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
-              <span class="score-num">4</span>
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
             </div>
           </div>
           
@@ -613,17 +1041,17 @@
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>核心技术只有一句：“微调后的流水分类模型，实测准确率 94.3%（人工抽检 500 笔交易）”。没写基座模型、微调数据量与来源、是否自研，也没写推理成本。</span>
+            <span class="evidence-body"><span class="evidence-quote">核心技术：微调后的流水分类模型，实测准确率 94.3%（人工抽检 500 笔交易）。</span><span>核心技术只有一句话：微调后的流水分类模型。没说底座模型是自研还是第三方、微调数据来源与规模、推理架构。这是营销级描述，不是技术描述。</span></span>
           </div>
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>准确率 94.3% 基于 500 笔人工抽检。没写抽样方式、是否覆盖多行业和多银行格式、是否有留出集，也没写错误分类对报表和报税的后果。</span>
+            <span class="evidence-body"><span class="evidence-quote">用大模型自动分类交易、生成月度利润表与现金流报表</span><span>方案里写的是'用大模型自动分类'，没说是自训还是调第三方 API。'微调'可能是自托管开源模型微调，也可能是调用厂商微调接口。材料没给出判断依据，所以'浅封装→壁垒判零'的规则不能确认触发，也不能排除。</span></span>
           </div>
           
           <div class="evidence-item">
-            <span class="evidence-level gap">gap</span>
-            <span>材料没有提供 demo、录屏、试用入口或架构图。“接入门槛低于 10 分钟”只是口头声称。</span>
+            <span class="evidence-level inferred">inferred</span>
+            <span class="evidence-body"><span>准确率 94.3% 的样本只有 500 笔，抽检方法、标注人、是否与训练集隔离、是否按交易类型分层都没说。94.3% 意味着约每 17 笔错 1 笔，对财务报表和报税是高风险错误率；500 笔下的置信区间也偏宽。</span></span>
           </div>
           
         </div>
@@ -636,33 +1064,33 @@
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge critical">critical</span>
-              <span class="issue-title">“微调模型”是否构成壁垒无法判断，大概率是第三方模型的浅封装</span>
+              <span class="issue-title">技术壁垒描述空洞，无法判断是否为第三方 API 浅封装</span>
             </div>
-            <div class="issue-why">材料没写基座模型、训练数据规模与来源、是否自托管。如果只是调用第三方大模型 API 加提示词或轻量微调，按我的规则技术壁垒判零，三个工程师一个月就能复刻。本次材料没有排除这个可能，所以规则处于待证实状态，不是已触发。这个判断来自信息缺失，不是负面证据。</div>
+            <div class="issue-why">我的规则是浅封装则壁垒判零。材料只写'微调后的大模型'，没说底座、训练数据、部署方式、成本。这类信息缺失，我默认按执行优势而非技术壁垒看待。</div>
             
-            <div class="issue-fix">披露基座模型、微调数据量与标注来源、自有标注数据积累速度，以及脱离第三方 API 后的效果。另给出规则引擎与模型各自承担的分类比例。</div>
+            <div class="issue-fix">补充架构图：底座模型来源、微调数据量与来源、是否自托管、单笔推理成本、换底座模型的迁移成本；说明规则引擎与模型如何分工。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge high">high</span>
-              <span class="issue-title">没有可演示的产品，demo 可信度为零</span>
+              <span class="issue-title">94.3% 准确率的验证方法不可核验</span>
             </div>
-            <div class="issue-why">我要看真实流水从接入到出报表的现场演示。材料连录屏都没有，MRR 虽然写了，但没有后台截图、客户名单或第三方可核验数据。</div>
+            <div class="issue-why">500 笔人工抽检，没说样本来源、标注方式、是否与训练集隔离、错误类型。对报税场景，约 6% 错误率可能造成合规后果，且不知道错误是否被人工复核兜底。</div>
             
-            <div class="issue-fix">现场用客户脱敏的真实流水跑一遍全流程。同时提供 MRR 的支付后台截图，以及按分类、按行业拆分的错误案例。</div>
+            <div class="issue-fix">公布评测集构成、按类别的混淆矩阵、置信区间、错误案例，以及低置信度交易的人工复核机制；提供可重复运行的评测。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge high">high</span>
-              <span class="issue-title">准确率指标的评测方法薄弱</span>
+              <span class="issue-title">没有可演示的产品，demo 可信度无从判断</span>
             </div>
-            <div class="issue-why">500 笔人工抽检样本太小。94.3% 意味着每 100 笔仍有约 6 笔错，而报税场景里错分的成本很高。没有分类粒度、置信度阈值和人工复核流程的说明。</div>
+            <div class="issue-why">BP 没有 demo、录屏或试用入口。我不会凭 MRR 数字判断系统是否真的在跑。</div>
             
-            <div class="issue-fix">给出分层抽样的评测集、分类别的精确率和召回率，以及低置信度交易的人工复核流程和错误对报表的影响。</div>
+            <div class="issue-fix">提供现场演示：用我给的脱敏真实流水跑一遍分类和报表生成，并给出内测环境访问。</div>
             
           </div>
           
@@ -674,15 +1102,15 @@
           <div class="trigger-group continue">
             <div class="sub-title">✅ 留存触发</div>
             
-            <span class="trigger-tag continue">能现场演示真实流水接入到出报表的完整流程</span>
+            <span class="trigger-tag continue">现场用真实流水演示端到端流程，而不是只给录屏</span>
             
-            <span class="trigger-tag continue">披露基座模型、训练数据来源与自有数据积累，证明不是浅封装</span>
+            <span class="trigger-tag continue">披露底座模型、训练数据和自托管/调用 API 的真实情况</span>
             
-            <span class="trigger-tag continue">给出分层评测集和分类别准确率</span>
+            <span class="trigger-tag continue">给出可复核的评测集和错误分析</span>
             
-            <span class="trigger-tag continue">说明规则引擎架构以及新增一个省份的人天成本</span>
+            <span class="trigger-tag continue">说明数据接入方案及合规，且有难复制之处</span>
             
-            <span class="trigger-tag continue">说明银行和支付流水的接入方式及合规授权</span>
+            <span class="trigger-tag continue">确认模型微调有专人负责，且有 ML 背景</span>
             
           </div>
           
@@ -690,13 +1118,15 @@
           <div class="trigger-group quit">
             <div class="sub-title">🚫 流失触发</div>
             
-            <span class="trigger-tag quit">确认核心只是第三方大模型 API 加提示词</span>
+            <span class="trigger-tag quit">确认核心只是调用第三方大模型 API 加提示词</span>
             
-            <span class="trigger-tag quit">拒绝现场演示或回避数据来源问题</span>
+            <span class="trigger-tag quit">拒绝提供评测数据或回避数据来源</span>
             
-            <span class="trigger-tag quit">技术团队里没有人真正写过生产代码</span>
+            <span class="trigger-tag quit">不能现场演示，只给录屏</span>
             
-            <span class="trigger-tag quit">银行流水靠不稳定的爬取实现</span>
+            <span class="trigger-tag quit">三个工程师一个月能复制，且团队不承认</span>
+            
+            <span class="trigger-tag quit">没有人真正负责模型</span>
             
           </div>
           
@@ -707,7 +1137,7 @@
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(153, 65%, 55%)">唐</div>
+        <div class="avatar" style="background:hsl(220, 65%, 55%)">唐</div>
         <div class="comment-user-info">
           <div class="comment-username">唐小满</div>
           <div class="comment-archetype">P58-early-adopter-customer</div>
@@ -717,7 +1147,7 @@
       <div class="comment-body">
 
         
-        <div class="voice-sample">月底对账那种烦我是真懂，如果能直接导我自己的流水五分钟出利润表，我愿意试。可是没有试用、也不告诉我比请代账省多少，月流失还有6.2%，我先看看，不会马上掏钱。</div>
+        <div class="voice-sample">月底对账那个痛我是真懂，¥99一个月我也愿意试，但你得先让我十分钟里看到自己的账变整齐。付了钱的人每月还走6%，这让我心里打鼓，所以我先观望。</div>
         
 
         
@@ -734,8 +1164,8 @@
           <div class="score-item">
             <div class="score-label">trust</div>
             <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
             </div>
           </div>
           
@@ -750,16 +1180,16 @@
           <div class="score-item">
             <div class="score-label">team_credibility</div>
             <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
-              <span class="score-num">4</span>
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
             </div>
           </div>
           
           <div class="score-item">
             <div class="score-label">evidence_quality</div>
             <div class="score-bar-wrap">
-              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
-              <span class="score-num">3</span>
+              <div class="score-bar"><div class="score-bar-fill s2" style="width:40%"></div></div>
+              <span class="score-num">2</span>
             </div>
           </div>
           
@@ -772,17 +1202,17 @@
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>目标用户是10人以下小微企业主，六成仍用Excel/纸质账本，每月花8-15小时对账和报税准备。场景（月底对账、报税）具体，本周/本月就能对上号。</span>
+            <span class="evidence-body"><span class="evidence-quote">每月花费 8-15 小时在对账与报税准备上</span><span>场景很真实：每月对账、报税准备就是我这类小老板本周就会撞上的麻烦。决策规则'想不出本周场景'没有被触发。</span></span>
           </div>
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>轻账连接银行对公账户和支付宝/微信商户流水，自动分类，生成利润表、现金流报表，并一键导出小规模纳税人申报格式。</span>
+            <span class="evidence-body"><span class="evidence-quote">面向 10 人以下小微企业的自动化记账 SaaS</span><span>目标用户明确，是10人以下小微，说明给谁用很清楚。</span></span>
           </div>
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>宣称接入门槛低于10分钟、无需会计知识。但没有演示、试用流程或免费体验入口，也没有说明上手后第一眼能看到什么。</span>
+            <span class="evidence-body"><span class="evidence-quote">接入门槛低于 10 分钟</span><span>上手成本：宣称10分钟接入，但这是自说自话，没有演示、试用或用户反馈。而且要授权银行对公账户，心理门槛不低。</span></span>
           </div>
           
         </div>
@@ -795,33 +1225,33 @@
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge high">high</span>
-              <span class="issue-title">月流失率6.2%说明付费后留不住人，却没解释原因</span>
+              <span class="issue-title">没有和小微主真正的替代方案对比</span>
             </div>
-            <div class="issue-why">我是会掏钱试的人，但如果用两三个月就不用了，我不会升级，也不会推荐给朋友。高流失说明实际价值没有宣传的那么稳。</div>
+            <div class="issue-why">我现在用Excel或找代账，要知道换过来省多少钱、多少时间；只和用友类产品比，对我没有说服力。</div>
             
-            <div class="issue-fix">披露流失用户的原因分布、按使用月数的留存曲线，以及流失前最后一次使用的功能。</div>
+            <div class="issue-fix">做一张对比表：Excel、代账公司、轻账的月成本、每月耗时、出错风险。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge high">high</span>
-              <span class="issue-title">没有和小微主真实在用的替代方案比较</span>
+              <span class="issue-title">月流失率6.2%没有解释</span>
             </div>
-            <div class="issue-why">我的现状是Excel加请代账或自己报税。不知道轻账比这些省多少时间和钱，就没有理由换。</div>
+            <div class="issue-why">付费用户走得快，说明上手后价值不稳，我不想当小白鼠。</div>
             
-            <div class="issue-fix">用一张表对比：自己用Excel、代账公司（月费约多少）、轻账，列出时间、成本、出错风险。</div>
+            <div class="issue-fix">公开流失原因分析、留存曲线和改进措施。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge medium">medium</span>
-              <span class="issue-title">没有免费体验或试用，价值要先付费才能看到</span>
+              <span class="issue-title">10分钟上手和试用体验缺证据</span>
             </div>
-            <div class="issue-why">我对价格敏感，付费才有核心价值就要先证明给我看。¥99/月起对没见过效果的人是门槛。</div>
+            <div class="issue-why">我五分钟内看不到价值就会放弃；对公账户授权也需要安全说明。</div>
             
-            <div class="issue-fix">提供14天试用或免费导入一个月流水并出报表预览，让用户五分钟内看到自己的利润表。</div>
+            <div class="issue-fix">提供演示视频、免费试用或先导入一个月流水看报表，并说明数据安全。</div>
             
           </div>
           
@@ -833,13 +1263,13 @@
           <div class="trigger-group continue">
             <div class="sub-title">✅ 留存触发</div>
             
-            <span class="trigger-tag continue">能导入我自己的一个月流水，五分钟内看到利润表预览</span>
+            <span class="trigger-tag continue">有免费试用或几分钟内能看到自己账变整齐的演示</span>
             
-            <span class="trigger-tag continue">有同行或朋友已经在用并续费</span>
+            <span class="trigger-tag continue">和Excel/代账公司的成本时间对比清楚且更划算</span>
             
-            <span class="trigger-tag continue">有试用期或免费版证明核心价值</span>
+            <span class="trigger-tag continue">身边有同行小老板已经在用并能说出效果</span>
             
-            <span class="trigger-tag continue">有和代账公司成本的清楚对比</span>
+            <span class="trigger-tag continue">流失原因清楚且有改进</span>
             
           </div>
           
@@ -847,13 +1277,11 @@
           <div class="trigger-group quit">
             <div class="sub-title">🚫 流失触发</div>
             
-            <span class="trigger-tag quit">接入要大量手工整理或授权流程复杂</span>
+            <span class="trigger-tag quit">上手要改很多习惯或需要懂会计</span>
             
-            <span class="trigger-tag quit">一上来就要付费才能看到效果</span>
+            <span class="trigger-tag quit">只有付费才能看到价值且不给试用</span>
             
-            <span class="trigger-tag quit">分类错误多、要我自己逐笔核对</span>
-            
-            <span class="trigger-tag quit">说不清比Excel或代账好在哪</span>
+            <span class="trigger-tag quit">说不清比我现在的Excel或代账好在哪</span>
             
           </div>
           
@@ -864,17 +1292,170 @@
     
     <div class="comment">
       <div class="comment-top">
-        <div class="avatar" style="background:hsl(317, 65%, 55%)">秦</div>
+        <div class="avatar" style="background:hsl(296, 65%, 55%)">何</div>
         <div class="comment-user-info">
-          <div class="comment-username">秦刀</div>
-          <div class="comment-archetype">P61-devils-advocate</div>
+          <div class="comment-username">何澄</div>
+          <div class="comment-archetype">P59-incubator-screener</div>
         </div>
-        <span class="stance-tag neutral">观望</span>
+        <span class="stance-tag neutral">值得跟进</span>
       </div>
       <div class="comment-body">
 
         
-        <div class="voice-sample">你最硬的主张是 94.3%，结果只有 500 笔抽样，还管它叫「合规」？6.2% 的月流失你一句不提，风险栏整页空白。你不是没想到，是不想让我看到。</div>
+        <div class="voice-sample">五分钟看完：一句话讲得清，217 个付费户、MRR 3.8 万也具体，进复审。但 6.2% 的月流失没解释，也没写要我们什么资源，这两栏要补。</div>
+        
+
+        
+        <div class="scores-grid">
+          
+          <div class="score-item">
+            <div class="score-label">clarity</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s4" style="width:80%"></div></div>
+              <span class="score-num">4</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">trust</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">market_potential</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">team_credibility</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+          <div class="score-item">
+            <div class="score-label">evidence_quality</div>
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill s3" style="width:60%"></div></div>
+              <span class="score-num">3</span>
+            </div>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="evidence-list">
+          <div class="sub-title">关键证据</div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">面向 10 人以下小微企业的自动化记账 SaaS，用 AI 从银行流水直接生成合规报表。</span><span>一句话概括清楚：给谁（10人以下小微企业）、做什么（自动记账出合规报表）。核心决策规则未被触发。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">超过六成仍用 Excel 或纸质账本记账，每月花费 8-15 小时在对账与报税准备上</span><span>痛点有量化：目标人群与每月耗时，但无来源。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level direct">direct</span>
+            <span class="evidence-body"><span class="evidence-quote">当前 MRR：¥38,000（内测阶段，217 个付费用户，月流失率 6.2%）。</span><span>阶段证据具体：有 MRR、付费用户数、流失率，阶段与证据对得上。</span></span>
+          </div>
+          
+        </div>
+        
+
+        
+        <div class="issues-list">
+          <div class="sub-title">关键问题</div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">月流失率 6.2% 未被回应，增长目标与留存矛盾</span>
+            </div>
+            <div class="issue-why">初筛看阶段证据是否撑得住目标。6.2% 月流失下 18 个月做到 MRR ¥50万 需要极大获客量，材料没给 CAC 和渠道。</div>
+            
+            <div class="issue-fix">补流失原因分析、获客渠道、CAC/LTV，并说明留存改善计划。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge high">high</span>
+              <span class="issue-title">没写要孵化器的什么资源</span>
+            </div>
+            <div class="issue-why">名额给最能被孵化加速的团队，写不出资源诉求，就判断不了加速价值。</div>
+            
+            <div class="issue-fix">增加一栏：具体需要的渠道、税务/监管、代账机构资源或导师。</div>
+            
+          </div>
+          
+          <div class="issue-item">
+            <div class="issue-title-row">
+              <span class="severity-badge medium">medium</span>
+              <span class="issue-title">关键数字无来源或可核验口径</span>
+            </div>
+            <div class="issue-why">4800万、六成、8-15小时、94.3% 均为自述，无出处。</div>
+            
+            <div class="issue-fix">标注来源，附抽检方法与第三方复核，附付费客户的可验证信息（可匿名）。</div>
+            
+          </div>
+          
+        </div>
+        
+
+        <div class="triggers-row">
+          
+          <div class="trigger-group continue">
+            <div class="sub-title">✅ 留存触发</div>
+            
+            <span class="trigger-tag continue">补上要孵化器的具体资源诉求</span>
+            
+            <span class="trigger-tag continue">给出流失原因与改善计划</span>
+            
+            <span class="trigger-tag continue">提供可核验的付费客户或准确率验证</span>
+            
+          </div>
+          
+          
+          <div class="trigger-group quit">
+            <div class="sub-title">🚫 流失触发</div>
+            
+            <span class="trigger-tag quit">追问后仍无法解释 6.2% 月流失</span>
+            
+            <span class="trigger-tag quit">团队非全职或投入度不足</span>
+            
+            <span class="trigger-tag quit">数字被发现无法核验或存在夸大</span>
+            
+          </div>
+          
+        </div>
+
+      </div>
+    </div>
+    
+    <div class="comment">
+      <div class="comment-top">
+        <div class="avatar" style="background:hsl(94, 65%, 55%)">秦</div>
+        <div class="comment-user-info">
+          <div class="comment-username">秦刀</div>
+          <div class="comment-archetype">P61-devils-advocate</div>
+        </div>
+        <span class="stance-tag neutral">不投</span>
+      </div>
+      <div class="comment-body">
+
+        
+        <div class="voice-sample">你把「合规报表」放在最前面，证据却只有 500 笔抽检的 94.3%，剩下 5.7% 出错谁来背？还有，整份 BP 找不到一行写着「我们不确定什么」，这不是自信，是没想清楚。</div>
         
 
         
@@ -929,17 +1510,17 @@
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>核心技术主张：流水分类准确率 94.3%，来自人工抽检 500 笔交易。未说明谁抽检、样本是否来自内测用户、是否分行业，也没给置信区间；5.7% 错误率用于「合规报表」和税务申报，没有说明错账后果与责任归属。</span>
+            <span class="evidence-body"><span class="evidence-quote">实测准确率 94.3%（人工抽检 500 笔交易）</span><span>最强主张是「从银行流水直接生成合规报表」，唯一证据是 500 笔人工抽检的 94.3% 准确率。抽检谁做的、怎么抽的、是否含训练集、是逐笔准确率还是报表级准确率，全都没说。按我的规则，这条默认是假的。</span></span>
+          </div>
+          
+          <div class="evidence-item">
+            <span class="evidence-level inferred">inferred</span>
+            <span class="evidence-body"><span>94.3% 意味着约 5.7% 的交易分错类。这些报表要拿去报税，「合规」二字撑不住。材料没有说明错误如何发现、谁来兜底、出错的责任归谁。</span></span>
           </div>
           
           <div class="evidence-item">
             <span class="evidence-level direct">direct</span>
-            <span>月流失率 6.2%，换算年留存约 46%（(1-0.062)^12），平均生命周期约 16 个月。材料把它只当作一个数字列出，没有解释原因，也没有留存改善计划。</span>
-          </div>
-          
-          <div class="evidence-item">
-            <span class="evidence-level direct">direct</span>
-            <span>MRR ¥38,000 / 217 付费用户，ARPU 约 ¥175。18 个月目标 MRR ¥50 万，约 13 倍增长，约需 2900+ 用户存量。在 6.2% 月流失下，所需毛新增远高于此数。融资用途却是 60% 研发、仅 25%（约 75 万）获客，且没有 CAC、渠道或转化数据。</span>
+            <span class="evidence-body"><span class="evidence-quote">国内约 4800 万小微企业主中，超过六成仍用 Excel 或纸质账本记账</span><span>市场规模的起点数字没有来源。4800 万是小微企业主还是含个体户？「六成」从哪来？8-15 小时同样没有出处。</span></span>
           </div>
           
         </div>
@@ -952,33 +1533,33 @@
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge critical">critical</span>
-              <span class="issue-title">最强主张「94.3% 准确率可出合规报表」证据薄弱，且没有错误兜底</span>
+              <span class="issue-title">核心主张「合规报表」只靠 500 笔抽检背书，且错误率约 5.7%</span>
             </div>
-            <div class="issue-why">这是整个产品的信任根基。500 笔人工抽检样本小、来源不明。税务申报错一笔就可能引发罚款，投委会第一刀会砍在这里。</div>
+            <div class="issue-why">这是整份 BP 最强的主张，也是投资人第一刀会砍的地方。报税场景容错极低，94.3% 的逐笔准确率换算成报表级错误后很可能不可接受。抽检方法不明，这条主张默认不成立。</div>
             
-            <div class="issue-fix">公开抽样方法、样本来源和分类别准确率，给出置信区间；补上错误率对报表的影响测算、人工复核流程和责任条款，最好有第三方或 CPA 背书。</div>
+            <div class="issue-fix">公开抽检方法（样本来源、是否与训练集隔离、第三方复核）。给出报表级而非逐笔的准确率、按交易类型分层的错误分布，以及出错后的人工复核流程和责任条款。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge critical">critical</span>
-              <span class="issue-title">6.2% 月流失与 13 倍增长目标、获客预算不匹配</span>
+              <span class="issue-title">估值约 55 倍 ARR，且留存数据糟糕</span>
             </div>
-            <div class="issue-why">年留存约 46%，增长靠不断补漏水的桶。75 万获客预算没有 CAC、LTV 或渠道验证，18 个月 50 万 MRR 是拍出来的数字。</div>
+            <div class="issue-why">月流失 6.2% 对应年留存不到一半，217 户的内测样本撑不起 ¥2,500 万投后。一追问 LTV/CAC，创始人很可能答不上来，这是投委会会议上最容易被问死的点。</div>
             
-            <div class="issue-fix">给出流失原因拆解、分群留存曲线、各渠道 CAC 和回收期；把融资用途重新对齐到「先降流失、再放量」，并给出增长模型。</div>
+            <div class="issue-fix">补齐按月的同期群留存、LTV、CAC、回本周期和毛利（含 CPA 人工成本）。解释流失原因（倒闭、换产品、报税季后弃用）并说明估值依据，或主动下调估值。</div>
             
           </div>
           
           <div class="issue-item">
             <div class="issue-title-row">
               <span class="severity-badge high">high</span>
-              <span class="issue-title">材料前后矛盾：无需会计知识 vs 税务顾问答疑 vs 省份覆盖未完成</span>
+              <span class="issue-title">18 个月 13 倍增长缺少获客与渠道论证</span>
             </div>
-            <div class="issue-why">产品价值主张和实际交付能力对不上。投资人会问到底有多少自动化、有多少靠人工，毛利如何。</div>
+            <div class="issue-why">要净增约 2,600 个付费户，还要对冲 6.2% 的月流失。材料只有「25% 获客」，没有渠道、CAC 或转化数据，团队里也没有增长角色。这个目标是愿望，不是计划。</div>
             
-            <div class="issue-fix">列出已支持的省份和税种；说明顾问答疑的人力成本、用户使用率和毛利；修正「一键合规」的表述。</div>
+            <div class="issue-fix">给出分渠道的获客测试数据与 CAC，写出月度用户增长与流失的模型，并说明谁来负责增长。</div>
             
           </div>
           
@@ -990,15 +1571,13 @@
           <div class="trigger-group continue">
             <div class="sub-title">✅ 留存触发</div>
             
-            <span class="trigger-tag continue">准确率有可复核的抽样方法、分类别数据和第三方或 CPA 背书</span>
+            <span class="trigger-tag continue">给出报表级准确率的第三方或可复现验证，并把短板写在明面上</span>
             
-            <span class="trigger-tag continue">给出流失原因拆解和分群留存数据</span>
+            <span class="trigger-tag continue">给出同期群留存、LTV/CAC 和毛利，且数字追问不变口径</span>
             
-            <span class="trigger-tag continue">给出 CAC/LTV、渠道和可复现的增长模型</span>
+            <span class="trigger-tag continue">补上风险栏，并坦率承认哪些问题还没有答案</span>
             
-            <span class="trigger-tag continue">BP 里明确写出风险和尚无答案的问题</span>
-            
-            <span class="trigger-tag continue">市场数据有出处，并与代理记账等替代方案做对比</span>
+            <span class="trigger-tag continue">给出分渠道获客的真实 CAC，证明 13 倍增长路径可行</span>
             
           </div>
           
@@ -1006,13 +1585,13 @@
           <div class="trigger-group quit">
             <div class="sub-title">🚫 流失触发</div>
             
-            <span class="trigger-tag quit">追问准确率或 MRR 时口径变化（如把内测、折扣、关系用户混在一起）</span>
+            <span class="trigger-tag quit">追问准确率或留存时口径改变</span>
             
-            <span class="trigger-tag quit">无法回答错账导致的税务责任问题</span>
+            <span class="trigger-tag quit">被问到风险时只回答「我们会解决」，拿不出具体应对</span>
             
-            <span class="trigger-tag quit">对流失率只有信念式回答，没有数据</span>
+            <span class="trigger-tag quit">估值不愿调整，也无法论证 55 倍 ARR</span>
             
-            <span class="trigger-tag quit">对风险缺乏认知或回避不谈</span>
+            <span class="trigger-tag quit">关键主张（合规、10 分钟接入）继续只靠信念支撑</span>
             
           </div>
           
@@ -1056,20 +1635,60 @@
     
     
     <div class="debate-card">
-      <div class="debate-topic">月流失率6.2%说明付费后留不住人，却没解释原因</div>
+      <div class="debate-topic">独特认知缺位，竞品分析单薄</div>
       
       
       <div class="debate-sides">
         <div class="debate-side pro">
           <div class="debate-side-label">正方</div>
           
-          <div class="debate-arg">年留存约 46%，增长靠不断补漏水的桶。75 万获客预算没有 CAC、LTV 或渠道验证，18 个月 50 万 MRR 是拍出来的数字。<div class="debate-arg-persona">— 秦刀</div></div>
+          <div class="debate-arg">只对标中型企业的记账通，回避了面向小微的直接竞品、代账公司、银行/支付平台自带功能。「4 倍客单价」与自家定价也对不上。<div class="debate-arg-persona">— 林可</div></div>
           
         </div>
         <div class="debate-side con">
           <div class="debate-side-label">反方</div>
           
-          <div class="debate-arg">我是会掏钱试的人，但如果用两三个月就不用了，我不会升级，也不会推荐给朋友。高流失说明实际价值没有宣传的那么稳。<div class="debate-arg-persona">— 唐小满</div></div>
+          <div class="debate-arg">小微记账赛道有不少轻量竞品，只拿中型企业产品对比削弱差异化论证。<div class="debate-arg-persona">— 何澄</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="debate-card">
+      <div class="debate-topic">月流失率6.2%没有解释，会拖垮增长故事</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">年留存约 46%，LTV 约 ¥2,800 营收，CAC 和毛利都没披露。无法判断每投 ¥1 获客能否回收，13 倍增长目标就没有依据。<div class="debate-arg-persona">— 林可</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">若流失来自分类错误或接入失败，则 94.3% 的说法与实际体验不符，单位经济也难成立。<div class="debate-arg-persona">— 郑北</div></div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="debate-card">
+      <div class="debate-topic">准确率与合规风险、数据接入风险未交代</div>
+      
+      
+      <div class="debate-sides">
+        <div class="debate-side pro">
+          <div class="debate-side-label">正方</div>
+          
+          <div class="debate-arg">这是产品能否规模化的主要工程风险；接口失效、授权政策变化、数据安全合规都能直接杀死产品，也是真正可能的壁垒所在，却被忽略。<div class="debate-arg-persona">— 郑北</div></div>
+          
+        </div>
+        <div class="debate-side con">
+          <div class="debate-side-label">反方</div>
+          
+          <div class="debate-arg">94.3%来自500笔抽检，错误会引发报税问题；银行接口接入是否稳定、合规未说明。<div class="debate-arg-persona">— 沈一舟</div></div>
           
         </div>
       </div>
@@ -1084,11 +1703,33 @@
       <div class="sub-title">置信度变化</div>
       
       <div class="conf-bar-row">
-        <span class="conf-bar-label">郑北</span>
+        <span class="conf-bar-label">沈一舟</span>
         <div class="conf-bar-track">
           <div class="conf-bar-fill medium" style="width:60%"></div>
         </div>
         <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">林可</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:70%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">70%</span>
+        
+        <span class="conf-delta same">0%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">郑北</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill high" style="width:70%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--green)">70%</span>
         
         <span class="conf-delta same">0%</span>
         
@@ -1106,13 +1747,24 @@
       </div>
       
       <div class="conf-bar-row">
-        <span class="conf-bar-label">秦刀</span>
+        <span class="conf-bar-label">何澄</span>
         <div class="conf-bar-track">
           <div class="conf-bar-fill medium" style="width:58%"></div>
         </div>
         <span class="conf-bar-num" style="color:var(--amber)">58%</span>
         
-        <span class="conf-delta down">-2%</span>
+        <span class="conf-delta down">-4%</span>
+        
+      </div>
+      
+      <div class="conf-bar-row">
+        <span class="conf-bar-label">秦刀</span>
+        <div class="conf-bar-track">
+          <div class="conf-bar-fill medium" style="width:60%"></div>
+        </div>
+        <span class="conf-bar-num" style="color:var(--amber)">60%</span>
+        
+        <span class="conf-delta same">0%</span>
         
       </div>
       
@@ -1131,131 +1783,171 @@
     
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“月流失率6.2%说明付费后留不住人，却没解释原因”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“月流失率6.2%没有解释，会拖垮增长故事”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 85% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 88% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复““微调模型”是否构成壁垒无法判断，大概率是第三方模型的浅封装”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“准确率与合规风险、数据接入风险未交代”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 80% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 75% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“最强主张「94.3% 准确率可出合规报表」证据薄弱，且没有错误兜底”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“独特认知缺位，竞品分析单薄”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 80% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 72% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有可演示的产品，demo 可信度为零”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“没讲清'为什么是你们'——只有履历，没有亲身痛点或信息优势”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“准确率指标的评测方法薄弱”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“市场规模只有企业数，没有 ¥ 金额的自下而上测算”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“银行与支付流水接入方式和合规风险不明”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“技术壁垒描述空洞，无法判断是否为第三方 API 浅封装”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有和小微主真实在用的替代方案比较”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“核心主张「合规报表」只靠 500 笔抽检背书，且错误率约 5.7%”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“材料前后矛盾：无需会计知识 vs 税务顾问答疑 vs 省份覆盖未完成”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“估值约 55 倍 ARR，且留存数据糟糕”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 78% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“市场数据无出处，竞争分析遗漏了真正的替代方案”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“冷启动与获客路径空白”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“整份 BP 没有风险与短板栏”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“资金用途与增长目标不匹配”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 70% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“税务规则引擎的扩展成本和技术债没有讲”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“94.3% 准确率的验证方法不可核验”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 60% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“团队工程证明不足”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“没有可演示的产品，demo 可信度无从判断”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 60% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“没有免费体验或试用，价值要先付费才能看到”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“没有和小微主真正的替代方案对比”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 60% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“准确率5.7%的错误如何兜底没说明”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“没写要孵化器的什么资源”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 60% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“估值（投后约 2500 万，约 55 倍 ARR）与竞品融资论据缺乏逻辑”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“18 个月 13 倍增长缺少获客与渠道论证”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 60% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
-      <div style="font-weight:600;margin-bottom:3px">修复“缺少真实用户案例和口碑”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="font-weight:600;margin-bottom:3px">修复“完全没有风险与短板栏，竞争分析口径混乱”后，qualified_followup_rate 相较当前版本将提高</div>
       <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
       <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
       <div style="opacity:.8">验证窗口：30d</div>
-      <div style="opacity:.7;font-size:12px">启发式置信度 50% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 68% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“10分钟上手和试用体验缺证据”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
+      <div style="opacity:.8">验证窗口：30d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 57% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“关键数字无来源或可核验口径”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
+      <div style="opacity:.8">验证窗口：30d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 57% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“团队投入度与分工未说明”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
+      <div style="opacity:.8">验证窗口：30d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 57% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“材料前后矛盾：「无需会计知识」与 CPA 答疑、「合规」与省份未覆盖”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
+      <div style="opacity:.8">验证窗口：30d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 57% · synthetic_panel_heuristic_not_empirically_calibrated</div>
+    </div>
+    
+    <div style="font-size:13px;margin-bottom:10px;padding-left:8px;border-left:2px solid var(--accent,#888)">
+      <div style="font-weight:600;margin-bottom:3px">修复“市场规模数据无出处，创始人背景不可核验”后，qualified_followup_rate 相较当前版本将提高</div>
+      <div style="opacity:.8">目标指标：qualified_followup_rate（increase）</div>
+      <div style="opacity:.8">判定标准：treatment.qualified_followup_rate > control.qualified_followup_rate</div>
+      <div style="opacity:.8">验证窗口：30d</div>
+      <div style="opacity:.7;font-size:12px">启发式置信度 57% · synthetic_panel_heuristic_not_empirically_calibrated</div>
     </div>
     
     <div style="font-size:12px;opacity:.8;margin-top:6px">
@@ -1271,57 +1963,95 @@
     <div class="section-title"><span class="icon">🕳️</span> 信息缺口</div>
     <ul class="point-list gap">
       
-      <li><span class="dot"></span>基座模型及是否自托管</li>
+      <li><span class="dot"></span>创始人为什么做这件事的个人叙事</li>
       
-      <li><span class="dot"></span>微调数据规模、来源与标注方式</li>
+      <li><span class="dot"></span>217用户的获客来源、CAC、LTV</li>
       
-      <li><span class="dot"></span>评测集构成与分类别指标</li>
+      <li><span class="dot"></span>流失原因与分群留存</li>
       
-      <li><span class="dot"></span>银行和支付流水的接入方式与授权</li>
+      <li><span class="dot"></span>市场数据来源</li>
       
-      <li><span class="dot"></span>规则引擎架构与各省覆盖现状</li>
+      <li><span class="dot"></span>代账公司等本土替代方案对比</li>
       
-      <li><span class="dot"></span>demo 或可试用入口</li>
+      <li><span class="dot"></span>银行/支付接口接入方式与合规</li>
       
-      <li><span class="dot"></span>MRR 的支付后台证明与流失原因</li>
+      <li><span class="dot"></span>估值与本轮其他投资人情况（3000万/12%反推估值约2500万，未说明依据）</li>
       
-      <li><span class="dot"></span>技术团队成员的工程履历</li>
+      <li><span class="dot"></span>自下而上的 TAM/SAM/SOM 测算和数据来源</li>
       
-      <li><span class="dot"></span>免费试用或演示</li>
+      <li><span class="dot"></span>MRR 月度增长曲线和 cohort 留存</li>
       
-      <li><span class="dot"></span>流失原因与留存曲线</li>
+      <li><span class="dot"></span>CAC、分渠道转化、毛利率</li>
       
-      <li><span class="dot"></span>与代账公司、Excel的成本时间对比</li>
+      <li><span class="dot"></span>两档价格的用户分布</li>
       
-      <li><span class="dot"></span>银行数据授权的安全说明</li>
+      <li><span class="dot"></span>月烧钱、跑道和下一轮里程碑</li>
       
-      <li><span class="dot"></span>错误分类的兜底与责任</li>
+      <li><span class="dot"></span>估值依据和可比交易</li>
       
-      <li><span class="dot"></span>用户证言或案例</li>
+      <li><span class="dot"></span>直接竞品清单和对比</li>
       
-      <li><span class="dot"></span>获客渠道和单客获取成本</li>
+      <li><span class="dot"></span>创始人姓名与可核验履历</li>
       
-      <li><span class="dot"></span>准确率抽检方法、样本来源与分类别错误率</li>
+      <li><span class="dot"></span>94.3% 准确率的测试集构成和错误兜底机制</li>
       
-      <li><span class="dot"></span>错账的责任归属与保险或赔付机制</li>
+      <li><span class="dot"></span>底座模型来源与微调细节</li>
       
-      <li><span class="dot"></span>流失原因与分群留存数据</li>
+      <li><span class="dot"></span>训练和评测数据的来源、规模与隔离方式</li>
       
-      <li><span class="dot"></span>CAC、LTV、获客渠道与付费用户来源</li>
+      <li><span class="dot"></span>系统架构图与推理成本</li>
       
-      <li><span class="dot"></span>当前支持的省份、银行和税种</li>
+      <li><span class="dot"></span>银行与支付宝/微信数据的接入方式及合规授权</li>
       
-      <li><span class="dot"></span>市场数据出处</li>
+      <li><span class="dot"></span>demo 或试用入口</li>
       
-      <li><span class="dot"></span>代理记账和低价记账 SaaS 的竞品对比</li>
+      <li><span class="dot"></span>流失原因分析</li>
       
-      <li><span class="dot"></span>估值依据</li>
+      <li><span class="dot"></span>团队中谁负责模型，及其 ML 背景</li>
       
-      <li><span class="dot"></span>毛利与顾问服务的人力成本</li>
+      <li><span class="dot"></span>税务规则引擎的维护方式与覆盖范围</li>
       
-      <li><span class="dot"></span>团队成员的可核验履历</li>
+      <li><span class="dot"></span>产品截图或演示</li>
       
-      <li><span class="dot"></span>18 个月的预算和人员计划</li>
+      <li><span class="dot"></span>免费试用或体验期安排</li>
+      
+      <li><span class="dot"></span>与Excel、代账公司的成本对比</li>
+      
+      <li><span class="dot"></span>用户评价或案例</li>
+      
+      <li><span class="dot"></span>流失原因和留存数据</li>
+      
+      <li><span class="dot"></span>银行对公账户授权的安全与合规说明</li>
+      
+      <li><span class="dot"></span>出错后的纠错机制</li>
+      
+      <li><span class="dot"></span>孵化器资源诉求</li>
+      
+      <li><span class="dot"></span>团队全职情况与股权结构</li>
+      
+      <li><span class="dot"></span>获客渠道与 CAC</li>
+      
+      <li><span class="dot"></span>同级别小微竞品</li>
+      
+      <li><span class="dot"></span>合规与数据安全（银行流水接入）</li>
+      
+      <li><span class="dot"></span>准确率抽检方法与报表级准确率</li>
+      
+      <li><span class="dot"></span>同期群留存、LTV、CAC、毛利</li>
+      
+      <li><span class="dot"></span>各档用户数与 CPA 工时成本</li>
+      
+      <li><span class="dot"></span>当前已覆盖省份清单</li>
+      
+      <li><span class="dot"></span>获客渠道与转化数据</li>
+      
+      <li><span class="dot"></span>估值依据与现金跑道</li>
+      
+      <li><span class="dot"></span>创始团队具体履历与可核验信息</li>
+      
+      <li><span class="dot"></span>风险与未解问题清单</li>
+      
+      <li><span class="dot"></span>代理记账与平台自带功能等真实替代品对比</li>
       
     </ul>
   </div>
@@ -1332,6 +2062,17 @@
   <div class="section-card">
     <div class="section-title"><span class="icon">🧪</span> 下一步真人测试建议</div>
     <div class="next-steps">
+      
+      <div class="next-step-card">
+        <div class="sub-title">建议测试任务</div>
+        <ul>
+          
+          <li>用真人验证争议点：月流失率6.2%没有解释，会拖垮增长故事</li>
+          
+          <li>用真人验证争议点：独特认知缺位，竞品分析单薄</li>
+          
+        </ul>
+      </div>
       
       
       
@@ -1362,57 +2103,95 @@
         <div class="sub-title">需要补充的材料</div>
         <ul>
           
-          <li>补充材料：基座模型及是否自托管</li>
+          <li>补充材料：创始人为什么做这件事的个人叙事</li>
           
-          <li>补充材料：微调数据规模、来源与标注方式</li>
+          <li>补充材料：217用户的获客来源、CAC、LTV</li>
           
-          <li>补充材料：评测集构成与分类别指标</li>
+          <li>补充材料：流失原因与分群留存</li>
           
-          <li>补充材料：银行和支付流水的接入方式与授权</li>
+          <li>补充材料：市场数据来源</li>
           
-          <li>补充材料：规则引擎架构与各省覆盖现状</li>
+          <li>补充材料：代账公司等本土替代方案对比</li>
           
-          <li>补充材料：demo 或可试用入口</li>
+          <li>补充材料：银行/支付接口接入方式与合规</li>
           
-          <li>补充材料：MRR 的支付后台证明与流失原因</li>
+          <li>补充材料：估值与本轮其他投资人情况（3000万/12%反推估值约2500万，未说明依据）</li>
           
-          <li>补充材料：技术团队成员的工程履历</li>
+          <li>补充材料：自下而上的 TAM/SAM/SOM 测算和数据来源</li>
           
-          <li>补充材料：免费试用或演示</li>
+          <li>补充材料：MRR 月度增长曲线和 cohort 留存</li>
           
-          <li>补充材料：流失原因与留存曲线</li>
+          <li>补充材料：CAC、分渠道转化、毛利率</li>
           
-          <li>补充材料：与代账公司、Excel的成本时间对比</li>
+          <li>补充材料：两档价格的用户分布</li>
           
-          <li>补充材料：银行数据授权的安全说明</li>
+          <li>补充材料：月烧钱、跑道和下一轮里程碑</li>
           
-          <li>补充材料：错误分类的兜底与责任</li>
+          <li>补充材料：估值依据和可比交易</li>
           
-          <li>补充材料：用户证言或案例</li>
+          <li>补充材料：直接竞品清单和对比</li>
           
-          <li>补充材料：获客渠道和单客获取成本</li>
+          <li>补充材料：创始人姓名与可核验履历</li>
           
-          <li>补充材料：准确率抽检方法、样本来源与分类别错误率</li>
+          <li>补充材料：94.3% 准确率的测试集构成和错误兜底机制</li>
           
-          <li>补充材料：错账的责任归属与保险或赔付机制</li>
+          <li>补充材料：底座模型来源与微调细节</li>
           
-          <li>补充材料：流失原因与分群留存数据</li>
+          <li>补充材料：训练和评测数据的来源、规模与隔离方式</li>
           
-          <li>补充材料：CAC、LTV、获客渠道与付费用户来源</li>
+          <li>补充材料：系统架构图与推理成本</li>
           
-          <li>补充材料：当前支持的省份、银行和税种</li>
+          <li>补充材料：银行与支付宝/微信数据的接入方式及合规授权</li>
           
-          <li>补充材料：市场数据出处</li>
+          <li>补充材料：demo 或试用入口</li>
           
-          <li>补充材料：代理记账和低价记账 SaaS 的竞品对比</li>
+          <li>补充材料：流失原因分析</li>
           
-          <li>补充材料：估值依据</li>
+          <li>补充材料：团队中谁负责模型，及其 ML 背景</li>
           
-          <li>补充材料：毛利与顾问服务的人力成本</li>
+          <li>补充材料：税务规则引擎的维护方式与覆盖范围</li>
           
-          <li>补充材料：团队成员的可核验履历</li>
+          <li>补充材料：产品截图或演示</li>
           
-          <li>补充材料：18 个月的预算和人员计划</li>
+          <li>补充材料：免费试用或体验期安排</li>
+          
+          <li>补充材料：与Excel、代账公司的成本对比</li>
+          
+          <li>补充材料：用户评价或案例</li>
+          
+          <li>补充材料：流失原因和留存数据</li>
+          
+          <li>补充材料：银行对公账户授权的安全与合规说明</li>
+          
+          <li>补充材料：出错后的纠错机制</li>
+          
+          <li>补充材料：孵化器资源诉求</li>
+          
+          <li>补充材料：团队全职情况与股权结构</li>
+          
+          <li>补充材料：获客渠道与 CAC</li>
+          
+          <li>补充材料：同级别小微竞品</li>
+          
+          <li>补充材料：合规与数据安全（银行流水接入）</li>
+          
+          <li>补充材料：准确率抽检方法与报表级准确率</li>
+          
+          <li>补充材料：同期群留存、LTV、CAC、毛利</li>
+          
+          <li>补充材料：各档用户数与 CPA 工时成本</li>
+          
+          <li>补充材料：当前已覆盖省份清单</li>
+          
+          <li>补充材料：获客渠道与转化数据</li>
+          
+          <li>补充材料：估值依据与现金跑道</li>
+          
+          <li>补充材料：创始团队具体履历与可核验信息</li>
+          
+          <li>补充材料：风险与未解问题清单</li>
+          
+          <li>补充材料：代理记账与平台自带功能等真实替代品对比</li>
           
         </ul>
       </div>
@@ -1429,23 +2208,39 @@
     <div class="section-title"><span class="icon">⚠️</span> 各人格声明的限制条件</div>
     <ul class="point-list question">
       
-      <li><span class="dot"></span>本评审基于一页 BP 文本，没有 demo、代码或数据可核验。</li>
+      <li><span class="dot"></span>基于BP文字判断，未与创始人交流；创始人答问质量是本人最看重的信号，此处缺失</li>
       
-      <li><span class="dot"></span>“浅封装”规则未被证实触发，也未被排除；观望基于信息缺失，不是负面证据。</li>
+      <li><span class="dot"></span>'为什么是你'未写出属于信息缺失而非负面证据，因此输出观望而非不投</li>
       
-      <li><span class="dot"></span>复制成本估算依据行业常识推断，不是材料内的事实。</li>
+      <li><span class="dot"></span>估值与年化留存为按材料数字做的推算</li>
       
-      <li><span class="dot"></span>这是合成角色的评审，仅从小微主使用者视角判断，不构成投资建议</li>
+      <li><span class="dot"></span>决策规则「自上而下拍市场规模则要求重算」已被触发。观望基于关键数据缺失，不是对项目的负面定论，补充数据后可能改判。</li>
       
-      <li><span class="dot"></span>决策规则未被触发：场景明确，但上手成本和付费价值缺少证据，所以只能观望</li>
+      <li><span class="dot"></span>LTV、年留存、CAC 反推和估值倍数均为本人基于材料数字的换算，未经公司确认。</li>
       
-      <li><span class="dot"></span>估值、市场规模等投资人视角不在评审范围内</li>
+      <li><span class="dot"></span>材料是单页 BP，未包含附件、数据室和财务模型，可能低估项目实际情况。</li>
       
-      <li><span class="dot"></span>基于单页 BP 文本的合成评审，没有创始人答辩和数据室材料。</li>
+      <li><span class="dot"></span>本判断基于信息缺失，而非已确认的负面证据：浅封装规则既未被触发，也未被排除。</li>
       
-      <li><span class="dot"></span>判断受信息缺失影响：「观望」主要因为证据缺失，不等于已证伪。</li>
+      <li><span class="dot"></span>仅依据一页 BP 文字，未见 demo、代码或架构文档。</li>
       
-      <li><span class="dot"></span>部分推断来自行业先验，已标为 inferred，需创始人核实。</li>
+      <li><span class="dot"></span>合成角色输出，不代表真实投资人意见。</li>
+      
+      <li><span class="dot"></span>决策规则'想不出本周场景'未被触发（月底对账场景成立），观望是因为缺少上手体验、留存与替代对比信息，而非负面证据。</li>
+      
+      <li><span class="dot"></span>以用户视角评价，不评估估值和市场规模；仅依据一页BP文字，未见产品。</li>
+      
+      <li><span class="dot"></span>合成评审，仅依据所给 BP 文本，按初筛深度判断，不替代复审尽调</li>
+      
+      <li><span class="dot"></span>材料未提供客户或数据的外部验证，所有数字均按自述处理</li>
+      
+      <li><span class="dot"></span>本评审为合成角色输出，仅基于所给 BP 文本，未做任何外部核实。</li>
+      
+      <li><span class="dot"></span>「不投」主要基于证据缺失和风险认知缺席，而非已被证实的负面证据；补充数据后结论可能改变。</li>
+      
+      <li><span class="dot"></span>关于流水与发票、合规报表要求的判断来自行业常识推断，材料未明言，需与财税专业人士核实。</li>
+      
+      <li><span class="dot"></span>估值倍数、年留存与用户数等换算为粗略推算，只用于压力测试。</li>
       
     </ul>
   </div>

@@ -1,6 +1,6 @@
 # Finding: the string-similarity fallback silently disables cross-examination on Chinese input
 
-Date: 2026-11-04 · Model: `claude-sonnet-5-5` · Inputs: the three fictional samples in `examples/reports/`
+Date: 2026-11-04 · Model: `claude-sonnet-5-5` · Inputs: the three fictional samples of 2026-11-04 (now in `docs/evaluation/runs/2026-11-04-pre-quote-field/`)
 
 ## What happened
 

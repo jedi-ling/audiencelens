@@ -105,31 +105,24 @@ def compute_coverage_score(persona_outputs: List[dict]) -> dict:
 
 
 def compute_hallucination_rate(persona_outputs: List[dict], artifact_texts: List[str]) -> dict:
+    """每位人格的 direct 证据里，**未落地条目的占比**（报告级的校准指标）。
+
+    和校验器是同一个函数、同一份参数（validator.validate_evidence_grounding →
+    src/config/grounding.yaml）：只核对 direct 条目的 quote，缺 quote 算未落地。
+    以前这里是另一套口径——整条 content 必须是材料的子串——同一条证据在门控和校准里
+    会得出两个结论。键名 hallucination 为兼容保留；它不是"幻觉概率"。
+    """
+    from .validator import validate_evidence_grounding
+
     per_persona = {}
     high_risk_personas = []
 
     for index, p in enumerate(persona_outputs):
         pid = _persona_id(p, index)
-        direct_evidence = [
-            e
-            for e in _dict_items(p.get("evidence", []))
-            if e.get("inference_level") == "direct"
-        ]
-        if not direct_evidence:
+        if not isinstance(p, dict):
             per_persona[pid] = 0.0
             continue
-
-        unsupported = 0
-        for e in direct_evidence:
-            content = e.get("content", "")
-            if not isinstance(content, str) or not content:
-                # 没有可核对的原文就不算"未被支持"，否则会凭空推高幻觉率
-                continue
-            found = any(content in text for text in artifact_texts)
-            if not found:
-                unsupported += 1
-
-        rate = unsupported / len(direct_evidence)
+        rate = validate_evidence_grounding(p, artifact_texts)["hallucination_risk"]
         per_persona[pid] = rate
         if rate > 0.5:
             high_risk_personas.append(pid)

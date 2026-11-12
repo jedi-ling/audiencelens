@@ -1,0 +1,46 @@
+{
+  "input_file": "test-materials/04_定价页_云笔记订阅.md",
+  "task_type": "pricing_page_review",
+  "persona_pack": "general-consumer",
+  "depth": "standard",
+  "model_id": "claude-sonnet-5-5",
+  "date": "2026-11-04",
+  "persona_outputs_from": {
+    "run_id": "20261104-043616-pricing_page_review",
+    "date": "2026-11-04",
+    "commit": "de65474",
+    "cost_usd": 0.2297,
+    "tokens_in": 50130,
+    "tokens_out": 19951,
+    "retries": 2
+  },
+  "cross_exam_run": {
+    "date": "2026-11-04",
+    "commit": "92b277e",
+    "cost_usd": 0.0363,
+    "calls": 1,
+    "tokens_in": 1891,
+    "tokens_out": 3249,
+    "mode": "moderated_rebuttal"
+  },
+  "dedup_method": "semantic",
+  "disputes": 3,
+  "cost_usd": 0.266,
+  "tokens_in": 52021,
+  "tokens_out": 23200,
+  "app_commit": "92b277e",
+  "retries": 2,
+  "grounding_revalidation": {
+    "note": "Generated under the earlier any-fragment grounding rule. Re-validated offline with the coverage rule (src/config/grounding.yaml); the report was not regenerated or edited. See docs/evaluation/grounding-check.md.",
+    "rule_at_generation": "any-fragment",
+    "generation_commit": "de65474",
+    "revalidated_on": "2026-11-11",
+    "script": "scripts/revalidate_samples.py",
+    "personas_in_report": 5,
+    "personas_passing_rule_at_generation": 5,
+    "personas_passing_coverage_rule": 0,
+    "direct_entries": 41,
+    "direct_entries_grounded_rule_at_generation": 38,
+    "direct_entries_grounded_coverage_rule": 0
+  }
+}

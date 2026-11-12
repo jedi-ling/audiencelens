@@ -1,0 +1,37 @@
+# Evidence grounding: when is one `direct` evidence entry accepted as a quote of the material?
+# Read by src/runner/validator.py (load_grounding_config). Write-up: docs/evaluation/grounding-check.md
+#
+# Rule, per `direct` entry:
+#   1. Normalise entry and material (NFKC, case-fold, one quote mark, one dash, single spaces),
+#      then tokenise: each CJK character is a token, each Latin word or number is a token,
+#      punctuation and whitespace are dropped.
+#   2. Drop a short lead-in such as 页面写着： / The page says " (see `framing`).
+#   3. Cover the entry with contiguous token runs that also occur in the material. A run only
+#      counts if it is long enough: (CJK chars / min_span_cjk_chars) + (Latin words or numbers /
+#      min_span_latin_words) >= 1.
+#   4. coverage = covered units / all units, with the same per-token weights as in step 3.
+#      The entry is grounded iff coverage >= coverage_threshold and, when
+#      require_numbers_covered is on, every number in the entry lies inside a covered run.
+#
+# How the values were chosen: grid search on the DEV split of tests/fixtures/grounding_eval
+# (python scripts/eval_grounding.py --split dev --sweep), then one run on the TEST split.
+# The grid, the tie-break and the numbers are in docs/evaluation/grounding-check.md.
+# Do not tune these on the test split.
+#
+# The persona-level rule is separate and unchanged: a persona fails when 30% or more of its
+# `direct` entries are not grounded (validator.py).
+
+min_span_cjk_chars: 4
+min_span_latin_words: 3
+coverage_threshold: 0.8
+require_numbers_covered: true
+
+framing:
+  # A lead-in is dropped only if it ends at the entry's first colon or quote mark, contains one
+  # of the cue words below, and is short: (CJK chars / max_cjk_chars) + (Latin words /
+  # max_latin_words) <= 1. Only the lead-in is dropped; what follows must still be covered.
+  max_cjk_chars: 16
+  max_latin_words: 8
+  cues_cjk: [写着, 写道, 写了, 写明, 写的是, 提到, 说, 称, 标注, 原文, 原话, 回答, 引用, 表述]
+  cues_latin: [says, said, states, stated, reads, read, writes, write, wrote, lists, listed,
+               quote, quoted, verbatim, according to, words, mentions, mentioned]

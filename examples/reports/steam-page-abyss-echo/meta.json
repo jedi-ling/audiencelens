@@ -4,30 +4,44 @@
   "persona_pack": "game-core",
   "depth": "standard",
   "model_id": "claude-sonnet-5-5",
-  "date": "2026-11-04",
-  "persona_outputs_from": {
-    "run_id": "20261104-043324-steam_page_review",
-    "date": "2026-11-04",
-    "commit": "de65474",
-    "cost_usd": 0.3373,
-    "tokens_in": 71036,
-    "tokens_out": 20884,
-    "retries": 3
-  },
-  "cross_exam_run": {
-    "date": "2026-11-04",
-    "commit": "92b277e",
-    "cost_usd": 0.0171,
-    "calls": 1,
-    "tokens_in": 1425,
-    "tokens_out": 1430,
-    "mode": "moderated_rebuttal"
+  "date": "2026-11-11",
+  "run_id": "20261111-180655-steam_page_review",
+  "app_commit": "af4e8c8",
+  "evidence_schema": "quote-field-v1",
+  "grounding_rule": {
+    "name": "coverage-on-quote",
+    "commit": "af4e8c8",
+    "config": "src/config/grounding.yaml"
   },
   "dedup_method": "semantic",
   "disputes": 2,
-  "cost_usd": 0.3544,
-  "tokens_in": 72461,
-  "tokens_out": 22314,
-  "app_commit": "92b277e",
-  "retries": 3
+  "cost_usd": 0.3541,
+  "tokens_in": 86358,
+  "tokens_out": 20669,
+  "retries": 4,
+  "cross_exam_run": {
+    "mode": "moderated_rebuttal",
+    "calls": 1,
+    "cost_usd": 0.0171,
+    "tokens_in": 1493,
+    "tokens_out": 1414
+  },
+  "grounding": {
+    "personas_passed": 4,
+    "personas_attempted": 6,
+    "direct_entries": 25,
+    "inferred_entries": 4,
+    "gap_entries": 6,
+    "direct_entries_with_quote": 25,
+    "direct_entries_grounded": 25,
+    "checked_by": "scripts/revalidate_samples.py (quote only; same rule as the engine)"
+  },
+  "stylesheet_updated": {
+    "what": "Only the <style> block of report.html was replaced with the stylesheet of the fixed template. Everything outside <style> is byte-identical to the file the engine generated; report.json, report.md and persona_outputs.json are untouched.",
+    "reason": "The template's stylesheet had three unclosed CSS rules that left the persona section unstyled in a browser.",
+    "template_fix_commit": "4986b39",
+    "date": "2026-11-12",
+    "generated_html_sha256": "5551ed617bb907ac18232913e53e364eecb37bd9eee5728b955a5a4297932341",
+    "outside_style_sha256": "19e90f47ca9de476b92de851c47248b8fbfe77f7d3c9b6c6feafea4e8f17d225"
+  }
 }

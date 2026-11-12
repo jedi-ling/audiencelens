@@ -582,8 +582,11 @@ def _coerce_ratio(value, default: float = 0.5) -> float:
     return max(0.0, min(1.0, num))
 
 
-_EVIDENCE_TEXT_ALIASES = ("content", "text", "quote", "observation", "detail",
+_EVIDENCE_TEXT_ALIASES = ("content", "text", "observation", "comment", "detail",
                           "description", "evidence", "fact")
+# quote = 材料原文的逐字片段（direct 必填），和 content（人格的观察/解读）是两个字段：
+# 校验器只拿 quote 对照材料。"quote" 以前被当成 content 的别名，现在不是了。
+_EVIDENCE_QUOTE_ALIASES = ("quote", "source_quote", "quoted_text", "verbatim", "原文")
 _EVIDENCE_LEVEL_ALIASES = ("inference_level", "level", "inference", "type", "kind")
 _EVIDENCE_LEVELS = ("direct", "inferred", "gap")
 # 中文/变体写法映射回 schema 枚举
@@ -605,7 +608,7 @@ def _normalize_level(value) -> str:
 
 
 def _normalize_evidence(value) -> list:
-    """evidence 归一成 [{"content": str, "inference_level": 枚举, ...}]。
+    """evidence 归一成 [{"content": str, "inference_level": 枚举, "quote"?: str, ...}]。
 
     元素是字符串时包成 {"content": 原文}——保留原文，不丢证据。
     层级缺失/写错一律记 inferred 而不是 direct：direct 会让 validator 的
@@ -620,9 +623,15 @@ def _normalize_evidence(value) -> list:
                 if isinstance(item.get(alias), str) and item[alias].strip():
                     content = item[alias].strip()
                     break
+            quote = ""
+            for alias in _EVIDENCE_QUOTE_ALIASES:
+                if isinstance(item.get(alias), str) and item[alias].strip():
+                    quote = item[alias].strip()
+                    break
             if not content:
-                # 没有任何已知正文键：整个 dict 摊平进 content，信息不丢
-                content = _coerce_text(item)
+                # 只给了引用没写观察：content 用引用本身顶上（schema 要求 content 非空）；
+                # 再没有就把整个 dict 摊平进 content，信息不丢
+                content = quote or _coerce_text(item)
             level = ""
             for alias in _EVIDENCE_LEVEL_ALIASES:
                 if alias in item:
@@ -633,7 +642,7 @@ def _normalize_evidence(value) -> list:
             basis = _coerce_text(item.get("inference_basis") or item.get("basis"))
         else:
             content = _coerce_text(item)
-            level, source, basis = "", "", ""
+            level, source, basis, quote = "", "", "", ""
 
         if not content:
             continue
@@ -642,6 +651,10 @@ def _normalize_evidence(value) -> list:
         entry = {"content": content, "inference_level": level or "inferred"}
         if not level and not basis:
             basis = _LEVEL_BACKFILL_NOTE
+        # quote 原样保留（不改写、不翻译）。只有 direct 条目带：inferred / gap 上的 quote
+        # 不参与校验，留着只会让读者以为它被核对过。
+        if quote and entry["inference_level"] == "direct":
+            entry["quote"] = quote
         if source:
             entry["source_location"] = source
         if basis:
@@ -848,9 +861,14 @@ def normalize_persona_output(output: dict) -> dict:
                 output[canonical] = output[alias]
                 break
 
-    if "evidence" in output:
+    # 工具输入损坏（字段值是一段 <invoke>/<parameter> 标记字符串）时**不归一化**：
+    # 原样留给 schema 校验判 schema_failure 并走修复轮。包成一条 inferred 证据会把它
+    # 伪装成"推断过度"（role_drift，不重试）。
+    from .validator import is_tool_markup_string
+
+    if "evidence" in output and not is_tool_markup_string(output["evidence"]):
         output["evidence"] = _normalize_evidence(output["evidence"])
-    if "key_issues" in output:
+    if "key_issues" in output and not is_tool_markup_string(output["key_issues"]):
         output["key_issues"] = _normalize_key_issues(output["key_issues"])
     if "must_comment_on_check" in output:
         output["must_comment_on_check"] = _normalize_must_comment_check(

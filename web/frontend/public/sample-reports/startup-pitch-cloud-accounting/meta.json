@@ -4,30 +4,56 @@
   "persona_pack": "startup-panel",
   "depth": "standard",
   "model_id": "claude-sonnet-5-5",
-  "date": "2026-11-04",
+  "date": "2026-11-12",
+  "evidence_schema": "quote-field-v1",
+  "grounding_rule": {
+    "name": "coverage-on-quote",
+    "commit": "939e8ca",
+    "config": "src/config/grounding.yaml"
+  },
   "persona_outputs_from": {
-    "run_id": "20261104-043717-pitch_review",
-    "date": "2026-11-04",
-    "commit": "de65474",
-    "cost_usd": 0.3508,
-    "tokens_in": 79684,
-    "tokens_out": 22380,
-    "retries": 5
+    "run_id": "20261111-182651-pitch_review",
+    "date": "2026-11-11",
+    "commit": "939e8ca",
+    "cost_usd": 0.4849,
+    "tokens_in": 91133,
+    "tokens_out": 32693,
+    "retries": 4
   },
   "cross_exam_run": {
-    "date": "2026-11-04",
-    "commit": "92b277e",
-    "cost_usd": 0.0185,
+    "date": "2026-11-12",
+    "commit": "8856ffa",
+    "cost_usd": 0.0214,
     "calls": 1,
-    "tokens_in": 1185,
-    "tokens_out": 1616,
-    "mode": "moderated_rebuttal"
+    "tokens_in": 1819,
+    "tokens_out": 1778,
+    "mode": "moderated_rebuttal",
+    "method": "runner.cli.run_panel_from_outputs",
+    "why_separate": "The persona stage reached the per-run cost cap set for that run (0.44 USD), so the engine skipped cross-examination; it was run afterwards on the same validated outputs."
   },
   "dedup_method": "semantic",
-  "disputes": 1,
-  "cost_usd": 0.3693,
-  "tokens_in": 80869,
-  "tokens_out": 23996,
-  "app_commit": "92b277e",
-  "retries": 5
+  "disputes": 3,
+  "cost_usd": 0.5063,
+  "tokens_in": 92952,
+  "tokens_out": 34471,
+  "app_commit": "8856ffa",
+  "retries": 4,
+  "grounding": {
+    "personas_passed": 6,
+    "personas_attempted": 6,
+    "direct_entries": 42,
+    "inferred_entries": 12,
+    "gap_entries": 5,
+    "direct_entries_with_quote": 42,
+    "direct_entries_grounded": 42,
+    "checked_by": "scripts/revalidate_samples.py (quote only; same rule as the engine)"
+  },
+  "stylesheet_updated": {
+    "what": "Only the <style> block of report.html was replaced with the stylesheet of the fixed template. Everything outside <style> is byte-identical to the file the engine generated; report.json, report.md and persona_outputs.json are untouched.",
+    "reason": "The template's stylesheet had three unclosed CSS rules that left the persona section unstyled in a browser.",
+    "template_fix_commit": "4986b39",
+    "date": "2026-11-12",
+    "generated_html_sha256": "017377b69f854b4276169e8ad204e1188958ebed4c814c75cd12e574d161f5ab",
+    "outside_style_sha256": "71ef2b494d40f00c1065edbd2a093709be908f96e50482994e62361d6f043b3d"
+  }
 }

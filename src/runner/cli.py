@@ -169,9 +169,9 @@ def _rebuttal_persona_card(persona: dict) -> str:
 
 # 单一注册表：见 runner/task_types.py（这里 re-export 保持既有导入路径不破）
 try:
-    from .task_types import VALID_TASK_TYPES
+    from .task_types import VALID_TASK_TYPES, default_personas_path, pack_mismatch_warning
 except ImportError:
-    from runner.task_types import VALID_TASK_TYPES
+    from runner.task_types import VALID_TASK_TYPES, default_personas_path, pack_mismatch_warning
 
 
 class AllPersonasFailedError(RuntimeError):
@@ -373,6 +373,7 @@ def _validation_failure_reason(validation: dict) -> Optional[str]:
 
 
 REPAIR_FEEDBACK_MAX_ITEMS = 8
+REPAIR_FEEDBACK_MAX_UNCOVERED = 3
 
 
 def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
@@ -383,13 +384,35 @@ def _repair_feedback(reason: str, validation: Optional[dict]) -> str:
     """
     details = (validation or {}).get("details") or {}
     if reason == RETRY_HALLUCINATION:
-        quotes = ((details.get("evidence") or {}).get("ungrounded_evidence") or [])[:REPAIR_FEEDBACK_MAX_ITEMS]
-        listed = "\n".join(f"- {str(q)[:160]}" for q in quotes)
+        evidence = details.get("evidence") or {}
+        # 逐条点名：是哪一条 evidence、quote 是缺了还是对不上、对不上的是哪一段。
+        # 只甩回一句"没通过"，模型不知道该补 quote、改 quote，还是改标 inferred。
+        entries = [d for d in (evidence.get("ungrounded_details") or []) if isinstance(d, dict)]
+        if not entries:  # 兼容只带 ungrounded_evidence 的旧结构
+            entries = [{"content": q} for q in (evidence.get("ungrounded_evidence") or [])]
+        lines = []
+        for d in entries[:REPAIR_FEEDBACK_MAX_ITEMS]:
+            where = f"evidence 第 {d['index'] + 1} 条" if isinstance(d.get("index"), int) else "evidence"
+            lines.append(f"- {where}（content：{str(d.get('content') or '')[:120]}）")
+            if d.get("reason") == "quote_missing":
+                lines.append("  缺少 quote：direct 条目必须在 quote 里放一段从材料逐字复制的原文")
+                continue
+            if d.get("quote"):
+                lines.append(f"  quote：「{str(d['quote'])[:160]}」")
+            parts = [str(u)[:60] for u in (d.get("uncovered") or []) if str(u).strip()]
+            if parts:
+                shown = "、".join(f"「{u}」" for u in parts[:REPAIR_FEEDBACK_MAX_UNCOVERED])
+                more = "等" if len(parts) > REPAIR_FEEDBACK_MAX_UNCOVERED else ""
+                lines.append(f"  原文里找不到的部分：{shown}{more}")
+            else:
+                lines.append("  quote 里的数字或文字与原文对不上")
+        listed = "\n".join(lines)
         return (
-            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据在材料原文里"
-            "找不到逐字出处：\n" + listed + "\n\n"
-            "direct 只能用于**逐字引用**材料原文的片段（直接复制原文中的一段话）。"
-            "概括、改写或你自己的判断请标为 inferred；材料里没有提到的请标为 gap。"
+            "你上一次提交的评审没有通过证据校验：下面这些标为 direct 的证据，quote 不是材料原文的"
+            "逐字引用：\n" + listed + "\n\n"
+            "规则只有一条：能把材料原文一字不差地复制进 quote，才是 direct（你的观察和评论写在 "
+            "content 里，不要写进 quote）；复制不出来的概括、改写或判断请改标 inferred 并去掉 "
+            "quote；材料里没有提到的请标为 gap。"
         )
     if reason == RETRY_SCHEMA:
         errors = blocking_schema_errors(((details.get("schema") or {}).get("errors")) or [])
@@ -418,10 +441,11 @@ def _validation_error_message(validation: dict, reason: str) -> str:
         return "校验未通过（role_drift）：" + "; ".join(issues)
     if reason == RETRY_HALLUCINATION:
         evidence = details.get("evidence") or {}
+        # hallucination_risk 是兼容键名，含义是"direct 证据中未落地条目的占比"，不是幻觉概率。
         risk = float(evidence.get("hallucination_risk", 0.0) or 0.0)
         return (
-            f"校验未通过（hallucination）：direct 证据 {risk:.0%} 在材料中找不到出处"
-            "（阈值 30%），疑似幻觉"
+            f"校验未通过（hallucination）：direct 证据中 {risk:.0%} 的条目 quote 缺失或不是材料原文的逐字引用"
+            "（阈值 30%）"
         )
     return f"校验未通过：{reason}"
 
@@ -629,6 +653,7 @@ def _build_simulated_output(persona: dict, task_type: str) -> dict:
             {
                 "content": "模拟证据内容",
                 "inference_level": "direct",
+                "quote": "模拟证据内容",
             }
         ],
         "scores": {
@@ -1000,7 +1025,13 @@ def run_panel(
 
     base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if personas_path is None:
-        personas_path = os.path.join(base, "src", "personas", "game-core.yaml")
+        # 没指定人格包：按任务类型取登记的默认包，不再一律回落到 game-core
+        # （见 task_types.DEFAULT_PACK_BY_TASK_TYPE 的说明）。没登记的类型直接报错。
+        personas_path = default_personas_path(task_type, os.path.join(base, "src", "personas"))
+    else:
+        _mismatch = pack_mismatch_warning(task_type, personas_path)
+        if _mismatch:
+            logging.getLogger("audiencelens").warning(_mismatch)
     if presets_path is None:
         presets_path = os.path.join(base, "src", "presets", "panel-presets.yaml")
     if budget_path is None:
@@ -1782,7 +1813,8 @@ def main():
 
     src_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    personas_path = args.personas or os.path.join(src_root, "personas", "game-core.yaml")
+    # 不传 --personas 时交给 run_panel 按任务类型取默认包
+    personas_path = args.personas or None
     presets_path = args.presets or os.path.join(src_root, "presets", "panel-presets.yaml")
     rules_path = os.path.join(src_root, "config", "aggregation-rules.yaml")
     budget_path = os.path.join(src_root, "config", "budget.yaml")

@@ -90,6 +90,8 @@ interface RealPersonaNote {
   /** 兼容：部分旧数据/测试数据用 primary_stance 字段名 */
   primary_stance?: string
   evidence_top3?: string[]
+  /** evidence_top3 的结构化版本：quote = 材料原文（仅 direct，不翻译），content = 人格的解读 */
+  evidence_top3_detail?: { content: string; level: string; quote?: string }[]
   top_issues?: string[]
   continue_triggers?: string[]
   quit_triggers?: string[]
@@ -2806,12 +2808,23 @@ export default function ReportPage() {
                     <div>
                       <h4 className="text-xs text-text-muted mb-1">{t('page.report.persona_evidence.label')}</h4>
                       <ul className="space-y-0.5">
-                        {note.evidence_top3!.map((e, i) => (
-                          <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
-                            <span className="text-brand-primary mt-0.5">•</span>
-                            {e}
-                          </li>
-                        ))}
+                        {note.evidence_top3!.map((e, i) => {
+                          // 有结构化版本时先显示原文引用，再显示人格的评论；引用是材料原话，不走 t()
+                          const quote = note.evidence_top3_detail?.[i]?.quote
+                          return (
+                            <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                              <span className="text-brand-primary mt-0.5">•</span>
+                              <span className="min-w-0">
+                                {quote && (
+                                  <q className="block border-l-2 border-brand-primary pl-2 mb-0.5 italic text-text-primary">
+                                    {quote}
+                                  </q>
+                                )}
+                                {e}
+                              </span>
+                            </li>
+                          )
+                        })}
                       </ul>
                     </div>
                   )}

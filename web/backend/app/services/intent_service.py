@@ -25,16 +25,9 @@ from app.config import settings
 _SRC = _os.path.join(settings.repo_root, "src")
 if _SRC not in _sys.path:
     _sys.path.insert(0, _SRC)
-from runner.task_types import VALID_TASK_TYPES  # noqa: E402
-
-# 通用任务类型没有命中任何 PACK_KEYWORDS 时的默认人格包——
-# 不能落回 game-core，否则"评一下定价页"这种非游戏请求会被硬塞游戏向人格。
-DEFAULT_PACK_BY_TASK_TYPE = {
-    "product_feedback_review": "general-consumer",
-    "pricing_page_review": "general-consumer",
-    "onboarding_review": "general-consumer",
-    "pitch_review": "startup-panel",
-}
+# 任务类型 → 默认人格包也从引擎那份单一映射读（以前这里自己维护一份，引擎读不到，
+# 于是没传人格包的调用方在引擎里一律落回 game-core）。没有命中任何 PACK_KEYWORDS 时用它。
+from runner.task_types import DEFAULT_PACK_BY_TASK_TYPE, VALID_TASK_TYPES  # noqa: E402
 
 VALID_MODES = ["quick", "standard", "full"]
 

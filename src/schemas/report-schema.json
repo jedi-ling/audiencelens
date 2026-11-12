@@ -204,6 +204,21 @@
             "items": { "type": "string" },
             "maxItems": 3
           },
+          "evidence_top3_detail": {
+            "type": "array",
+            "maxItems": 3,
+            "description": "evidence_top3 的结构化版本（同序）：level 为推断层级；quote 为材料原文的逐字片段（仅 direct 条目有，不翻译）；content 为人格的观察/解读。",
+            "items": {
+              "type": "object",
+              "required": ["content", "level"],
+              "properties": {
+                "content": { "type": "string" },
+                "level": { "type": "string", "enum": ["direct", "inferred", "gap"] },
+                "quote": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
           "top_issues": { "type": "array", "items": { "type": "string" } },
           "continue_triggers": { "type": "array", "items": { "type": "string" } },
           "quit_triggers": { "type": "array", "items": { "type": "string" } }
